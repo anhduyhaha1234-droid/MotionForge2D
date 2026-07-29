@@ -87,7 +87,7 @@ class TestSelectionInput:
 class TestProjectData:
     def test_create_minimal(self) -> None:
         project = ProjectData(name="Test", source_video="/tmp/test.mp4")
-        assert project.version == "1.0.0"
+        assert project.version == "2.0.0"
         assert project.scenes == []
         assert project.objects == []
 
@@ -102,8 +102,12 @@ class TestProjectData:
         assert restored.video_metadata.width == 1920
 
     def test_schema_version(self, sample_project_data: dict) -> None:
+        # v1.0.0 data loads fine — version is a string field, not validated
         project = ProjectData.model_validate(sample_project_data)
         assert project.version == "1.0.0"
+        # New projects default to v2.0.0
+        new_project = ProjectData(name="New", source_video="/tmp/test.mp4")
+        assert new_project.version == "2.0.0"
 
     def test_with_tracked_object(self, sample_project_data: dict) -> None:
         data = sample_project_data.copy()
