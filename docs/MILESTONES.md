@@ -1,8 +1,14 @@
 # MotionForge 2D — Milestones
 
-## Milestone 0: Technical Discovery & Vertical Spike ⬅ CURRENT
+## Milestone 0: Technical Discovery & Vertical Spike
 
 **Goal:** Prove the end-to-end pipeline works from MP4 input to MP4 output.
+
+**Status:** `CONDITIONALLY ACCEPTED` (2026-07-29)
+
+**Reason:** Pipeline runs end-to-end but contour mask propagation fails (only 1/90 frames tracked). SAM2 backend was not tested in M0 due to missing checkpoint. See M0 review package for details.
+
+**Resolution:** Milestone 0.5 validated SAM2 backend with100% tracking on all fixtures.
 
 **Deliverables:**
 - [x] Project scaffold with all service modules
@@ -30,6 +36,30 @@
 5. All tests pass
 
 **Status:** ✅ Complete
+
+---
+
+## Milestone 0.5: Core Tracking Validation ⬅ CURRENT
+
+**Goal:** Validate SAM2 end-to-end: segmentation, propagation, compositing on real GPU.
+
+**Status:** ✅ Complete (2026-07-29)
+
+**Key results:**
+- SAM2 runs on RTX 5070 (2.7GB VRAM, 3.1 fps at 640×360)
+- All 3 fixtures:100% tracked,100% composited
+- Schema upgraded to v2.0.0 (confidence, occlusion, mask_path)
+- Occlusion limitation documented (SAM2 tracks occluder, not hidden object)
+
+**Deliverables:**
+- [x] SAM2 checkpoint downloaded and validated
+- [x] SAM2 adapter rewritten (temp dir, forward+backward propagation)
+- [x] FFmpeg PATH utility (cross-platform binary discovery)
+- [x] 3 test fixtures (synthetic, animation, occlusion)
+- [x] Tracking metrics for all fixtures
+- [x] Schema v2.0.0 with migration from v1.0.0
+- [x] .gitignore, LICENSE, pinned dependencies
+- [x] Review packages (5 documents)
 
 ---
 
