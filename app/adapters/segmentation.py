@@ -7,6 +7,9 @@ without changing the rest of the pipeline.
 from __future__ import annotations
 
 import abc
+import os
+import shutil
+import tempfile
 from pathlib import Path
 
 import cv2
@@ -62,7 +65,11 @@ class SegmentationAdapter(abc.ABC):
 
 
 class SAM2Adapter(SegmentationAdapter):
-    """SAM 2.1 based segmentation adapter."""
+    """SAM 2.1 based segmentation adapter.
+
+    Uses SAM2's video predictor for temporal mask propagation.
+    Frames are written to a temp directory since SAM2 expects a video_path.
+    """
 
     def __init__(
         self,
@@ -74,6 +81,7 @@ class SAM2Adapter(SegmentationAdapter):
         self.checkpoint = checkpoint
         self.device = device
         self._predictor = None
+        self._tmp_dir: str | None = None
 
     def _ensure_model(self) -> None:
         """Lazy-load the SAM 2 model."""
@@ -94,25 +102,40 @@ class SAM2Adapter(SegmentationAdapter):
             device=self.device,
         )
 
+    def _frames_to_dir(self, frames: list[np.ndarray]) -> str:
+        """Write frames to a temp directory for SAM2 init_state."""
+        if self._tmp_dir:
+            shutil.rmtree(self._tmp_dir, ignore_errors=True)
+        self._tmp_dir = tempfile.mkdtemp(prefix="motionforge_sam2_")
+        for i, frame in enumerate(frames):
+            path = os.path.join(self._tmp_dir, f"{i:06d}.jpg")
+            cv2.imwrite(path, frame)
+        return self._tmp_dir
+
     def segment_frame(
         self,
         frame: np.ndarray,
         selection: SelectionInput,
     ) -> np.ndarray:
-        """Generate mask for a single frame using SAM 2."""
+        """Generate mask for a single frame using SAM 2 video predictor."""
         self._ensure_model()
         assert self._predictor is not None
 
         h, w = frame.shape[:2]
 
-        # Prepare points/boxes for SAM 2
+        # Write single frame to temp dir
+        frame_dir = self._frames_to_dir([frame])
+
+        # Initialize with single frame
+        inference_state = self._predictor.init_state(video_path=frame_dir)
+
+        # Prepare prompt
         if selection.mode == SelectionMode.POINT:
             points = np.array([[selection.x, selection.y]], dtype=np.float32)
-            labels = np.array([1], dtype=np.int32)  # 1 = positive
+            labels = np.array([1], dtype=np.int32)
             box = None
         elif selection.mode == SelectionMode.BBOX:
             assert selection.width is not None and selection.height is not None
-            # SAM2 expects box as [x1, y1, x2, y2]
             box = np.array([[
                 selection.x,
                 selection.y,
@@ -124,13 +147,7 @@ class SAM2Adapter(SegmentationAdapter):
         else:
             raise ValueError(f"Unknown selection mode: {selection.mode}")
 
-        # Initialize predictor state with single image
-        inference_state = self._predictor.init_state(
-            video_path=None,
-            frame_idx=0,
-        )
-
-        # Add the prompt
+        # Run inference
         _, out_obj_ids, out_mask_logits = self._predictor.add_new_points_or_box(
             inference_state=inference_state,
             frame_idx=0,
@@ -140,15 +157,16 @@ class SAM2Adapter(SegmentationAdapter):
             box=box,
         )
 
-        # Get mask from logits
+        # Extract mask
         mask_logits = out_mask_logits[0]
         mask = (mask_logits > 0.0).cpu().numpy().squeeze()
-
-        # Convert to uint8 binary mask
         mask_uint8 = (mask * 255).astype(np.uint8)
 
-        self._predictor.reset_state(inference_state)
+        # Resize to original if needed
+        if mask_uint8.shape[:2] != (h, w):
+            mask_uint8 = cv2.resize(mask_uint8, (w, h), interpolation=cv2.INTER_NEAREST)
 
+        self._predictor.reset_state(inference_state)
         return mask_uint8
 
     def propagate_masks(
@@ -157,7 +175,11 @@ class SAM2Adapter(SegmentationAdapter):
         initial_mask: np.ndarray,
         initial_frame_idx: int,
     ) -> list[np.ndarray]:
-        """Propagate mask across frames using SAM 2 video predictor."""
+        """Propagate mask across frames using SAM 2 video predictor.
+
+        SAM2 propagates forward from the prompt frame. For backward propagation
+        (when selection is in the middle), we run two passes: forward and reverse.
+        """
         self._ensure_model()
         assert self._predictor is not None
 
@@ -167,20 +189,20 @@ class SAM2Adapter(SegmentationAdapter):
         h, w = frames[0].shape[:2]
         n_frames = len(frames)
 
-        # Initialize video state with all frames
-        inference_state = self._predictor.init_state(
-            video_path=None,
-            frame_idx=0,
-        )
+        # Write frames to temp directory
+        frame_dir = self._frames_to_dir(frames)
 
-        # Feed all frames
-        for _i, frame in enumerate(frames):
-            self._predictor.append_frame(inference_state, frame)
+        # Initialize video state
+        inference_state = self._predictor.init_state(video_path=frame_dir)
 
-        # Add mask prompt at the initial frame
+        # Add mask prompt at the initial frame — SAM2 expects 2D tensor (H, W)
+        mask_resized = initial_mask
+        if initial_mask.shape[:2] != (h, w):
+            mask_resized = cv2.resize(initial_mask, (w, h), interpolation=cv2.INTER_NEAREST)
+
         mask_tensor = torch.from_numpy(
-            (initial_mask > 127).astype(np.float32)
-        ).unsqueeze(0).unsqueeze(0)  # (1, 1, H, W)
+            (mask_resized > 127).astype(np.float32)
+        )  # (H, W) — SAM2 requires 2D
 
         _, out_obj_ids, out_mask_logits = self._predictor.add_new_mask(
             inference_state=inference_state,
@@ -189,22 +211,49 @@ class SAM2Adapter(SegmentationAdapter):
             mask=mask_tensor,
         )
 
-        # Propagate through all frames
-        masks: list[np.ndarray] = [np.zeros((h, w), dtype=np.uint8)] * n_frames
+        # Forward propagation from selection frame to end
+        masks: list[np.ndarray | None] = [None] * n_frames
 
         for frame_idx, _obj_ids, mask_logits in self._predictor.propagate_in_video(
-            inference_state
+            inference_state,
+            start_frame_idx=initial_frame_idx,
         ):
-            if frame_idx < n_frames and len(mask_logits) > 0:
+            if 0 <= frame_idx < n_frames and len(mask_logits) > 0:
                 mask = (mask_logits[0] > 0.0).cpu().numpy().squeeze()
                 masks[frame_idx] = (mask * 255).astype(np.uint8)
 
+        # Backward propagation from selection frame to start
+        if initial_frame_idx > 0:
+            for frame_idx, _obj_ids, mask_logits in self._predictor.propagate_in_video(
+                inference_state,
+                start_frame_idx=initial_frame_idx,
+                reverse=True,
+            ):
+                if 0 <= frame_idx < n_frames and len(mask_logits) > 0 and masks[frame_idx] is None:
+                    mask = (mask_logits[0] > 0.0).cpu().numpy().squeeze()
+                    masks[frame_idx] = (mask * 255).astype(np.uint8)
+
         self._predictor.reset_state(inference_state)
-        return masks
+
+        # Fill any remaining None masks with zeros
+        result: list[np.ndarray] = []
+        for _i, m in enumerate(masks):
+            if m is None:
+                result.append(np.zeros((h, w), dtype=np.uint8))
+            else:
+                # Resize if SAM2 returned different resolution
+                if m.shape[:2] != (h, w):
+                    m = cv2.resize(m, (w, h), interpolation=cv2.INTER_NEAREST)
+                result.append(m)
+
+        return result
 
     def cleanup(self) -> None:
-        """Release GPU resources."""
+        """Release GPU resources and clean temp files."""
         self._predictor = None
+        if self._tmp_dir:
+            shutil.rmtree(self._tmp_dir, ignore_errors=True)
+            self._tmp_dir = None
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
@@ -213,6 +262,7 @@ class SimpleContourAdapter(SegmentationAdapter):
     """Fallback adapter using OpenCV contour detection (no GPU required).
 
     Used for testing or when SAM 2 is not available.
+    NOTE: Template matching propagation is unreliable for moving objects.
     """
 
     def segment_frame(
@@ -225,9 +275,7 @@ class SimpleContourAdapter(SegmentationAdapter):
         mask = np.zeros((h, w), dtype=np.uint8)
 
         if selection.mode == SelectionMode.POINT:
-            # Flood fill from point
             x, y = int(selection.x), int(selection.y)
-            # Use floodFill
             flood_mask = np.zeros((h + 2, w + 2), dtype=np.uint8)
             cv2.floodFill(
                 frame, flood_mask, (x, y), 255,
@@ -256,7 +304,6 @@ class SimpleContourAdapter(SegmentationAdapter):
                     255, 0
                 ).astype(np.uint8)
             except cv2.error:
-                # Fallback: fill the bbox
                 mask[y1:y2, x1:x2] = 255
 
         return mask
@@ -267,7 +314,7 @@ class SimpleContourAdapter(SegmentationAdapter):
         initial_mask: np.ndarray,
         initial_frame_idx: int,
     ) -> list[np.ndarray]:
-        """Propagate mask using template matching (simple, not accurate)."""
+        """Propagate mask using template matching (unreliable for moving objects)."""
         if not frames:
             return []
 
@@ -275,18 +322,15 @@ class SimpleContourAdapter(SegmentationAdapter):
         masks: list[np.ndarray] = [np.zeros((h, w), dtype=np.uint8)] * len(frames)
         masks[initial_frame_idx] = initial_mask.copy()
 
-        # Get reference region from mask
         contours, _ = cv2.findContours(
             initial_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
         )
         if not contours:
             return masks
 
-        # Get centroid and template from initial frame
         moments = cv2.moments(initial_mask)
         if moments["m00"] == 0:
             return masks
-
 
         x, y, tw, th = cv2.boundingRect(max(contours, key=cv2.contourArea))
         template = frames[initial_frame_idx][y:y+th, x:x+tw]

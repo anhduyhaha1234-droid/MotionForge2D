@@ -3,26 +3,11 @@
 from __future__ import annotations
 
 import json
-import shutil
 import subprocess
 from pathlib import Path
 
 from app.schemas import VideoMetadata
-
-
-def _find_ffprobe() -> str:
-    """Locate ffprobe binary."""
-    ffprobe = shutil.which("ffprobe")
-    if ffprobe:
-        return ffprobe
-    # Common Windows install paths
-    for candidate in [
-        r"C:\Users\Admin\AppData\Local\Microsoft\WinGet\Links\ffprobe.exe",
-        r"C:\ffmpeg\bin\ffprobe.exe",
-    ]:
-        if Path(candidate).exists():
-            return candidate
-    raise FileNotFoundError("ffprobe not found. Install FFmpeg and ensure it's on PATH.")
+from app.services.ffmpeg_utils import find_ffprobe
 
 
 def probe_video(video_path: str | Path) -> VideoMetadata:
@@ -42,7 +27,7 @@ def probe_video(video_path: str | Path) -> VideoMetadata:
     if not video_path.exists():
         raise FileNotFoundError(f"Video not found: {video_path}")
 
-    ffprobe = _find_ffprobe()
+    ffprobe = find_ffprobe()
 
     cmd = [
         ffprobe,
@@ -119,7 +104,8 @@ def extract_audio(video_path: str | Path, output_path: str | Path) -> Path:
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    ffmpeg = shutil.which("ffmpeg") or "ffmpeg"
+    from app.services.ffmpeg_utils import find_ffmpeg
+    ffmpeg = find_ffmpeg()
 
     cmd = [
         ffmpeg, "-y",

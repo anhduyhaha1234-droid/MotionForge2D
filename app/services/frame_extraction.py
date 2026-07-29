@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import shutil
 import subprocess
 from pathlib import Path
 
 from app.schemas import SceneInfo
+from app.services.ffmpeg_utils import find_ffmpeg
 
 
 def extract_frames(
@@ -33,7 +33,7 @@ def extract_frames(
     if not video_path.exists():
         raise FileNotFoundError(f"Video not found: {video_path}")
 
-    ffmpeg = shutil.which("ffmpeg") or "ffmpeg"
+    ffmpeg = find_ffmpeg()
 
     # Extract frames using ffmpeg select filter
     output_pattern = str(output_dir / f"frame_%06d.{format}")
@@ -75,7 +75,7 @@ def extract_single_frame(
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    ffmpeg = shutil.which("ffmpeg") or "ffmpeg"
+    ffmpeg = find_ffmpeg()
 
     cmd = [
         ffmpeg, "-y",

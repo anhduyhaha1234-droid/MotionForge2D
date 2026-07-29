@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import shutil
 import subprocess
 from pathlib import Path
 
 from app.schemas import VideoMetadata
+from app.services.ffmpeg_utils import find_ffmpeg
 
 
 def render_video(
@@ -32,7 +32,7 @@ def render_video(
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    ffmpeg = shutil.which("ffmpeg") or "ffmpeg"
+    ffmpeg = find_ffmpeg()
 
     frame_input = str(frames_dir / frame_pattern)
 
@@ -96,7 +96,7 @@ def render_scene_video(
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    ffmpeg = shutil.which("ffmpeg") or "ffmpeg"
+    ffmpeg = find_ffmpeg()
 
     # Create concat list file
     concat_file = output_path.parent / "_concat_list.txt"

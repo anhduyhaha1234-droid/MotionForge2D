@@ -23,7 +23,7 @@ class AppConfig:
     )))
 
     # SAM 2.1
-    sam2_model_cfg: str = "sam2.1_hiera_l"
+    sam2_model_cfg: str = "configs/sam2.1/sam2.1_hiera_l.yaml"
     sam2_checkpoint: str = ""  # Set after download
 
     # Server
