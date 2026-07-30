@@ -31,6 +31,65 @@ class JobStatus(str, Enum):
     FAILED = "failed"
 
 
+class JobState(str, Enum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    CANCELLING = "cancelling"
+    CANCELLED = "cancelled"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+# ─── Replacement Config (from TRANSFORM_SPEC.md) ────────────────────────────
+
+class FitMode(str, Enum):
+    CONTAIN = "contain"
+    COVER = "cover"
+    STRETCH = "stretch"
+
+
+class ReplacementMode(str, Enum):
+    NONE = "none"
+    STATIC_ASSET = "static_asset"
+    FRAME_SEQUENCE = "frame_sequence"
+    KEYFRAME_ASSETS = "keyframe_assets"
+
+
+class Point2D(BaseModel):
+    x: float = 0.0
+    y: float = 0.0
+
+
+class ReplacementConfig(BaseModel):
+    """Replacement transform settings matching docs/TRANSFORM_SPEC.md."""
+    mode: ReplacementMode = ReplacementMode.STATIC_ASSET
+    asset_path: str = Field(default="", alias="assetPath")
+    anchor: Point2D = Field(default_factory=Point2D)
+    offset: Point2D = Field(default_factory=Point2D)
+    scale: float = 1.0
+    rotation_offset_deg: float = Field(default=0.0, alias="rotationOffsetDeg")
+    opacity: float = 1.0
+    fit_mode: FitMode = Field(default=FitMode.CONTAIN, alias="fitMode")
+
+    model_config = {"populate_by_name": True}
+
+
+# ─── Object Crop Manifest ────────────────────────────────────────────────────
+
+class ObjectCrop(BaseModel):
+    """A single crop image for a tracked object at a frame."""
+    frame_index: int
+    crop_path: str
+
+
+class GalleryManifest(BaseModel):
+    """Manifest listing all crop images for a tracked object."""
+    object_id: str
+    project_id: str
+    thumbnail_path: str = ""
+    crops: list[ObjectCrop] = Field(default_factory=list)
+
+
 # ─── Video Metadata ──────────────────────────────────────────────────────────
 
 class VideoMetadata(BaseModel):
@@ -144,6 +203,7 @@ class TrackedObject(BaseModel):
     scene_id: int
     replacement_image: str | None = None  # Path to replacement PNG
     motion: SceneMotion | None = None
+    replacement_config: ReplacementConfig | None = None
 
 
 # ─── Project ──────────────────────────────────────────────────────────────────
@@ -169,11 +229,12 @@ class ProjectData(BaseModel):
 class JobInfo(BaseModel):
     """Status of a background processing job."""
     job_id: str
-    status: JobStatus = JobStatus.PENDING
+    state: JobState = JobState.QUEUED
     progress: float = 0.0
     message: str = ""
     result_path: str | None = None
     error: str | None = None
+    job_type: str = ""
 
 
 # ─── Migration ────────────────────────────────────────────────────────────────
@@ -199,5 +260,6 @@ def migrate_v1_to_v2(data: dict) -> dict:
                 frame.setdefault("occluded", False)
                 frame.setdefault("needs_review", False)
                 frame.setdefault("mask_path", None)
+        obj.setdefault("replacement_config", None)
 
     return data
