@@ -29,7 +29,7 @@ export function ScreenC() {
     api.getGallery(projectId, objectId).then(setGallery).catch(console.error);
   }, [projectId, objectId]);
 
-  const representativeFrames = gallery?.representative_frames ?? [];
+  const representativeFrames = gallery?.crops ?? [];
 
   return (
     <div className="flex flex-col h-screen">

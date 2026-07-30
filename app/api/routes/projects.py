@@ -230,7 +230,18 @@ def propagate_object(project_id: str, object_id: str) -> dict:
 
     mask_path = proj_dir / "objects" / object_id / "masks" / "initial_mask.png"
     if not mask_path.exists():
-        raise HTTPException(400, "No initial mask. Create object with mask_data first.")
+        # Fallback: look for the most recent preview mask in debug/
+        debug_dir = proj_dir / "debug"
+        preview_masks = sorted(debug_dir.glob("preview_mask_*.png"), reverse=True)
+        if preview_masks:
+            mask_dir = proj_dir / "objects" / object_id / "masks"
+            mask_dir.mkdir(parents=True, exist_ok=True)
+            import shutil
+            shutil.copy2(str(preview_masks[0]), str(mask_path))
+        else:
+            raise HTTPException(
+                400, "No initial mask. Preview a mask or create with mask_data."
+            )
 
     scene_id = obj.scene_id
     frames_dir = proj_dir / "frames" / f"scene_{scene_id}"
@@ -257,7 +268,7 @@ def propagate_object(project_id: str, object_id: str) -> dict:
 
         masks = seg_svc.propagate_masks(
             frame_paths, initial_mask, list_idx,
-            backend="contour", progress_cb=seg_progress,
+            backend="sam2", progress_cb=seg_progress,
             is_cancelled=is_cancelled,
         )
 
@@ -336,14 +347,22 @@ async def upload_replacement(
     proj_dir = pwf._project_dir(project_id)
     obj_dir = proj_dir / "objects" / object_id
     obj_dir.mkdir(parents=True, exist_ok=True)
-    dest = obj_dir / "replacement.png"
 
-    with open(dest, "wb") as f:
-        shutil.copyfileobj(file.file, f)
+    # Write to temp file first, then let service copy to final location
+    import tempfile
+    from pathlib import Path
+    suffix = Path(file.filename or "replacement.png").suffix or ".png"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        shutil.copyfileobj(file.file, tmp)
+        tmp_path = Path(tmp.name)
 
-    rep_svc = get_replacement_service()
-    rel_path = rep_svc.upload_replacement(project_id, object_id, dest)
-    return {"status": "ok", "path": rel_path}
+    try:
+        rep_svc = get_replacement_service()
+        rel_path = rep_svc.upload_replacement(project_id, object_id, tmp_path)
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+    return {"status": "ok", "asset_path": rel_path}
 
 
 @router.patch("/{project_id}/objects/{object_id}/replacement-settings")

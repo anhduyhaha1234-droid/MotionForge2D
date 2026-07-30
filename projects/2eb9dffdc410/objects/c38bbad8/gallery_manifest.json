@@ -1,0 +1,87 @@
+{
+  "object_id": "c38bbad8",
+  "project_id": "2eb9dffdc410",
+  "thumbnail_path": "objects/c38bbad8/thumbnail.png",
+  "crops": [
+    {
+      "frame_index": 0,
+      "crop_path": "objects/c38bbad8/crops/frame_000000.png"
+    },
+    {
+      "frame_index": 9,
+      "crop_path": "objects/c38bbad8/crops/frame_000009.png"
+    },
+    {
+      "frame_index": 18,
+      "crop_path": "objects/c38bbad8/crops/frame_000018.png"
+    },
+    {
+      "frame_index": 27,
+      "crop_path": "objects/c38bbad8/crops/frame_000027.png"
+    },
+    {
+      "frame_index": 36,
+      "crop_path": "objects/c38bbad8/crops/frame_000036.png"
+    },
+    {
+      "frame_index": 45,
+      "crop_path": "objects/c38bbad8/crops/frame_000045.png"
+    },
+    {
+      "frame_index": 54,
+      "crop_path": "objects/c38bbad8/crops/frame_000054.png"
+    },
+    {
+      "frame_index": 63,
+      "crop_path": "objects/c38bbad8/crops/frame_000063.png"
+    },
+    {
+      "frame_index": 72,
+      "crop_path": "objects/c38bbad8/crops/frame_000072.png"
+    },
+    {
+      "frame_index": 81,
+      "crop_path": "objects/c38bbad8/crops/frame_000081.png"
+    },
+    {
+      "frame_index": 90,
+      "crop_path": "objects/c38bbad8/crops/frame_000090.png"
+    },
+    {
+      "frame_index": 99,
+      "crop_path": "objects/c38bbad8/crops/frame_000099.png"
+    },
+    {
+      "frame_index": 108,
+      "crop_path": "objects/c38bbad8/crops/frame_000108.png"
+    },
+    {
+      "frame_index": 117,
+      "crop_path": "objects/c38bbad8/crops/frame_000117.png"
+    },
+    {
+      "frame_index": 126,
+      "crop_path": "objects/c38bbad8/crops/frame_000126.png"
+    },
+    {
+      "frame_index": 135,
+      "crop_path": "objects/c38bbad8/crops/frame_000135.png"
+    },
+    {
+      "frame_index": 144,
+      "crop_path": "objects/c38bbad8/crops/frame_000144.png"
+    },
+    {
+      "frame_index": 153,
+      "crop_path": "objects/c38bbad8/crops/frame_000153.png"
+    },
+    {
+      "frame_index": 162,
+      "crop_path": "objects/c38bbad8/crops/frame_000162.png"
+    },
+    {
+      "frame_index": 179,
+      "crop_path": "objects/c38bbad8/crops/frame_000179.png"
+    }
+  ]
+}

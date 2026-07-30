@@ -137,7 +137,9 @@ export interface GalleryFrame {
 
 export interface GalleryManifest {
   object_id: string;
-  representative_frames: GalleryFrame[];
+  project_id: string;
+  thumbnail_path: string;
+  crops: GalleryFrame[];
 }
 
 export interface MaskPreviewRequest {
