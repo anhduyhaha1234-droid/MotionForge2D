@@ -48,6 +48,12 @@ class FitMode(str, Enum):
     STRETCH = "stretch"
 
 
+class ClipMode(str, Enum):
+    ASSET_ALPHA = "asset_alpha"
+    ORIGINAL_MASK = "original_mask"
+    INTERSECTION = "intersection"
+
+
 class ReplacementMode(str, Enum):
     NONE = "none"
     STATIC_ASSET = "static_asset"
@@ -70,6 +76,7 @@ class ReplacementConfig(BaseModel):
     rotation_offset_deg: float = Field(default=0.0, alias="rotationOffsetDeg")
     opacity: float = 1.0
     fit_mode: FitMode = Field(default=FitMode.CONTAIN, alias="fitMode")
+    clip_mode: ClipMode = Field(default=ClipMode.ASSET_ALPHA, alias="clipMode")
 
     model_config = {"populate_by_name": True}
 

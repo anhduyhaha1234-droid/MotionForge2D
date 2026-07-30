@@ -55,6 +55,7 @@ Both must produce identical positioning.
 | `rotationOffsetDeg` | float | -180–180 | degrees | Additional rotation on top of tracked rotation |
 | `opacity` | float | 0.0–1.0 | multiplier | Alpha multiplier for replacement |
 | `fitMode` | enum | — | — | `contain`, `cover`, `stretch` |
+| `clipMode` | enum | — | — | `asset_alpha`, `original_mask`, `intersection` |
 
 ---
 
@@ -128,10 +129,80 @@ center_y = pos_y + final_h / 2
 
 Rotate the asset around its center by `total_rotation` degrees.
 
-### Step 7: Alpha Composite
+### Step 7: Clip Mode
+
+The `clipMode` determines how the replacement image's alpha channel interacts with the original object's mask.
 
 ```
-alpha = replacement.opacity * mask_at_pixel
+clipMode: "asset_alpha" | "original_mask" | "intersection"
+```
+
+#### asset_alpha (default)
+
+Replacement is drawn using only its own PNG alpha channel. Not constrained by the original object's silhouette. Best when the replacement has a different shape than the original.
+
+```
+alpha_at_pixel = replacement.opacity * replacement.alpha[x, y]
+```
+
+#### original_mask
+
+Replacement is clipped to the original object's mask shape. The replacement PNG's alpha is ignored; only the tracked mask determines where the replacement appears. Best when you want to preserve the original silhouette exactly.
+
+```
+alpha_at_pixel = replacement.opacity * original_mask[x, y]
+```
+
+#### intersection
+
+Replacement is clipped to the intersection of its own alpha AND the original mask. Both must agree that a pixel is visible. Best when you want the replacement shape to conform partially to the original.
+
+```
+alpha_at_pixel = replacement.opacity * min(replacement.alpha[x, y], original_mask[x, y])
+```
+
+**Frontend and backend must use the same clip mode computation.** The frontend applies clip mode via Konva globalCompositeOperation or canvas clipping; the backend applies it via numpy mask operations.
+
+### Clip Mode Implementation Reference
+
+#### Frontend (Konva / Canvas 2D)
+
+The frontend renders clip modes by layering the replacement image and the mask:
+
+| clipMode | Technique |
+|----------|-----------|
+| `asset_alpha` | Draw replacement normally (`source-over`). The PNG's own alpha channel controls transparency. |
+| `original_mask` | First draw the mask to an offscreen canvas, then draw the replacement with `destination-in` composite. Only pixels inside the mask survive. |
+| `intersection` | First draw the replacement's alpha to an offscreen canvas, then draw the mask with `source-in`. Only pixels where both are opaque survive. |
+
+The resulting clipped image is then composited onto the frame with `source-over` at the computed opacity.
+
+#### Backend (OpenCV / NumPy)
+
+```python
+if clip_mode == "asset_alpha":
+    alpha = replacement_alpha * opacity
+elif clip_mode == "original_mask":
+    alpha = original_mask * opacity
+elif clip_mode == "intersection":
+    alpha = np.minimum(replacement_alpha, original_mask) * opacity
+
+output = background * (1 - alpha) + foreground * alpha
+```
+
+### Clip Mode Agreement Contract
+
+Both frontend and backend **must** produce visually identical results given the same inputs. To ensure this:
+
+1. The clip mode value is stored in `ReplacementConfig.clip_mode` and transmitted to both sides.
+2. The frontend preview uses the same clip math as the backend render, applied via Canvas 2D compositing operations.
+3. The backend validates clip mode before rendering and rejects unknown values.
+4. Test fixtures must verify that frontend canvas output (exported as PNG) matches backend render output within a tolerance of ≤2% per-pixel MSE.
+
+### Step 8: Alpha Composite
+
+```
+alpha = alpha_at_pixel (from Step 7)
 output = background * (1 - alpha) + foreground * alpha
 ```
 

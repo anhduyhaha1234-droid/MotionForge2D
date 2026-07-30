@@ -80,6 +80,8 @@ export interface FrameMotion {
   mask_path: string | null;
 }
 
+export type ClipMode = "asset_alpha" | "original_mask" | "intersection";
+
 export interface ReplacementConfig {
   mode: "none" | "static_asset";
   asset_path: string | null;
@@ -89,6 +91,7 @@ export interface ReplacementConfig {
   rotation_offset_deg: number;
   opacity: number;
   fit_mode: "contain" | "cover" | "stretch";
+  clip_mode: ClipMode;
 }
 
 export interface TrackedObject {
@@ -265,4 +268,14 @@ export const api = {
     apiFetch<{ ok: boolean }>(`/api/jobs/${jobId}/cancel`, {
       method: "POST",
     }),
+
+  // Image URLs (direct links, no fetch)
+  getMaskImageUrl: (projectId: string, objectId: string, frameIndex: number) =>
+    `${API_BASE}/api/projects/${projectId}/objects/${objectId}/masks/${frameIndex}`,
+
+  getCropImageUrl: (projectId: string, objectId: string, frameIndex: number) =>
+    `${API_BASE}/api/projects/${projectId}/objects/${objectId}/crops/${frameIndex}`,
+
+  getReplacementImageUrl: (projectId: string, objectId: string) =>
+    `${API_BASE}/api/projects/${projectId}/objects/${objectId}/replacement-image`,
 };

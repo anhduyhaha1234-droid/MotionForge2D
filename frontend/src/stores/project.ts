@@ -12,9 +12,12 @@ import type {
   ReplacementConfig,
   JobInfo,
   GalleryManifest,
+  FrameMotion,
 } from "@/lib/api";
 
 type Screen = "start" | "selection" | "review" | "replacement" | "render";
+
+type PreviewMode = "original" | "mask" | "result" | "comparison";
 
 interface ProjectState {
   // Project
@@ -34,6 +37,10 @@ interface ProjectState {
   // Replacement
   replacement: ReplacementConfig;
 
+  // Preview
+  previewMode: PreviewMode;
+  frameMotion: FrameMotion | null;
+
   // Jobs
   activeJobs: Record<string, JobInfo>;
 
@@ -48,6 +55,8 @@ interface ProjectState {
   setGallery: (g: GalleryManifest | null) => void;
   setReplacement: (r: Partial<ReplacementConfig>) => void;
   resetReplacement: () => void;
+  setPreviewMode: (mode: PreviewMode) => void;
+  setFrameMotion: (motion: FrameMotion | null) => void;
   updateJob: (job: JobInfo) => void;
   removeJob: (id: string) => void;
 }
@@ -61,6 +70,7 @@ const DEFAULT_REPLACEMENT: ReplacementConfig = {
   rotation_offset_deg: 0,
   opacity: 1.0,
   fit_mode: "contain",
+  clip_mode: "asset_alpha",
 };
 
 export const useProjectStore = create<ProjectState>((set) => ({
@@ -73,6 +83,8 @@ export const useProjectStore = create<ProjectState>((set) => ({
   activeObject: null,
   gallery: null,
   replacement: { ...DEFAULT_REPLACEMENT },
+  previewMode: "result",
+  frameMotion: null,
   activeJobs: {},
 
   setProjectId: (id) => set({ projectId: id }),
@@ -86,6 +98,8 @@ export const useProjectStore = create<ProjectState>((set) => ({
   setReplacement: (r) =>
     set((s) => ({ replacement: { ...s.replacement, ...r } })),
   resetReplacement: () => set({ replacement: { ...DEFAULT_REPLACEMENT } }),
+  setPreviewMode: (mode) => set({ previewMode: mode }),
+  setFrameMotion: (motion) => set({ frameMotion: motion }),
   updateJob: (job) =>
     set((s) => ({ activeJobs: { ...s.activeJobs, [job.job_id]: job } })),
   removeJob: (id) =>
