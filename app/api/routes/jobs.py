@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 
 from app.api.deps import get_job_service
+from app.api.helpers import job_response
 
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
@@ -16,7 +17,7 @@ def get_job_status(job_id: str) -> dict:
     info = job_svc.get_job(job_id)
     if info is None:
         raise HTTPException(404, "Job not found")
-    return info.model_dump()
+    return job_response(info)
 
 
 @router.post("/{job_id}/cancel")

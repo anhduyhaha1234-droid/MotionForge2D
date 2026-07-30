@@ -40,7 +40,7 @@ def project_with_object(client: TestClient) -> tuple[str, str]:
     for _ in range(60):
         time.sleep(0.5)
         r = client.get(f"/api/jobs/{jid}")
-        if r.json().get("state") in ("completed", "failed"):
+        if r.json().get("status") in ("completed", "failed"):
             break
 
     # Preview mask

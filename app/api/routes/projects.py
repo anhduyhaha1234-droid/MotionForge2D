@@ -18,6 +18,7 @@ from app.api.deps import (
     get_replacement_service,
     get_segmentation_service,
 )
+from app.api.helpers import job_response
 from app.schemas import (
     ObjectKind,
     ProjectData,
@@ -105,7 +106,7 @@ def trigger_ingest(project_id: str) -> dict:
         return svc.ingest(project_id, progress_cb, is_cancelled)
 
     info = job_svc.create_job("ingest", worker)
-    return info.model_dump()
+    return job_response(info)
 
 
 @router.get("/{project_id}")
@@ -303,7 +304,7 @@ def propagate_object(project_id: str, object_id: str) -> dict:
         return str(proj_dir / "objects" / object_id)
 
     info = job_svc.create_job("propagate", worker)
-    return info.model_dump()
+    return job_response(info)
 
 
 @router.get("/{project_id}/objects/{object_id}")
@@ -408,7 +409,7 @@ def render_preview(project_id: str, object_id: str = "") -> dict:
         )
 
     info = job_svc.create_job("preview", worker)
-    return info.model_dump()
+    return job_response(info)
 
 
 @router.post("/{project_id}/render")
@@ -439,4 +440,4 @@ def render_final(project_id: str, object_id: str = "") -> dict:
         )
 
     info = job_svc.create_job("render", worker)
-    return info.model_dump()
+    return job_response(info)

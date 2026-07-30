@@ -150,7 +150,7 @@ class TestIngest:
         assert resp.status_code == 200
         data = resp.json()
         assert "job_id" in data
-        assert data["state"] in ("queued", "running", "completed", "failed")
+        assert data["status"] in ("queued", "running", "completed", "failed")
 
     def test_ingest_missing_project(self, client: TestClient) -> None:
         resp = client.post("/api/projects/nonexistent/ingest")
@@ -409,7 +409,7 @@ class TestJobStatus:
         assert resp.status_code == 200
         data = resp.json()
         assert data["job_id"] == info.job_id
-        assert data["state"] in ("queued", "running", "completed")
+        assert data["status"] in ("queued", "running", "completed")
 
     def test_job_not_found(self, client: TestClient) -> None:
         resp = client.get("/api/jobs/nonexistent")
