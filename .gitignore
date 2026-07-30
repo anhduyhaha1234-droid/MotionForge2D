@@ -30,6 +30,7 @@ htmlcov/
 # Output (generated artifacts)
 output/
 output_m05/
+projects/
 
 # Model checkpoints (large binaries)
 models_checkpoints/*.pt
