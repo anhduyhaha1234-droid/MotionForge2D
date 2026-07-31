@@ -57,6 +57,25 @@ class ProjectService:
         self.data.scenes = scenes
         self.save()
 
+    def set_scene_details(self, scene_details: list) -> None:
+        """Update scene details list in the project."""
+        self.data.scene_details = scene_details
+        # Also update scenes list for backward compatibility
+        from app.schemas import SceneInfo
+        self.data.scenes = [
+            SceneInfo(
+                scene_id=sd.scene_id,
+                start_frame=sd.start_frame,
+                end_frame=sd.end_frame,
+                start_time_sec=sd.start_time_sec,
+                end_time_sec=sd.end_time_sec,
+                duration_sec=sd.duration_sec,
+                frame_count=sd.frame_count,
+            )
+            for sd in scene_details
+        ]
+        self.save()
+
     def add_tracked_object(self, obj: TrackedObject) -> None:
         """Add a tracked object to the project."""
         self.data.objects.append(obj)

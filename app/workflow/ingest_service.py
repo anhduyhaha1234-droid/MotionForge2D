@@ -1,20 +1,24 @@
-"""Ingest service — probe video, detect scenes, extract frames."""
+"""Ingest service — probe video, detect scenes, slice scene clips."""
 
 from __future__ import annotations
 
-import contextlib
 from collections.abc import Callable
 from pathlib import Path
 
 from app.config import AppConfig
-from app.services.frame_extraction import extract_frames
-from app.services.scene_detection import detect_scenes
-from app.services.video_probe import extract_audio, probe_video
+from app.services.video_probe import probe_video
 from app.workflow.project_workflow import ProjectWorkflowService
+from app.workflow.scene_chunking_service import SceneChunkingService
 
 
 class IngestService:
-    """Orchestrates video ingest: probe + scene detect + frame extract."""
+    """Orchestrates video ingest: probe + scene detect + slice clips.
+
+    Architecture: On-Demand Video Chunking
+    - Ingest only: probe metadata, detect scene boundaries, slice scene MP4s
+    - Frame extraction happens on-demand when user opens a scene
+    - This keeps ingest fast (~3-5s) regardless of video length
+    """
 
     def __init__(self, config: AppConfig, project_wf: ProjectWorkflowService) -> None:
         self._config = config
@@ -26,7 +30,14 @@ class IngestService:
         progress_cb: Callable[[float, str], None] | None = None,
         is_cancelled: Callable[[], bool] | None = None,
     ) -> str:
-        """Run full ingest pipeline for a project.
+        """Run fast ingest pipeline for a project.
+
+        Pipeline:
+        1. Probe video metadata (~0.5s)
+        2. Detect scene boundaries with PySceneDetect (~1-3s)
+        3. Slice video into scene clips with FFmpeg stream copy (~1-2s)
+        4. Extract per-scene audio (~1s)
+        5. Done! No frame extraction at this stage.
 
         Args:
             project_id: Target project ID.
@@ -66,28 +77,23 @@ class IngestService:
 
         # Step 2: Detect scenes
         _pct(30, "Detecting scenes")
-        scenes = detect_scenes(video_path)
-        svc.set_scenes(scenes)
+        chunk_svc = SceneChunkingService(self._config)
+        scene_details = chunk_svc.chunk_video(
+            video_path, proj_dir / "audio", threshold=27.0,
+        )
+        svc.set_scene_details(scene_details)
 
         if _cancelled():
             return str(proj_dir)
 
-        # Step 3: Extract frames
-        total_scenes = len(scenes)
-        for i, scene in enumerate(scenes):
-            if _cancelled():
-                return str(proj_dir)
-            pct = 50 + 40 * (i / max(total_scenes, 1))
-            _pct(pct, f"Extracting frames for scene {i}")
-            frames_dir = proj_dir / "frames" / f"scene_{scene.scene_id}"
-            extract_frames(video_path, frames_dir, scene)
+        # Step 3: Slice video into scene clips (stream copy, no re-encode)
+        _pct(60, "Slicing scene videos")
+        scenes_dir = proj_dir / "scenes"
+        chunk_svc.slice_scene_videos(video_path, scene_details, scenes_dir)
 
-        # Step 4: Extract audio (if present)
-        if metadata.has_audio:
-            _pct(90, "Extracting audio")
-            audio_dir = proj_dir / "audio"
-            with contextlib.suppress(Exception):
-                extract_audio(video_path, audio_dir / "original_audio.aac")
+        if _cancelled():
+            return str(proj_dir)
 
+        # Step 4: Done — no frame extraction at ingest time
         _pct(100, "Ingest complete")
         return str(proj_dir)

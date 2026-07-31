@@ -377,6 +377,12 @@ export const api = {
       { method: "POST" },
     ),
 
+  extractSceneFrames: (projectId: string, sceneId: number, format = "jpg") =>
+    apiFetch<{ scene_id: number; frame_count: number; format: string }>(
+      `/api/projects/${projectId}/scenes/${sceneId}/extract-frames?format=${format}`,
+      { method: "POST" },
+    ),
+
   // ─── Bulk Mapping ────────────────────────────────────────────────────
 
   applyBulkMapping: (

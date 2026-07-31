@@ -839,6 +839,42 @@ def get_scene_audio(project_id: str, scene_id: int) -> FileResponse:
     return FileResponse(str(audio_path), media_type="audio/aac")
 
 
+@router.post("/{project_id}/scenes/{scene_id}/extract-frames")
+def extract_scene_frames(
+    project_id: str, scene_id: int, format: str = "jpg",
+) -> dict:
+    """Extract frames from a scene clip on-demand.
+
+    Only called when user opens/selects a scene. Much faster than
+    extracting all frames at ingest time.
+    """
+    from app.workflow.scene_chunking_service import SceneChunkingService
+
+    pwf = get_project_workflow()
+    config = get_config()
+    try:
+        pwf.get_project(project_id)
+    except FileNotFoundError as err:
+        raise HTTPException(404, "Project not found") from err
+
+    proj_dir = pwf._project_dir(project_id)
+    clip_path = proj_dir / "scenes" / f"scene_{scene_id:03d}.mp4"
+
+    if not clip_path.exists():
+        raise HTTPException(404, f"Scene clip {scene_id} not found")
+
+    frames_dir = proj_dir / "frames" / f"scene_{scene_id}"
+    svc = SceneChunkingService(config)
+    frames = svc.extract_frames_on_demand(clip_path, frames_dir, format=format)
+
+    return {
+        "scene_id": scene_id,
+        "frame_count": len(frames),
+        "format": format,
+        "frames_dir": str(frames_dir),
+    }
+
+
 @router.post("/{project_id}/scenes/stitch")
 def stitch_scenes(project_id: str) -> dict:
     """Stitch all approved scenes into final video."""
