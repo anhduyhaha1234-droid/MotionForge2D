@@ -8,10 +8,31 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from app.schemas import ProjectData, TrackedObject
+from app.schemas import ProjectData, ReplacementMode, TrackedObject
 from app.services.compositing import composite_object, load_replacement_image
 from app.services.render import render_video
 from app.services.video_probe import probe_video
+
+
+def _get_sequence_frame(
+    sequence_dir: Path,
+    frame_index: int,
+    total_frames: int,
+) -> np.ndarray | None:
+    """Load the appropriate frame from a PNG sequence.
+
+    Frames are sorted alphabetically and cycled through.
+    """
+    if not sequence_dir.exists():
+        return None
+
+    png_files = sorted(sequence_dir.glob("*.png"))
+    if not png_files:
+        return None
+
+    # Cycle through sequence
+    seq_idx = frame_index % len(png_files)
+    return cv2.imread(str(png_files[seq_idx]), cv2.IMREAD_UNCHANGED)
 
 
 class PreviewRenderService:
@@ -65,7 +86,12 @@ class PreviewRenderService:
         _pct(10, "Loading frames and masks")
 
         replacement_img = None
-        if obj.replacement_image:
+        use_sequence = False
+        rc = obj.replacement_config
+        if rc and rc.mode == ReplacementMode.FRAME_SEQUENCE and rc.frame_sequence_dir:
+            use_sequence = True
+            seq_dir = Path(rc.frame_sequence_dir)
+        elif obj.replacement_image:
             rep_path = project_dir / obj.replacement_image
             if rep_path.exists():
                 ref_bbox = motion.reference_bbox
@@ -101,6 +127,24 @@ class PreviewRenderService:
             )
 
             if (
+                use_sequence
+                and fm is not None
+                and fm.visibility
+            ):
+                h, w = frame.shape[:2]
+                mask = np.zeros((h, w), dtype=np.uint8)
+                bw = int(fm.bbox.width)
+                bh = int(fm.bbox.height)
+                if bw > 0 and bh > 0:
+                    bx = int(fm.bbox.x)
+                    by = int(fm.bbox.y)
+                    mask[by:by + bh, bx:bx + bw] = 255
+                seq_frame = _get_sequence_frame(seq_dir, i, len(frame_paths))
+                if seq_frame is not None:
+                    result = composite_object(frame, mask, seq_frame, fm)
+                else:
+                    result = frame
+            elif (
                 replacement_img is not None
                 and fm is not None
                 and fm.visibility

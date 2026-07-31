@@ -96,7 +96,7 @@ export interface FrameMotion {
 export type ClipMode = "asset_alpha" | "original_mask" | "intersection";
 
 export interface ReplacementConfig {
-  mode: "none" | "static_asset";
+  mode: "none" | "static_asset" | "frame_sequence";
   asset_path: string | null;
   anchor: { x: number; y: number };
   offset: { x: number; y: number };
@@ -105,6 +105,8 @@ export interface ReplacementConfig {
   opacity: number;
   fit_mode: "contain" | "cover" | "stretch";
   clip_mode: ClipMode;
+  frameSequenceDir?: string;
+  frameSequenceFps?: number;
 }
 
 export interface TrackedObject {
@@ -326,4 +328,33 @@ export const api = {
       `/api/projects/${projectId}/scenes/stitch`,
       { method: "POST" },
     ),
+
+  // ─── Bulk Mapping ────────────────────────────────────────────────────
+
+  applyBulkMapping: (
+    projectId: string,
+    objectId: string,
+    sceneIds: number[],
+  ) =>
+    apiFetch<{ applied_to: string[]; scene_ids: number[] }>(
+      `/api/projects/${projectId}/objects/${objectId}/apply-bulk`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ object_id: objectId, scene_ids: sceneIds }),
+      },
+    ),
+
+  // ─── Inpainting ──────────────────────────────────────────────────────
+
+  inpaintScene: (projectId: string, sceneId: number) =>
+    apiFetch<{ ok: boolean }>(
+      `/api/projects/${projectId}/scenes/${sceneId}/inpaint`,
+      { method: "POST" },
+    ),
+
+  // ─── Sequence Frame URL ─────────────────────────────────────────────
+
+  getSequenceFrameUrl: (projectId: string, objectId: string, index: number) =>
+    `${API_BASE}/api/projects/${projectId}/objects/${objectId}/sequence-frame?index=${index}`,
 };

@@ -10,7 +10,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type ClipMode, type FrameMotion } from "@/lib/api";
+import { api, type ClipMode, type FrameMotion, type ReplacementConfig } from "@/lib/api";
 import { useProjectStore } from "@/stores/project";
 import { CompositeCanvas } from "@/components/CompositeCanvas";
 import { SceneSelector } from "./SceneSelector";
@@ -35,6 +35,12 @@ const CLIP_MODES: { value: ClipMode; label: string; desc: string }[] = [
   { value: "asset_alpha", label: "Alpha asset", desc: "Dùng alpha của PNG thay thế" },
   { value: "original_mask", label: "Mask gốc", desc: "Cắt theo mask object gốc" },
   { value: "intersection", label: "Giao", desc: "Giao của alpha + mask gốc" },
+];
+
+const REPLACEMENT_MODES: { value: ReplacementConfig["mode"]; label: string }[] = [
+  { value: "none", label: "Không thay thế" },
+  { value: "static_asset", label: "Ảnh tĩnh (PNG)" },
+  { value: "frame_sequence", label: "Chuỗi ảnh (Frame Sequence)" },
 ];
 
 /* ── Slider helper ─────────────────────────────────────────────────────── */
@@ -175,9 +181,32 @@ export function ScreenD() {
         opacity: replacement.opacity,
         fit_mode: replacement.fit_mode,
         clip_mode: replacement.clip_mode,
+        frameSequenceDir: replacement.frameSequenceDir,
+        frameSequenceFps: replacement.frameSequenceFps,
       });
     },
   });
+
+  /* ── Bulk mapping ─────────────────────────────────────────────────────── */
+
+  const [bulkSceneIds] = useState<number[]>([]);
+
+  const bulkMut = useMutation({
+    mutationFn: () => {
+      if (!projectId || !objectId) return Promise.resolve({ applied_to: [] as string[], scene_ids: [] as number[] });
+      return api.applyBulkMapping(projectId, objectId, bulkSceneIds);
+    },
+    onSuccess: (data) => {
+      alert(`Đã áp dụng cho ${data.applied_to.length} nhân vật trong ${data.scene_ids.length} cảnh`);
+    },
+  });
+
+  /* ── Sequence frame URL ──────────────────────────────────────────────── */
+
+  const sequenceFrameUrl =
+    projectId && objectId && replacement.mode === "frame_sequence"
+      ? api.getSequenceFrameUrl(projectId, objectId, currentFrame)
+      : null;
 
   /* ── Frame slider helper ────────────────────────────────────────────── */
 
@@ -269,33 +298,84 @@ export function ScreenD() {
             <h3 className="text-xs text-gray-500 uppercase mb-2">
               Ảnh thay thế
             </h3>
-            <input
-              type="file"
-              accept=".png,image/png"
-              onChange={handleFileChange}
-              data-testid="replacement-upload"
-              className="w-full text-xs text-gray-400 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-blue-600 file:text-white file:text-xs"
-            />
-            {uploadMut.isPending && (
-              <p className="text-xs text-yellow-400 mt-1">Đang tải lên...</p>
+
+            {/* Mode selector */}
+            <div className="mb-2">
+              <label className="text-xs text-gray-400">Chế độ thay thế</label>
+              <select
+                value={replacement.mode}
+                onChange={(e) => setReplacement({ mode: e.target.value as ReplacementConfig["mode"] })}
+                className="w-full px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm"
+              >
+                {REPLACEMENT_MODES.map((rm) => (
+                  <option key={rm.value} value={rm.value}>{rm.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Static asset upload — only shown when mode is static_asset */}
+            {replacement.mode === "static_asset" && (
+              <>
+                <input
+                  type="file"
+                  accept=".png,image/png"
+                  onChange={handleFileChange}
+                  data-testid="replacement-upload"
+                  className="w-full text-xs text-gray-400 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-blue-600 file:text-white file:text-xs"
+                />
+                {uploadMut.isPending && (
+                  <p className="text-xs text-yellow-400 mt-1">Đang tải lên...</p>
+                )}
+                {replacementUrl && (
+                  <div className="mt-2 aspect-square bg-gray-800 rounded overflow-hidden relative">
+                    <div
+                      className="absolute inset-0"
+                      style={{
+                        backgroundImage:
+                          "linear-gradient(45deg, #333 25%, transparent 25%), linear-gradient(-45deg, #333 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #333 75%), linear-gradient(-45deg, transparent 75%, #333 75%)",
+                        backgroundSize: "12px 12px",
+                        backgroundPosition: "0 0, 0 6px, 6px -6px, -6px 0px",
+                      }}
+                    />
+                    <img
+                      src={replacementUrl}
+                      alt="Ảnh thay thế"
+                      className="relative w-full h-full object-contain"
+                      data-testid="replacement-preview"
+                    />
+                  </div>
+                )}
+              </>
             )}
-            {replacementUrl && (
-              <div className="mt-2 aspect-square bg-gray-800 rounded overflow-hidden relative">
-                <div
-                  className="absolute inset-0"
-                  style={{
-                    backgroundImage:
-                      "linear-gradient(45deg, #333 25%, transparent 25%), linear-gradient(-45deg, #333 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #333 75%), linear-gradient(-45deg, transparent 75%, #333 75%)",
-                    backgroundSize: "12px 12px",
-                    backgroundPosition: "0 0, 0 6px, 6px -6px, -6px 0px",
-                  }}
-                />
-                <img
-                  src={replacementUrl}
-                  alt="Ảnh thay thế"
-                  className="relative w-full h-full object-contain"
-                  data-testid="replacement-preview"
-                />
+
+            {/* Frame sequence controls — only shown when mode is frame_sequence */}
+            {replacement.mode === "frame_sequence" && (
+              <div className="space-y-2">
+                <div>
+                  <label className="text-xs text-gray-400">Thư mục chuỗi ảnh</label>
+                  <input
+                    type="text"
+                    value={replacement.frameSequenceDir ?? ""}
+                    onChange={(e) => setReplacement({ frameSequenceDir: e.target.value || undefined })}
+                    placeholder="/path/to/frames/"
+                    className="w-full px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400">FPS (tùy chọn)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={120}
+                    value={replacement.frameSequenceFps ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setReplacement({ frameSequenceFps: v ? Number(v) : undefined });
+                    }}
+                    placeholder="24"
+                    className="w-full px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm"
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -366,6 +446,7 @@ export function ScreenD() {
             frameUrl={frameUrl}
             maskUrl={maskUrl}
             replacementUrl={replacementUrl}
+            sequenceFrameUrl={sequenceFrameUrl}
             frameMotion={frameMotion}
             replacement={replacement}
             videoWidth={videoWidth}
@@ -523,6 +604,24 @@ export function ScreenD() {
               data-testid="next-render"
             >
               Tiếp: Render →
+            </button>
+          </div>
+
+          {/* Bulk Character Mapping */}
+          <div className="border-t border-gray-700 pt-3 mt-3">
+            <h4 className="text-sm font-medium text-gray-300 mb-2">
+              🔄 Áp dụng hàng loạt
+            </h4>
+            <p className="text-xs text-gray-500 mb-2">
+              Gán cấu hình nhân vật này cho tất cả cảnh đã chọn
+            </p>
+            <button
+              onClick={() => bulkMut.mutate()}
+              disabled={bulkMut.isPending}
+              className="w-full py-2 bg-purple-600 hover:bg-purple-500
+                disabled:bg-gray-700 rounded text-sm transition-colors"
+            >
+              {bulkMut.isPending ? "Đang áp dụng..." : "Áp dụng cho tất cả cảnh"}
             </button>
           </div>
         </div>

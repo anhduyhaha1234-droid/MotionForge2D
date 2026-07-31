@@ -8,7 +8,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.api.deps import (
     get_config,
@@ -646,3 +646,49 @@ def stitch_scenes(project_id: str) -> dict:
     result = svc.stitch_with_audio(proj_dir, proj.scene_details, output_path)
 
     return {"ok": True, "output_path": str(result)}
+
+
+# ── Bulk character mapping ───────────────────────────────────────────────────
+
+class BulkMappingRequest(BaseModel):
+    object_id: str
+    scene_ids: list[int] = Field(default_factory=list)  # empty = all scenes
+
+
+@router.post("/{project_id}/objects/{object_id}/apply-bulk")
+def apply_bulk_mapping(
+    project_id: str, object_id: str, body: BulkMappingRequest,
+) -> dict:
+    """Apply an object's replacement config to multiple scenes."""
+    pwf = get_project_workflow()
+    try:
+        proj = pwf.get_project(project_id)
+    except FileNotFoundError as err:
+        raise HTTPException(404, "Project not found") from err
+
+    # Find the source object
+    source_obj = None
+    for obj in proj.objects:
+        if obj.object_id == object_id:
+            source_obj = obj
+            break
+
+    if source_obj is None:
+        raise HTTPException(404, "Object not found")
+
+    # Determine target scenes
+    target_scenes = body.scene_ids
+    if not target_scenes:
+        target_scenes = [s.scene_id for s in proj.scene_details]
+
+    # Apply replacement config to all objects in target scenes
+    applied = []
+    for obj in proj.objects:
+        if obj.object_id == object_id:
+            continue  # skip source
+        if obj.scene_id in target_scenes:
+            obj.replacement_config = source_obj.replacement_config
+            applied.append(obj.object_id)
+
+    pwf._save_project(project_id, proj)
+    return {"applied_to": applied, "scene_ids": target_scenes}

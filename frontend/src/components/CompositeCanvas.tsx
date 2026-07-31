@@ -18,6 +18,7 @@ interface CompositeCanvasProps {
   frameUrl: string | null;
   maskUrl: string | null;
   replacementUrl: string | null;
+  sequenceFrameUrl: string | null;
   frameMotion: FrameMotion | null;
   replacement: ReplacementConfig;
   videoWidth: number;
@@ -113,6 +114,7 @@ export function CompositeCanvas({
   frameUrl,
   maskUrl,
   replacementUrl,
+  sequenceFrameUrl,
   frameMotion,
   replacement,
   videoWidth,
@@ -126,6 +128,7 @@ export function CompositeCanvas({
   const [frameImg, setFrameImg] = useState<HTMLImageElement | null>(null);
   const [maskImg, setMaskImg] = useState<HTMLImageElement | null>(null);
   const [repImg, setRepImg] = useState<HTMLImageElement | null>(null);
+  const [sequenceFrameImg, setSequenceFrameImg] = useState<HTMLImageElement | null>(null);
 
   /* ── Load images ─────────────────────────────────────────────────────── */
 
@@ -164,6 +167,18 @@ export function CompositeCanvas({
     img.onerror = () => setRepImg(null);
     img.src = replacementUrl;
   }, [replacementUrl]);
+
+  useEffect(() => {
+    if (!sequenceFrameUrl) {
+      setSequenceFrameImg(null);
+      return;
+    }
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => setSequenceFrameImg(img);
+    img.onerror = () => setSequenceFrameImg(null);
+    img.src = sequenceFrameUrl;
+  }, [sequenceFrameUrl]);
 
   /* ── Stage setup & resize ────────────────────────────────────────────── */
 
@@ -216,6 +231,9 @@ export function CompositeCanvas({
     const dh = videoHeight * vt.scale;
     const ox = vt.offsetX;
     const oy = vt.offsetY;
+
+    // Choose active replacement image based on mode
+    const activeRepImg = replacement.mode === "frame_sequence" ? sequenceFrameImg : repImg;
 
     // Checkerboard background
     const bgGroup = new Konva.Group({ x: ox, y: oy, width: dw, height: dh });
@@ -307,12 +325,12 @@ export function CompositeCanvas({
       }
 
       // Replacement image with transform
-      if (repImg && frameMotion) {
+      if (activeRepImg && frameMotion) {
         const tf = computeReplacementTransform(
           frameMotion,
           replacement,
-          repImg.naturalWidth,
-          repImg.naturalHeight,
+          activeRepImg.naturalWidth,
+          activeRepImg.naturalHeight,
           videoWidth,
           videoHeight,
         );
@@ -332,7 +350,7 @@ export function CompositeCanvas({
           y: scaledY,
           width: scaledW,
           height: scaledH,
-          image: repImg,
+          image: activeRepImg,
           opacity: tf.opacity,
           rotation: tf.rotation,
           offsetX: scaledW / 2,
@@ -489,6 +507,7 @@ export function CompositeCanvas({
     frameImg,
     maskImg,
     repImg,
+    sequenceFrameImg,
     frameMotion,
     replacement,
     videoWidth,

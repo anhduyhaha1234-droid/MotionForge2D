@@ -77,6 +77,8 @@ class ReplacementConfig(BaseModel):
     opacity: float = 1.0
     fit_mode: FitMode = Field(default=FitMode.CONTAIN, alias="fitMode")
     clip_mode: ClipMode = Field(default=ClipMode.ASSET_ALPHA, alias="clipMode")
+    frame_sequence_dir: str = Field(default="", alias="frameSequenceDir")
+    frame_sequence_fps: float = Field(default=0.0, alias="frameSequenceFps")
 
     model_config = {"populate_by_name": True}
 
