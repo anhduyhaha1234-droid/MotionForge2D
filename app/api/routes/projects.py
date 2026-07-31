@@ -1188,3 +1188,107 @@ def assign_channel(project_id: str, channel_id: str) -> dict:
     proj.channel_id = channel_id
     pwf._save_project(project_id, proj)
     return {"ok": True, "channel_id": channel_id}
+
+
+# ── GPU Encoder info ────────────────────────────────────────────────────────
+
+@router.get("/gpu-info")
+def get_gpu_info() -> dict:
+    """Check GPU encoder availability."""
+    from app.services.gpu_encoder import detect_nvenc  # noqa: PLC0415
+
+    info = detect_nvenc()
+    return {
+        "has_nvenc": info.has_nvenc,
+        "gpu_name": info.gpu_name,
+        "encoder": info.encoder_name,
+    }
+
+
+# ── Cleanup endpoint ────────────────────────────────────────────────────────
+
+@router.post("/{project_id}/cleanup")
+def cleanup_project(project_id: str) -> dict:
+    """Clean up temp files and debug artifacts."""
+    from app.services.cleanup_service import CleanupService  # noqa: PLC0415
+
+    pwf = get_project_workflow()
+    try:
+        pwf.get_project(project_id)
+    except FileNotFoundError as err:
+        raise HTTPException(404, "Project not found") from err
+
+    proj_dir = pwf._project_dir(project_id)
+    svc = CleanupService()
+    stats = svc.cleanup_project(proj_dir)
+
+    return {
+        "ok": True,
+        "files_removed": stats["files_removed"],
+        "dirs_removed": stats["dirs_removed"],
+        "bytes_freed": stats["bytes_freed"],
+    }
+
+
+# ── Auto-match character endpoint ──────────────────────────────────────────
+
+@router.post("/{project_id}/objects/{object_id}/auto-match")
+def auto_match_character(project_id: str, object_id: str) -> dict:
+    """Auto-match character across all scenes using bbox similarity.
+
+    Finds objects in other scenes with similar position/size and
+    applies the same replacement config.
+    """
+    pwf = get_project_workflow()
+    try:
+        proj = pwf.get_project(project_id)
+    except FileNotFoundError as err:
+        raise HTTPException(404, "Project not found") from err
+
+    # Find source object
+    source = None
+    for obj in proj.objects:
+        if obj.object_id == object_id:
+            source = obj
+            break
+    if source is None:
+        raise HTTPException(404, "Object not found")
+
+    if not source.motion:
+        raise HTTPException(400, "Object has no motion data")
+
+    # Get source centroid and bbox from first tracked frame
+    source_motion = None
+    for m in source.motion.frames:
+        if m.centroid_x > 0:
+            source_motion = m
+            break
+    if source_motion is None:
+        raise HTTPException(400, "No valid motion data")
+
+    matched = []
+    for obj in proj.objects:
+        if obj.object_id == object_id:
+            continue
+        if obj.scene_id == source.scene_id:
+            continue
+        if not obj.motion:
+            continue
+
+        # Check similarity with first tracked frame
+        for m in obj.motion.frames:
+            if m.centroid_x <= 0:
+                continue
+
+            # Position similarity (within 200 px)
+            pos_sim = abs(m.centroid_x - source_motion.centroid_x) < 200
+            # Size similarity (within 100 px)
+            size_sim = abs(m.bbox.width - source_motion.bbox.width) < 100
+
+            if pos_sim and size_sim:
+                obj.replacement_config = source.replacement_config
+                matched.append(obj.object_id)
+                break
+
+    pwf._save_project(project_id, proj)
+    return {"matched": matched, "count": len(matched)}

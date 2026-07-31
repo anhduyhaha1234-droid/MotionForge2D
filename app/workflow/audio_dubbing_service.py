@@ -209,7 +209,13 @@ class AudioDubbingService:
         output_dir: Path,
         voice: str = "en-US-AriaNeural",
     ) -> list[Path]:
-        """Generate TTS for each segment.
+        """Generate TTS for each segment with auto lip-sync rate adjustment.
+
+        For each segment:
+        1. Generate TTS at normal speed
+        2. Measure TTS duration vs original segment duration
+        3. If ratio outside 0.85–1.15, regenerate with adjusted rate
+        4. Use FFmpeg atempo filter as final fallback if still off
 
         Args:
             segments: List of {start, end, text} dicts.
@@ -220,15 +226,18 @@ class AudioDubbingService:
             List of paths to TTS audio files.
         """
         output_dir.mkdir(parents=True, exist_ok=True)
-        paths = []
+        paths: list[Path] = []
 
         for i, seg in enumerate(segments):
             out_path = output_dir / f"tts_{i:04d}.wav"
             mp3_path = output_dir / f"tts_{i:04d}.mp3"
+            original_duration = seg["end"] - seg["start"]
 
             try:
+                # Step 1: Generate TTS at normal speed
                 self.tts(seg["text"], mp3_path, voice=voice)
-                # Convert to WAV for mixing
+
+                # Step 2: Convert to WAV
                 cmd = [
                     self._ffmpeg, "-y",
                     "-i", str(mp3_path),
@@ -237,15 +246,70 @@ class AudioDubbingService:
                     str(out_path),
                 ]
                 subprocess.run(cmd, capture_output=True, check=True)
+
+                # Step 3: Check duration and adjust if needed
+                if original_duration > 0:
+                    rate = self._calculate_speech_rate(original_duration, out_path)
+                    if rate != "+0%":
+                        # Regenerate with adjusted rate
+                        adjusted_mp3 = output_dir / f"tts_{i:04d}_adj.mp3"
+                        self.tts(seg["text"], adjusted_mp3, voice=voice, rate=rate)
+                        cmd = [
+                            self._ffmpeg, "-y",
+                            "-i", str(adjusted_mp3),
+                            "-ar", "16000",
+                            "-ac", "1",
+                            str(out_path),
+                        ]
+                        subprocess.run(cmd, capture_output=True, check=True)
+                        adjusted_mp3.unlink(missing_ok=True)
+
+                    # Step 4: Final fallback — use atempo filter if still off
+                    try:
+                        ffprobe = self._find_ffprobe()
+                        probe_cmd = [
+                            ffprobe, "-v", "quiet",
+                            "-show_entries", "format=duration",
+                            "-of", "csv=p=0",
+                            str(out_path),
+                        ]
+                        probe_result = subprocess.run(
+                            probe_cmd, capture_output=True, text=True,
+                        )
+                        current_duration = float(probe_result.stdout.strip())
+                        if current_duration > 0 and original_duration > 0:
+                            tempo_ratio = current_duration / original_duration
+                            if tempo_ratio < 0.5:
+                                tempo_ratio = 0.5
+                            elif tempo_ratio > 2.0:
+                                tempo_ratio = 2.0
+                            # Only apply atempo if significantly off (>5%)
+                            if abs(tempo_ratio - 1.0) > 0.05:
+                                tmp_path = out_path.with_suffix(".tmp.wav")
+                                tempo_cmd = [
+                                    self._ffmpeg, "-y",
+                                    "-i", str(out_path),
+                                    "-af", f"atempo={tempo_ratio}",
+                                    "-ar", "16000",
+                                    "-ac", "1",
+                                    str(tmp_path),
+                                ]
+                                subprocess.run(
+                                    tempo_cmd, capture_output=True, check=True,
+                                )
+                                tmp_path.replace(out_path)
+                    except (ValueError, subprocess.CalledProcessError):
+                        pass  # keep original if atempo fails
+
+                mp3_path.unlink(missing_ok=True)
                 paths.append(out_path)
             except Exception:
                 # Fallback: create silence of same duration
-                duration = seg["end"] - seg["start"]
                 cmd = [
                     self._ffmpeg, "-y",
                     "-f", "lavfi", "-i",
                     "anullsrc=r=16000:cl=mono",
-                    "-t", str(duration),
+                    "-t", str(original_duration),
                     str(out_path),
                 ]
                 subprocess.run(cmd, capture_output=True, check=True)
@@ -385,3 +449,66 @@ class AudioDubbingService:
         if win_path.exists():
             return str(win_path)
         raise FileNotFoundError("ffmpeg not found")
+
+    def _find_ffprobe(self) -> str:
+        """Find ffprobe binary."""
+        import shutil  # noqa: PLC0415
+
+        ffprobe = shutil.which("ffprobe")
+        if ffprobe:
+            return ffprobe
+        win_path = Path(r"C:\Users\Admin\AppData\Local\Microsoft\WinGet\Links\ffprobe.exe")
+        if win_path.exists():
+            return str(win_path)
+        raise FileNotFoundError("ffprobe not found")
+
+    def _calculate_speech_rate(
+        self,
+        original_duration: float,
+        tts_path: Path,
+    ) -> str:
+        """Calculate Edge-TTS rate to match original duration.
+
+        Compares original speech duration with TTS output duration.
+        Applies safe ratio clamped to 0.85x - 1.15x.
+
+        Args:
+            original_duration: Duration of original speech segment in seconds.
+            tts_path: Path to generated TTS audio file.
+
+        Returns:
+            Edge-TTS rate string (e.g., "+10%", "-5%").
+        """
+        # Get TTS duration using ffprobe
+        ffprobe = self._find_ffprobe()
+        cmd = [
+            ffprobe, "-v", "quiet",
+            "-show_entries", "format=duration",
+            "-of", "csv=p=0",
+            str(tts_path),
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        try:
+            tts_duration = float(result.stdout.strip())
+        except (ValueError, AttributeError):
+            return "+0%"
+
+        if tts_duration <= 0 or original_duration <= 0:
+            return "+0%"
+
+        # Calculate speed ratio
+        ratio = tts_duration / original_duration
+
+        # Clamp to safe range (0.85x - 1.15x)
+        ratio = max(0.85, min(1.15, ratio))
+
+        # Convert to percentage
+        # If ratio > 1, TTS is too slow -> speed up (positive %)
+        # If ratio < 1, TTS is too fast -> slow down (negative %)
+        pct = round((1.0 / ratio - 1.0) * 100)
+
+        # Clamp percentage
+        pct = max(-15, min(15, pct))
+
+        return f"{'+' if pct >= 0 else ''}{pct}%"

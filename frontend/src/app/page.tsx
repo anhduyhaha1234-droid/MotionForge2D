@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useProjectStore } from "@/stores/project";
 import { ScreenA } from "@/components/ScreenA";
 import { ScreenB } from "@/components/ScreenB";
@@ -36,17 +37,33 @@ export default function Home() {
   const screen = useProjectStore((s) => s.screen);
   const projectId = useProjectStore((s) => s.projectId);
 
+  const { data: gpuInfo } = useQuery({
+    queryKey: ["gpu-info"],
+    queryFn: () => api.getGpuInfo(),
+    staleTime: 60000,
+  });
+
   const showFloatingStitchBtn = screen !== "start" && !!projectId;
 
   return (
     <>
-      {/* Channel Dashboard Button */}
-      <button
-        onClick={() => setShowDashboard(true)}
-        className="fixed top-4 right-4 z-40 px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-full"
-      >
-        📁 Quản Lý Kênh & Dự Án
-      </button>
+      {/* Channel Dashboard Button + GPU Indicator */}
+      <div className="fixed top-4 right-4 z-40 flex items-center gap-3">
+        {gpuInfo && (
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className={`w-2 h-2 rounded-full ${gpuInfo.has_nvenc ? 'bg-green-500' : 'bg-gray-500'}`} />
+            <span className="text-gray-400">
+              {gpuInfo.has_nvenc ? `GPU: ${gpuInfo.gpu_name}` : 'CPU Encode'}
+            </span>
+          </div>
+        )}
+        <button
+          onClick={() => setShowDashboard(true)}
+          className="px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-full"
+        >
+          📁 Quản Lý Kênh & Dự Án
+        </button>
+      </div>
       <ScreenRouter />
       {showFloatingStitchBtn && (
         <button

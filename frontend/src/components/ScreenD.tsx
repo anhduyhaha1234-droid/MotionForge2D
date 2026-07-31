@@ -626,6 +626,30 @@ export function ScreenD() {
             </button>
           </div>
 
+          {/* Auto-Match Character */}
+          <div className="border-t border-gray-700 pt-3 mt-3">
+            <h4 className="text-sm font-medium text-gray-300 mb-2">
+              🪄 Tự động khớp nhân vật
+            </h4>
+            <p className="text-xs text-gray-500 mb-2">
+              Tự động gán cấu hình nhân vật này cho các cảnh khác có vị trí tương tự
+            </p>
+            <button
+              onClick={async () => {
+                if (!projectId || !objectId) return;
+                try {
+                  const result = await api.autoMatchCharacter(projectId, objectId);
+                  alert(`Đã khớp ${result.count} nhân vật trong các cảnh khác`);
+                } catch (err) {
+                  alert(`Lỗi: ${(err as Error).message}`);
+                }
+              }}
+              className="w-full py-2 bg-purple-600 hover:bg-purple-500 rounded text-sm transition-colors"
+            >
+              🪄 Auto-Match All Scenes
+            </button>
+          </div>
+
           {/* Dubbing Section */}
           <details className="border-t border-gray-700 pt-3">
             <summary className="text-sm font-medium text-gray-300 cursor-pointer">

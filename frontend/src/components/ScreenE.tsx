@@ -51,6 +51,13 @@ export function ScreenE() {
     },
   });
 
+  const cleanupMut = useMutation({
+    mutationFn: () => api.cleanupProject(projectId!),
+    onSuccess: (data) => {
+      alert(`Đã dọn dẹp: ${data.dirs_removed} thư mục, ${(data.bytes_freed / 1024 / 1024).toFixed(1)} MB`);
+    },
+  });
+
   const meta = project?.video_metadata;
 
   return (
@@ -143,6 +150,17 @@ export function ScreenE() {
             >
               📦 Export Project ZIP
             </a>
+          )}
+
+          {/* Cleanup */}
+          {projectId && (
+            <button
+              onClick={() => cleanupMut.mutate()}
+              disabled={cleanupMut.isPending}
+              className="w-full py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors"
+            >
+              {cleanupMut.isPending ? "Đang dọn dẹp..." : "🧹 Dọn dẹp file tạm"}
+            </button>
           )}
 
           {/* Job status */}

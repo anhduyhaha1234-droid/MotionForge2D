@@ -220,6 +220,12 @@ export interface PresetInfo {
   mapping_count: number;
 }
 
+export interface GpuInfo {
+  has_nvenc: boolean;
+  gpu_name: string;
+  encoder: string;
+}
+
 export interface ChannelWorkspace {
   channel_id: string;
   name: string;
@@ -567,5 +573,22 @@ export const api = {
     apiFetch<{ ok: boolean }>(
       `/api/projects/${projectId}/assign-channel?channel_id=${channelId}`,
       { method: "PATCH" },
+    ),
+
+  // ─── Performance & Automation ─────────────────────────────────────────
+
+  getGpuInfo: () =>
+    apiFetch<GpuInfo>("/api/projects/gpu-info"),
+
+  autoMatchCharacter: (projectId: string, objectId: string) =>
+    apiFetch<{ matched: string[]; count: number }>(
+      `/api/projects/${projectId}/objects/${objectId}/auto-match`,
+      { method: "POST" },
+    ),
+
+  cleanupProject: (projectId: string) =>
+    apiFetch<{ ok: boolean; files_removed: number; dirs_removed: number; bytes_freed: number }>(
+      `/api/projects/${projectId}/cleanup`,
+      { method: "POST" },
     ),
 };
