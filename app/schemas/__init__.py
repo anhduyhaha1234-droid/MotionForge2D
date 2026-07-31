@@ -272,6 +272,8 @@ class ProjectData(BaseModel):
     objects: list[TrackedObject] = Field(default_factory=list)
     channel_id: str = ""
     task_status: str = "draft"
+    created_at: str = ""
+    updated_at: str = ""
 
 
 # ─── Job ──────────────────────────────────────────────────────────────────────

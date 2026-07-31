@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { api } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
+import { api, type ProjectSummary } from "@/lib/api";
 import { useProjectStore } from "@/stores/project";
 import { PresetManager } from "@/components/PresetManager";
 import {
@@ -27,6 +28,13 @@ export function ScreenA() {
   const [statusMessage, setStatusMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+
+  // Recent projects query
+  const { data: recentProjects = [] } = useQuery({
+    queryKey: ["recent-projects"],
+    queryFn: () => api.listAllProjects(),
+    staleTime: 30000,
+  });
 
   // File Selection
   const handleFileSelect = (file: File | null) => {
@@ -178,6 +186,64 @@ export function ScreenA() {
             Tải lên video 2D của đối thủ để tự động chia phân cảnh, bóc tách nhân vật và chuẩn bị lồng tiếng AI sang thị trường quốc tế.
           </p>
         </div>
+
+        {/* Recent Projects Section */}
+        {recentProjects.length > 0 && (
+          <div className="mb-6">
+            <h3 className="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
+              📂 Dự án gần đây của bạn
+            </h3>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {recentProjects.slice(0, 10).map((proj) => {
+                const statusConfig: Record<string, { emoji: string; label: string; color: string }> = {
+                  draft: { emoji: "⚪", label: "Bản nháp", color: "text-gray-400" },
+                  in_progress: { emoji: "🟡", label: "Đang làm", color: "text-yellow-300" },
+                  ready_to_stitch: { emoji: "🔵", label: "Sẵn sàng ghép", color: "text-blue-300" },
+                  completed: { emoji: "🟢", label: "Hoàn thành", color: "text-green-300" },
+                };
+                const status = statusConfig[proj.task_status] ?? statusConfig.draft;
+
+                return (
+                  <div
+                    key={proj.project_id}
+                    className="flex items-center justify-between p-3 bg-slate-900/60 border border-slate-800 rounded-lg"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-gray-200 truncate">
+                        {proj.name}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[10px]">{status.emoji} <span className={status.color}>{status.label}</span></span>
+                        <span className="text-[10px] text-gray-500">{proj.scenes_count} cảnh</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setProjectId(proj.project_id);
+                        api.getProject(proj.project_id).then((p) => {
+                          setProject(p);
+                          // Determine which screen to go to based on status
+                          if (proj.task_status === "completed") {
+                            setScreen("render");
+                          } else if (p.objects && p.objects.length > 0) {
+                            setScreen("replacement");
+                          } else if (p.scenes && p.scenes.length > 0) {
+                            setScreen("selection");
+                          } else {
+                            setScreen("selection");
+                          }
+                        });
+                      }}
+                      className="ml-3 px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-500 rounded transition-colors whitespace-nowrap"
+                    >
+                      ▶️ Tiếp tục
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Project Form & Drag-and-Drop Card */}
         <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">

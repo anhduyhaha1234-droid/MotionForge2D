@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 
 from app.config import AppConfig
@@ -39,6 +40,10 @@ class ProjectWorkflowService:
 
         svc = ProjectService(self._project_json(project_id))
         data = svc.create(name=name, source_video="")
+        now = datetime.now(UTC).isoformat()
+        data.created_at = now
+        data.updated_at = now
+        svc.save()
         return project_id, data
 
     def get_project(self, project_id: str) -> ProjectData:
@@ -80,6 +85,7 @@ class ProjectWorkflowService:
 
     def _save_project(self, project_id: str, data: ProjectData) -> None:
         """Save project data directly."""
+        data.updated_at = datetime.now(UTC).isoformat()
         svc = ProjectService(self._project_json(project_id))
         svc._data = data
         svc.save()

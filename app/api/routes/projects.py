@@ -64,6 +64,39 @@ class ReplacementSettingsRequest(BaseModel):
 
 # ─── Endpoints ────────────────────────────────────────────────────────────────
 
+@router.get("")
+def list_all_projects() -> list[dict]:
+    """List all projects on disk with summary info."""
+    import json
+
+    pwf = get_project_workflow()
+    projects_dir = pwf.projects_dir  # projects root
+    if not projects_dir.exists():
+        return []
+
+    results = []
+    for proj_dir in sorted(projects_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+        if not proj_dir.is_dir():
+            continue
+        project_json = proj_dir / "project.json"
+        if not project_json.exists():
+            continue
+        try:
+            data = json.loads(project_json.read_text(encoding="utf-8"))
+            results.append({
+                "project_id": proj_dir.name,
+                "name": data.get("name", ""),
+                "task_status": data.get("task_status", "draft"),
+                "source_video": data.get("source_video", ""),
+                "scenes_count": len(data.get("scenes", [])),
+                "updated_at": data.get("updated_at", ""),
+                "created_at": data.get("created_at", ""),
+            })
+        except Exception:
+            continue
+    return results
+
+
 @router.post("", status_code=201)
 @router.post("/", status_code=201)
 def create_project(body: CreateProjectRequest) -> CreateProjectResponse:

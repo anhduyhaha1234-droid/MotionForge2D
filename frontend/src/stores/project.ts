@@ -1,10 +1,11 @@
 /**
- * MotionForge 2D — Zustand Store
+ * MotionForge 2D — Zustand Store (Persisted)
  *
- * Global state for the active project.
+ * Global state for the active project with localStorage persistence.
  */
 
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import type {
   ProjectData,
   TrackedObject,
@@ -52,9 +53,13 @@ interface ProjectState {
   // Channel
   activeChannelId: string | null;
 
+  // Persisted screen for rehydration
+  persistedScreen: Screen | null;
+  setPersistedScreen: (screen: Screen | null) => void;
+
   // Actions
-  setProjectId: (id: string) => void;
-  setProject: (data: ProjectData) => void;
+  setProjectId: (id: string | null) => void;
+  setProject: (data: ProjectData | null) => void;
   setScreen: (screen: Screen) => void;
   setCurrentFrame: (frame: number) => void;
   setSelection: (sel: SelectionInput | null) => void;
@@ -70,6 +75,7 @@ interface ProjectState {
   setScenes: (scenes: SceneDetail[]) => void;
   setActiveSceneId: (id: number | null) => void;
   setActiveChannelId: (id: string | null) => void;
+  resetAll: () => void;
 }
 
 const DEFAULT_REPLACEMENT: ReplacementConfig = {
@@ -84,47 +90,82 @@ const DEFAULT_REPLACEMENT: ReplacementConfig = {
   clip_mode: "asset_alpha",
 };
 
-export const useProjectStore = create<ProjectState>((set) => ({
-  projectId: null,
-  project: null,
-  screen: "start",
-  currentFrame: 0,
-  selection: null,
-  maskPreview: null,
-  activeObject: null,
-  gallery: null,
-  replacement: { ...DEFAULT_REPLACEMENT },
-  previewMode: "result",
-  frameMotion: null,
-  activeJobs: {},
+export const useProjectStore = create<ProjectState>()(
+  persist(
+    (set) => ({
+      projectId: null,
+      project: null,
+      screen: "start",
+      currentFrame: 0,
+      selection: null,
+      maskPreview: null,
+      activeObject: null,
+      gallery: null,
+      replacement: { ...DEFAULT_REPLACEMENT },
+      previewMode: "result",
+      frameMotion: null,
+      activeJobs: {},
 
-  scenes: [],
-  activeSceneId: null,
+      scenes: [],
+      activeSceneId: null,
 
-  activeChannelId: null,
+      activeChannelId: null,
 
-  setProjectId: (id) => set({ projectId: id }),
-  setProject: (data) => set({ project: data }),
-  setScreen: (screen) => set({ screen }),
-  setCurrentFrame: (frame) => set({ currentFrame: frame }),
-  setSelection: (sel) => set({ selection: sel }),
-  setMaskPreview: (png) => set({ maskPreview: png }),
-  setActiveObject: (obj) => set({ activeObject: obj }),
-  setGallery: (g) => set({ gallery: g }),
-  setReplacement: (r) =>
-    set((s) => ({ replacement: { ...s.replacement, ...r } })),
-  resetReplacement: () => set({ replacement: { ...DEFAULT_REPLACEMENT } }),
-  setPreviewMode: (mode) => set({ previewMode: mode }),
-  setFrameMotion: (motion) => set({ frameMotion: motion }),
-  updateJob: (job) =>
-    set((s) => ({ activeJobs: { ...s.activeJobs, [job.job_id]: job } })),
-  removeJob: (id) =>
-    set((s) => {
-      const jobs = { ...s.activeJobs };
-      delete jobs[id];
-      return { activeJobs: jobs };
+      persistedScreen: null,
+      setPersistedScreen: (screen) => set({ persistedScreen: screen }),
+
+      setProjectId: (id) => set({ projectId: id }),
+      setProject: (data) => set({ project: data }),
+      setScreen: (screen) => set({ screen }),
+      setCurrentFrame: (frame) => set({ currentFrame: frame }),
+      setSelection: (sel) => set({ selection: sel }),
+      setMaskPreview: (png) => set({ maskPreview: png }),
+      setActiveObject: (obj) => set({ activeObject: obj }),
+      setGallery: (g) => set({ gallery: g }),
+      setReplacement: (r) =>
+        set((s) => ({ replacement: { ...s.replacement, ...r } })),
+      resetReplacement: () => set({ replacement: { ...DEFAULT_REPLACEMENT } }),
+      setPreviewMode: (mode) => set({ previewMode: mode }),
+      setFrameMotion: (motion) => set({ frameMotion: motion }),
+      updateJob: (job) =>
+        set((s) => ({ activeJobs: { ...s.activeJobs, [job.job_id]: job } })),
+      removeJob: (id) =>
+        set((s) => {
+          const jobs = { ...s.activeJobs };
+          delete jobs[id];
+          return { activeJobs: jobs };
+        }),
+      setScenes: (scenes) => set({ scenes }),
+      setActiveSceneId: (id) => set({ activeSceneId: id }),
+      setActiveChannelId: (id) => set({ activeChannelId: id }),
+
+      resetAll: () =>
+        set({
+          projectId: null,
+          project: null,
+          screen: "start",
+          currentFrame: 0,
+          selection: null,
+          maskPreview: null,
+          activeObject: null,
+          gallery: null,
+          replacement: { ...DEFAULT_REPLACEMENT },
+          previewMode: "result",
+          frameMotion: null,
+          activeJobs: {},
+          scenes: [],
+          activeSceneId: null,
+        }),
     }),
-  setScenes: (scenes) => set({ scenes }),
-  setActiveSceneId: (id) => set({ activeSceneId: id }),
-  setActiveChannelId: (id) => set({ activeChannelId: id }),
-}));
+    {
+      name: "motionforge-project-storage",
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        projectId: state.projectId,
+        screen: state.screen,
+        activeSceneId: state.activeSceneId,
+        activeChannelId: state.activeChannelId,
+      }),
+    }
+  )
+);

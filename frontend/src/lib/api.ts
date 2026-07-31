@@ -234,6 +234,16 @@ export interface ChannelWorkspace {
   created_at: string;
 }
 
+export interface ProjectSummary {
+  project_id: string;
+  name: string;
+  task_status: string;
+  source_video: string;
+  scenes_count: number;
+  updated_at: string;
+  created_at: string;
+}
+
 export interface ChannelProject {
   project_id: string;
   name: string;
@@ -253,6 +263,9 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),
     }),
+
+  listAllProjects: () =>
+    apiFetch<ProjectSummary[]>("/api/projects"),
 
   getProject: (id: string) =>
     apiFetch<ProjectData>(`/api/projects/${id}`),
