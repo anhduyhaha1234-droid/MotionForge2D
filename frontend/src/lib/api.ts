@@ -4,13 +4,15 @@
  * Typed client for all backend endpoints.
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const rawApiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8888";
+const API_BASE = rawApiUrl.replace(/\/+$/, "");
 
 async function apiFetch<T>(
   path: string,
   options?: RequestInit,
 ): Promise<T> {
-  const url = `${API_BASE}${path}`;
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  const url = `${API_BASE}${cleanPath}`;
   const res = await fetch(url, {
     ...options,
     headers: {

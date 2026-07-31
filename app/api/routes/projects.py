@@ -20,7 +20,7 @@ from app.api.deps import (
     get_replacement_service,
     get_segmentation_service,
 )
-from app.api.helpers import job_response
+from app.api.helpers import find_frame_path, job_response
 from app.schemas import (
     ObjectKind,
     ProjectData,
@@ -65,6 +65,7 @@ class ReplacementSettingsRequest(BaseModel):
 # ─── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.post("", status_code=201)
+@router.post("/", status_code=201)
 def create_project(body: CreateProjectRequest) -> CreateProjectResponse:
     """Create a new project."""
     pwf = get_project_workflow()
@@ -75,19 +76,26 @@ def create_project(body: CreateProjectRequest) -> CreateProjectResponse:
 @router.post("/{project_id}/video")
 async def upload_video(project_id: str, file: UploadFile) -> dict:
     """Upload a video file for the project."""
+    import re
     pwf = get_project_workflow()
     try:
         pwf.get_project(project_id)
     except FileNotFoundError as err:
         raise HTTPException(404, "Project not found") from err
 
+    # Sanitize filename to avoid invalid characters on Windows (?, :, *, <, >, |, ")
+    original_name = file.filename or "video.mp4"
+    safe_filename = re.sub(r'[^\w\.-]', '_', original_name)
+    if not safe_filename or safe_filename.startswith("."):
+        safe_filename = f"source_{safe_filename}"
+
     proj_dir = pwf._project_dir(project_id)
-    dest = proj_dir / file.filename
+    dest = proj_dir / safe_filename
     with open(dest, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
-    pwf.set_video(project_id, file.filename)
-    return {"status": "ok", "filename": file.filename}
+    pwf.set_video(project_id, safe_filename)
+    return {"status": "ok", "filename": safe_filename}
 
 
 @router.post("/{project_id}/ingest")
@@ -147,17 +155,17 @@ def get_scene_objects(project_id: str, scene_id: int) -> list[dict]:
 
 @router.get("/{project_id}/frames/{frame_index}")
 def get_frame(project_id: str, frame_index: int, scene_id: int = 0) -> FileResponse:
-    """Serve a frame image."""
+    """Serve a frame image (tries jpg first, then png)."""
     pwf = get_project_workflow()
     proj_dir = pwf._project_dir(project_id)
-    frame_path = (
-        proj_dir / "frames" / f"scene_{scene_id}"
-        / f"frame_{frame_index:06d}.png"
-    )
+    scene_dir = proj_dir / "frames" / f"scene_{scene_id}"
 
-    if not frame_path.exists():
+    frame_path = find_frame_path(scene_dir, frame_index)
+    if frame_path is None:
         raise HTTPException(404, f"Frame {frame_index} not found")
-    return FileResponse(str(frame_path), media_type="image/png")
+
+    media = "image/jpeg" if frame_path.suffix in (".jpg", ".jpeg") else "image/png"
+    return FileResponse(str(frame_path), media_type=media)
 
 
 @router.post("/{project_id}/objects/preview-mask")
@@ -165,17 +173,16 @@ def preview_mask(project_id: str, body: PreviewMaskRequest) -> dict:
     """Preview mask for a selection on a frame."""
     pwf = get_project_workflow()
     proj_dir = pwf._project_dir(project_id)
-    frame_path = (
-        proj_dir / "frames" / "scene_0" / f"frame_{body.frame_index:06d}.png"
-    )
+    scene_dir_0 = proj_dir / "frames" / "scene_0"
+    frame_path = find_frame_path(scene_dir_0, body.frame_index)
 
-    if not frame_path.exists():
-        for scene_dir in (proj_dir / "frames").glob("scene_*"):
-            candidate = scene_dir / f"frame_{body.frame_index:06d}.png"
-            if candidate.exists():
-                frame_path = candidate
+    if frame_path is None:
+        for sd in (proj_dir / "frames").glob("scene_*"):
+            found = find_frame_path(sd, body.frame_index)
+            if found is not None:
+                frame_path = found
                 break
-        else:
+        if frame_path is None:
             raise HTTPException(404, f"Frame {body.frame_index} not found")
 
     seg_svc = get_segmentation_service()
@@ -249,16 +256,15 @@ def create_object(project_id: str, body: CreateObjectRequest) -> dict:
         if not initial_mask_path.exists():
             try:
                 s_id = body.scene_id
-                frame_path = (
-                    proj_dir / "frames" / f"scene_{s_id}" / f"frame_{f_idx:06d}.png"
-                )
-                if not frame_path.exists():
-                    for scene_dir in (proj_dir / "frames").glob("scene_*"):
-                        candidate = scene_dir / f"frame_{f_idx:06d}.png"
-                        if candidate.exists():
-                            frame_path = candidate
+                scene_dir = proj_dir / "frames" / f"scene_{s_id}"
+                frame_path = find_frame_path(scene_dir, f_idx)
+                if frame_path is None:
+                    for sd in (proj_dir / "frames").glob("scene_*"):
+                        found = find_frame_path(sd, f_idx)
+                        if found is not None:
+                            frame_path = found
                             break
-                if frame_path.exists():
+                if frame_path is not None:
                     seg_svc = get_segmentation_service()
                     mask = seg_svc.preview_mask(frame_path, body.selection, "contour")
                     cv2.imwrite(str(initial_mask_path), mask)
@@ -310,16 +316,15 @@ def propagate_object(project_id: str, object_id: str) -> dict:
             else:
                 try:
                     s_id = obj.scene_id
-                    frame_path = (
-                        proj_dir / "frames" / f"scene_{s_id}" / f"frame_{f_idx:06d}.png"
-                    )
-                    if not frame_path.exists():
-                        for scene_dir in (proj_dir / "frames").glob("scene_*"):
-                            candidate = scene_dir / f"frame_{f_idx:06d}.png"
-                            if candidate.exists():
-                                frame_path = candidate
+                    scene_dir = proj_dir / "frames" / f"scene_{s_id}"
+                    frame_path = find_frame_path(scene_dir, f_idx)
+                    if frame_path is None:
+                        for sd in (proj_dir / "frames").glob("scene_*"):
+                            found = find_frame_path(sd, f_idx)
+                            if found is not None:
+                                frame_path = found
                                 break
-                    if frame_path.exists():
+                    if frame_path is not None:
                         seg_svc = get_segmentation_service()
                         mask = seg_svc.preview_mask(frame_path, obj.selection, "contour")
                         mask_dir = proj_dir / "objects" / object_id / "masks"

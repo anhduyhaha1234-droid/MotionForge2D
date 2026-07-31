@@ -30,19 +30,27 @@ function ScreenRouter() {
 
 export default function Home() {
   const [showAssembly, setShowAssembly] = useState(false);
+  const screen = useProjectStore((s) => s.screen);
+  const projectId = useProjectStore((s) => s.projectId);
+
+  const showFloatingStitchBtn = screen !== "start" && !!projectId;
 
   return (
     <>
       <ScreenRouter />
-      <button
-        onClick={() => setShowAssembly(true)}
-        className="fixed bottom-4 right-4 px-4 py-2 bg-purple-600
-          hover:bg-purple-500 rounded-full font-medium text-sm
-          shadow-lg transition-colors z-40"
-      >
-        🎬 Ghép video
-      </button>
-      <AssemblyModal isOpen={showAssembly} onClose={() => setShowAssembly(false)} />
+      {showFloatingStitchBtn && (
+        <button
+          onClick={() => setShowAssembly(true)}
+          title="Bấm để xem danh sách cảnh đã duyệt và tiến hành ghép video thành phẩm"
+          className="fixed bottom-6 right-6 px-5 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-full text-xs shadow-2xl shadow-purple-600/40 transition-all z-40 border border-purple-400/30 flex items-center gap-2"
+        >
+          🎬 Ghép Video Hoàn Chỉnh
+        </button>
+      )}
+      <AssemblyModal
+        isOpen={showAssembly}
+        onClose={() => setShowAssembly(false)}
+      />
     </>
   );
 }

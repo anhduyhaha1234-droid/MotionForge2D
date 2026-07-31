@@ -13,7 +13,7 @@ def extract_frames(
     video_path: str | Path,
     output_dir: str | Path,
     scene: SceneInfo,
-    format: str = "png",
+    format: str = "jpg",
 ) -> list[Path]:
     """Extract frames for a specific scene from a video.
 
