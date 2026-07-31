@@ -235,6 +235,24 @@ class TrackedObject(BaseModel):
     replacement_config: ReplacementConfig | None = None
 
 
+# ─── Task Status / Channel Workspace ──────────────────────────────────────────
+
+class TaskStatus(str, Enum):
+    DRAFT = "draft"                # ⚪ Bản Nháp
+    IN_PROGRESS = "in_progress"    # 🟡 Đang Xử Lý
+    READY_TO_STITCH = "ready_to_stitch"  # 🔵 Sẵn sàng ghép
+    COMPLETED = "completed"        # 🟢 Hoàn thành
+
+
+class ChannelWorkspace(BaseModel):
+    """A channel workspace grouping related projects."""
+    channel_id: str = ""
+    name: str = ""
+    target_lang: str = "en"
+    default_preset_id: str = ""
+    created_at: str = ""
+
+
 # ─── Project ──────────────────────────────────────────────────────────────────
 
 class ProjectData(BaseModel):
@@ -252,6 +270,8 @@ class ProjectData(BaseModel):
     scenes: list[SceneInfo] = Field(default_factory=list)
     scene_details: list[SceneDetail] = Field(default_factory=list)
     objects: list[TrackedObject] = Field(default_factory=list)
+    channel_id: str = ""
+    task_status: str = "draft"
 
 
 # ─── Job ──────────────────────────────────────────────────────────────────────

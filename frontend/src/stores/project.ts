@@ -49,6 +49,9 @@ interface ProjectState {
   scenes: SceneDetail[];
   activeSceneId: number | null;
 
+  // Channel
+  activeChannelId: string | null;
+
   // Actions
   setProjectId: (id: string) => void;
   setProject: (data: ProjectData) => void;
@@ -66,6 +69,7 @@ interface ProjectState {
   removeJob: (id: string) => void;
   setScenes: (scenes: SceneDetail[]) => void;
   setActiveSceneId: (id: number | null) => void;
+  setActiveChannelId: (id: string | null) => void;
 }
 
 const DEFAULT_REPLACEMENT: ReplacementConfig = {
@@ -97,6 +101,8 @@ export const useProjectStore = create<ProjectState>((set) => ({
   scenes: [],
   activeSceneId: null,
 
+  activeChannelId: null,
+
   setProjectId: (id) => set({ projectId: id }),
   setProject: (data) => set({ project: data }),
   setScreen: (screen) => set({ screen }),
@@ -120,4 +126,5 @@ export const useProjectStore = create<ProjectState>((set) => ({
     }),
   setScenes: (scenes) => set({ scenes }),
   setActiveSceneId: (id) => set({ activeSceneId: id }),
+  setActiveChannelId: (id) => set({ activeChannelId: id }),
 }));

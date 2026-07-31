@@ -99,6 +99,7 @@ export function ScreenA() {
           setStatusMessage("Phân tích hoàn tất! Đang chuyển sang bước tiếp theo...");
           const updatedProj = await api.getProject(newProjId);
           setProject(updatedProj);
+          await api.updateTaskStatus(newProjId, "in_progress");
           setTimeout(() => setScreen("selection"), 600);
           return;
         }

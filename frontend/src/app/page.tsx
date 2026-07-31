@@ -8,6 +8,8 @@ import { ScreenC } from "@/components/ScreenC";
 import { ScreenD } from "@/components/ScreenD";
 import { ScreenE } from "@/components/ScreenE";
 import { AssemblyModal } from "@/components/AssemblyModal";
+import { ChannelDashboard } from "@/components/ChannelDashboard";
+import { api } from "@/lib/api";
 
 function ScreenRouter() {
   const screen = useProjectStore((s) => s.screen);
@@ -30,6 +32,7 @@ function ScreenRouter() {
 
 export default function Home() {
   const [showAssembly, setShowAssembly] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false);
   const screen = useProjectStore((s) => s.screen);
   const projectId = useProjectStore((s) => s.projectId);
 
@@ -37,6 +40,13 @@ export default function Home() {
 
   return (
     <>
+      {/* Channel Dashboard Button */}
+      <button
+        onClick={() => setShowDashboard(true)}
+        className="fixed top-4 right-4 z-40 px-3 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-full"
+      >
+        📁 Quản Lý Kênh & Dự Án
+      </button>
       <ScreenRouter />
       {showFloatingStitchBtn && (
         <button
@@ -50,6 +60,18 @@ export default function Home() {
       <AssemblyModal
         isOpen={showAssembly}
         onClose={() => setShowAssembly(false)}
+      />
+      <ChannelDashboard
+        isOpen={showDashboard}
+        onClose={() => setShowDashboard(false)}
+        onResumeProject={(pid) => {
+          const store = useProjectStore.getState();
+          store.setProjectId(pid);
+          api.getProject(pid).then((proj) => {
+            store.setProject(proj);
+            store.setScreen("selection");
+          });
+        }}
       />
     </>
   );

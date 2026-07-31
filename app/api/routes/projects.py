@@ -1094,3 +1094,97 @@ def export_project_zip(project_id: str) -> FileResponse:
         media_type="application/zip",
         filename=f"{project_id}_export.zip",
     )
+
+
+# ── Channel Workspace endpoints ──────────────────────────────────────────────
+
+class CreateChannelRequest(BaseModel):
+    name: str
+    target_lang: str = "en"
+    default_preset_id: str = ""
+
+class UpdateTaskStatusRequest(BaseModel):
+    task_status: str  # draft | in_progress | ready_to_stitch | completed
+
+
+@router.post("/channels")
+def create_channel(body: CreateChannelRequest) -> dict:
+    """Create a new channel workspace."""
+    from app.workflow.channel_service import ChannelService  # noqa: PLC0415
+
+    config = get_config()
+    svc = ChannelService(config)
+    channel = svc.create_channel(
+        name=body.name,
+        target_lang=body.target_lang,
+        default_preset_id=body.default_preset_id,
+    )
+    return channel.model_dump()
+
+
+@router.get("/channels")
+def list_channels() -> list[dict]:
+    """List all channel workspaces."""
+    from app.workflow.channel_service import ChannelService  # noqa: PLC0415
+
+    config = get_config()
+    svc = ChannelService(config)
+    return [c.model_dump() for c in svc.list_channels()]
+
+
+@router.get("/channels/{channel_id}/projects")
+def get_channel_projects(channel_id: str) -> list[dict]:
+    """List projects in a channel."""
+    from app.workflow.channel_service import ChannelService  # noqa: PLC0415
+
+    config = get_config()
+    svc = ChannelService(config)
+    channel = svc.get_channel(channel_id)
+    if channel is None:
+        raise HTTPException(404, "Channel not found")
+
+    return svc.get_projects_for_channel(channel_id, config.project_root)
+
+
+@router.delete("/channels/{channel_id}")
+def delete_channel(channel_id: str) -> dict:
+    """Delete a channel workspace."""
+    from app.workflow.channel_service import ChannelService  # noqa: PLC0415
+
+    config = get_config()
+    svc = ChannelService(config)
+    if not svc.delete_channel(channel_id):
+        raise HTTPException(404, "Channel not found")
+    return {"ok": True}
+
+
+@router.patch("/{project_id}/task-status")
+def update_task_status(project_id: str, body: UpdateTaskStatusRequest) -> dict:
+    """Update project task status."""
+    valid = {"draft", "in_progress", "ready_to_stitch", "completed"}
+    if body.task_status not in valid:
+        raise HTTPException(400, f"Invalid status: {body.task_status}")
+
+    pwf = get_project_workflow()
+    try:
+        proj = pwf.get_project(project_id)
+    except FileNotFoundError as err:
+        raise HTTPException(404, "Project not found") from err
+
+    proj.task_status = body.task_status
+    pwf._save_project(project_id, proj)
+    return {"ok": True, "task_status": body.task_status}
+
+
+@router.patch("/{project_id}/assign-channel")
+def assign_channel(project_id: str, channel_id: str) -> dict:
+    """Assign a project to a channel."""
+    pwf = get_project_workflow()
+    try:
+        proj = pwf.get_project(project_id)
+    except FileNotFoundError as err:
+        raise HTTPException(404, "Project not found") from err
+
+    proj.channel_id = channel_id
+    pwf._save_project(project_id, proj)
+    return {"ok": True, "channel_id": channel_id}

@@ -1,0 +1,58 @@
+[
+  {
+    "channel_id": "e4b25fc47092",
+    "name": "Test Channel",
+    "target_lang": "en",
+    "default_preset_id": "",
+    "created_at": "2026-07-31T14:06:00.623846+00:00"
+  },
+  {
+    "channel_id": "b4aa19a9e909",
+    "name": "Channel A",
+    "target_lang": "en",
+    "default_preset_id": "",
+    "created_at": "2026-07-31T14:06:00.631353+00:00"
+  },
+  {
+    "channel_id": "87f398eb6cb1",
+    "name": "Channel B",
+    "target_lang": "en",
+    "default_preset_id": "",
+    "created_at": "2026-07-31T14:06:00.635908+00:00"
+  },
+  {
+    "channel_id": "dd9078c5333a",
+    "name": "Find Me",
+    "target_lang": "en",
+    "default_preset_id": "",
+    "created_at": "2026-07-31T14:06:00.642018+00:00"
+  },
+  {
+    "channel_id": "00b255acda1c",
+    "name": "Test Channel",
+    "target_lang": "en",
+    "default_preset_id": "",
+    "created_at": "2026-07-31T14:07:19.195106+00:00"
+  },
+  {
+    "channel_id": "ef073bcde1bc",
+    "name": "Channel A",
+    "target_lang": "en",
+    "default_preset_id": "",
+    "created_at": "2026-07-31T14:07:19.200612+00:00"
+  },
+  {
+    "channel_id": "60fb4ca2824e",
+    "name": "Channel B",
+    "target_lang": "en",
+    "default_preset_id": "",
+    "created_at": "2026-07-31T14:07:19.204613+00:00"
+  },
+  {
+    "channel_id": "cde6cead119a",
+    "name": "Find Me",
+    "target_lang": "en",
+    "default_preset_id": "",
+    "created_at": "2026-07-31T14:07:19.210661+00:00"
+  }
+]

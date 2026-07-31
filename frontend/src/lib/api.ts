@@ -220,6 +220,23 @@ export interface PresetInfo {
   mapping_count: number;
 }
 
+export interface ChannelWorkspace {
+  channel_id: string;
+  name: string;
+  target_lang: string;
+  default_preset_id: string;
+  created_at: string;
+}
+
+export interface ChannelProject {
+  project_id: string;
+  name: string;
+  task_status: "draft" | "in_progress" | "ready_to_stitch" | "completed";
+  created_at: string;
+  scene_count: number;
+  object_count: number;
+}
+
 // ─── API Functions ──────────────────────────────────────────────────────────
 
 export const api = {
@@ -511,4 +528,44 @@ export const api = {
 
   exportProjectZip: (projectId: string) =>
     `/api/projects/${projectId}/export`,
+
+  // ─── Channels ───────────────────────────────────────────────────────────
+
+  createChannel: (name: string, targetLang?: string) =>
+    apiFetch<ChannelWorkspace>(
+      `/api/projects/channels`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, target_lang: targetLang ?? "en" }),
+      },
+    ),
+
+  listChannels: () =>
+    apiFetch<ChannelWorkspace[]>("/api/projects/channels"),
+
+  getChannelProjects: (channelId: string) =>
+    apiFetch<ChannelProject[]>(`/api/projects/channels/${channelId}/projects`),
+
+  deleteChannel: (channelId: string) =>
+    apiFetch<{ ok: boolean }>(
+      `/api/projects/channels/${channelId}`,
+      { method: "DELETE" },
+    ),
+
+  updateTaskStatus: (projectId: string, taskStatus: string) =>
+    apiFetch<{ ok: boolean }>(
+      `/api/projects/${projectId}/task-status`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task_status: taskStatus }),
+      },
+    ),
+
+  assignChannel: (projectId: string, channelId: string) =>
+    apiFetch<{ ok: boolean }>(
+      `/api/projects/${projectId}/assign-channel?channel_id=${channelId}`,
+      { method: "PATCH" },
+    ),
 };
