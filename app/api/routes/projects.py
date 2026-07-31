@@ -519,6 +519,207 @@ def render_final(project_id: str, object_id: str = "") -> dict:
     return job_response(info)
 
 
+# ── Dubbing endpoints ───────────────────────────────────────────────────────
+
+class DubbingRequest(BaseModel):
+    scene_id: int
+    source_lang: str = "vi"
+    target_lang: str = "en"
+    whisper_model: str = "base"
+    tts_voice: str = "en-US-AriaNeural"
+
+
+@router.post("/{project_id}/dubbing/separate")
+def separate_audio(project_id: str, scene_id: int) -> dict:
+    """Separate scene audio into vocal and background tracks."""
+    from app.workflow.audio_dubbing_service import AudioDubbingService  # noqa: PLC0415
+
+    pwf = get_project_workflow()
+    try:
+        pwf.get_project(project_id)
+    except FileNotFoundError as err:
+        raise HTTPException(404, "Project not found") from err
+
+    proj_dir = pwf._project_dir(project_id)
+    audio_path = proj_dir / "audio" / f"scene_{scene_id:03d}.aac"
+    if not audio_path.exists():
+        raise HTTPException(404, f"Audio for scene {scene_id} not found")
+
+    output_dir = proj_dir / "dubbing" / f"scene_{scene_id:03d}"
+    svc = AudioDubbingService()
+    vocal, bgm = svc.separate_vocals(audio_path, output_dir)
+
+    return {
+        "vocal_track": str(vocal),
+        "bgm_track": str(bgm),
+    }
+
+
+@router.post("/{project_id}/dubbing/transcribe")
+def transcribe_scene(
+    project_id: str, scene_id: int,
+    source_lang: str = "vi", whisper_model: str = "base",
+) -> dict:
+    """Transcribe scene vocal track to text."""
+    from app.workflow.audio_dubbing_service import AudioDubbingService  # noqa: PLC0415
+
+    pwf = get_project_workflow()
+    try:
+        pwf.get_project(project_id)
+    except FileNotFoundError as err:
+        raise HTTPException(404, "Project not found") from err
+
+    proj_dir = pwf._project_dir(project_id)
+    vocal_path = proj_dir / "dubbing" / f"scene_{scene_id:03d}" / "vocal_track.wav"
+    if not vocal_path.exists():
+        raise HTTPException(400, "Run audio separation first")
+
+    svc = AudioDubbingService()
+    segments = svc.transcribe(vocal_path, language=source_lang, model_size=whisper_model)
+    srt_path = svc.segments_to_srt(
+        segments,
+        proj_dir / "dubbing" / f"scene_{scene_id:03d}" / "subtitles_original.srt",
+    )
+
+    return {"segments": segments, "srt_path": str(srt_path)}
+
+
+@router.post("/{project_id}/dubbing/translate")
+def translate_subtitles(
+    project_id: str, scene_id: int,
+    target_lang: str = "en", source_lang: str = "auto",
+) -> dict:
+    """Translate scene subtitles to target language."""
+    from app.workflow.audio_dubbing_service import AudioDubbingService  # noqa: PLC0415
+
+    pwf = get_project_workflow()
+    try:
+        pwf.get_project(project_id)
+    except FileNotFoundError as err:
+        raise HTTPException(404, "Project not found") from err
+
+    proj_dir = pwf._project_dir(project_id)
+    dubbing_dir = proj_dir / "dubbing" / f"scene_{scene_id:03d}"
+
+    svc = AudioDubbingService()
+
+    # Try to load existing segments
+    vocal_path = dubbing_dir / "vocal_track.wav"
+    if not vocal_path.exists():
+        raise HTTPException(400, "Run audio separation and transcription first")
+
+    segments = svc.transcribe(vocal_path, language=source_lang)
+    translated = svc.translate_segments(segments, target_lang=target_lang)
+    srt_path = svc.segments_to_srt(translated, dubbing_dir / "subtitles_translated.srt")
+
+    return {"segments": translated, "srt_path": str(srt_path)}
+
+
+@router.post("/{project_id}/dubbing/tts")
+def generate_tts(
+    project_id: str, scene_id: int,
+    target_lang: str = "en",
+    tts_voice: str = "en-US-AriaNeural",
+) -> dict:
+    """Generate TTS audio for translated segments."""
+    from app.workflow.audio_dubbing_service import AudioDubbingService  # noqa: PLC0415
+
+    pwf = get_project_workflow()
+    try:
+        pwf.get_project(project_id)
+    except FileNotFoundError as err:
+        raise HTTPException(404, "Project not found") from err
+
+    proj_dir = pwf._project_dir(project_id)
+    dubbing_dir = proj_dir / "dubbing" / f"scene_{scene_id:03d}"
+
+    # Load translated segments
+    translated_srt = dubbing_dir / "subtitles_translated.srt"
+    if not translated_srt.exists():
+        raise HTTPException(400, "Run translation first")
+
+    svc = AudioDubbingService()
+    # Parse SRT back to segments
+    segments = svc.transcribe(dubbing_dir / "vocal_track.wav", language=target_lang)
+
+    # Generate TTS
+    tts_dir = dubbing_dir / "tts_segments"
+    tts_paths = svc.tts_segments(segments, tts_dir, voice=tts_voice)
+
+    return {"tts_count": len(tts_paths), "tts_dir": str(tts_dir)}
+
+
+@router.post("/{project_id}/dubbing/remux")
+def remux_dubbed_audio(
+    project_id: str, scene_id: int,
+    tts_voice: str = "en-US-AriaNeural",
+) -> dict:
+    """Remux TTS with background music into final dubbed audio."""
+    from app.workflow.audio_dubbing_service import AudioDubbingService  # noqa: PLC0415
+
+    pwf = get_project_workflow()
+    try:
+        pwf.get_project(project_id)
+    except FileNotFoundError as err:
+        raise HTTPException(404, "Project not found") from err
+
+    proj_dir = pwf._project_dir(project_id)
+    dubbing_dir = proj_dir / "dubbing" / f"scene_{scene_id:03d}"
+    bgm_path = dubbing_dir / "bgm_sfx_track.wav"
+
+    if not bgm_path.exists():
+        raise HTTPException(400, "Run audio separation first")
+
+    svc = AudioDubbingService()
+
+    # Get TTS files
+    tts_dir = dubbing_dir / "tts_segments"
+    tts_paths = sorted(tts_dir.glob("tts_*.wav"))
+    if not tts_paths:
+        raise HTTPException(400, "Generate TTS first")
+
+    # Parse timing from translated SRT
+    segments = svc.transcribe(dubbing_dir / "vocal_track.wav")
+    translated = svc.translate_segments(segments, target_lang="en")
+
+    # Remux
+    final_path = dubbing_dir / "dubbed_audio.wav"
+    svc.remux_audio(tts_paths, translated, bgm_path, final_path)
+
+    return {"final_audio": str(final_path)}
+
+
+@router.post("/{project_id}/dubbing/full")
+def full_dubbing_pipeline(project_id: str, body: DubbingRequest) -> dict:
+    """Run full dubbing pipeline for a scene."""
+    from app.workflow.audio_dubbing_service import AudioDubbingService  # noqa: PLC0415
+
+    pwf = get_project_workflow()
+    try:
+        pwf.get_project(project_id)
+    except FileNotFoundError as err:
+        raise HTTPException(404, "Project not found") from err
+
+    proj_dir = pwf._project_dir(project_id)
+    audio_path = proj_dir / "audio" / f"scene_{body.scene_id:03d}.aac"
+    if not audio_path.exists():
+        raise HTTPException(404, f"Audio for scene {body.scene_id} not found")
+
+    output_dir = proj_dir / "dubbing" / f"scene_{body.scene_id:03d}"
+    svc = AudioDubbingService()
+
+    result = svc.dub_scene(
+        audio_path=audio_path,
+        output_dir=output_dir,
+        source_lang=body.source_lang,
+        target_lang=body.target_lang,
+        whisper_model=body.whisper_model,
+        tts_voice=body.tts_voice,
+    )
+
+    return result
+
+
 # ── Scene management endpoints ──────────────────────────────────────────────
 
 class SceneStatusUpdate(BaseModel):

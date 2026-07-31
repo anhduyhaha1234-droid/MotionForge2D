@@ -15,6 +15,7 @@ import { useProjectStore } from "@/stores/project";
 import { CompositeCanvas } from "@/components/CompositeCanvas";
 import { SceneSelector } from "./SceneSelector";
 import { ScenePreview } from "./ScenePreview";
+import { DubbingPanel } from "./DubbingPanel";
 
 /* ── Preview mode labels (Vietnamese) ──────────────────────────────────── */
 
@@ -624,6 +625,16 @@ export function ScreenD() {
               {bulkMut.isPending ? "Đang áp dụng..." : "Áp dụng cho tất cả cảnh"}
             </button>
           </div>
+
+          {/* Dubbing Section */}
+          <details className="border-t border-gray-700 pt-3">
+            <summary className="text-sm font-medium text-gray-300 cursor-pointer">
+              🎙️ Lồng tiếng / Dubbing
+            </summary>
+            <div className="mt-2">
+              <DubbingPanel />
+            </div>
+          </details>
         </div>
       </div>
     </div>

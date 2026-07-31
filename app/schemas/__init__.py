@@ -267,6 +267,26 @@ class JobInfo(BaseModel):
     job_type: str = ""
 
 
+# ─── Audio Dubbing ──────────────────────────────────────────────────────────
+
+class DubbingConfig(BaseModel):
+    """Configuration for dubbing a scene."""
+    source_lang: str = "vi"
+    target_lang: str = "en"
+    whisper_model: str = "base"  # tiny/base/small/medium
+    tts_voice: str = "en-US-AriaNeural"
+
+
+class DubbingResult(BaseModel):
+    """Result of dubbing a scene."""
+    vocal_track: str = ""
+    bgm_track: str = ""
+    original_srt: str = ""
+    translated_srt: str = ""
+    final_audio: str = ""
+    segments: list[dict] = Field(default_factory=list)
+
+
 # ─── Migration ────────────────────────────────────────────────────────────────
 
 def migrate_v1_to_v2(data: dict) -> dict:

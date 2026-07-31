@@ -172,6 +172,30 @@ export interface MaskPreviewResponse {
   nonzero_pixels: number;
 }
 
+export interface DubbingConfig {
+  scene_id: number;
+  source_lang: string;
+  target_lang: string;
+  whisper_model: string;
+  tts_voice: string;
+}
+
+export interface DubbingResult {
+  vocal_track: string;
+  bgm_track: string;
+  original_srt: string;
+  translated_srt: string;
+  final_audio: string;
+  segments: Array<{ start: number; end: number; text: string; original?: string }>;
+}
+
+export interface DubbingSegment {
+  start: number;
+  end: number;
+  text: string;
+  original?: string;
+}
+
 // ─── API Functions ──────────────────────────────────────────────────────────
 
 export const api = {
@@ -357,4 +381,61 @@ export const api = {
 
   getSequenceFrameUrl: (projectId: string, objectId: string, index: number) =>
     `${API_BASE}/api/projects/${projectId}/objects/${objectId}/sequence-frame?index=${index}`,
+
+  // ─── Dubbing ────────────────────────────────────────────────────────
+
+  separateAudio: (projectId: string, sceneId: number) =>
+    apiFetch<{ vocal_track: string; bgm_track: string }>(
+      `/api/projects/${projectId}/dubbing/separate?scene_id=${sceneId}`,
+      { method: "POST" },
+    ),
+
+  transcribeScene: (
+    projectId: string,
+    sceneId: number,
+    sourceLang?: string,
+    whisperModel?: string,
+  ) =>
+    apiFetch<{ segments: DubbingSegment[]; srt_path: string }>(
+      `/api/projects/${projectId}/dubbing/transcribe?scene_id=${sceneId}&source_lang=${sourceLang ?? "vi"}&whisper_model=${whisperModel ?? "base"}`,
+      { method: "POST" },
+    ),
+
+  translateSubtitles: (
+    projectId: string,
+    sceneId: number,
+    targetLang: string,
+    sourceLang?: string,
+  ) =>
+    apiFetch<{ segments: DubbingSegment[]; srt_path: string }>(
+      `/api/projects/${projectId}/dubbing/translate?scene_id=${sceneId}&target_lang=${targetLang}&source_lang=${sourceLang ?? "auto"}`,
+      { method: "POST" },
+    ),
+
+  generateTts: (
+    projectId: string,
+    sceneId: number,
+    targetLang?: string,
+    ttsVoice?: string,
+  ) =>
+    apiFetch<{ tts_count: number; tts_dir: string }>(
+      `/api/projects/${projectId}/dubbing/tts?scene_id=${sceneId}&target_lang=${targetLang ?? "en"}&tts_voice=${ttsVoice ?? "en-US-AriaNeural"}`,
+      { method: "POST" },
+    ),
+
+  remuxDubbedAudio: (projectId: string, sceneId: number) =>
+    apiFetch<{ final_audio: string }>(
+      `/api/projects/${projectId}/dubbing/remux?scene_id=${sceneId}`,
+      { method: "POST" },
+    ),
+
+  fullDubbingPipeline: (projectId: string, config: DubbingConfig) =>
+    apiFetch<DubbingResult>(
+      `/api/projects/${projectId}/dubbing/full`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(config),
+      },
+    ),
 };
