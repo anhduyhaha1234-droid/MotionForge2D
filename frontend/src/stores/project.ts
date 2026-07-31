@@ -13,6 +13,7 @@ import type {
   JobInfo,
   GalleryManifest,
   FrameMotion,
+  SceneDetail,
 } from "@/lib/api";
 
 type Screen = "start" | "selection" | "review" | "replacement" | "render";
@@ -44,6 +45,10 @@ interface ProjectState {
   // Jobs
   activeJobs: Record<string, JobInfo>;
 
+  // Scenes
+  scenes: SceneDetail[];
+  activeSceneId: number | null;
+
   // Actions
   setProjectId: (id: string) => void;
   setProject: (data: ProjectData) => void;
@@ -59,6 +64,8 @@ interface ProjectState {
   setFrameMotion: (motion: FrameMotion | null) => void;
   updateJob: (job: JobInfo) => void;
   removeJob: (id: string) => void;
+  setScenes: (scenes: SceneDetail[]) => void;
+  setActiveSceneId: (id: number | null) => void;
 }
 
 const DEFAULT_REPLACEMENT: ReplacementConfig = {
@@ -87,6 +94,9 @@ export const useProjectStore = create<ProjectState>((set) => ({
   frameMotion: null,
   activeJobs: {},
 
+  scenes: [],
+  activeSceneId: null,
+
   setProjectId: (id) => set({ projectId: id }),
   setProject: (data) => set({ project: data }),
   setScreen: (screen) => set({ screen }),
@@ -108,4 +118,6 @@ export const useProjectStore = create<ProjectState>((set) => ({
       delete jobs[id];
       return { activeJobs: jobs };
     }),
+  setScenes: (scenes) => set({ scenes }),
+  setActiveSceneId: (id) => set({ activeSceneId: id }),
 }));

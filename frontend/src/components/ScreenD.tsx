@@ -9,10 +9,12 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type ClipMode, type FrameMotion } from "@/lib/api";
 import { useProjectStore } from "@/stores/project";
 import { CompositeCanvas } from "@/components/CompositeCanvas";
+import { SceneSelector } from "./SceneSelector";
+import { ScenePreview } from "./ScenePreview";
 
 /* ── Preview mode labels (Vietnamese) ──────────────────────────────────── */
 
@@ -91,6 +93,19 @@ export function ScreenD() {
     setFrameMotion,
     setScreen,
   } = useProjectStore();
+
+  const queryClient = useQueryClient();
+  const activeSceneId = useProjectStore((s) => s.activeSceneId);
+
+  const approveSceneMut = useMutation({
+    mutationFn: () => {
+      if (!projectId || activeSceneId === null) return Promise.resolve({ ok: false });
+      return api.updateSceneStatus(projectId, activeSceneId, "approved");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["scenes", projectId] });
+    },
+  });
 
   const objectId = activeObject?.object_id;
   const meta = project?.video_metadata;
@@ -208,6 +223,21 @@ export function ScreenD() {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
+        {/* ── Scene panel ────────────────────────────────────────────────── */}
+        <div className="w-52 bg-gray-900 border-r border-gray-800 p-4 space-y-4 overflow-y-auto flex-shrink-0">
+          <SceneSelector />
+          <ScenePreview />
+          <button
+            onClick={() => approveSceneMut.mutate()}
+            disabled={activeSceneId === null || approveSceneMut.isPending}
+            className="w-full py-2 bg-green-600 hover:bg-green-500
+              disabled:bg-gray-700 disabled:text-gray-500
+              rounded font-medium text-sm transition-colors"
+          >
+            ✅ Duyệt phân cảnh này
+          </button>
+        </div>
+
         {/* ── Left panel ─────────────────────────────────────────────────── */}
         <div className="w-64 bg-gray-900 border-r border-gray-800 p-4 space-y-4 overflow-y-auto">
           {/* Object thumbnail */}

@@ -78,6 +78,12 @@ class ProjectWorkflowService:
                 return obj
         raise KeyError(f"Object not found: {object_id}")
 
+    def _save_project(self, project_id: str, data: ProjectData) -> None:
+        """Save project data directly."""
+        svc = ProjectService(self._project_json(project_id))
+        svc._data = data
+        svc.save()
+
     def get_tracked_object(self, project_id: str, object_id: str) -> TrackedObject:
         """Get a single tracked object."""
         data = self.get_project(project_id)

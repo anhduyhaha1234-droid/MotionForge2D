@@ -47,6 +47,19 @@ export interface SceneInfo {
   frame_count: number;
 }
 
+export interface SceneDetail {
+  scene_id: number;
+  start_frame: number;
+  end_frame: number;
+  start_time_sec: number;
+  end_time_sec: number;
+  duration_sec: number;
+  frame_count: number;
+  status: "pending" | "draft" | "approved";
+  audio_path: string;
+  notes: string;
+}
+
 export interface BoundingBox {
   x: number;
   y: number;
@@ -278,4 +291,39 @@ export const api = {
 
   getReplacementImageUrl: (projectId: string, objectId: string) =>
     `${API_BASE}/api/projects/${projectId}/objects/${objectId}/replacement-image`,
+
+  // ─── Scene Approval ───────────────────────────────────────────────────
+
+  chunkScenes: (projectId: string, threshold?: number) =>
+    apiFetch<{ scene_count: number; scenes: SceneDetail[] }>(
+      `/api/projects/${projectId}/scenes/chunk?threshold=${threshold ?? 27.0}`,
+      { method: "POST" },
+    ),
+
+  getSceneDetails: (projectId: string) =>
+    apiFetch<SceneDetail[]>(`/api/projects/${projectId}/scenes/details`),
+
+  updateSceneStatus: (
+    projectId: string,
+    sceneId: number,
+    status: "pending" | "draft" | "approved",
+    notes?: string,
+  ) =>
+    apiFetch<{ ok: boolean }>(
+      `/api/projects/${projectId}/scenes/${sceneId}/status`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, notes: notes ?? "" }),
+      },
+    ),
+
+  getSceneAudioUrl: (projectId: string, sceneId: number) =>
+    `${API_BASE}/api/projects/${projectId}/scenes/${sceneId}/audio`,
+
+  stitchScenes: (projectId: string) =>
+    apiFetch<{ ok: boolean; output_path: string }>(
+      `/api/projects/${projectId}/scenes/stitch`,
+      { method: "POST" },
+    ),
 };

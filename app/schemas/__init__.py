@@ -129,6 +129,26 @@ class SceneInfo(BaseModel):
     frame_count: int
 
 
+class SceneStatus(str, Enum):
+    PENDING = "pending"      # Chưa làm
+    DRAFT = "draft"          # Đang sửa
+    APPROVED = "approved"    # Đã duyệt
+
+
+class SceneDetail(BaseModel):
+    """Extended scene info with status and audio path."""
+    scene_id: int
+    start_frame: int
+    end_frame: int
+    start_time_sec: float
+    end_time_sec: float
+    duration_sec: float
+    frame_count: int
+    status: SceneStatus = SceneStatus.PENDING
+    audio_path: str = ""         # relative path to scene audio file
+    notes: str = ""
+
+
 # ─── Selection ────────────────────────────────────────────────────────────────
 
 class SelectionInput(BaseModel):
@@ -228,6 +248,7 @@ class ProjectData(BaseModel):
     source_video: str
     video_metadata: VideoMetadata | None = None
     scenes: list[SceneInfo] = Field(default_factory=list)
+    scene_details: list[SceneDetail] = Field(default_factory=list)
     objects: list[TrackedObject] = Field(default_factory=list)
 
 
