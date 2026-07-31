@@ -10,6 +10,7 @@ export function ScreenE() {
   const [previewJob, setPreviewJob] = useState<JobInfo | null>(null);
   const [renderJob, setRenderJob] = useState<JobInfo | null>(null);
   const [outputPath, setOutputPath] = useState<string | null>(null);
+  const [renderFormat, setRenderFormat] = useState("mp4");
 
   const pollJob = useCallback(
     async (jobId: string, setter: (j: JobInfo) => void) => {
@@ -42,7 +43,7 @@ export function ScreenE() {
   const renderMut = useMutation({
     mutationFn: async () => {
       if (!projectId) throw new Error("No project");
-      const { job_id } = await api.triggerRender(projectId);
+      const { job_id } = await api.renderWithFormat(projectId, renderFormat);
       const job = await pollJob(job_id, setRenderJob);
       if (job?.result?.output_path) {
         setOutputPath(job.result.output_path as string);
@@ -120,7 +121,29 @@ export function ScreenE() {
                 ? `Đang render... (${Math.round(renderJob?.progress ?? 0)}%)`
                 : "Render Final"}
             </button>
+
+            <select
+              value={renderFormat}
+              onChange={(e) => setRenderFormat(e.target.value)}
+              className="w-full px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-sm"
+            >
+              <option value="mp4">MP4 (H.264)</option>
+              <option value="webm">WebM (VP9)</option>
+              <option value="gif">GIF</option>
+            </select>
           </div>
+
+          {/* Export ZIP */}
+          {renderJob?.status === "completed" && projectId && (
+            <a
+              href={api.exportProjectZip(projectId)}
+              download
+              className="block w-full py-2 bg-indigo-600 hover:bg-indigo-500
+                rounded font-medium text-sm text-center transition-colors"
+            >
+              📦 Export Project ZIP
+            </a>
+          )}
 
           {/* Job status */}
           {(previewJob || renderJob) && (

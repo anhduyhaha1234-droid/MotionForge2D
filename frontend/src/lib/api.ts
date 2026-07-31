@@ -196,6 +196,28 @@ export interface DubbingSegment {
   original?: string;
 }
 
+export interface CharacterMapping {
+  original_name: string;
+  replacement_asset: string;
+  voice_config: Record<string, unknown>;
+  replacement_config: Record<string, unknown>;
+}
+
+export interface ProjectPreset {
+  name: string;
+  description: string;
+  version: string;
+  mappings: CharacterMapping[];
+  dubbing_config: Record<string, unknown>;
+}
+
+export interface PresetInfo {
+  filename: string;
+  name: string;
+  description: string;
+  mapping_count: number;
+}
+
 // ─── API Functions ──────────────────────────────────────────────────────────
 
 export const api = {
@@ -438,4 +460,47 @@ export const api = {
         body: JSON.stringify(config),
       },
     ),
+
+  // ─── Scene Objects ──────────────────────────────────────────────────────
+
+  getSceneObjects: (projectId: string, sceneId: number) =>
+    apiFetch<TrackedObject[]>(
+      `/api/projects/${projectId}/scenes/${sceneId}/objects`,
+    ),
+
+  // ─── Presets ────────────────────────────────────────────────────────────
+
+  savePreset: (projectId: string, name: string, description?: string) =>
+    apiFetch<{ ok: boolean; path: string; mapping_count: number }>(
+      `/api/projects/${projectId}/presets/save`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, description: description ?? "" }),
+      },
+    ),
+
+  listPresets: (projectId: string) =>
+    apiFetch<PresetInfo[]>(
+      `/api/projects/${projectId}/presets`,
+    ),
+
+  applyPreset: (projectId: string, presetFilename: string) =>
+    apiFetch<{ ok: boolean; updated_objects: number }>(
+      `/api/projects/${projectId}/presets/${presetFilename}/apply`,
+      { method: "POST" },
+    ),
+
+  // ─── Multi-Format Render ────────────────────────────────────────────────
+
+  renderWithFormat: (projectId: string, format: string) =>
+    apiFetch<{ job_id: string }>(
+      `/api/projects/${projectId}/render?format=${format}`,
+      { method: "POST" },
+    ),
+
+  // ─── Export ─────────────────────────────────────────────────────────────
+
+  exportProjectZip: (projectId: string) =>
+    `/api/projects/${projectId}/export`,
 };

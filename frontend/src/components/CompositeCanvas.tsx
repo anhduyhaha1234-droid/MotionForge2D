@@ -14,6 +14,13 @@ import type { FrameMotion, ReplacementConfig, ClipMode } from "@/lib/api";
 
 /* ── Types ─────────────────────────────────────────────────────────────── */
 
+export interface CompositeObjectConfig {
+  objectId: string;
+  motion: FrameMotion | null;
+  replacementUrl: string | null;
+  replacement: ReplacementConfig | null;
+}
+
 interface CompositeCanvasProps {
   frameUrl: string | null;
   maskUrl: string | null;
@@ -24,6 +31,7 @@ interface CompositeCanvasProps {
   videoWidth: number;
   videoHeight: number;
   previewMode: "original" | "mask" | "result" | "comparison";
+  allObjects?: CompositeObjectConfig[];
 }
 
 interface TransformResult {
@@ -120,6 +128,7 @@ export function CompositeCanvas({
   videoWidth,
   videoHeight,
   previewMode,
+  allObjects,
 }: CompositeCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage | null>(null);
@@ -129,6 +138,7 @@ export function CompositeCanvas({
   const [maskImg, setMaskImg] = useState<HTMLImageElement | null>(null);
   const [repImg, setRepImg] = useState<HTMLImageElement | null>(null);
   const [sequenceFrameImg, setSequenceFrameImg] = useState<HTMLImageElement | null>(null);
+  const [multiObjImgs, setMultiObjImgs] = useState<Map<string, HTMLImageElement>>(new Map());
 
   /* ── Load images ─────────────────────────────────────────────────────── */
 
@@ -179,6 +189,44 @@ export function CompositeCanvas({
     img.onerror = () => setSequenceFrameImg(null);
     img.src = sequenceFrameUrl;
   }, [sequenceFrameUrl]);
+
+  /* ── Load multi-object images ─────────────────────────────────────────── */
+
+  useEffect(() => {
+    if (!allObjects || allObjects.length === 0) {
+      setMultiObjImgs(new Map());
+      return;
+    }
+
+    const newMap = new Map<string, HTMLImageElement>();
+    let loaded = 0;
+    const total = allObjects.filter((o) => o.replacementUrl).length;
+
+    if (total === 0) {
+      setMultiObjImgs(new Map());
+      return;
+    }
+
+    for (const obj of allObjects) {
+      if (!obj.replacementUrl) continue;
+      const img = new window.Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        newMap.set(obj.objectId, img);
+        loaded++;
+        if (loaded === total) {
+          setMultiObjImgs(new Map(newMap));
+        }
+      };
+      img.onerror = () => {
+        loaded++;
+        if (loaded === total) {
+          setMultiObjImgs(new Map(newMap));
+        }
+      };
+      img.src = obj.replacementUrl;
+    }
+  }, [allObjects]);
 
   /* ── Stage setup & resize ────────────────────────────────────────────── */
 
@@ -324,7 +372,90 @@ export function CompositeCanvas({
         );
       }
 
-      // Replacement image with transform
+      // Multi-object mode: render all objects when allObjects is provided
+      if (allObjects && allObjects.length > 0) {
+        for (const obj of allObjects) {
+          const objImg = multiObjImgs.get(obj.objectId);
+          if (!objImg || !obj.motion || !obj.replacement) continue;
+
+          const tf = computeReplacementTransform(
+            obj.motion,
+            obj.replacement,
+            objImg.naturalWidth,
+            objImg.naturalHeight,
+            videoWidth,
+            videoHeight,
+          );
+
+          const scaledX = tf.x * vt.scale + offsetX + ox;
+          const scaledY = tf.y * vt.scale + oy;
+          const scaledW = tf.width * vt.scale;
+          const scaledH = tf.height * vt.scale;
+          const centerX = scaledX + scaledW / 2;
+          const centerY = scaledY + scaledH / 2;
+
+          const repNode = new Konva.Image({
+            x: centerX,
+            y: centerY,
+            width: scaledW,
+            height: scaledH,
+            image: objImg,
+            opacity: tf.opacity,
+            rotation: tf.rotation,
+            offsetX: scaledW / 2,
+            offsetY: scaledH / 2,
+          });
+          layer.add(repNode);
+
+          // Bbox for each object
+          const bbox = obj.motion.bbox;
+          const bx = bbox.x * vt.scale + offsetX + ox;
+          const by = bbox.y * vt.scale + oy;
+          const bw = bbox.width * vt.scale;
+          const bh = bbox.height * vt.scale;
+          layer.add(
+            new Konva.Rect({
+              x: bx,
+              y: by,
+              width: bw,
+              height: bh,
+              stroke: "#3b82f6",
+              strokeWidth: 1.5,
+              dash: [5, 3],
+              listening: false,
+            }),
+          );
+
+          // Centroid dot
+          const cDotX = obj.motion.centroid_x * vt.scale + offsetX + ox;
+          const cDotY = obj.motion.centroid_y * vt.scale + oy;
+          layer.add(
+            new Konva.Circle({
+              x: cDotX,
+              y: cDotY,
+              radius: 4,
+              fill: "#22c55e",
+              stroke: "#fff",
+              strokeWidth: 1,
+            }),
+          );
+
+          // Label
+          layer.add(
+            new Konva.Text({
+              x: bx,
+              y: by - 14,
+              text: obj.objectId,
+              fontSize: 10,
+              fill: "#3b82f6",
+              fontFamily: "sans-serif",
+            }),
+          );
+        }
+        return;
+      }
+
+      // Single-object mode (original behavior)
       if (activeRepImg && frameMotion) {
         const tf = computeReplacementTransform(
           frameMotion,
@@ -513,6 +644,8 @@ export function CompositeCanvas({
     videoWidth,
     videoHeight,
     previewMode,
+    allObjects,
+    multiObjImgs,
   ]);
 
   return (

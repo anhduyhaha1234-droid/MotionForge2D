@@ -132,6 +132,19 @@ def list_scenes(project_id: str) -> list[SceneInfo]:
     return data.scenes
 
 
+@router.get("/{project_id}/scenes/{scene_id}/objects")
+def get_scene_objects(project_id: str, scene_id: int) -> list[dict]:
+    """Get all tracked objects in a specific scene."""
+    pwf = get_project_workflow()
+    try:
+        proj = pwf.get_project(project_id)
+    except FileNotFoundError as err:
+        raise HTTPException(404, "Project not found") from err
+
+    scene_objects = [o for o in proj.objects if o.scene_id == scene_id]
+    return [o.model_dump(by_alias=True) for o in scene_objects]
+
+
 @router.get("/{project_id}/frames/{frame_index}")
 def get_frame(project_id: str, frame_index: int, scene_id: int = 0) -> FileResponse:
     """Serve a frame image."""
@@ -489,8 +502,10 @@ def render_preview(project_id: str, object_id: str = "") -> dict:
 
 
 @router.post("/{project_id}/render")
-def render_final(project_id: str, object_id: str = "") -> dict:
-    """Render the final video. Returns a job."""
+def render_final(
+    project_id: str, object_id: str = "", format: str = "mp4",
+) -> dict:
+    """Render the final video in specified format (mp4/webm/gif). Returns a job."""
     pwf = get_project_workflow()
     proj_dir = pwf._project_dir(project_id)
 
@@ -893,3 +908,148 @@ def apply_bulk_mapping(
 
     pwf._save_project(project_id, proj)
     return {"applied_to": applied, "scene_ids": target_scenes}
+
+
+# ── Preset endpoints ────────────────────────────────────────────────────────
+
+class SavePresetRequest(BaseModel):
+    name: str = "Untitled Preset"
+    description: str = ""
+
+
+@router.post("/{project_id}/presets/save")
+def save_project_preset(
+    project_id: str, body: SavePresetRequest,
+) -> dict:
+    """Save current project configuration as a preset."""
+    from app.workflow.preset_service import (  # noqa: PLC0415
+        CharacterMapping,
+        PresetService,
+        ProjectPreset,
+    )
+
+    pwf = get_project_workflow()
+    try:
+        proj = pwf.get_project(project_id)
+    except FileNotFoundError as err:
+        raise HTTPException(404, "Project not found") from err
+
+    # Build mappings from current objects
+    mappings = []
+    for obj in proj.objects:
+        rc = obj.replacement_config
+        mappings.append(CharacterMapping(
+            original_name=obj.name,
+            replacement_asset=rc.asset_path if rc else "",
+            replacement_config=rc.model_dump(by_alias=True) if rc else {},
+        ))
+
+    preset = ProjectPreset(
+        name=body.name,
+        description=body.description,
+        mappings=mappings,
+    )
+
+    proj_dir = pwf._project_dir(project_id)
+    presets_dir = proj_dir / "presets"
+    output_path = presets_dir / f"{body.name.lower().replace(' ', '_')}.json"
+
+    svc = PresetService()
+    svc.save_preset(preset, output_path)
+
+    return {"ok": True, "path": str(output_path), "mapping_count": len(mappings)}
+
+
+@router.get("/{project_id}/presets")
+def list_project_presets(project_id: str) -> list[dict]:
+    """List all presets for a project."""
+    from app.workflow.preset_service import PresetService  # noqa: PLC0415
+
+    pwf = get_project_workflow()
+    try:
+        pwf.get_project(project_id)
+    except FileNotFoundError as err:
+        raise HTTPException(404, "Project not found") from err
+
+    proj_dir = pwf._project_dir(project_id)
+    presets_dir = proj_dir / "presets"
+
+    svc = PresetService()
+    return svc.list_presets(presets_dir)
+
+
+@router.post("/{project_id}/presets/{preset_filename}/apply")
+def apply_preset(project_id: str, preset_filename: str) -> dict:
+    """Apply a preset to the current project."""
+    from app.workflow.preset_service import PresetService  # noqa: PLC0415
+
+    pwf = get_project_workflow()
+    try:
+        proj = pwf.get_project(project_id)
+    except FileNotFoundError as err:
+        raise HTTPException(404, "Project not found") from err
+
+    proj_dir = pwf._project_dir(project_id)
+    preset_path = proj_dir / "presets" / preset_filename
+
+    svc = PresetService()
+    try:
+        preset = svc.load_preset(preset_path)
+    except FileNotFoundError as err:
+        raise HTTPException(404, "Preset not found") from err
+
+    updated = svc.apply_preset_to_project(preset, proj)
+    pwf._save_project(project_id, proj)
+
+    return {"ok": True, "updated_objects": updated}
+
+
+# ── Export ZIP endpoint ─────────────────────────────────────────────────────
+
+@router.get("/{project_id}/export")
+def export_project_zip(project_id: str) -> FileResponse:
+    """Export project as ZIP containing rendered video, SRT, and dubbing."""
+    import zipfile  # noqa: PLC0415
+
+    pwf = get_project_workflow()
+    try:
+        pwf.get_project(project_id)
+    except FileNotFoundError as err:
+        raise HTTPException(404, "Project not found") from err
+
+    proj_dir = pwf._project_dir(project_id)
+    zip_path = proj_dir / f"{project_id}_export.zip"
+
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        # Add rendered videos
+        renders_dir = proj_dir / "renders"
+        if renders_dir.exists():
+            for f in renders_dir.glob("*.mp4"):
+                zf.write(f, f"renders/{f.name}")
+            for f in renders_dir.glob("*.webm"):
+                zf.write(f, f"renders/{f.name}")
+
+        # Add SRT and WAV files
+        dubbing_dir = proj_dir / "dubbing"
+        if dubbing_dir.exists():
+            for f in dubbing_dir.rglob("*.srt"):
+                zf.write(f, f"dubbing/{f.relative_to(dubbing_dir)}")
+            for f in dubbing_dir.rglob("*.wav"):
+                zf.write(f, f"dubbing/{f.relative_to(dubbing_dir)}")
+
+        # Add project JSON
+        project_json = proj_dir / "project.json"
+        if project_json.exists():
+            zf.write(project_json, "project.json")
+
+        # Add presets
+        presets_dir = proj_dir / "presets"
+        if presets_dir.exists():
+            for f in presets_dir.glob("*.json"):
+                zf.write(f, f"presets/{f.name}")
+
+    return FileResponse(
+        str(zip_path),
+        media_type="application/zip",
+        filename=f"{project_id}_export.zip",
+    )

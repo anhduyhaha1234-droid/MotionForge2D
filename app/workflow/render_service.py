@@ -183,6 +183,16 @@ class PreviewRenderService:
         return str(output_video)
 
 
+def get_format_params(fmt: str) -> dict:
+    """Get FFmpeg parameters for a given output format."""
+    formats: dict[str, dict] = {
+        "mp4": {"ext": ".mp4", "codec": "libx264", "pix_fmt": "yuv420p"},
+        "webm": {"ext": ".webm", "codec": "libvpx-vp9", "pix_fmt": "yuv420p"},
+        "gif": {"ext": ".gif", "codec": "gif", "pix_fmt": None},
+    }
+    return formats.get(fmt, formats["mp4"])
+
+
 class FinalRenderService:
     """Renders the final high-quality output."""
 

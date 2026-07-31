@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api, type ProjectData } from "@/lib/api";
 import { useProjectStore } from "@/stores/project";
+import { PresetManager } from "@/components/PresetManager";
 
 export function ScreenA() {
   const { projectId, setProjectId, setProject, setScreen } = useProjectStore();
@@ -131,6 +132,13 @@ export function ScreenA() {
             </p>
           )}
         </div>
+
+        {/* Preset Manager */}
+        {projectId && (
+          <div className="mt-6">
+            <PresetManager />
+          </div>
+        )}
       </div>
     </div>
   );
