@@ -395,6 +395,95 @@ def preview_mask(project_id: str, body: PreviewMaskRequest) -> dict:
     }
 
 
+def _auto_crop_object(
+    proj_dir: Path,
+    object_id: str,
+    selection: SelectionInput,
+    pad: int = 10,
+) -> Path | None:
+    """Crop the object region from the current frame into crop.png.
+
+    Uses the selection bbox (or point with a default window). Returns the
+    crop file path, or None if the frame can't be found.
+    """
+    import cv2
+
+    try:
+        f_idx = selection.frame_index
+        s_id = 0  # default scene
+        scene_dir = proj_dir / "frames" / f"scene_{s_id}"
+        frame_path = find_frame_path(scene_dir, f_idx)
+        if frame_path is None:
+            for sd in (proj_dir / "frames").glob("scene_*"):
+                found = find_frame_path(sd, f_idx)
+                if found is not None:
+                    frame_path = found
+                    break
+        if frame_path is None:
+            return None
+
+        frame = cv2.imread(str(frame_path))
+        if frame is None:
+            return None
+
+        h, w = frame.shape[:2]
+
+        if selection.mode == "bounding_box":
+            x = max(0, int(selection.x) - pad)
+            y = max(0, int(selection.y) - pad)
+            bw = int(selection.width) + 2 * pad
+            bh = int(selection.height) + 2 * pad
+        else:
+            # Point mode: use a 160x160 window centered on the point
+            cx, cy = int(selection.x), int(selection.y)
+            half = 80
+            x = max(0, cx - half)
+            y = max(0, cy - half)
+            bw, bh = 2 * half, 2 * half
+
+        x = min(x, w - 1)
+        y = min(y, h - 1)
+        bw = min(bw, w - x)
+        bh = min(bh, h - y)
+        if bw <= 0 or bh <= 0:
+            return None
+
+        crop_img = frame[y : y + bh, x : x + bw]
+
+        obj_dir = proj_dir / "objects" / object_id
+        obj_dir.mkdir(parents=True, exist_ok=True)
+        crop_file = obj_dir / "crop.png"
+        cv2.imwrite(str(crop_file), crop_img)
+        return crop_file
+    except Exception:
+        return None
+
+
+@router.get("/{project_id}/objects/{object_id}/crop")
+@router.get("/{project_id}/objects/{object_id}/crop/")
+def get_object_crop(project_id: str, object_id: str) -> FileResponse:
+    """Return the cropped object thumbnail. Auto-generates if missing."""
+    pwf = get_project_workflow()
+    try:
+        obj = pwf.get_tracked_object(project_id, object_id)
+    except (FileNotFoundError, KeyError) as e:
+        raise HTTPException(404, str(e)) from e
+
+    proj_dir = pwf._project_dir(project_id)
+    crop_file = proj_dir / "objects" / object_id / "crop.png"
+
+    # Auto-generate crop if missing
+    if not crop_file.exists():
+        generated = _auto_crop_object(proj_dir, object_id, obj.selection)
+        if generated is not None:
+            crop_file = generated
+
+    if not crop_file.exists():
+        raise HTTPException(404, "Crop not found")
+
+    return FileResponse(str(crop_file), media_type="image/png")
+
+
 @router.post("/{project_id}/objects", status_code=201)
 @router.post("/{project_id}/objects/", status_code=201)
 def create_object(project_id: str, body: CreateObjectRequest) -> dict:
@@ -461,6 +550,13 @@ def create_object(project_id: str, body: CreateObjectRequest) -> dict:
                     cv2.imwrite(str(initial_mask_path), mask)
             except Exception:
                 pass
+
+    # Auto-crop the object from the frame into crop.png
+    crop_file = _auto_crop_object(
+        proj_dir, obj_id, body.selection,
+    )
+    if crop_file is not None:
+        obj.crop_path = str(crop_file)
 
     data = pwf.add_tracked_object(project_id, obj)
     return {"object_id": obj_id, "project": data.model_dump()}

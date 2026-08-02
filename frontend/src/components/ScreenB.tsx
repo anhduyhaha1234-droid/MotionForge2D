@@ -324,8 +324,37 @@ export function ScreenB() {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Left: Auto-detected objects + list */}
+        {/* Left: Existing objects + Auto-detected objects */}
         <aside className="w-64 bg-gray-900 border-r border-gray-800 p-4 space-y-3 overflow-y-auto">
+          {/* Existing tracked objects with crop thumbnails */}
+          {project?.objects && project.objects.length > 0 && (
+            <>
+              <h3 className="text-xs text-gray-500 uppercase mb-2">🎭 Nhân vật đã tách</h3>
+              <div className="space-y-1">
+                {project.objects.map((obj) => (
+                  <button
+                    key={obj.object_id}
+                    onClick={() => setActiveObject(obj)}
+                    className="w-full text-left px-2.5 py-2 bg-gray-800/80 hover:bg-purple-900/40 border border-gray-700 hover:border-purple-500/50 rounded-lg text-xs transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <img
+                        src={api.getObjectCropUrl(projectId!, obj.object_id)}
+                        alt={obj.name}
+                        className="w-12 h-12 object-contain bg-black/60 rounded border border-purple-500/50 flex-shrink-0"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                      />
+                      <div className="min-w-0">
+                        <p className="font-medium text-gray-200 truncate">{obj.name}</p>
+                        <p className="text-[10px] text-gray-500">Scene {obj.scene_id}</p>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
           <h3 className="text-xs text-gray-500 uppercase mb-2">🎯 Vật thể phát hiện</h3>
           {autoObjects.length === 0 ? (
             <p className="text-xs text-gray-600">Chưa quét. Bấm "🪄 Tự Động Bắt" ở bên phải để tìm nhân vật & vật thể.</p>

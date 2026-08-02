@@ -103,3 +103,61 @@ class TestAutoSegment:
         """Auto-segment on nonexistent project returns 404."""
         response = client.post("/api/projects/nope/auto-segment-objects")
         assert response.status_code == 404
+
+
+class TestObjectCrop:
+    def test_crop_nonexistent_object(self, client: TestClient) -> None:
+        """GET crop for nonexistent object returns 404."""
+        create_resp = client.post("/api/projects", json={"name": "CropProj"})
+        pid = create_resp.json()["project_id"]
+        resp = client.get(f"/api/projects/{pid}/objects/nope/crop")
+        assert resp.status_code == 404
+
+    def test_crop_generates_after_create(self, client: TestClient) -> None:
+        """GET crop returns image/png after creating an object with a frame.
+
+        Uses a synthetic frame created in the test project's frames dir,
+        then creates an object and verifies the crop endpoint serves PNG.
+        """
+        import cv2
+        import numpy as np
+
+        # Create project
+        create_resp = client.post("/api/projects", json={"name": "CropProj2"})
+        pid = create_resp.json()["project_id"]
+
+        # Create a synthetic frame at projects/{pid}/frames/scene_0/frame_000000.png
+        from app.api import deps
+        proj_root = deps._config.project_root
+        frame_dir = proj_root / "projects" / pid / "frames" / "scene_0"
+        frame_dir.mkdir(parents=True, exist_ok=True)
+        frame = np.zeros((200, 200, 3), dtype=np.uint8)
+        frame[50:150, 50:150] = (0, 0, 255)  # red square
+        cv2.imwrite(str(frame_dir / "frame_000000.png"), frame)
+
+        # Create object with point selection on the red square
+        r = client.post(
+            f"/api/projects/{pid}/objects",
+            json={
+                "name": "CropObj",
+                "selection": {
+                    "mode": "point",
+                    "frame_index": 0,
+                    "x": 100,
+                    "y": 100,
+                },
+                "scene_id": 0,
+            },
+        )
+        assert r.status_code == 201
+        oid = r.json()["object_id"]
+
+        # GET crop (no trailing slash)
+        resp = client.get(f"/api/projects/{pid}/objects/{oid}/crop")
+        assert resp.status_code == 200
+        assert resp.headers["content-type"].startswith("image/png")
+
+        # GET crop (trailing slash) — no 405
+        resp2 = client.get(f"/api/projects/{pid}/objects/{oid}/crop/")
+        assert resp2.status_code == 200
+        assert resp2.headers["content-type"].startswith("image/png")

@@ -231,6 +231,7 @@ class TrackedObject(BaseModel):
     selection: SelectionInput
     scene_id: int
     replacement_image: str | None = None  # Path to replacement PNG
+    crop_path: str | None = None  # Path to cropped thumbnail PNG
     motion: SceneMotion | None = None
     replacement_config: ReplacementConfig | None = None
 

@@ -379,6 +379,9 @@ export const api = {
   getReplacementImageUrl: (projectId: string, objectId: string) =>
     `${API_BASE}/api/projects/${projectId}/objects/${objectId}/replacement-image`,
 
+  getObjectCropUrl: (projectId: string, objectId: string) =>
+    `${API_BASE}/api/projects/${projectId}/objects/${objectId}/crop`,
+
   listObjects: (projectId: string) =>
     apiFetch<
       Array<

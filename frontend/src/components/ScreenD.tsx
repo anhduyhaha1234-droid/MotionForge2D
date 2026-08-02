@@ -261,17 +261,15 @@ export function ScreenD() {
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 bg-gray-900 rounded overflow-hidden flex-shrink-0">
+                  <div className="w-12 h-12 bg-gray-900 rounded overflow-hidden flex-shrink-0">
                     {projectId && (
                       <img
-                        src={api.getReplacementImageUrl(projectId, obj.object_id)}
+                        src={api.getObjectCropUrl(projectId, obj.object_id)}
                         alt={obj.name}
-                        className="w-full h-full object-contain"
+                        className="w-full h-full object-contain bg-black/60 rounded border border-purple-500/50"
                         onError={(e) => {
-                          // Fallback to generic thumbnail
-                          const el = e.target as HTMLImageElement;
-                          el.src = `http://localhost:8000/api/projects/${projectId}/objects/${obj.object_id}/thumbnail`;
-                          el.onerror = null;
+                          // Fallback: hide broken image, show empty box
+                          (e.target as HTMLImageElement).style.display = "none";
                         }}
                       />
                     )}
