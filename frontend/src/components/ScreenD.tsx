@@ -9,7 +9,7 @@
  * Right:  4 transform sliders + apply-all action + scene/dubbing panels
  */
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useProjectStore } from "@/stores/project";
@@ -166,11 +166,35 @@ export function ScreenD() {
       setReplacement({ mode: "static_asset", asset_path: result.asset_path });
       return result;
     },
+    onSuccess: () => {
+      // Close modal + clear preview when upload completes
+      setPendingFile(null);
+      setPendingPreview(null);
+    },
   });
+
+  // Preview flow: store file locally, show side-by-side modal, upload only on confirm
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingPreview, setPendingPreview] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) uploadMut.mutate(file);
+    if (!file) return;
+    // Step 1: save file locally + create preview URL (no upload yet)
+    setPendingFile(file);
+    setPendingPreview(URL.createObjectURL(file));
+    // Reset input so selecting the same file again re-triggers
+    e.target.value = "";
+  };
+
+  const handleCancelPreview = () => {
+    if (pendingPreview) URL.revokeObjectURL(pendingPreview);
+    setPendingFile(null);
+    setPendingPreview(null);
+  };
+
+  const handleConfirmReplace = () => {
+    if (pendingFile) uploadMut.mutate(pendingFile);
   };
 
   /* ── Settings mutation ──────────────────────────────────────────────── */
@@ -300,10 +324,10 @@ export function ScreenD() {
 
           <div className="border-t border-gray-700 pt-3 space-y-2">
             <label className="block w-full py-2 text-center text-xs bg-blue-600 hover:bg-blue-500 rounded cursor-pointer">
-              📁 Tải Ảnh Nhân Vật Mới (PNG)
+              📁 Tải Ảnh Nhân Vật Mới (PNG/JPG/WebP)
               <input
                 type="file"
-                accept=".png,image/png"
+                accept="image/*,.png,.jpg,.jpeg,.webp"
                 onChange={handleFileChange}
                 className="hidden"
               />
@@ -499,6 +523,96 @@ export function ScreenD() {
           </details>
         </div>
       </div>
+
+      {/* ── Side-by-side comparison modal (preview before upload) ──────── */}
+      {pendingPreview && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          onClick={handleCancelPreview}
+        >
+          <div
+            className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-3xl p-6 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium text-gray-200">
+                👀 Đối Chiếu Nhân Vật — Xác Nhận Thay Thế
+              </h3>
+              <button
+                onClick={handleCancelPreview}
+                className="text-gray-500 hover:text-gray-300 text-lg leading-none"
+                title="Đóng"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Two-column comparison */}
+            <div className="grid grid-cols-2 gap-4">
+              {/* Left: original object */}
+              <div className="space-y-2">
+                <p className="text-xs text-gray-400 uppercase tracking-wide">
+                  Nhân vật gốc (đang chọn)
+                </p>
+                <div className="aspect-square bg-gray-800 rounded-xl overflow-hidden flex items-center justify-center border border-gray-700">
+                  {projectId && objectId ? (
+                    <img
+                      src={api.getObjectCropUrl(projectId, objectId)}
+                      alt="Nhân vật gốc"
+                      className="w-full h-full object-contain"
+                      onError={(e) => {
+                        const el = e.target as HTMLImageElement;
+                        el.style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    <span className="text-gray-600 text-xs">Chưa có ảnh gốc</span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 truncate">
+                  {activeObject?.name ?? "Nhân vật gốc"}
+                </p>
+              </div>
+
+              {/* Right: new file preview */}
+              <div className="space-y-2">
+                <p className="text-xs text-gray-400 uppercase tracking-wide">
+                  Nhân vật mới
+                </p>
+                <div className="aspect-square bg-gray-800 rounded-xl overflow-hidden flex items-center justify-center border border-purple-500/50">
+                  <img
+                    src={pendingPreview}
+                    alt="Nhân vật mới"
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 truncate">
+                  📄 {pendingFile?.name ?? "File ảnh"}
+                </p>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-gray-800">
+              <button
+                onClick={handleCancelPreview}
+                disabled={uploadMut.isPending}
+                className="px-4 py-2 text-xs bg-gray-800 hover:bg-gray-700 rounded transition-colors disabled:opacity-50"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleConfirmReplace}
+                disabled={uploadMut.isPending}
+                className="px-4 py-2 text-xs bg-purple-600 hover:bg-purple-500 rounded font-medium text-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                data-testid="confirm-replace"
+              >
+                {uploadMut.isPending ? "Đang tải lên..." : "✅ Xác Nhận Thay Thế"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
