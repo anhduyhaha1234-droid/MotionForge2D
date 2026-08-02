@@ -3,14 +3,15 @@
 /**
  * ScreenD — Replacement & Composite Preview
  *
- * Left panel:   object thumbnail + replacement upload
- * Center:       Konva composite canvas
- * Right panel:  transform controls + preview mode selector
+ * 3-column layout:
+ * Left:   objects & library (cards + upload + frame slider)
+ * Center: Konva composite canvas
+ * Right:  4 transform sliders + apply-all action + scene/dubbing panels
  */
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type ClipMode, type FrameMotion, type ReplacementConfig } from "@/lib/api";
+import { api } from "@/lib/api";
 import { useProjectStore } from "@/stores/project";
 import { CompositeCanvas } from "@/components/CompositeCanvas";
 import { SceneSelector } from "./SceneSelector";
@@ -26,28 +27,11 @@ const PREVIEW_MODES = [
   { value: "comparison" as const, label: "So sánh" },
 ];
 
-const FIT_MODES = [
-  { value: "contain" as const, label: "Contain" },
-  { value: "cover" as const, label: "Cover" },
-  { value: "stretch" as const, label: "Stretch" },
-];
-
-const CLIP_MODES: { value: ClipMode; label: string; desc: string }[] = [
-  { value: "asset_alpha", label: "Alpha asset", desc: "Dùng alpha của PNG thay thế" },
-  { value: "original_mask", label: "Mask gốc", desc: "Cắt theo mask object gốc" },
-  { value: "intersection", label: "Giao", desc: "Giao của alpha + mask gốc" },
-];
-
-const REPLACEMENT_MODES: { value: ReplacementConfig["mode"]; label: string }[] = [
-  { value: "none", label: "Không thay thế" },
-  { value: "static_asset", label: "Ảnh tĩnh (PNG)" },
-  { value: "frame_sequence", label: "Chuỗi ảnh (Frame Sequence)" },
-];
-
 /* ── Slider helper ─────────────────────────────────────────────────────── */
 
 function Slider({
   label,
+  caption,
   value,
   min,
   max,
@@ -56,6 +40,7 @@ function Slider({
   onChange,
 }: {
   label: string;
+  caption?: string;
   value: number;
   min: number;
   max: number;
@@ -65,7 +50,18 @@ function Slider({
 }) {
   return (
     <div>
-      <label className="text-xs text-gray-400">{label}</label>
+      <div className="flex items-center justify-between">
+        <label className="text-xs text-gray-300">{label}</label>
+        <span className="text-xs text-gray-500 font-mono">
+          {unit === "°"
+            ? `${value}${unit}`
+            : unit === "x"
+              ? `${value.toFixed(2)}${unit}`
+              : unit === "%"
+                ? `${Math.round(value * 100)}${unit}`
+                : value.toFixed(2)}
+        </span>
+      </div>
       <input
         type="range"
         min={min}
@@ -75,9 +71,7 @@ function Slider({
         onChange={(e) => onChange(Number(e.target.value))}
         className="w-full"
       />
-      <span className="text-xs text-gray-500">
-        {unit === "°" ? `${value}${unit}` : unit === "x" ? `${value.toFixed(2)}${unit}` : unit === "%" ? `${Math.round(value * 100)}${unit}` : value.toFixed(2)}
-      </span>
+      {caption && <p className="text-[10px] text-gray-600 -mt-1">{caption}</p>}
     </div>
   );
 }
@@ -89,6 +83,7 @@ export function ScreenD() {
     projectId,
     project,
     activeObject,
+    setActiveObject,
     currentFrame,
     setCurrentFrame,
     replacement,
@@ -103,6 +98,14 @@ export function ScreenD() {
 
   const queryClient = useQueryClient();
   const activeSceneId = useProjectStore((s) => s.activeSceneId);
+
+  /* ── Auto-select first object ───────────────────────────────────────── */
+
+  useEffect(() => {
+    if (!activeObject && project?.objects?.length) {
+      setActiveObject(project.objects[0]);
+    }
+  }, [activeObject, project, setActiveObject]);
 
   const approveSceneMut = useMutation({
     mutationFn: () => {
@@ -119,6 +122,9 @@ export function ScreenD() {
   const videoWidth = meta?.width ?? 1920;
   const videoHeight = meta?.height ?? 1080;
   const totalFrames = meta?.total_frames ?? 1;
+
+  const sceneCount =
+    project?.scene_details?.length ?? project?.scenes?.length ?? 0;
 
   /* ── Frame motion data ──────────────────────────────────────────────── */
 
@@ -188,20 +194,6 @@ export function ScreenD() {
     },
   });
 
-  /* ── Bulk mapping ─────────────────────────────────────────────────────── */
-
-  const [bulkSceneIds] = useState<number[]>([]);
-
-  const bulkMut = useMutation({
-    mutationFn: () => {
-      if (!projectId || !objectId) return Promise.resolve({ applied_to: [] as string[], scene_ids: [] as number[] });
-      return api.applyBulkMapping(projectId, objectId, bulkSceneIds);
-    },
-    onSuccess: (data) => {
-      alert(`Đã áp dụng cho ${data.applied_to.length} nhân vật trong ${data.scene_ids.length} cảnh`);
-    },
-  });
-
   /* ── Sequence frame URL ──────────────────────────────────────────────── */
 
   const sequenceFrameUrl =
@@ -211,7 +203,6 @@ export function ScreenD() {
 
   /* ── Frame slider helper ────────────────────────────────────────────── */
 
-  // Find the nearest tracked frame when user scrubs
   const handleFrameChange = useCallback(
     (val: number) => {
       setCurrentFrame(val);
@@ -253,132 +244,81 @@ export function ScreenD() {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* ── Scene panel ────────────────────────────────────────────────── */}
-        <div className="w-52 bg-gray-900 border-r border-gray-800 p-4 space-y-4 overflow-y-auto flex-shrink-0">
-          <SceneSelector />
-          <ScenePreview />
-          <button
-            onClick={() => approveSceneMut.mutate()}
-            disabled={activeSceneId === null || approveSceneMut.isPending}
-            className="w-full py-2 bg-green-600 hover:bg-green-500
-              disabled:bg-gray-700 disabled:text-gray-500
-              rounded font-medium text-sm transition-colors"
-          >
-            ✅ Duyệt phân cảnh này
-          </button>
-        </div>
-
-        {/* ── Left panel ─────────────────────────────────────────────────── */}
-        <div className="w-64 bg-gray-900 border-r border-gray-800 p-4 space-y-4 overflow-y-auto">
-          {/* Object thumbnail */}
-          <div>
-            <h3 className="text-xs text-gray-500 uppercase mb-2">
-              Object gốc
-            </h3>
-            <div className="aspect-square bg-gray-800 rounded flex items-center justify-center overflow-hidden">
-              {projectId && objectId ? (
-                <img
-                  src={api.getReplacementImageUrl(projectId, objectId)}
-                  alt="Object thumbnail"
-                  className="w-full h-full object-contain"
-                  onError={(e) => {
-                    // Fallback to generic thumbnail
-                    const el = e.target as HTMLImageElement;
-                    el.src = `http://localhost:8000/api/projects/${projectId}/objects/${objectId}/thumbnail`;
-                    el.onerror = null;
-                  }}
-                />
-              ) : (
-                <span className="text-gray-600 text-xs">Chưa có object</span>
-              )}
-            </div>
+        {/* ── Left column: Objects & Library ─────────────────────────────── */}
+        <div className="w-64 bg-gray-900 border-r border-gray-800 p-4 space-y-4 overflow-y-auto flex-shrink-0">
+          <h3 className="text-xs text-gray-500 uppercase mb-2">
+            🎭 Nhân vật đã tách
+          </h3>
+          <div className="space-y-2">
+            {project?.objects?.map((obj) => (
+              <button
+                key={obj.object_id}
+                onClick={() => setActiveObject(obj)}
+                className={`w-full text-left p-2 rounded-lg border transition-colors ${
+                  activeObject?.object_id === obj.object_id
+                    ? "bg-purple-900/40 border-purple-500/50"
+                    : "bg-gray-800/80 border-gray-700 hover:bg-gray-700/80"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 bg-gray-900 rounded overflow-hidden flex-shrink-0">
+                    {projectId && (
+                      <img
+                        src={api.getReplacementImageUrl(projectId, obj.object_id)}
+                        alt={obj.name}
+                        className="w-full h-full object-contain"
+                        onError={(e) => {
+                          // Fallback to generic thumbnail
+                          const el = e.target as HTMLImageElement;
+                          el.src = `http://localhost:8000/api/projects/${projectId}/objects/${obj.object_id}/thumbnail`;
+                          el.onerror = null;
+                        }}
+                      />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-gray-200 truncate">
+                      {obj.name}
+                    </p>
+                    <p className="text-[10px] text-gray-500">
+                      Scene {obj.scene_id}
+                    </p>
+                  </div>
+                </div>
+              </button>
+            ))}
+            {!project?.objects?.length && (
+              <p className="text-xs text-gray-600">
+                Chưa có nhân vật nào. Vào Màn B để tách nhân vật.
+              </p>
+            )}
           </div>
 
-          {/* Replacement upload */}
-          <div>
-            <h3 className="text-xs text-gray-500 uppercase mb-2">
-              Ảnh thay thế
-            </h3>
-
-            {/* Mode selector */}
-            <div className="mb-2">
-              <label className="text-xs text-gray-400">Chế độ thay thế</label>
-              <select
-                value={replacement.mode}
-                onChange={(e) => setReplacement({ mode: e.target.value as ReplacementConfig["mode"] })}
-                className="w-full px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm"
-              >
-                {REPLACEMENT_MODES.map((rm) => (
-                  <option key={rm.value} value={rm.value}>{rm.label}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Static asset upload — only shown when mode is static_asset */}
-            {replacement.mode === "static_asset" && (
-              <>
-                <input
-                  type="file"
-                  accept=".png,image/png"
-                  onChange={handleFileChange}
-                  data-testid="replacement-upload"
-                  className="w-full text-xs text-gray-400 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-blue-600 file:text-white file:text-xs"
-                />
-                {uploadMut.isPending && (
-                  <p className="text-xs text-yellow-400 mt-1">Đang tải lên...</p>
-                )}
-                {replacementUrl && (
-                  <div className="mt-2 aspect-square bg-gray-800 rounded overflow-hidden relative">
-                    <div
-                      className="absolute inset-0"
-                      style={{
-                        backgroundImage:
-                          "linear-gradient(45deg, #333 25%, transparent 25%), linear-gradient(-45deg, #333 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #333 75%), linear-gradient(-45deg, transparent 75%, #333 75%)",
-                        backgroundSize: "12px 12px",
-                        backgroundPosition: "0 0, 0 6px, 6px -6px, -6px 0px",
-                      }}
-                    />
-                    <img
-                      src={replacementUrl}
-                      alt="Ảnh thay thế"
-                      className="relative w-full h-full object-contain"
-                      data-testid="replacement-preview"
-                    />
-                  </div>
-                )}
-              </>
+          <div className="border-t border-gray-700 pt-3 space-y-2">
+            <label className="block w-full py-2 text-center text-xs bg-blue-600 hover:bg-blue-500 rounded cursor-pointer">
+              📁 Tải Ảnh Nhân Vật Mới (PNG)
+              <input
+                type="file"
+                accept=".png,image/png"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+            </label>
+            {uploadMut.isPending && (
+              <p className="text-xs text-yellow-400 text-center">
+                Đang tải lên...
+              </p>
             )}
-
-            {/* Frame sequence controls — only shown when mode is frame_sequence */}
-            {replacement.mode === "frame_sequence" && (
-              <div className="space-y-2">
-                <div>
-                  <label className="text-xs text-gray-400">Thư mục chuỗi ảnh</label>
-                  <input
-                    type="text"
-                    value={replacement.frameSequenceDir ?? ""}
-                    onChange={(e) => setReplacement({ frameSequenceDir: e.target.value || undefined })}
-                    placeholder="/path/to/frames/"
-                    className="w-full px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-400">FPS (tùy chọn)</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={120}
-                    value={replacement.frameSequenceFps ?? ""}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setReplacement({ frameSequenceFps: v ? Number(v) : undefined });
-                    }}
-                    placeholder="24"
-                    className="w-full px-2 py-1 bg-gray-800 border border-gray-700 rounded text-sm"
-                  />
-                </div>
-              </div>
-            )}
+            <button
+              onClick={() =>
+                alert(
+                  "Thư viện nhân vật mẫu đang được phát triển — hãy tải PNG của bạn lên nhé!",
+                )
+              }
+              className="w-full py-2 text-xs bg-gray-700 hover:bg-gray-600 rounded"
+            >
+              🎭 Thư Viện Nhân Vật Mẫu
+            </button>
           </div>
 
           {/* Frame slider */}
@@ -400,45 +340,6 @@ export function ScreenD() {
               <span>{totalFrames - 1}</span>
             </div>
           </div>
-
-          {/* Motion data info */}
-          {frameMotion && (
-            <div className="text-xs space-y-1">
-              <h3 className="text-gray-500 uppercase">Motion data</h3>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Centroid:</span>
-                <span>
-                  ({Math.round(frameMotion.centroid_x)},{" "}
-                  {Math.round(frameMotion.centroid_y)})
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">BBox:</span>
-                <span>
-                  {Math.round(frameMotion.bbox.width)}×
-                  {Math.round(frameMotion.bbox.height)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Rotation:</span>
-                <span>{frameMotion.rotation_deg.toFixed(1)}°</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Confidence:</span>
-                <span
-                  className={
-                    frameMotion.confidence >= 0.8
-                      ? "text-green-400"
-                      : frameMotion.confidence >= 0.5
-                        ? "text-yellow-400"
-                        : "text-red-400"
-                  }
-                >
-                  {(frameMotion.confidence * 100).toFixed(0)}%
-                </span>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* ── Center: Konva canvas ───────────────────────────────────────── */}
@@ -456,57 +357,16 @@ export function ScreenD() {
           />
         </div>
 
-        {/* ── Right panel: Transform controls ────────────────────────────── */}
-        <div className="w-72 bg-gray-900 border-l border-gray-800 p-4 space-y-4 overflow-y-auto">
-          <h3 className="text-xs text-gray-500 uppercase">Transform</h3>
-
-          {/* Anchor */}
-          <Slider
-            label="Anchor X"
-            value={replacement.anchor.x}
-            min={0}
-            max={1}
-            step={0.01}
-            onChange={(v) =>
-              setReplacement({ anchor: { ...replacement.anchor, x: v } })
-            }
-          />
-          <Slider
-            label="Anchor Y"
-            value={replacement.anchor.y}
-            min={0}
-            max={1}
-            step={0.01}
-            onChange={(v) =>
-              setReplacement({ anchor: { ...replacement.anchor, y: v } })
-            }
-          />
-
-          {/* Offset */}
-          <Slider
-            label="Offset X"
-            value={replacement.offset.x}
-            min={-0.5}
-            max={0.5}
-            step={0.01}
-            onChange={(v) =>
-              setReplacement({ offset: { ...replacement.offset, x: v } })
-            }
-          />
-          <Slider
-            label="Offset Y"
-            value={replacement.offset.y}
-            min={-0.5}
-            max={0.5}
-            step={0.01}
-            onChange={(v) =>
-              setReplacement({ offset: { ...replacement.offset, y: v } })
-            }
-          />
+        {/* ── Right column: Transform controls ───────────────────────────── */}
+        <div className="w-72 bg-gray-900 border-l border-gray-800 p-4 space-y-4 overflow-y-auto flex-shrink-0">
+          <h3 className="text-xs text-gray-500 uppercase">
+            Điều chỉnh nhân vật
+          </h3>
 
           {/* Scale */}
           <Slider
-            label="Tỷ lệ"
+            label="🔍 Kích thước"
+            caption="Phóng to / Thu nhỏ nhân vật mới"
             value={replacement.scale}
             min={0.1}
             max={3}
@@ -517,7 +377,8 @@ export function ScreenD() {
 
           {/* Rotation */}
           <Slider
-            label="Xoay bổ sung"
+            label="🔄 Góc xoay"
+            caption="Xoay nhân vật mới theo góc tùy chỉnh"
             value={replacement.rotation_offset_deg}
             min={-180}
             max={180}
@@ -526,62 +387,53 @@ export function ScreenD() {
             onChange={(v) => setReplacement({ rotation_offset_deg: v })}
           />
 
-          {/* Opacity */}
+          {/* Offset X */}
           <Slider
-            label="Độ mờ"
-            value={replacement.opacity}
-            min={0}
-            max={1}
+            label="↔️ Vị trí Ngang"
+            caption="Dịch chuyển nhân vật sang trái / phải"
+            value={replacement.offset.x}
+            min={-0.5}
+            max={0.5}
             step={0.01}
-            unit="%"
-            onChange={(v) => setReplacement({ opacity: v })}
+            onChange={(v) =>
+              setReplacement({ offset: { ...replacement.offset, x: v } })
+            }
           />
 
-          {/* Fit mode */}
-          <div>
-            <label className="text-xs text-gray-400">Chế độ fit</label>
-            <div className="grid grid-cols-3 gap-1 mt-1">
-              {FIT_MODES.map((fm) => (
-                <button
-                  key={fm.value}
-                  onClick={() => setReplacement({ fit_mode: fm.value })}
-                  className={`px-2 py-1 text-xs rounded ${
-                    replacement.fit_mode === fm.value
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-800 text-gray-300 hover:bg-gray-700"
-                  }`}
-                >
-                  {fm.label}
-                </button>
-              ))}
-            </div>
-          </div>
+          {/* Offset Y */}
+          <Slider
+            label="↕️ Vị trí Dọc"
+            caption="Dịch chuyển nhân vật lên / xuống"
+            value={replacement.offset.y}
+            min={-0.5}
+            max={0.5}
+            step={0.01}
+            onChange={(v) =>
+              setReplacement({ offset: { ...replacement.offset, y: v } })
+            }
+          />
 
-          {/* Clip mode */}
-          <div>
-            <label className="text-xs text-gray-400">Chế độ clip</label>
-            <div className="space-y-1 mt-1">
-              {CLIP_MODES.map((cm) => (
-                <button
-                  key={cm.value}
-                  onClick={() =>
-                    setReplacement({ clip_mode: cm.value })
-                  }
-                  className={`w-full px-2 py-1.5 text-xs rounded text-left ${
-                    replacement.clip_mode === cm.value
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-800 text-gray-300 hover:bg-gray-700"
-                  }`}
-                  title={cm.desc}
-                >
-                  {cm.label}
-                  <span className="block text-[10px] opacity-70">
-                    {cm.desc}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
+          {/* 🚀 Apply to all scenes — save settings then auto-match */}
+          <button
+            onClick={async () => {
+              if (!projectId || !objectId) return;
+              try {
+                await settingsMut.mutateAsync();
+                const result = await api.autoMatchCharacter(
+                  projectId,
+                  objectId,
+                );
+                alert(`Đã áp dụng nhân vật mới cho ${result.count} cảnh!`);
+              } catch (err) {
+                alert(`Lỗi: ${(err as Error).message}`);
+              }
+            }}
+            disabled={settingsMut.isPending}
+            className="w-full py-3 text-sm bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl shadow-lg shadow-purple-900/40 transition-all disabled:bg-gray-700 disabled:text-gray-400"
+            data-testid="apply-all-scenes"
+          >
+            🚀 Áp Dụng Nhân Vật Mới Cho Tất Cả {sceneCount} Cảnh
+          </button>
 
           {/* Actions */}
           <div className="space-y-1 pt-2 border-t border-gray-800">
@@ -593,14 +445,18 @@ export function ScreenD() {
             >
               {settingsMut.isPending ? "Đang lưu..." : "Áp dụng"}
             </button>
-            <p className="text-[11px] text-gray-400 mt-1">Lưu ảnh thay thế + vị trí nhân vật hiện tại.</p>
+            <p className="text-[11px] text-gray-400 mt-1">
+              Lưu ảnh thay thế + vị trí nhân vật hiện tại.
+            </p>
             <button
               onClick={() => resetReplacement()}
               className="w-full py-2 text-sm bg-gray-800 hover:bg-gray-700 rounded"
             >
               Đặt lại
             </button>
-            <p className="text-[11px] text-gray-400 mt-1">Xóa ảnh thay thế, quay về ảnh nhân vật gốc.</p>
+            <p className="text-[11px] text-gray-400 mt-1">
+              Xóa ảnh thay thế, quay về ảnh nhân vật gốc.
+            </p>
             <button
               onClick={() => setScreen("render")}
               className="w-full py-2 text-sm bg-blue-700 hover:bg-blue-600 rounded"
@@ -608,51 +464,24 @@ export function ScreenD() {
             >
               Tiếp: Render →
             </button>
-            <p className="text-[11px] text-gray-400 mt-1">Chuyển sang bước render & ghép video hoàn chỉnh.</p>
+            <p className="text-[11px] text-gray-400 mt-1">
+              Chuyển sang bước render & ghép video hoàn chỉnh.
+            </p>
           </div>
 
-          {/* Bulk Character Mapping */}
-          <div className="border-t border-gray-700 pt-3 mt-3">
-            <h4 className="text-sm font-medium text-gray-300 mb-2">
-              🔄 Áp dụng hàng loạt
-            </h4>
-            <p className="text-xs text-gray-500 mb-2">
-              Gán cấu hình nhân vật này cho tất cả cảnh đã chọn
-            </p>
+          {/* Scene selector & preview */}
+          <div className="border-t border-gray-700 pt-3 space-y-3">
+            <SceneSelector />
+            <ScenePreview />
             <button
-              onClick={() => bulkMut.mutate()}
-              disabled={bulkMut.isPending}
-              className="w-full py-2 bg-purple-600 hover:bg-purple-500
-                disabled:bg-gray-700 rounded text-sm transition-colors"
+              onClick={() => approveSceneMut.mutate()}
+              disabled={activeSceneId === null || approveSceneMut.isPending}
+              className="w-full py-2 bg-green-600 hover:bg-green-500
+                disabled:bg-gray-700 disabled:text-gray-500
+                rounded font-medium text-sm transition-colors"
             >
-              {bulkMut.isPending ? "Đang áp dụng..." : "Áp dụng cho tất cả cảnh"}
+              ✅ Duyệt phân cảnh này
             </button>
-            <p className="text-[11px] text-gray-400 mt-1">Gán ảnh nhân vật này cho mọi cảnh đang chọn — không cần làm lại từng cảnh.</p>
-          </div>
-
-          {/* Auto-Match Character */}
-          <div className="border-t border-gray-700 pt-3 mt-3">
-            <h4 className="text-sm font-medium text-gray-300 mb-2">
-              🪄 Tự động khớp nhân vật
-            </h4>
-            <p className="text-xs text-gray-500 mb-2">
-              Tự động gán cấu hình nhân vật này cho các cảnh khác có vị trí tương tự
-            </p>
-            <button
-              onClick={async () => {
-                if (!projectId || !objectId) return;
-                try {
-                  const result = await api.autoMatchCharacter(projectId, objectId);
-                  alert(`Đã khớp ${result.count} nhân vật trong các cảnh khác`);
-                } catch (err) {
-                  alert(`Lỗi: ${(err as Error).message}`);
-                }
-              }}
-              className="w-full py-2 bg-purple-600 hover:bg-purple-500 rounded text-sm transition-colors"
-            >
-              🪄 Auto-Match All Scenes
-            </button>
-            <p className="text-[11px] text-gray-400 mt-1">AI tự tìm nhân vật giống vị trí/kích thước ở các cảnh khác và áp dụng cùng ảnh thay thế.</p>
           </div>
 
           {/* Dubbing Section */}

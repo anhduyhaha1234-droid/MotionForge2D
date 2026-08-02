@@ -311,6 +311,37 @@ def get_scene_objects(project_id: str, scene_id: int) -> list[dict]:
     return [o.model_dump(by_alias=True) for o in scene_objects]
 
 
+@router.get("/{project_id}/objects")
+@router.get("/{project_id}/objects/")
+def list_objects(project_id: str) -> list[dict]:
+    """List all tracked objects with thumbnail (base64 PNG) for UI display."""
+    import base64
+
+    pwf = get_project_workflow()
+    try:
+        proj = pwf.get_project(project_id)
+    except FileNotFoundError as err:
+        raise HTTPException(404, "Project not found") from err
+
+    proj_dir = pwf._project_dir(project_id)
+    results = []
+    for obj in proj.objects:
+        item = obj.model_dump(by_alias=True)
+        # Attach thumbnail base64 if thumbnail.png exists
+        thumb_path = proj_dir / "objects" / obj.object_id / "thumbnail.png"
+        item["thumbnail_base64"] = ""
+        if thumb_path.exists():
+            try:
+                data = thumb_path.read_bytes()
+                item["thumbnail_base64"] = (
+                    "data:image/png;base64," + base64.b64encode(data).decode()
+                )
+            except Exception:
+                item["thumbnail_base64"] = ""
+        results.append(item)
+    return results
+
+
 @router.get("/{project_id}/frames/{frame_index}")
 def get_frame(project_id: str, frame_index: int, scene_id: int = 0) -> FileResponse:
     """Serve a frame image (tries jpg first, then png)."""

@@ -133,6 +133,7 @@ export interface ProjectData {
   source_video: string;
   video_metadata: VideoMetadata | null;
   scenes: SceneInfo[];
+  scene_details: SceneDetail[];
   objects: TrackedObject[];
 }
 
@@ -377,6 +378,13 @@ export const api = {
 
   getReplacementImageUrl: (projectId: string, objectId: string) =>
     `${API_BASE}/api/projects/${projectId}/objects/${objectId}/replacement-image`,
+
+  listObjects: (projectId: string) =>
+    apiFetch<
+      Array<
+        TrackedObject & { thumbnail_base64: string }
+      >
+    >(`/api/projects/${projectId}/objects`),
 
   // ─── Scene Approval ───────────────────────────────────────────────────
 

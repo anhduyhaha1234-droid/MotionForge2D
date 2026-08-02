@@ -91,7 +91,13 @@ export function ScreenC() {
 
           <div className="space-y-1">
             <button
-              onClick={() => setScreen("replacement")}
+              onClick={() => {
+                // Auto-select first object if none active, then go to replacement
+                if (!activeObject && project?.objects?.length) {
+                  setActiveObject(project.objects[0]);
+                }
+                setScreen("replacement");
+              }}
               className="w-full py-2 text-sm bg-blue-700 hover:bg-blue-600 rounded"
             >
               Thay ảnh →
