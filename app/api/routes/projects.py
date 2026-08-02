@@ -387,12 +387,31 @@ def clear_objects(project_id: str) -> dict:
     proj_dir = pwf._project_dir(project_id)
     objects_dir = proj_dir / "objects"
     if objects_dir.exists():
-        import shutil as _sh
-        for child in objects_dir.iterdir():
-            if child.is_dir():
-                _sh.rmtree(child, ignore_errors=True)
+        shutil.rmtree(objects_dir, ignore_errors=True)
 
-    return {"status": "ok", "message": "Cleared all objects"}
+    return {"status": "ok", "project": proj.model_dump()}
+
+
+@router.delete("/{project_id}/objects/{object_id}")
+@router.delete("/{project_id}/objects/{object_id}/")
+def delete_single_object(project_id: str, object_id: str) -> dict:
+    """Delete a single tracked object by ID."""
+    pwf = get_project_workflow()
+    try:
+        proj = pwf.get_project(project_id)
+    except FileNotFoundError as err:
+        raise HTTPException(404, "Project not found") from err
+
+    proj.objects = [o for o in proj.objects if o.object_id != object_id]
+    pwf._save_project(project_id, proj)
+
+    # Remove object dir on disk
+    proj_dir = pwf._project_dir(project_id)
+    obj_dir = proj_dir / "objects" / object_id
+    if obj_dir.exists():
+        shutil.rmtree(obj_dir, ignore_errors=True)
+
+    return {"status": "ok", "project": proj.model_dump()}
 
 
 @router.get("/{project_id}/frames/{frame_index}")

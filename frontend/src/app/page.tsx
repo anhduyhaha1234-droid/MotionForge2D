@@ -84,8 +84,6 @@ export default function Home() {
     staleTime: 60000,
   });
 
-  const showFloatingStitchBtn = screen !== "start" && !!projectId;
-
   if (isRehydrating) {
     return (
       <div className="min-h-screen bg-[#0b0f19] flex items-center justify-center">
@@ -126,19 +124,9 @@ export default function Home() {
         </button>
       </div>
 
-      <NavigationHeader />
+      <NavigationHeader onOpenAssembly={() => setShowAssembly(true)} />
 
       <ScreenRouter />
-
-      {showFloatingStitchBtn && (
-        <button
-          onClick={() => setShowAssembly(true)}
-          title="Bấm để xem danh sách cảnh đã duyệt và tiến hành ghép video thành phẩm"
-          className="fixed bottom-6 right-6 px-5 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-full text-xs shadow-2xl shadow-purple-600/40 transition-all z-40 border border-purple-400/30 flex items-center gap-2"
-        >
-          🎬 Ghép Video Hoàn Chỉnh
-        </button>
-      )}
 
       <AssemblyModal
         isOpen={showAssembly}

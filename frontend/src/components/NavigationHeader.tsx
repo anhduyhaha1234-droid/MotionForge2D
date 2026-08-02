@@ -2,7 +2,11 @@
 
 import { useProjectStore } from "@/stores/project";
 
-export function NavigationHeader() {
+interface Props {
+  onOpenAssembly?: () => void;
+}
+
+export function NavigationHeader({ onOpenAssembly }: Props) {
   const { projectId, project, screen, setScreen, activeSceneId, setActiveSceneId } = useProjectStore();
 
   if (!projectId || screen === "start") return null;
@@ -53,25 +57,33 @@ export function NavigationHeader() {
         )}
       </div>
 
-      {/* Right: Scene navigation */}
-      {scenes.length > 0 && (
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handlePrevScene}
-            disabled={currentSceneIdx <= 0}
-            className="px-2 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed border border-gray-700 rounded transition-colors"
-          >
-            ◀️ Cảnh Trước
-          </button>
-          <button
-            onClick={handleNextScene}
-            disabled={currentSceneIdx >= scenes.length - 1}
-            className="px-2 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed border border-gray-700 rounded transition-colors"
-          >
-            Cảnh Sau ▶️
-          </button>
-        </div>
-      )}
+      {/* Right: Scene navigation + Assembly */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={onOpenAssembly}
+          className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-500 rounded-lg font-medium text-white shadow-lg shadow-purple-900/40 transition-colors"
+        >
+          🔮 Ghép Video Hoàn Chỉnh
+        </button>
+        {scenes.length > 0 && (
+          <>
+            <button
+              onClick={handlePrevScene}
+              disabled={currentSceneIdx <= 0}
+              className="px-2 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed border border-gray-700 rounded transition-colors"
+            >
+              ◀️ Cảnh Trước
+            </button>
+            <button
+              onClick={handleNextScene}
+              disabled={currentSceneIdx >= scenes.length - 1}
+              className="px-2 py-1.5 text-xs bg-gray-800 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed border border-gray-700 rounded transition-colors"
+            >
+              Cảnh Sau ▶️
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }

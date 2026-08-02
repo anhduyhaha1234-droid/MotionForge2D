@@ -278,3 +278,124 @@ class TestCropBase64AndClear:
         resp2 = client.delete(f"/api/projects/{pid}/objects/")
         assert resp2.status_code == 200
         assert resp2.json()["status"] == "ok"
+
+
+class TestDeleteSingleAndClear:
+    def _make_frame_and_object(self, client, pid: str) -> str:
+        """Create a synthetic frame + one object, return object_id."""
+        import cv2
+        import numpy as np
+
+        from app.api import deps
+        proj_root = deps._config.project_root
+        frame_dir = proj_root / "projects" / pid / "frames" / "scene_0"
+        frame_dir.mkdir(parents=True, exist_ok=True)
+        frame = np.full((200, 200, 3), 255, dtype=np.uint8)
+        frame[50:150, 50:150] = (0, 0, 0)
+        cv2.imwrite(str(frame_dir / "frame_000000.png"), frame)
+
+        r = client.post(
+            f"/api/projects/{pid}/objects",
+            json={
+                "name": "ObjX",
+                "selection": {"mode": "point", "frame_index": 0, "x": 100, "y": 100},
+                "scene_id": 0,
+            },
+        )
+        assert r.status_code == 201
+        return r.json()["object_id"]
+
+    def test_delete_single_object(self, client: TestClient) -> None:
+        """Deleting one object keeps the others."""
+        create_resp = client.post("/api/projects", json={"name": "DelOne"})
+        pid = create_resp.json()["project_id"]
+
+        oid1 = self._make_frame_and_object(client, pid)
+        # Create a second object
+        import cv2
+        import numpy as np
+
+        from app.api import deps
+        proj_root = deps._config.project_root
+        frame_dir = proj_root / "projects" / pid / "frames" / "scene_0"
+        frame = np.full((200, 200, 3), 255, dtype=np.uint8)
+        frame[50:150, 50:150] = (0, 0, 0)
+        cv2.imwrite(str(frame_dir / "frame_000000.png"), frame)
+        r2 = client.post(
+            f"/api/projects/{pid}/objects",
+            json={
+                "name": "ObjY",
+                "selection": {"mode": "point", "frame_index": 0, "x": 100, "y": 100},
+                "scene_id": 0,
+            },
+        )
+        oid2 = r2.json()["object_id"]
+
+        # Verify 2 objects exist
+        resp = client.get(f"/api/projects/{pid}/objects")
+        assert len(resp.json()) == 2
+
+        # Delete oid1 (no trailing slash)
+        resp = client.delete(f"/api/projects/{pid}/objects/{oid1}")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "ok"
+        remaining = [o["object_id"] for o in resp.json()["project"]["objects"]]
+        assert oid1 not in remaining
+        assert oid2 in remaining
+
+        # Trailing slash also works
+        resp2 = client.delete(f"/api/projects/{pid}/objects/{oid2}/")
+        assert resp2.status_code == 200
+        assert resp2.json()["status"] == "ok"
+
+        # All gone now
+        resp3 = client.get(f"/api/projects/{pid}/objects")
+        assert len(resp3.json()) == 0
+
+    def test_clear_all_objects(self, client: TestClient) -> None:
+        """Clearing all objects returns project with empty objects list."""
+        create_resp = client.post("/api/projects", json={"name": "ClearAll"})
+        pid = create_resp.json()["project_id"]
+
+        self._make_frame_and_object(client, pid)
+        self._make_frame_and_object(client, pid)
+
+        resp = client.delete(f"/api/projects/{pid}/objects")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "ok"
+        assert resp.json()["project"]["objects"] == []
+
+        # Verify via GET too
+        resp2 = client.get(f"/api/projects/{pid}/objects")
+        assert len(resp2.json()) == 0
+
+    def test_auto_segment_returns_crop_b64(self, client: TestClient) -> None:
+        """Auto-segment returns non-empty crop_png_base64 per object."""
+        import cv2
+        import numpy as np
+
+        create_resp = client.post("/api/projects", json={"name": "CropB64"})
+        pid = create_resp.json()["project_id"]
+
+        from app.api import deps
+        proj_root = deps._config.project_root
+        frame_dir = proj_root / "projects" / pid / "frames" / "scene_0"
+        frame_dir.mkdir(parents=True, exist_ok=True)
+        frame = np.full((300, 400, 3), 255, dtype=np.uint8)
+        frame[50:200, 50:150] = (0, 0, 0)
+        frame[80:130, 250:350] = (0, 0, 0)
+        cv2.imwrite(str(frame_dir / "frame_000000.png"), frame)
+
+        resp = client.post(
+            f"/api/projects/{pid}/auto-segment-objects",
+            params={"scene_id": 0, "min_area": 100},
+        )
+        assert resp.status_code == 200
+        objs = resp.json()["objects"]
+        assert len(objs) >= 1
+        for o in objs:
+            assert "crop_png_base64" in o
+            assert o["crop_png_base64"] != ""
+            import base64
+            raw = base64.b64decode(o["crop_png_base64"])
+            assert raw[:8] == b"\x89PNG\r\n\x1a\n"

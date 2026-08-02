@@ -306,7 +306,7 @@ export const api = {
     ),
 
   createObject: (projectId: string, obj: { name: string; selection: SelectionInput; scene_id: number }) =>
-    apiFetch<TrackedObject>(`/api/projects/${projectId}/objects`, {
+    apiFetch<{ object_id: string; project: ProjectData }>(`/api/projects/${projectId}/objects`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(obj),
@@ -391,8 +391,14 @@ export const api = {
     >(`/api/projects/${projectId}/objects`),
 
   clearObjects: (projectId: string) =>
-    apiFetch<{ status: string; message: string }>(
+    apiFetch<{ status: string; project: ProjectData }>(
       `/api/projects/${projectId}/objects`,
+      { method: "DELETE" },
+    ),
+
+  deleteObject: (projectId: string, objectId: string) =>
+    apiFetch<{ status: string; project: ProjectData }>(
+      `/api/projects/${projectId}/objects/${objectId}`,
       { method: "DELETE" },
     ),
 

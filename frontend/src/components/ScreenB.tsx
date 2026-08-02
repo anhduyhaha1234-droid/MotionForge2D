@@ -23,6 +23,7 @@ export function ScreenB() {
     setSelection,
     maskPreview,
     setMaskPreview,
+    activeObject,
     setActiveObject,
     setProject,
     setScreen,
@@ -54,16 +55,64 @@ export function ScreenB() {
     if (!confirm("Xóa tất cả nhân vật đã tách? Hành động này không thể hoàn tác.")) return;
     setIsClearingObjects(true);
     try {
-      await api.clearObjects(projectId);
-      // Reload project from API to reset objects list
-      const updated = await api.getProject(projectId);
-      setProject(updated);
+      const res = await api.clearObjects(projectId);
+      setProject(res.project);
       setActiveObject(null);
       setAutoObjects([]);
     } catch (err) {
       alert(`Lỗi: ${(err as Error).message}`);
     } finally {
       setIsClearingObjects(false);
+    }
+  };
+
+  // Delete a single tracked object
+  const handleDeleteSingleObject = async (objectId: string) => {
+    if (!projectId) return;
+    if (!confirm("Xóa nhân vật này?")) return;
+    try {
+      const res = await api.deleteObject(projectId, objectId);
+      setProject(res.project);
+      if (activeObject?.object_id === objectId) setActiveObject(null);
+    } catch (err) {
+      alert(`Lỗi: ${(err as Error).message}`);
+    }
+  };
+
+  // 1-Click select auto-detected object → create TrackedObject + preview mask
+  const handleSelectAutoObject = async (obj: {
+    object_index: number;
+    name?: string;
+    crop_png_base64?: string;
+    bbox: { x: number; y: number; width: number; height: number };
+    area: number;
+  }) => {
+    if (!projectId) return;
+    try {
+      // 1. Create the TrackedObject with bbox selection
+      const newObj = await api.createObject(projectId, {
+        name: obj.name ?? `Vật thể #${obj.object_index + 1}`,
+        selection: {
+          mode: "bounding_box",
+          frame_index: currentFrame,
+          x: obj.bbox.x,
+          y: obj.bbox.y,
+          width: obj.bbox.width,
+          height: obj.bbox.height,
+        },
+        scene_id: 0,
+      });
+      // 2. Set as active object (find it in returned project)
+      const created = newObj.project.objects.find(
+        (o) => o.object_id === newObj.object_id,
+      );
+      if (created) setActiveObject(created);
+      // 3. Update project state so new object shows in list
+      setProject(newObj.project);
+      // 4. Preview mask on canvas
+      previewMut.mutate();
+    } catch (err) {
+      alert(`Lỗi: ${(err as Error).message}`);
     }
   };
 
@@ -267,7 +316,10 @@ export function ScreenB() {
         selection: sel,
         scene_id: 0,
       });
-      setActiveObject(obj);
+      // Find full TrackedObject in returned project
+      const created = obj.project.objects.find((o) => o.object_id === obj.object_id);
+      if (created) setActiveObject(created);
+      setProject(obj.project);
 
       // Propagate
       const { job_id } = await api.propagateObject(projectId, obj.object_id);
@@ -364,10 +416,10 @@ export function ScreenB() {
               </div>
               <div className="space-y-1">
                 {project.objects.map((obj) => (
-                  <button
+                  <div
                     key={obj.object_id}
                     onClick={() => setActiveObject(obj)}
-                    className="w-full text-left px-2.5 py-2 bg-gray-800/80 hover:bg-purple-900/40 border border-gray-700 hover:border-purple-500/50 rounded-lg text-xs transition-colors"
+                    className="w-full text-left px-2.5 py-2 bg-gray-800/80 hover:bg-purple-900/40 border border-gray-700 hover:border-purple-500/50 rounded-lg text-xs transition-colors cursor-pointer"
                   >
                     <div className="flex items-center gap-2">
                       <img
@@ -376,12 +428,22 @@ export function ScreenB() {
                         className="w-12 h-12 object-contain bg-black/60 rounded border border-purple-500/50 flex-shrink-0"
                         onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                       />
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="font-medium text-gray-200 truncate">{obj.name}</p>
                         <p className="text-[10px] text-gray-500">Scene {obj.scene_id}</p>
                       </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteSingleObject(obj.object_id);
+                        }}
+                        className="p-1 text-red-400 hover:text-red-200 transition-colors"
+                        title="Xóa nhân vật này"
+                      >
+                        🗑️
+                      </button>
                     </div>
-                  </button>
+                  </div>
                 ))}
               </div>
             </>
@@ -415,21 +477,10 @@ export function ScreenB() {
                     </div>
                   </div>
                   <button
-                    onClick={() => {
-                      // 1-Click: set selection + accept as new TrackedObject
-                      setSelection({
-                        mode: "bounding_box",
-                        frame_index: currentFrame,
-                        x: obj.bbox.x,
-                        y: obj.bbox.y,
-                        width: obj.bbox.width,
-                        height: obj.bbox.height,
-                      });
-                      previewMut.mutate();
-                    }}
+                    onClick={() => handleSelectAutoObject(obj)}
                     className="mt-2 w-full py-1.5 text-[11px] bg-green-600 hover:bg-green-500 rounded text-white font-medium transition-colors"
                   >
-                    ✅ Chọn Nhân Vật Này
+                    ✅ Chọn & Bắt Nhân Vật Này
                   </button>
                 </div>
               ))}
