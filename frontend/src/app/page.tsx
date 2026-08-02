@@ -10,6 +10,7 @@ import { ScreenD } from "@/components/ScreenD";
 import { ScreenE } from "@/components/ScreenE";
 import { AssemblyModal } from "@/components/AssemblyModal";
 import { ChannelDashboard } from "@/components/ChannelDashboard";
+import { NavigationHeader } from "@/components/NavigationHeader";
 import { api } from "@/lib/api";
 import { useProjectRehydration, saveSession, clearSession } from "@/hooks/useProjectRehydration";
 
@@ -124,6 +125,8 @@ export default function Home() {
           📁 Quản Lý Kênh & Dự Án
         </button>
       </div>
+
+      <NavigationHeader />
 
       <ScreenRouter />
 

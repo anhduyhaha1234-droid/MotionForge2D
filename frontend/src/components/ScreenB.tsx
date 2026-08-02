@@ -42,6 +42,7 @@ export function ScreenB() {
     area: number;
   }>>([]);
   const [isAutoSegmenting, setIsAutoSegmenting] = useState(false);
+  const autoPreviewRef = useRef(false);
 
   const meta = project?.video_metadata;
   const frameUrl = projectId
@@ -169,6 +170,7 @@ export function ScreenB() {
 
       if (tool === "point") {
         setPoints((prev) => [...prev, { x: src.x, y: src.y, label: 1 }]);
+        autoPreviewRef.current = true;
       } else if (tool === "negative") {
         setPoints((prev) => [...prev, { x: src.x, y: src.y, label: 0 }]);
       }
@@ -220,6 +222,14 @@ export function ScreenB() {
       setMaskPreview(result.mask_png_base64);
     },
   });
+
+  // Auto-trigger mask preview after adding a point+ click
+  useEffect(() => {
+    if (autoPreviewRef.current && points.length > 0) {
+      autoPreviewRef.current = false;
+      previewMut.mutate();
+    }
+  }, [points, previewMut]);
 
   // Accept mask → create object → propagate
   const acceptMut = useMutation({
@@ -338,27 +348,37 @@ export function ScreenB() {
             <h3 className="text-xs text-gray-500 uppercase mb-2">
               Công cụ chọn
             </h3>
-            <div className="grid grid-cols-2 gap-1">
+            <div className="space-y-2">
               {(["point", "negative", "bbox"] as Tool[]).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTool(t)}
-                  className={`px-2 py-1.5 text-xs rounded ${
-                    tool === t
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-800 text-gray-300 hover:bg-gray-700"
-                  }`}
-                >
-                  {t === "point"
-                    ? "Điểm +"
-                    : t === "negative"
-                    ? "Điểm −"
-                    : "Hộp"}
-                </button>
+                <div key={t}>
+                  <button
+                    onClick={() => setTool(t)}
+                    className={`w-full px-2 py-1.5 text-xs rounded ${
+                      tool === t
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                    }`}
+                  >
+                    {t === "point"
+                      ? "Điểm +"
+                      : t === "negative"
+                      ? "Điểm −"
+                      : "Hộp"}
+                  </button>
+                  {t === "point" && (
+                    <p className="text-[10px] text-gray-500 mt-1">Click 1 điểm màu xanh trên thân nhân vật đối thủ.</p>
+                  )}
+                  {t === "negative" && (
+                    <p className="text-[10px] text-gray-500 mt-1">Click điểm màu đỏ trên phông nền xung quanh để loại trừ.</p>
+                  )}
+                  {t === "bbox" && (
+                    <p className="text-[10px] text-gray-500 mt-1">Kéo ô hình chữ nhật bao trùm toàn thân nhân vật.</p>
+                  )}
+                </div>
               ))}
               <button
                 onClick={clearPrompts}
-                className="px-2 py-1.5 text-xs rounded bg-gray-800 text-gray-300 hover:bg-gray-700"
+                className="w-full px-2 py-1.5 text-xs rounded bg-gray-800 text-gray-300 hover:bg-gray-700"
               >
                 Xóa
               </button>
@@ -373,6 +393,7 @@ export function ScreenB() {
             >
               {previewMut.isPending ? "Đang tạo mask..." : "Xem mask"}
             </button>
+            <p className="text-[10px] text-gray-500 mt-1">Xem trước đường khoanh màu tím bao quanh nhân vật.</p>
 
             <button
               onClick={() => acceptMut.mutate()}
@@ -383,6 +404,7 @@ export function ScreenB() {
             >
               {acceptMut.isPending ? "Đang tách object..." : "Chấp nhận & Tách"}
             </button>
+            <p className="text-[10px] text-gray-500 mt-1">Xác nhận chọn & AI tự động theo vết (tracking) qua các frame.</p>
           </div>
 
           {/* Auto-Segment */}
@@ -394,6 +416,7 @@ export function ScreenB() {
             >
               {isAutoSegmenting ? "Đang quét..." : "🪄 Tự Động Bắt Tất Cả Nhân Vật"}
             </button>
+            <p className="text-[10px] text-gray-500 mt-1">AI tự động quét & bóc tách toàn bộ nhân vật, bàn ghế có trong cảnh mà không cần chấm điểm thủ công.</p>
             {autoObjects.length > 0 && (
               <div className="mt-3 space-y-1 max-h-40 overflow-y-auto">
                 <p className="text-xs text-gray-400 mb-1">Phát hiện {autoObjects.length} vật thể:</p>

@@ -11,6 +11,7 @@ app = FastAPI(
     title="MotionForge 2D API",
     version="0.2.0",
     description="Local-first 2D animation motion extraction and replacement",
+    redirect_slashes=False,
 )
 
 # CORS for frontend dev server

@@ -159,6 +159,7 @@ def trigger_ingest(project_id: str) -> dict:
 
 
 @router.delete("/{project_id}")
+@router.delete("/{project_id}/")
 def delete_project(project_id: str) -> dict:
     """Delete a project and purge all files from disk."""
     import shutil
@@ -187,6 +188,7 @@ def get_project(project_id: str) -> ProjectData:
 
 
 @router.post("/{project_id}/auto-segment-objects")
+@router.post("/{project_id}/auto-segment-objects/")
 def auto_segment_objects(
     project_id: str,
     scene_id: int = 0,
@@ -1355,6 +1357,7 @@ def get_gpu_info() -> dict:
 # ── Cleanup endpoint ────────────────────────────────────────────────────────
 
 @router.post("/{project_id}/cleanup")
+@router.post("/{project_id}/cleanup/")
 def cleanup_project(project_id: str) -> dict:
     """Clean up temp files and debug artifacts."""
     from app.services.cleanup_service import CleanupService  # noqa: PLC0415
@@ -1380,6 +1383,7 @@ def cleanup_project(project_id: str) -> dict:
 # ── Auto-match character endpoint ──────────────────────────────────────────
 
 @router.post("/{project_id}/objects/{object_id}/auto-match")
+@router.post("/{project_id}/objects/{object_id}/auto-match/")
 def auto_match_character(project_id: str, object_id: str) -> dict:
     """Auto-match character across all scenes using bbox similarity.
 
