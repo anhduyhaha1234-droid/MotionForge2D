@@ -83,6 +83,27 @@ class ReplacementConfig(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+# ─── Character Reference Repository ──────────────────────────────────────────
+
+class CharacterPosePaths(BaseModel):
+    """Reference image paths for the 6 canonical character poses."""
+
+    sitting: str = "sitting.png"
+    standing: str = "standing.png"
+    three_quarter: str = "three_quarter.png"
+    walking: str = "walking.png"
+    talking: str = "talking.png"
+    back: str = "back.png"
+
+
+class CharacterReferencePack(BaseModel):
+    """A reference character pack: id, display name, and 6 pose images."""
+
+    character_id: str
+    name: str
+    poses: CharacterPosePaths
+
+
 # ─── Object Crop Manifest ────────────────────────────────────────────────────
 
 class ObjectCrop(BaseModel):

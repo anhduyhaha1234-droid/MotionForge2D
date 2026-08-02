@@ -1,13 +1,15 @@
 """Character preset library manager — multi-pose template characters.
 
-Provides three built-in character sets (Boy Cool, Thỏ Cute, Gấu Nâu), each
-with 4 poses (sitting, standing, walking, talking) as PNG assets, plus
-AI auto-pose matching logic that selects the best pose from the aspect
-ratio of the original character's bounding box:
+Provides three built-in character reference packs (Boy Hacker, Thỏ Pink
+Cute, Gấu Nâu), each with 6 canonical poses (sitting, standing,
+three_quarter, walking, talking, back) as PNG assets, plus AI auto-pose
+matching logic that selects the best pose from the aspect ratio of the
+original character's bounding box:
 
-- width > height * 1.1  → sitting (lying/wide pose)
-- height > width * 1.3  → standing / walking (tall pose)
-- otherwise             → talking (balanced pose)
+- width > height * 1.1   → sitting (lying/wide pose)
+- height > width * 1.3   → standing / walking (tall pose)
+- centroid far from bbox center (looking away) → back
+- otherwise              → talking (balanced pose)
 """
 
 from __future__ import annotations
@@ -17,33 +19,41 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-# Built-in character sets: name → {pose: filename}
-BUILTIN_CHARACTERS: dict[str, dict[str, str]] = {
-    "boy_cool": {
-        "label": "Bộ Boy Cool",
+from app.schemas import CharacterPosePaths, CharacterReferencePack
+
+# Built-in character reference packs: id → {name, poses: {pose: filename}}
+BUILTIN_CHARACTERS: dict[str, dict[str, object]] = {
+    "boy_hacker": {
+        "label": "Boy Hacker",
         "poses": {
-            "sitting": "boy_cool_sitting.png",
-            "standing": "boy_cool_standing.png",
-            "walking": "boy_cool_walking.png",
-            "talking": "boy_cool_talking.png",
+            "sitting": "boy_hacker_sitting.png",
+            "standing": "boy_hacker_standing.png",
+            "three_quarter": "boy_hacker_three_quarter.png",
+            "walking": "boy_hacker_walking.png",
+            "talking": "boy_hacker_talking.png",
+            "back": "boy_hacker_back.png",
         },
     },
     "tho_cute": {
-        "label": "Bộ Thỏ Cute",
+        "label": "Thỏ Pink Cute",
         "poses": {
             "sitting": "tho_cute_sitting.png",
             "standing": "tho_cute_standing.png",
+            "three_quarter": "tho_cute_three_quarter.png",
             "walking": "tho_cute_walking.png",
             "talking": "tho_cute_talking.png",
+            "back": "tho_cute_back.png",
         },
     },
     "gau_nau": {
-        "label": "Bộ Gấu Nâu",
+        "label": "Gấu Nâu",
         "poses": {
             "sitting": "gau_nau_sitting.png",
             "standing": "gau_nau_standing.png",
+            "three_quarter": "gau_nau_three_quarter.png",
             "walking": "gau_nau_walking.png",
             "talking": "gau_nau_talking.png",
+            "back": "gau_nau_back.png",
         },
     },
 }
@@ -51,8 +61,10 @@ BUILTIN_CHARACTERS: dict[str, dict[str, str]] = {
 POSE_LABELS: dict[str, str] = {
     "sitting": "🪑 Ngồi",
     "standing": "🧍 Đứng",
+    "three_quarter": "🚶 Góc 45°",
     "walking": "🚶 Đi bộ",
     "talking": "💬 Nói chuyện",
+    "back": "🔙 Quay lưng",
 }
 
 
@@ -138,6 +150,56 @@ def _draw_character(canvas: np.ndarray, color: tuple[int, int, int], pose: str) 
             canvas, (cx + int(w * 0.05), body_bottom - int(h * 0.2)),
             (cx + int(w * 0.18), body_bottom), color, -1,
         )
+    elif pose == "three_quarter":
+        # Body slightly angled; head + shoulders offset to one side
+        cv2.ellipse(
+            canvas, (cx, int(h * 0.40)),
+            (int(w * 0.18), int(h * 0.22)), 0, 0, 360, color, -1,
+        )
+        cv2.rectangle(
+            canvas, (cx - int(w * 0.16), int(h * 0.30)),
+            (cx + int(w * 0.10), body_bottom), color, -1,
+        )
+        cv2.rectangle(
+            canvas, (cx - int(w * 0.2), int(h * 0.32)),
+            (cx - int(w * 0.12), int(h * 0.52)), color, -1,
+        )
+        cv2.rectangle(
+            canvas, (cx + int(w * 0.06), int(h * 0.32)),
+            (cx + int(w * 0.14), int(h * 0.52)), color, -1,
+        )
+        # Legs offset (walking angle hint)
+        cv2.rectangle(
+            canvas, (cx - int(w * 0.14), body_bottom - int(h * 0.2)),
+            (cx - int(w * 0.04), body_bottom), color, -1,
+        )
+        cv2.rectangle(
+            canvas, (cx + int(w * 0.04), body_bottom - int(h * 0.2)),
+            (cx + int(w * 0.14), body_bottom), color, -1,
+        )
+    elif pose == "back":
+        # Body + head seen from behind (no face features)
+        cv2.rectangle(
+            canvas, (cx - int(w * 0.14), int(h * 0.28)),
+            (cx + int(w * 0.14), body_bottom), color, -1,
+        )
+        cv2.rectangle(
+            canvas, (cx - int(w * 0.2), int(h * 0.30)),
+            (cx - int(w * 0.14), int(h * 0.55)), color, -1,
+        )
+        cv2.rectangle(
+            canvas, (cx + int(w * 0.14), int(h * 0.30)),
+            (cx + int(w * 0.2), int(h * 0.55)), color, -1,
+        )
+        cv2.rectangle(
+            canvas, (cx - int(w * 0.13), body_bottom - int(h * 0.2)),
+            (cx + int(w * 0.13), body_bottom), color, -1,
+        )
+        # Hair hint (small cap on head)
+        cv2.circle(
+            canvas, (cx, int(h * 0.16)),
+            int(h * 0.07), color, -1,
+        )
     else:  # talking
         # Body + open mouth indication (small circle below head)
         cv2.rectangle(
@@ -183,14 +245,14 @@ class CharacterPresetManager:
     def _generate_asset(self, filename: str, pose: str, set_key: str) -> None:
         """Generate a transparent PNG for a pose with a set-specific color."""
         palette: dict[str, tuple[int, int, int]] = {
-            "boy_cool": (70, 130, 220),      # cool blue
-            "tho_cute": (250, 180, 210),     # pink
-            "gau_nau": (150, 110, 80),       # brown
+            "boy_hacker": (70, 130, 220),      # cool blue
+            "tho_cute": (250, 180, 210),       # pink
+            "gau_nau": (150, 110, 80),         # brown
         }
         color = palette.get(set_key, (200, 200, 200))
 
-        # Sitting/talking → wide canvas; standing/walking → tall canvas
-        if pose in ("standing", "walking"):
+        # Tall poses → tall canvas; sitting → wide; angled/back → square
+        if pose in ("standing", "walking", "three_quarter"):
             w, h = 512, 768
         elif pose == "sitting":
             w, h = 768, 512
@@ -244,14 +306,43 @@ class CharacterPresetManager:
         p = self.assets_root / filename
         return p if p.is_file() else None
 
+    # ── Reference packs (CharacterReferencePack schema) ───────────────────
+
+    def get_reference_pack(self, character_id: str) -> CharacterReferencePack | None:
+        """Return the reference pack for a character id, or None."""
+        spec = BUILTIN_CHARACTERS.get(character_id)
+        if spec is None:
+            return None
+        return CharacterReferencePack(
+            character_id=character_id,
+            name=str(spec["label"]),
+            poses=CharacterPosePaths(**{k: v for k, v in spec["poses"].items()}),
+        )
+
+    def list_reference_packs(self) -> list[CharacterReferencePack]:
+        """Return all built-in reference packs (schema-validated)."""
+        self.ensure_assets()
+        return [
+            pack
+            for cid in BUILTIN_CHARACTERS
+            if (pack := self.get_reference_pack(cid)) is not None
+        ]
+
     # ── AI auto-pose matching ─────────────────────────────────────────────
 
     @staticmethod
-    def auto_pose_for_bbox(width: float, height: float) -> str:
-        """Pick a pose based on the original character bbox aspect ratio.
+    def auto_pose_for_bbox(
+        width: float, height: float,
+        centroid_x: float | None = None,
+        centroid_y: float | None = None,
+        bbox_x: float | None = None,
+        bbox_y: float | None = None,
+    ) -> str:
+        """Pick a pose from the original character bbox aspect ratio + pose.
 
         - width  > height * 1.1  → sitting (lying/wide)
         - height > width * 1.3   → standing (tall)
+        - centroid far from bbox center horizontally → back (looking away)
         - otherwise              → talking (balanced)
         """
         if width <= 0 or height <= 0:
@@ -260,6 +351,15 @@ class CharacterPresetManager:
             return "sitting"
         if height > width * 1.3:
             return "standing"
+        # Centroid shifted far to one side of the bbox → character looks away
+        if (
+            centroid_x is not None
+            and bbox_x is not None
+            and width > 0
+        ):
+            center_x = bbox_x + width / 2.0
+            if abs(centroid_x - center_x) > width * 0.3:
+                return "back"
         return "talking"
 
 

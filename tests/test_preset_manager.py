@@ -36,6 +36,25 @@ class TestPresetManager:
         assert CharacterPresetManager.auto_pose_for_bbox(100, 100) == "talking"
         assert CharacterPresetManager.auto_pose_for_bbox(100, 110) == "talking"
 
+    def test_auto_pose_for_bbox_back(self) -> None:
+        """Centroid far from bbox center → back (looking away)."""
+        from app.services.preset_manager import CharacterPresetManager
+
+        # Balanced aspect (not wide/tall), centroid shifted far right
+        assert (
+            CharacterPresetManager.auto_pose_for_bbox(
+                100, 100, centroid_x=180, centroid_y=50, bbox_x=0, bbox_y=0
+            )
+            == "back"
+        )
+        # Centroid near center → talking
+        assert (
+            CharacterPresetManager.auto_pose_for_bbox(
+                100, 100, centroid_x=55, centroid_y=50, bbox_x=0, bbox_y=0
+            )
+            == "talking"
+        )
+
     def test_auto_pose_zero_size(self) -> None:
         """Zero/invalid sizes must not crash and return talking."""
         from app.services.preset_manager import CharacterPresetManager
@@ -43,21 +62,55 @@ class TestPresetManager:
         assert CharacterPresetManager.auto_pose_for_bbox(0, 0) == "talking"
         assert CharacterPresetManager.auto_pose_for_bbox(-5, 100) == "talking"
 
-    def test_builtin_sets_cover_four_poses(self) -> None:
-        """Each built-in set has exactly sitting/standing/walking/talking."""
+    def test_builtin_sets_cover_six_poses(self) -> None:
+        """Each built-in set has all 6 canonical reference poses."""
         from app.services.preset_manager import BUILTIN_CHARACTERS
 
-        assert set(BUILTIN_CHARACTERS.keys()) == {"boy_cool", "tho_cute", "gau_nau"}
+        assert set(BUILTIN_CHARACTERS.keys()) == {
+            "boy_hacker",
+            "tho_cute",
+            "gau_nau",
+        }
+        expected = {
+            "sitting",
+            "standing",
+            "three_quarter",
+            "walking",
+            "talking",
+            "back",
+        }
         for key, spec in BUILTIN_CHARACTERS.items():
-            assert set(spec["poses"].keys()) == {
-                "sitting",
-                "standing",
-                "walking",
-                "talking",
-            }, key
+            assert set(spec["poses"].keys()) == expected, key
+
+    def test_reference_pack_schema(self) -> None:
+        """CharacterReferencePack validates id/name + 6 pose paths."""
+        from app.schemas import CharacterPosePaths, CharacterReferencePack
+
+        pack = CharacterReferencePack(
+            character_id="boy_hacker",
+            name="Boy Hacker",
+            poses=CharacterPosePaths(),
+        )
+        assert pack.character_id == "boy_hacker"
+        assert pack.name == "Boy Hacker"
+        assert pack.poses.sitting == "sitting.png"
+        assert pack.poses.three_quarter == "three_quarter.png"
+        assert pack.poses.back == "back.png"
+        assert len(pack.poses.model_dump()) == 6
+
+    def test_reference_packs_endpoint(self, client: TestClient) -> None:
+        """Manager builds 3 reference packs with 6 poses each."""
+        from app.services.preset_manager import get_preset_manager
+
+        packs = get_preset_manager().list_reference_packs()
+        assert len(packs) == 3
+        ids = {p.character_id for p in packs}
+        assert ids == {"boy_hacker", "tho_cute", "gau_nau"}
+        for pack in packs:
+            assert len(pack.poses.model_dump()) == 6
 
     def test_list_characters_endpoint(self, client: TestClient) -> None:
-        """GET /api/presets/characters returns 3 sets × 4 poses."""
+        """GET /api/presets/characters returns 3 sets × 6 poses."""
         r = client.get("/api/projects/presets/characters")
         assert r.status_code == 200
         body = r.json()
@@ -65,9 +118,9 @@ class TestPresetManager:
         chars = body["characters"]
         assert len(chars) == 3
         labels = {c["label"] for c in chars}
-        assert labels == {"Bộ Boy Cool", "Bộ Thỏ Cute", "Bộ Gấu Nâu"}
+        assert labels == {"Boy Hacker", "Thỏ Pink Cute", "Gấu Nâu"}
         for c in chars:
-            assert len(c["poses"]) == 4
+            assert len(c["poses"]) == 6
 
     def test_character_preset_image_endpoint(self, client: TestClient) -> None:
         """GET preset image returns 200 image/png for every set+pose."""
@@ -117,7 +170,7 @@ class TestPresetManager:
         assert obj.status_code == 201
         oid = obj.json()["object_id"]
 
-        r = client.post(f"/api/projects/{pid}/presets/characters/boy_cool/sitting/apply")
+        r = client.post(f"/api/projects/{pid}/presets/characters/boy_hacker/sitting/apply")
         assert r.status_code == 200, r.text
         body = r.json()
         assert body["status"] == "ok"

@@ -1899,11 +1899,34 @@ def auto_match_character(project_id: str, object_id: str) -> dict:
 
     pose_choice: str | None = None
     if source_bbox is not None and getattr(source_bbox, "width", 0) > 0:
+        # Pass centroid + bbox position so the AI can also detect a
+        # "looking away" pose (centroid far from bbox center → back).
+        centroid_x: float | None = None
+        centroid_y: float | None = None
+        bbox_x: float | None = None
+        bbox_y: float | None = None
+        if source.motion and source.motion.frames:
+            for m in source.motion.frames:
+                if m.centroid_x > 0:
+                    centroid_x = m.centroid_x
+                    centroid_y = m.centroid_y
+                    bbox_x = m.bbox.x if m.bbox else None
+                    bbox_y = m.bbox.y if m.bbox else None
+                    break
+        elif source.selection and source.selection.mode == "bounding_box":
+            bbox_x = source.selection.x
+            bbox_y = source.selection.y
+
         pose_choice = CharacterPresetManager.auto_pose_for_bbox(
-            float(source_bbox.width), float(source_bbox.height)
+            float(source_bbox.width),
+            float(source_bbox.height),
+            centroid_x=centroid_x,
+            centroid_y=centroid_y,
+            bbox_x=bbox_x,
+            bbox_y=bbox_y,
         )
         pm = get_preset_manager()
-        pose_asset = pm.asset_path("boy_cool", pose_choice)  # default set
+        pose_asset = pm.asset_path("boy_hacker", pose_choice)  # default set
         if pose_asset is not None:
             proj_dir = pwf._project_dir(project_id)
             for obj in proj.objects:
