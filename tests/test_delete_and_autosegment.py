@@ -197,3 +197,84 @@ class TestObjectCrop:
         resp2 = client.get(f"/api/projects/{pid}/objects/{oid}/crop/")
         assert resp2.status_code == 200
         assert resp2.headers["content-type"].startswith("image/png")
+
+
+class TestCropBase64AndClear:
+    def test_auto_segment_crop_base64(self, client: TestClient) -> None:
+        """Auto-segment returns crop_png_base64 for each object."""
+        import cv2
+        import numpy as np
+
+        create_resp = client.post("/api/projects", json={"name": "B64Proj"})
+        pid = create_resp.json()["project_id"]
+
+        from app.api import deps
+        proj_root = deps._config.project_root
+        frame_dir = proj_root / "projects" / pid / "frames" / "scene_0"
+        frame_dir.mkdir(parents=True, exist_ok=True)
+        frame = np.full((300, 400, 3), 255, dtype=np.uint8)
+        frame[50:200, 50:150] = (0, 0, 0)
+        frame[80:130, 250:350] = (0, 0, 0)
+        cv2.imwrite(str(frame_dir / "frame_000000.png"), frame)
+
+        resp = client.post(
+            f"/api/projects/{pid}/auto-segment-objects",
+            params={"scene_id": 0, "min_area": 100},
+        )
+        assert resp.status_code == 200
+        objs = resp.json()["objects"]
+        assert len(objs) >= 1
+        for o in objs:
+            assert "crop_png_base64" in o
+            assert o["crop_png_base64"] != "", "crop_png_base64 must be non-empty"
+            # Verify it decodes as a PNG
+            import base64
+            raw = base64.b64decode(o["crop_png_base64"])
+            assert raw[:8] == b"\x89PNG\r\n\x1a\n", "Not a valid PNG"
+
+    def test_clear_objects(self, client: TestClient) -> None:
+        """DELETE /objects clears all tracked objects."""
+        create_resp = client.post("/api/projects", json={"name": "ClearProj"})
+        pid = create_resp.json()["project_id"]
+
+        # Create an object (needs a frame)
+        import cv2
+        import numpy as np
+
+        from app.api import deps
+        proj_root = deps._config.project_root
+        frame_dir = proj_root / "projects" / pid / "frames" / "scene_0"
+        frame_dir.mkdir(parents=True, exist_ok=True)
+        frame = np.full((200, 200, 3), 255, dtype=np.uint8)
+        frame[50:150, 50:150] = (0, 0, 0)
+        cv2.imwrite(str(frame_dir / "frame_000000.png"), frame)
+
+        r = client.post(
+            f"/api/projects/{pid}/objects",
+            json={
+                "name": "Obj1",
+                "selection": {"mode": "point", "frame_index": 0, "x": 100, "y": 100},
+                "scene_id": 0,
+            },
+        )
+        assert r.status_code == 201
+
+        # Verify object exists
+        resp = client.get(f"/api/projects/{pid}/objects")
+        assert resp.status_code == 200
+        assert len(resp.json()) == 1
+
+        # DELETE all objects (no trailing slash)
+        resp = client.delete(f"/api/projects/{pid}/objects")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "ok"
+
+        # Verify cleared
+        resp = client.get(f"/api/projects/{pid}/objects")
+        assert resp.status_code == 200
+        assert len(resp.json()) == 0
+
+        # DELETE with trailing slash — no 405
+        resp2 = client.delete(f"/api/projects/{pid}/objects/")
+        assert resp2.status_code == 200
+        assert resp2.json()["status"] == "ok"

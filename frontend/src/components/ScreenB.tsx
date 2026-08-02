@@ -24,6 +24,7 @@ export function ScreenB() {
     maskPreview,
     setMaskPreview,
     setActiveObject,
+    setProject,
     setScreen,
   } = useProjectStore();
 
@@ -39,11 +40,32 @@ export function ScreenB() {
   const [autoObjects, setAutoObjects] = useState<Array<{
     object_index: number;
     name?: string;
+    crop_png_base64?: string;
     bbox: { x: number; y: number; width: number; height: number };
     area: number;
   }>>([]);
   const [isAutoSegmenting, setIsAutoSegmenting] = useState(false);
+  const [isClearingObjects, setIsClearingObjects] = useState(false);
   const autoPreviewRef = useRef(false);
+
+  // Clear all tracked objects
+  const handleClearObjects = async () => {
+    if (!projectId) return;
+    if (!confirm("Xóa tất cả nhân vật đã tách? Hành động này không thể hoàn tác.")) return;
+    setIsClearingObjects(true);
+    try {
+      await api.clearObjects(projectId);
+      // Reload project from API to reset objects list
+      const updated = await api.getProject(projectId);
+      setProject(updated);
+      setActiveObject(null);
+      setAutoObjects([]);
+    } catch (err) {
+      alert(`Lỗi: ${(err as Error).message}`);
+    } finally {
+      setIsClearingObjects(false);
+    }
+  };
 
   const meta = project?.video_metadata;
   const frameUrl = projectId
@@ -330,7 +352,16 @@ export function ScreenB() {
           {/* Existing tracked objects with crop thumbnails */}
           {project?.objects && project.objects.length > 0 && (
             <>
-              <h3 className="text-xs text-gray-500 uppercase mb-2">🎭 Nhân vật đã tách</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs text-gray-500 uppercase">🎭 Nhân vật đã tách</h3>
+                <button
+                  onClick={handleClearObjects}
+                  disabled={isClearingObjects}
+                  className="px-2 py-0.5 text-[10px] bg-red-900/60 hover:bg-red-800 border border-red-800 rounded text-red-300 transition-colors"
+                >
+                  {isClearingObjects ? "Đang xóa..." : "🗑️ Xóa Tất Cả Nhân Vật Cũ"}
+                </button>
+              </div>
               <div className="space-y-1">
                 {project.objects.map((obj) => (
                   <button
@@ -362,27 +393,45 @@ export function ScreenB() {
           ) : (
             <div className="space-y-1">
               {autoObjects.map((obj) => (
-                <button
+                <div
                   key={obj.object_index}
-                  onClick={() => {
-                    setSelection({
-                      mode: "bounding_box",
-                      frame_index: currentFrame,
-                      x: obj.bbox.x,
-                      y: obj.bbox.y,
-                      width: obj.bbox.width,
-                      height: obj.bbox.height,
-                    });
-                    // Auto-load mask preview for this object
-                    previewMut.mutate();
-                  }}
                   className="w-full text-left px-2.5 py-2 bg-gray-800/80 hover:bg-purple-900/40 border border-gray-700 hover:border-purple-500/50 rounded-lg text-xs transition-colors"
                 >
-                  🎯 {obj.name ?? `Vật thể #${obj.object_index + 1}`}
-                  <span className="block text-[10px] text-gray-500 mt-0.5">
-                    Kích thước {obj.bbox.width}×{obj.bbox.height}px
-                  </span>
-                </button>
+                  <div className="flex items-center gap-2">
+                    {obj.crop_png_base64 && (
+                      <img
+                        src={`data:image/png;base64,${obj.crop_png_base64}`}
+                        alt={obj.name ?? `Vật thể #${obj.object_index + 1}`}
+                        className="w-14 h-14 object-contain bg-black/80 rounded border border-purple-500/50 flex-shrink-0"
+                      />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-gray-200 truncate">
+                        🎯 {obj.name ?? `Vật thể #${obj.object_index + 1}`}
+                      </p>
+                      <p className="text-[10px] text-gray-500 mt-0.5">
+                        Kích thước {obj.bbox.width}×{obj.bbox.height}px
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      // 1-Click: set selection + accept as new TrackedObject
+                      setSelection({
+                        mode: "bounding_box",
+                        frame_index: currentFrame,
+                        x: obj.bbox.x,
+                        y: obj.bbox.y,
+                        width: obj.bbox.width,
+                        height: obj.bbox.height,
+                      });
+                      previewMut.mutate();
+                    }}
+                    className="mt-2 w-full py-1.5 text-[11px] bg-green-600 hover:bg-green-500 rounded text-white font-medium transition-colors"
+                  >
+                    ✅ Chọn Nhân Vật Này
+                  </button>
+                </div>
               ))}
             </div>
           )}

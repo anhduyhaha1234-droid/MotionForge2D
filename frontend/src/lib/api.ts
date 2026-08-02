@@ -390,6 +390,12 @@ export const api = {
       >
     >(`/api/projects/${projectId}/objects`),
 
+  clearObjects: (projectId: string) =>
+    apiFetch<{ status: string; message: string }>(
+      `/api/projects/${projectId}/objects`,
+      { method: "DELETE" },
+    ),
+
   // ─── Scene Approval ───────────────────────────────────────────────────
 
   chunkScenes: (projectId: string, threshold?: number) =>
@@ -630,6 +636,7 @@ export const api = {
       objects: Array<{
         object_index: number;
         name?: string;
+        crop_png_base64?: string;
         bbox: { x: number; y: number; width: number; height: number };
         area: number;
         centroid: { x: number; y: number };

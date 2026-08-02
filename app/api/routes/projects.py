@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import shutil
 import uuid
 from pathlib import Path
@@ -261,11 +262,23 @@ def auto_segment_objects(
 
         x, y, bw, bh = cv2.boundingRect(contour)
         # Scale back to original resolution
+        full_x = int(x / scale)
+        full_y = int(y / scale)
         full_w = int(bw / scale)
         full_h = int(bh / scale)
         cx = int((x + bw / 2) / scale)
         cy = int((y + bh / 2) / scale)
         full_area = int(area / (scale * scale))
+
+        # Crop the object region from the ORIGINAL frame and encode as base64 PNG
+        crop_png_base64 = ""
+        try:
+            crop_img = img[full_y : full_y + full_h, full_x : full_x + full_w]
+            if crop_img.size > 0:
+                _, buf = cv2.imencode(".png", crop_img)
+                crop_png_base64 = base64.b64encode(buf).decode("utf-8")
+        except Exception:
+            crop_png_base64 = ""
 
         # Distinct name based on size + position
         # Large object near center → "Nhân vật", else "Vật thể"
@@ -277,9 +290,10 @@ def auto_segment_objects(
         objects.append({
             "object_index": len(objects),
             "name": name,
+            "crop_png_base64": crop_png_base64,
             "bbox": {
-                "x": int(x / scale),
-                "y": int(y / scale),
+                "x": full_x,
+                "y": full_y,
                 "width": full_w,
                 "height": full_h,
             },
@@ -354,6 +368,31 @@ def list_objects(project_id: str) -> list[dict]:
                 item["thumbnail_base64"] = ""
         results.append(item)
     return results
+
+
+@router.delete("/{project_id}/objects")
+@router.delete("/{project_id}/objects/")
+def clear_objects(project_id: str) -> dict:
+    """Delete all tracked objects for a project (reset objects list)."""
+    pwf = get_project_workflow()
+    try:
+        proj = pwf.get_project(project_id)
+    except FileNotFoundError as err:
+        raise HTTPException(404, "Project not found") from err
+
+    proj.objects = []
+    pwf._save_project(project_id, proj)
+
+    # Also clean object dirs on disk
+    proj_dir = pwf._project_dir(project_id)
+    objects_dir = proj_dir / "objects"
+    if objects_dir.exists():
+        import shutil as _sh
+        for child in objects_dir.iterdir():
+            if child.is_dir():
+                _sh.rmtree(child, ignore_errors=True)
+
+    return {"status": "ok", "message": "Cleared all objects"}
 
 
 @router.get("/{project_id}/frames/{frame_index}")
