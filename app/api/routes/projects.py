@@ -261,18 +261,32 @@ def auto_segment_objects(
 
         x, y, bw, bh = cv2.boundingRect(contour)
         # Scale back to original resolution
+        full_w = int(bw / scale)
+        full_h = int(bh / scale)
+        cx = int((x + bw / 2) / scale)
+        cy = int((y + bh / 2) / scale)
+        full_area = int(area / (scale * scale))
+
+        # Distinct name based on size + position
+        # Large object near center → "Nhân vật", else "Vật thể"
+        center_dist = abs(cx - w / 2) + abs(cy - h / 2)
+        is_character = full_area > (w * h * 0.05) and center_dist < (w * 0.4)
+        label = "Nhân vật" if is_character else "Vật thể"
+        name = f"{label} #{len(objects) + 1} ({full_w}×{full_h}px)"
+
         objects.append({
             "object_index": len(objects),
+            "name": name,
             "bbox": {
                 "x": int(x / scale),
                 "y": int(y / scale),
-                "width": int(bw / scale),
-                "height": int(bh / scale),
+                "width": full_w,
+                "height": full_h,
             },
-            "area": int(area / (scale * scale)),
+            "area": full_area,
             "centroid": {
-                "x": int((x + bw / 2) / scale),
-                "y": int((y + bh / 2) / scale),
+                "x": cx,
+                "y": cy,
             },
         })
 
@@ -498,9 +512,23 @@ def create_object(project_id: str, body: CreateObjectRequest) -> dict:
         raise HTTPException(404, "Project not found") from err
 
     obj_id = uuid.uuid4().hex[:8]
+
+    # Distinct name: use provided name, or auto-generate from selection size
+    obj_name = body.name
+    if not obj_name or obj_name.lower() in ("test", "object", "vật thể", "nhân vật"):
+        selection = body.selection
+        if selection.mode == "bounding_box":
+            sw = int(selection.width)
+            sh = int(selection.height)
+        else:
+            sw, sh = 160, 160
+        existing = [o for o in pwf.get_project(project_id).objects]
+        idx = len(existing) + 1
+        obj_name = f"Vật thể #{idx} ({sw}×{sh}px)"
+
     obj = TrackedObject(
         object_id=obj_id,
-        name=body.name,
+        name=obj_name,
         kind=body.kind,
         selection=body.selection,
         scene_id=body.scene_id,

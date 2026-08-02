@@ -38,6 +38,7 @@ export function ScreenB() {
   const maskImageRef = useRef<HTMLImageElement | null>(null);
   const [autoObjects, setAutoObjects] = useState<Array<{
     object_index: number;
+    name?: string;
     bbox: { x: number; y: number; width: number; height: number };
     area: number;
   }>>([]);
@@ -377,7 +378,7 @@ export function ScreenB() {
                   }}
                   className="w-full text-left px-2.5 py-2 bg-gray-800/80 hover:bg-purple-900/40 border border-gray-700 hover:border-purple-500/50 rounded-lg text-xs transition-colors"
                 >
-                  🎯 Vật thể #{obj.object_index + 1}
+                  🎯 {obj.name ?? `Vật thể #${obj.object_index + 1}`}
                   <span className="block text-[10px] text-gray-500 mt-0.5">
                     Kích thước {obj.bbox.width}×{obj.bbox.height}px
                   </span>

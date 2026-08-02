@@ -104,6 +104,42 @@ class TestAutoSegment:
         response = client.post("/api/projects/nope/auto-segment-objects")
         assert response.status_code == 404
 
+    def test_auto_segment_distinct_names(self, client: TestClient) -> None:
+        """Auto-segment returns distinct names with size for each object."""
+        import cv2
+        import numpy as np
+
+        # Create project
+        create_resp = client.post("/api/projects", json={"name": "NamesProj"})
+        pid = create_resp.json()["project_id"]
+
+        # Create a synthetic frame with two distinct objects (white bg, dark objects)
+        from app.api import deps
+        proj_root = deps._config.project_root
+        frame_dir = proj_root / "projects" / pid / "frames" / "scene_0"
+        frame_dir.mkdir(parents=True, exist_ok=True)
+        frame = np.full((300, 400, 3), 255, dtype=np.uint8)  # white background
+        frame[50:200, 50:150] = (0, 0, 0)   # large left object
+        frame[80:130, 250:350] = (0, 0, 0)  # medium right object
+        cv2.imwrite(str(frame_dir / "frame_000000.png"), frame)
+
+        resp = client.post(
+            f"/api/projects/{pid}/auto-segment-objects",
+            params={"scene_id": 0, "min_area": 100},
+        )
+        assert resp.status_code == 200
+        objs = resp.json()["objects"]
+        assert len(objs) >= 2
+
+        # Every object has a distinct name containing size
+        names = [o["name"] for o in objs]
+        assert len(set(names)) == len(names), f"Duplicate names: {names}"
+        for o in objs:
+            assert "×" in o["name"] and "px" in o["name"], o["name"]
+            # Name should reference the size
+            assert str(o["bbox"]["width"]) in o["name"]
+            assert str(o["bbox"]["height"]) in o["name"]
+
 
 class TestObjectCrop:
     def test_crop_nonexistent_object(self, client: TestClient) -> None:

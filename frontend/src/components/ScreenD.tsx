@@ -266,10 +266,16 @@ export function ScreenD() {
                       <img
                         src={api.getObjectCropUrl(projectId, obj.object_id)}
                         alt={obj.name}
-                        className="w-full h-full object-contain bg-black/60 rounded border border-purple-500/50"
+                        className="w-full h-full object-contain bg-black/80 rounded border border-purple-500/50"
                         onError={(e) => {
-                          // Fallback: hide broken image, show empty box
-                          (e.target as HTMLImageElement).style.display = "none";
+                          // Fallback to thumbnail_base64 if available
+                          const el = e.target as HTMLImageElement;
+                          if (obj.thumbnail_base64) {
+                            el.src = obj.thumbnail_base64;
+                            el.onerror = null;
+                          } else {
+                            el.style.display = "none";
+                          }
                         }}
                       />
                     )}

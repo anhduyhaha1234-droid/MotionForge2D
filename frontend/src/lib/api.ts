@@ -118,6 +118,7 @@ export interface TrackedObject {
   selection: SelectionInput;
   scene_id: number;
   replacement: ReplacementConfig | null;
+  thumbnail_base64?: string;
   motion: {
     scene_id: number;
     frames: FrameMotion[];
@@ -628,6 +629,7 @@ export const api = {
       objects_found: number;
       objects: Array<{
         object_index: number;
+        name?: string;
         bbox: { x: number; y: number; width: number; height: number };
         area: number;
         centroid: { x: number; y: number };
