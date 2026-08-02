@@ -81,3 +81,48 @@ def sample_mask() -> np.ndarray[Any, Any]:
     mask = np.zeros((100, 100), dtype=np.uint8)
     mask[20:80, 20:80] = 255
     return mask
+
+
+@pytest.fixture()
+def _patch_project_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+    """Redirect project root to a temp dir so tests never write to real projects/.
+
+    Returns the test project root (contains projects/ subdir).
+    """
+    test_root = tmp_path / "motionforge_test"
+    test_root.mkdir(exist_ok=True)
+    monkeypatch.setenv("MOTIONFORGE_PROJECT_ROOT", str(test_root))
+
+    from app.api import deps
+    from app.config import AppConfig
+
+    test_config = AppConfig(
+        project_root=test_root,
+        models_dir=test_root / "models",
+        output_dir=test_root / "output",
+    )
+    monkeypatch.setattr(deps, "_config", test_config)
+    monkeypatch.setattr(
+        deps,
+        "_project_wf",
+        __import__(
+            "app.workflow.project_workflow",
+            fromlist=["ProjectWorkflowService"],
+        ).ProjectWorkflowService(test_config),
+    )
+    monkeypatch.setattr(
+        deps,
+        "_job_service",
+        __import__("app.workflow.job_service", fromlist=["JobService"]).JobService(),
+    )
+    return test_root
+
+
+@pytest.fixture()
+def client(_patch_project_root: Path):
+    """FastAPI test client with isolated project root (no disk pollution)."""
+    from fastapi.testclient import TestClient
+
+    from app.api.app import app
+
+    return TestClient(app, raise_server_exceptions=False)

@@ -2,23 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-from fastapi.testclient import TestClient
-
-from app.api.app import app
-
-
-@pytest.fixture()
-def _patch_project_root(monkeypatch: pytest.MonkeyPatch, tmp_path: str) -> None:
-    """Redirect project root to temp dir."""
-    monkeypatch.setenv("MOTIONFORGE_PROJECT_ROOT", str(tmp_path))
-
-
-@pytest.fixture()
-def client(_patch_project_root: None) -> TestClient:
-    """FastAPI test client."""
-    return TestClient(app, raise_server_exceptions=False)
-
 
 class TestTrailingSlashDelete:
     def test_delete_without_slash(self, client) -> None:
