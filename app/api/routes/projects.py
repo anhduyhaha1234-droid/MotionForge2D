@@ -118,6 +118,7 @@ def create_project(body: CreateProjectRequest) -> CreateProjectResponse:
 
 
 @router.post("/{project_id}/video")
+@router.post("/{project_id}/video/")
 async def upload_video(project_id: str, file: UploadFile) -> dict:
     """Upload a video file for the project."""
     import re
@@ -143,6 +144,7 @@ async def upload_video(project_id: str, file: UploadFile) -> dict:
 
 
 @router.post("/{project_id}/ingest")
+@router.post("/{project_id}/ingest/")
 def trigger_ingest(project_id: str) -> dict:
     """Trigger ingest (probe + scene detect + frame extract). Returns a job."""
     from app.workflow.ingest_service import IngestService
@@ -197,12 +199,14 @@ def get_project(project_id: str) -> ProjectData:
 def auto_segment_objects(
     project_id: str,
     scene_id: int = 0,
-    min_area: int = 500,
+    min_area: int = 300,
     max_objects: int = 20,
 ) -> dict:
     """Auto-detect objects in a frame using OpenCV contour detection.
 
     Returns list of detected objects with bounding boxes.
+    min_area computed on 0.5x downsampled frame; 300 ≈ 1200px at full res —
+    catches characters, chairs, tables, beds.
     """
     import cv2
     import numpy as np  # noqa: F401
@@ -323,6 +327,7 @@ def get_frame(project_id: str, frame_index: int, scene_id: int = 0) -> FileRespo
 
 
 @router.post("/{project_id}/objects/preview-mask")
+@router.post("/{project_id}/objects/preview-mask/")
 def preview_mask(project_id: str, body: PreviewMaskRequest) -> dict:
     """Preview mask for a selection on a frame."""
     pwf = get_project_workflow()
@@ -360,6 +365,7 @@ def preview_mask(project_id: str, body: PreviewMaskRequest) -> dict:
 
 
 @router.post("/{project_id}/objects", status_code=201)
+@router.post("/{project_id}/objects/", status_code=201)
 def create_object(project_id: str, body: CreateObjectRequest) -> dict:
     """Create a tracked object."""
     import cv2
@@ -430,6 +436,7 @@ def create_object(project_id: str, body: CreateObjectRequest) -> dict:
 
 
 @router.post("/{project_id}/objects/{object_id}/propagate")
+@router.post("/{project_id}/objects/{object_id}/propagate/")
 def propagate_object(project_id: str, object_id: str) -> dict:
     """Propagate masks for a tracked object. Returns a job."""
     import cv2
@@ -583,6 +590,7 @@ def get_gallery(project_id: str, object_id: str) -> dict:
 
 
 @router.post("/{project_id}/objects/{object_id}/replacement")
+@router.post("/{project_id}/objects/{object_id}/replacement/")
 async def upload_replacement(
     project_id: str, object_id: str, file: UploadFile,
 ) -> dict:
@@ -630,6 +638,7 @@ def update_replacement_settings(
 
 
 @router.post("/{project_id}/preview")
+@router.post("/{project_id}/preview/")
 def render_preview(project_id: str, object_id: str = "") -> dict:
     """Render a preview video. Returns a job."""
     pwf = get_project_workflow()
@@ -661,6 +670,7 @@ def render_preview(project_id: str, object_id: str = "") -> dict:
 
 
 @router.post("/{project_id}/render")
+@router.post("/{project_id}/render/")
 def render_final(
     project_id: str, object_id: str = "", format: str = "mp4",
 ) -> dict:
@@ -704,6 +714,7 @@ class DubbingRequest(BaseModel):
 
 
 @router.post("/{project_id}/dubbing/separate")
+@router.post("/{project_id}/dubbing/separate/")
 def separate_audio(project_id: str, scene_id: int) -> dict:
     """Separate scene audio into vocal and background tracks."""
     from app.workflow.audio_dubbing_service import AudioDubbingService  # noqa: PLC0415
@@ -730,6 +741,7 @@ def separate_audio(project_id: str, scene_id: int) -> dict:
 
 
 @router.post("/{project_id}/dubbing/transcribe")
+@router.post("/{project_id}/dubbing/transcribe/")
 def transcribe_scene(
     project_id: str, scene_id: int,
     source_lang: str = "vi", whisper_model: str = "base",
@@ -759,6 +771,7 @@ def transcribe_scene(
 
 
 @router.post("/{project_id}/dubbing/translate")
+@router.post("/{project_id}/dubbing/translate/")
 def translate_subtitles(
     project_id: str, scene_id: int,
     target_lang: str = "en", source_lang: str = "auto",
@@ -790,6 +803,7 @@ def translate_subtitles(
 
 
 @router.post("/{project_id}/dubbing/tts")
+@router.post("/{project_id}/dubbing/tts/")
 def generate_tts(
     project_id: str, scene_id: int,
     target_lang: str = "en",
@@ -824,6 +838,7 @@ def generate_tts(
 
 
 @router.post("/{project_id}/dubbing/remux")
+@router.post("/{project_id}/dubbing/remux/")
 def remux_dubbed_audio(
     project_id: str, scene_id: int,
     tts_voice: str = "en-US-AriaNeural",
@@ -864,6 +879,7 @@ def remux_dubbed_audio(
 
 
 @router.post("/{project_id}/dubbing/full")
+@router.post("/{project_id}/dubbing/full/")
 def full_dubbing_pipeline(project_id: str, body: DubbingRequest) -> dict:
     """Run full dubbing pipeline for a scene."""
     from app.workflow.audio_dubbing_service import AudioDubbingService  # noqa: PLC0415
@@ -902,6 +918,7 @@ class SceneStatusUpdate(BaseModel):
 
 
 @router.post("/{project_id}/scenes/chunk")
+@router.post("/{project_id}/scenes/chunk/")
 def chunk_scenes(project_id: str, threshold: float = 27.0) -> dict:
     """Re-chunk video into scenes and extract per-scene audio."""
     from app.workflow.scene_chunking_service import SceneChunkingService
@@ -994,6 +1011,7 @@ def get_scene_audio(project_id: str, scene_id: int) -> FileResponse:
 
 
 @router.post("/{project_id}/scenes/{scene_id}/extract-frames")
+@router.post("/{project_id}/scenes/{scene_id}/extract-frames/")
 def extract_scene_frames(
     project_id: str, scene_id: int, format: str = "jpg",
 ) -> dict:
@@ -1030,6 +1048,7 @@ def extract_scene_frames(
 
 
 @router.post("/{project_id}/scenes/stitch")
+@router.post("/{project_id}/scenes/stitch/")
 def stitch_scenes(project_id: str) -> dict:
     """Stitch all approved scenes into final video."""
     from app.workflow.scene_stitch_service import SceneStitchService
@@ -1067,6 +1086,7 @@ class BulkMappingRequest(BaseModel):
 
 
 @router.post("/{project_id}/objects/{object_id}/apply-bulk")
+@router.post("/{project_id}/objects/{object_id}/apply-bulk/")
 def apply_bulk_mapping(
     project_id: str, object_id: str, body: BulkMappingRequest,
 ) -> dict:
@@ -1113,6 +1133,7 @@ class SavePresetRequest(BaseModel):
 
 
 @router.post("/{project_id}/presets/save")
+@router.post("/{project_id}/presets/save/")
 def save_project_preset(
     project_id: str, body: SavePresetRequest,
 ) -> dict:
@@ -1174,6 +1195,7 @@ def list_project_presets(project_id: str) -> list[dict]:
 
 
 @router.post("/{project_id}/presets/{preset_filename}/apply")
+@router.post("/{project_id}/presets/{preset_filename}/apply/")
 def apply_preset(project_id: str, preset_filename: str) -> dict:
     """Apply a preset to the current project."""
     from app.workflow.preset_service import PresetService  # noqa: PLC0415
@@ -1262,6 +1284,7 @@ class UpdateTaskStatusRequest(BaseModel):
 
 
 @router.post("/channels")
+@router.post("/channels/")
 def create_channel(body: CreateChannelRequest) -> dict:
     """Create a new channel workspace."""
     from app.workflow.channel_service import ChannelService  # noqa: PLC0415
@@ -1301,6 +1324,7 @@ def get_channel_projects(channel_id: str) -> list[dict]:
 
 
 @router.delete("/channels/{channel_id}")
+@router.delete("/channels/{channel_id}/")
 def delete_channel(channel_id: str) -> dict:
     """Delete a channel workspace."""
     from app.workflow.channel_service import ChannelService  # noqa: PLC0415

@@ -324,11 +324,39 @@ export function ScreenB() {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Left: Object list (empty for now) */}
-        <div className="w-48 bg-gray-900 border-r border-gray-800 p-3">
-          <h3 className="text-xs text-gray-500 uppercase mb-2">Vật thể</h3>
-          <p className="text-xs text-gray-600">Chưa có vật thể nào</p>
-        </div>
+        {/* Left: Auto-detected objects + list */}
+        <aside className="w-64 bg-gray-900 border-r border-gray-800 p-4 space-y-3 overflow-y-auto">
+          <h3 className="text-xs text-gray-500 uppercase mb-2">🎯 Vật thể phát hiện</h3>
+          {autoObjects.length === 0 ? (
+            <p className="text-xs text-gray-600">Chưa quét. Bấm "🪄 Tự Động Bắt" ở bên phải để tìm nhân vật & vật thể.</p>
+          ) : (
+            <div className="space-y-1">
+              {autoObjects.map((obj) => (
+                <button
+                  key={obj.object_index}
+                  onClick={() => {
+                    setSelection({
+                      mode: "bounding_box",
+                      frame_index: currentFrame,
+                      x: obj.bbox.x,
+                      y: obj.bbox.y,
+                      width: obj.bbox.width,
+                      height: obj.bbox.height,
+                    });
+                    // Auto-load mask preview for this object
+                    previewMut.mutate();
+                  }}
+                  className="w-full text-left px-2.5 py-2 bg-gray-800/80 hover:bg-purple-900/40 border border-gray-700 hover:border-purple-500/50 rounded-lg text-xs transition-colors"
+                >
+                  🎯 Vật thể #{obj.object_index + 1}
+                  <span className="block text-[10px] text-gray-500 mt-0.5">
+                    Kích thước {obj.bbox.width}×{obj.bbox.height}px
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </aside>
 
         {/* Center: Canvas */}
         <div ref={containerRef} className="flex-1 relative">
@@ -418,30 +446,25 @@ export function ScreenB() {
               {isAutoSegmenting ? "Đang quét..." : "🪄 Tự Động Bắt Tất Cả Nhân Vật"}
             </button>
             <p className="text-[11px] text-gray-400 mt-1">AI tự động quét & bóc tách toàn bộ nhân vật, bàn ghế có trong cảnh mà không cần chấm điểm thủ công.</p>
-            {autoObjects.length > 0 && (
-              <div className="mt-3 space-y-1 max-h-40 overflow-y-auto">
-                <p className="text-xs text-gray-400 mb-1">Phát hiện {autoObjects.length} vật thể:</p>
-                {autoObjects.map((obj) => (
-                  <button
-                    key={obj.object_index}
-                    onClick={() => {
-                      // Set selection to this object's bbox centroid
-                      setSelection({
-                        mode: "bounding_box",
-                        frame_index: currentFrame,
-                        x: obj.bbox.x,
-                        y: obj.bbox.y,
-                        width: obj.bbox.width,
-                        height: obj.bbox.height,
-                      });
-                    }}
-                    className="w-full text-left px-2 py-1 bg-gray-800 hover:bg-gray-700 rounded text-xs"
-                  >
-                    Vật thể #{obj.object_index + 1} — {obj.bbox.width}×{obj.bbox.height}px
-                  </button>
-                ))}
-              </div>
-            )}
+          </div>
+
+          {/* Go to Screen C */}
+          <button
+            onClick={() => setScreen("replacement")}
+            className="w-full py-3 text-sm bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl shadow-lg shadow-green-900/30 transition-all"
+          >
+            ➡️ CHUYỂN SANG MÀN C THAY THẾ NHÂN VẬT
+          </button>
+          <p className="text-[11px] text-gray-400 mt-1">Sau khi đã chọn & tách nhân vật, bấm để chuyển sang bước thay ảnh nhân vật mới.</p>
+
+          {/* 3-step guide */}
+          <div className="bg-gray-800/60 border border-gray-700 rounded-lg p-3 space-y-2">
+            <h4 className="text-xs font-medium text-gray-300">📋 Hướng dẫn 3 bước thay thế:</h4>
+            <ol className="text-[11px] text-gray-400 space-y-1.5 list-decimal list-inside">
+              <li>Chọn công cụ Điểm + / Hộp để khoanh nhân vật đối thủ.</li>
+              <li>Bấm <span className="text-green-400">Chấp nhận & Tách</span> để AI tách & theo vết.</li>
+              <li>Bấm <span className="text-green-400">➡️ Chuyển sang Màn C</span> để thay ảnh nhân vật mới.</li>
+            </ol>
           </div>
 
           {/* Frame slider */}
@@ -461,6 +484,7 @@ export function ScreenB() {
               <span>0</span>
               <span>{(meta?.total_frames ?? 1) - 1}</span>
             </div>
+            <p className="text-[11px] text-gray-400 mt-1">💡 Kéo thanh này để xem trước các giây/khung hình khác nhau trong video. Hãy chọn khung hình có nhân vật hiển thị rõ nhất để chấm điểm.</p>
           </div>
 
           {/* Points list */}
