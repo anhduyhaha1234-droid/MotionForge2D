@@ -77,7 +77,14 @@ def list_all_projects() -> list[dict]:
     # Filter valid project directories (excluding dummy test projects)
     results = []
     dirs = [d for d in projects_dir.iterdir() if d.is_dir() and (d / "project.json").exists()]
-    dirs.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    # Sort: scenes_count desc first (real projects), then by mtime
+    def _sort_key(p):
+        try:
+            data = json.loads((p / "project.json").read_text(encoding="utf-8"))
+            return (len(data.get("scenes", [])), p.stat().st_mtime)
+        except Exception:
+            return (0, 0)
+    dirs.sort(key=_sort_key, reverse=True)
 
     for proj_dir in dirs:
         try:
@@ -96,8 +103,6 @@ def list_all_projects() -> list[dict]:
                 "updated_at": data.get("updated_at", ""),
                 "created_at": data.get("created_at", ""),
             })
-            if len(results) >= 30:
-                break
         except Exception:
             continue
     return results
