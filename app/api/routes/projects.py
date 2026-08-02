@@ -569,6 +569,43 @@ def create_object(project_id: str, body: CreateObjectRequest) -> dict:
     except FileNotFoundError as err:
         raise HTTPException(404, "Project not found") from err
 
+    # Dedupe: if an existing object has nearly the same bbox in the same
+    # scene and same frame, return the existing object instead of creating
+    # a duplicate.
+    try:
+        proj_now = pwf.get_project(project_id)
+        sel = body.selection
+        for existing in proj_now.objects:
+            if existing.scene_id != body.scene_id:
+                continue
+            es = existing.selection
+            if es.mode == "bounding_box" and sel.mode == "bounding_box":
+                if (
+                    abs(es.x - sel.x) < 20
+                    and abs(es.y - sel.y) < 20
+                    and abs(es.width - sel.width) < 30
+                    and abs(es.height - sel.height) < 30
+                    and abs(es.frame_index - sel.frame_index) < 3
+                ):
+                    return {
+                        "object_id": existing.object_id,
+                        "project": proj_now.model_dump(),
+                        "duplicate": True,
+                    }
+            elif (
+                es.mode == sel.mode == "point"
+                and abs(es.x - sel.x) < 30
+                and abs(es.y - sel.y) < 30
+                and abs(es.frame_index - sel.frame_index) < 3
+            ):
+                return {
+                    "object_id": existing.object_id,
+                    "project": proj_now.model_dump(),
+                    "duplicate": True,
+                }
+    except Exception:
+        pass
+
     obj_id = uuid.uuid4().hex[:8]
 
     # Distinct name: use provided name, or auto-generate from selection size

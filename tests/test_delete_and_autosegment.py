@@ -281,7 +281,9 @@ class TestCropBase64AndClear:
 
 
 class TestDeleteSingleAndClear:
-    def _make_frame_and_object(self, client, pid: str) -> str:
+    def _make_frame_and_object(
+        self, client, pid: str, x: int = 100, y: int = 100
+    ) -> str:
         """Create a synthetic frame + one object, return object_id."""
         import cv2
         import numpy as np
@@ -298,7 +300,7 @@ class TestDeleteSingleAndClear:
             f"/api/projects/{pid}/objects",
             json={
                 "name": "ObjX",
-                "selection": {"mode": "point", "frame_index": 0, "x": 100, "y": 100},
+                "selection": {"mode": "point", "frame_index": 0, "x": x, "y": y},
                 "scene_id": 0,
             },
         )
@@ -325,7 +327,7 @@ class TestDeleteSingleAndClear:
             f"/api/projects/{pid}/objects",
             json={
                 "name": "ObjY",
-                "selection": {"mode": "point", "frame_index": 0, "x": 100, "y": 100},
+                "selection": {"mode": "point", "frame_index": 0, "x": 50, "y": 50},
                 "scene_id": 0,
             },
         )
@@ -358,7 +360,7 @@ class TestDeleteSingleAndClear:
         pid = create_resp.json()["project_id"]
 
         self._make_frame_and_object(client, pid)
-        self._make_frame_and_object(client, pid)
+        self._make_frame_and_object(client, pid, x=50, y=50)
 
         resp = client.delete(f"/api/projects/{pid}/objects")
         assert resp.status_code == 200
@@ -399,3 +401,45 @@ class TestDeleteSingleAndClear:
             import base64
             raw = base64.b64decode(o["crop_png_base64"])
             assert raw[:8] == b"\x89PNG\r\n\x1a\n"
+
+    def test_create_object_dedupes_duplicate_bbox(self, client: TestClient) -> None:
+        """Creating an object with the same bbox returns the existing object."""
+        import cv2
+        import numpy as np
+
+        create_resp = client.post("/api/projects", json={"name": "Dedupe"})
+        pid = create_resp.json()["project_id"]
+
+        from app.api import deps
+        proj_root = deps._config.project_root
+        frame_dir = proj_root / "projects" / pid / "frames" / "scene_0"
+        frame_dir.mkdir(parents=True, exist_ok=True)
+        frame = np.full((200, 200, 3), 255, dtype=np.uint8)
+        frame[50:150, 50:150] = (0, 0, 0)
+        cv2.imwrite(str(frame_dir / "frame_000000.png"), frame)
+
+        payload = {
+            "name": "Nhân vật #1",
+            "selection": {
+                "mode": "bounding_box",
+                "frame_index": 0,
+                "x": 60,
+                "y": 60,
+                "width": 80,
+                "height": 80,
+            },
+            "scene_id": 0,
+        }
+        r1 = client.post(f"/api/projects/{pid}/objects", json=payload)
+        assert r1.status_code == 201
+        oid1 = r1.json()["object_id"]
+
+        # Same bbox → should return the SAME object (duplicate)
+        r2 = client.post(f"/api/projects/{pid}/objects", json=payload)
+        assert r2.status_code == 201
+        assert r2.json().get("duplicate") is True
+        assert r2.json()["object_id"] == oid1
+
+        # Verify only 1 object exists
+        resp = client.get(f"/api/projects/{pid}/objects")
+        assert len(resp.json()) == 1

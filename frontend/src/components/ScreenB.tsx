@@ -310,9 +310,10 @@ export function ScreenB() {
       const sel = buildSelection();
       if (!sel) return;
 
-      // Create object
+      // Create object — distinct name based on existing count
+      const existingCount = project?.objects?.length ?? 0;
       const obj = await api.createObject(projectId, {
-        name: "Object 1",
+        name: `Nhân vật #${existingCount + 1}`,
         selection: sel,
         scene_id: 0,
       });
