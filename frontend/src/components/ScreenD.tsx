@@ -213,7 +213,14 @@ export function ScreenD() {
   };
 
   const handleConfirmReplace = () => {
-    if (pendingFile) uploadMut.mutate(pendingFile);
+    if (!pendingFile) return;
+    // Close the compare modal IMMEDIATELY (no hanging)
+    setPendingPreview(null);
+    // Switch canvas to result mode so the new character is drawn
+    setPreviewMode("result");
+    // Kick off the upload; onSuccess updates replacement + shows banner
+    uploadMut.mutate(pendingFile);
+    // Keep pendingFile for onSuccess banner (cleared there)
   };
 
   /* ── Settings mutation & Apply All ──────────────────────────────────── */
@@ -580,7 +587,12 @@ export function ScreenD() {
             </p>
             <button
               onClick={() => setScreen("render")}
-              className="w-full py-2.5 text-sm bg-blue-600 hover:bg-blue-500 font-semibold text-white rounded transition-colors shadow flex items-center justify-center gap-1"
+              disabled={!replacement.asset_path && !confirmedReplacement}
+              className={`w-full py-2.5 text-sm font-semibold text-white rounded transition-colors shadow flex items-center justify-center gap-1 ${
+                !replacement.asset_path && !confirmedReplacement
+                  ? "bg-gray-700 text-gray-400 cursor-not-allowed"
+                  : "bg-blue-600 hover:bg-blue-500"
+              }`}
               data-testid="next-render"
             >
               <span>Tiếp: Render Video</span>

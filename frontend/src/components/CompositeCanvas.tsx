@@ -456,15 +456,47 @@ export function CompositeCanvas({
       }
 
       // Single-object mode (original behavior)
-      if (activeRepImg && frameMotion) {
-        const tf = computeReplacementTransform(
-          frameMotion,
-          replacement,
-          activeRepImg.naturalWidth,
-          activeRepImg.naturalHeight,
-          videoWidth,
-          videoHeight,
-        );
+      // Fallback motion: when frameMotion is missing (e.g. bbox-created object
+      // without tracking), build one from a fixed bbox so the replacement
+      // image still draws over the original character area.
+      const fallbackMotion: FrameMotion | null = frameMotion
+        ? frameMotion
+        : null;
+      const effMotion = fallbackMotion;
+
+      if (activeRepImg && (effMotion || true)) {
+        let tf: TransformResult;
+        // Fallback placement variables (used for bbox when no motion)
+        let fallbackW = 0;
+        let fallbackH = 0;
+        let cx = videoWidth / 2;
+        let cy = videoHeight / 2;
+        if (effMotion) {
+          tf = computeReplacementTransform(
+            effMotion,
+            replacement,
+            activeRepImg.naturalWidth,
+            activeRepImg.naturalHeight,
+            videoWidth,
+            videoHeight,
+          );
+        } else {
+          // No motion data: place at video center with a sensible size.
+          // Use the replacement's natural size scaled to 30% of frame height.
+          fallbackH = videoHeight * 0.3;
+          fallbackW =
+            (activeRepImg.naturalWidth / activeRepImg.naturalHeight) * fallbackH;
+          const anchorPxX = fallbackW * replacement.anchor.x;
+          const anchorPxY = fallbackH * replacement.anchor.y;
+          tf = {
+            x: cx - anchorPxX + replacement.offset.x * videoWidth,
+            y: cy - anchorPxY + replacement.offset.y * videoHeight,
+            width: fallbackW * replacement.scale,
+            height: fallbackH * replacement.scale,
+            rotation: replacement.rotation_offset_deg,
+            opacity: replacement.opacity,
+          };
+        }
 
         // Scale from source coords to viewport coords
         const scaledX = tf.x * vt.scale + offsetX + ox;
@@ -486,18 +518,16 @@ export function CompositeCanvas({
           rotation: tf.rotation,
           offsetX: scaledW / 2,
           offsetY: scaledH / 2,
-          // Position at center, then offset by half-size to rotate around center
-          // Actually: Konva rotation is around (x, y) by default, or (x+offsetX, y+offsetY)
-          // We want to rotate around center of the image
-          // So set x,y to center, and offsetX/offsetY to half-width/height
         });
         // Fix: position at center
         repNode.x(centerX);
         repNode.y(centerY);
         layer.add(repNode);
 
-        // Bounding box rectangle
-        const bbox = frameMotion.bbox;
+        // Bounding box rectangle (from motion if available, else fallback area)
+        const bbox = effMotion
+          ? frameMotion!.bbox
+          : { x: cx - fallbackW / 2, y: cy - fallbackH / 2, width: fallbackW, height: fallbackH };
         const bx = bbox.x * vt.scale + offsetX + ox;
         const by = bbox.y * vt.scale + oy;
         const bw = bbox.width * vt.scale;
@@ -516,8 +546,8 @@ export function CompositeCanvas({
         );
 
         // Centroid dot
-        const cDotX = frameMotion.centroid_x * vt.scale + offsetX + ox;
-        const cDotY = frameMotion.centroid_y * vt.scale + oy;
+        const cDotX = (effMotion ? effMotion.centroid_x : cx) * vt.scale + offsetX + ox;
+        const cDotY = (effMotion ? effMotion.centroid_y : cy) * vt.scale + oy;
         layer.add(
           new Konva.Circle({
             x: cDotX,
@@ -531,22 +561,22 @@ export function CompositeCanvas({
 
         // Anchor point marker
         const anchorAbsX =
-          (frameMotion.centroid_x - tf.width * replacement.anchor.x +
+          ((effMotion ? effMotion.centroid_x : cx) - tf.width * replacement.anchor.x +
             replacement.offset.x * videoWidth) *
             vt.scale +
           offsetX +
           ox +
           (tf.width * replacement.anchor.x * vt.scale);
         const anchorAbsY =
-          (frameMotion.centroid_y - tf.height * replacement.anchor.y +
+          ((effMotion ? effMotion.centroid_y : cy) - tf.height * replacement.anchor.y +
             replacement.offset.y * videoHeight) *
             vt.scale +
           oy +
           (tf.height * replacement.anchor.y * vt.scale);
         // The anchor point is at the centroid in source coords
         // Actually, the anchor point on the asset that aligns with centroid:
-        const anchorOnScreenX = frameMotion.centroid_x * vt.scale + offsetX + ox;
-        const anchorOnScreenY = frameMotion.centroid_y * vt.scale + oy;
+        const anchorOnScreenX = (effMotion ? effMotion.centroid_x : cx) * vt.scale + offsetX + ox;
+        const anchorOnScreenY = (effMotion ? effMotion.centroid_y : cy) * vt.scale + oy;
         layer.add(
           new Konva.Star({
             x: anchorOnScreenX,
@@ -580,9 +610,10 @@ export function CompositeCanvas({
     };
 
     if (previewMode === "comparison") {
-      // Side-by-side: left = original, right = result
+      // Split 50/50: left = original frame, right = composite result
       const halfW = stageW / 2;
-      // Draw original on left half
+
+      // ── Left half: original (no overlay) ──
       if (frameImg) {
         layer.add(
           new Konva.Image({
@@ -595,37 +626,61 @@ export function CompositeCanvas({
           }),
         );
       }
+
       // Divider line
       layer.add(
         new Konva.Line({
           points: [halfW, oy, halfW, oy + dh],
-          stroke: "#555",
-          strokeWidth: 1,
-          dash: [4, 4],
+          stroke: "#888",
+          strokeWidth: 2,
+          dash: [6, 4],
         }),
       );
-      // Draw composite on right half
+
+      // ── Right half: composite result (full draw at offset) ──
       drawComposite(halfW);
 
-      // Label
+      // Labels
       layer.add(
         new Konva.Text({
-          x: 8,
-          y: 8,
-          text: "Ảnh gốc",
-          fontSize: 12,
-          fill: "#aaa",
+          x: ox + 8,
+          y: oy + 8,
+          text: "📷 Ảnh Gốc (Gốc ban đầu)",
+          fontSize: 14,
+          fill: "#94a3b8",
           fontFamily: "sans-serif",
+          fontStyle: "bold",
+        }),
+      );
+      layer.add(
+        new Konva.Rect({
+          x: ox,
+          y: oy,
+          width: halfW - ox,
+          height: 32,
+          fill: "rgba(0,0,0,0.45)",
+          listening: false,
         }),
       );
       layer.add(
         new Konva.Text({
-          x: halfW + 8,
-          y: 8,
-          text: "Kết quả",
-          fontSize: 12,
-          fill: "#aaa",
+          x: halfW + ox + 8,
+          y: oy + 8,
+          text: "🎨 Kết Quả Thay Thế (Sau khi đổi)",
+          fontSize: 14,
+          fill: "#c084fc",
           fontFamily: "sans-serif",
+          fontStyle: "bold",
+        }),
+      );
+      layer.add(
+        new Konva.Rect({
+          x: halfW + ox,
+          y: oy,
+          width: halfW - ox,
+          height: 32,
+          fill: "rgba(0,0,0,0.45)",
+          listening: false,
         }),
       );
     } else {
