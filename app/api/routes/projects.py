@@ -118,6 +118,19 @@ def create_project(body: CreateProjectRequest) -> CreateProjectResponse:
     return CreateProjectResponse(project_id=project_id, project=data)
 
 
+@router.get("/gpu-info")
+def get_gpu_info_early() -> dict:
+    """Check GPU encoder availability (declared early to avoid path conflict)."""
+    from app.services.gpu_encoder import detect_nvenc  # noqa: PLC0415
+
+    info = detect_nvenc()
+    return {
+        "gpu_name": info.gpu_name,
+        "has_nvenc": info.has_nvenc,
+        "encoder": info.encoder_name,
+    }
+
+
 @router.post("/{project_id}/video")
 @router.post("/{project_id}/video/")
 async def upload_video(project_id: str, file: UploadFile) -> dict:
@@ -1616,21 +1629,6 @@ def assign_channel(project_id: str, channel_id: str) -> dict:
     proj.channel_id = channel_id
     pwf._save_project(project_id, proj)
     return {"ok": True, "channel_id": channel_id}
-
-
-# ── GPU Encoder info ────────────────────────────────────────────────────────
-
-@router.get("/gpu-info")
-def get_gpu_info() -> dict:
-    """Check GPU encoder availability."""
-    from app.services.gpu_encoder import detect_nvenc  # noqa: PLC0415
-
-    info = detect_nvenc()
-    return {
-        "has_nvenc": info.has_nvenc,
-        "gpu_name": info.gpu_name,
-        "encoder": info.encoder_name,
-    }
 
 
 # ── Cleanup endpoint ────────────────────────────────────────────────────────
