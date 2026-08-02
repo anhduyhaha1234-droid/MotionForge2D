@@ -154,7 +154,7 @@ export function ScreenD() {
 
   const replacementUrl =
     projectId && objectId && replacement.asset_path
-      ? `http://localhost:8000${replacement.asset_path}`
+      ? api.getReplacementImageUrl(projectId, objectId)
       : null;
 
   /* ── Upload mutation ────────────────────────────────────────────────── */

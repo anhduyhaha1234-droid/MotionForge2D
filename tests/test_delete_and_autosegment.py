@@ -443,3 +443,56 @@ class TestDeleteSingleAndClear:
         # Verify only 1 object exists
         resp = client.get(f"/api/projects/{pid}/objects")
         assert len(resp.json()) == 1
+
+    def test_replacement_image_served_after_upload(self, client: TestClient) -> None:
+        """GET replacement-image returns the uploaded file (200 image/png)."""
+        import cv2
+        import numpy as np
+
+        create_resp = client.post("/api/projects", json={"name": "RepImg"})
+        pid = create_resp.json()["project_id"]
+
+        from app.api import deps
+        proj_root = deps._config.project_root
+        frame_dir = proj_root / "projects" / pid / "frames" / "scene_0"
+        frame_dir.mkdir(parents=True, exist_ok=True)
+        frame = np.full((200, 200, 3), 255, dtype=np.uint8)
+        frame[50:150, 50:150] = (0, 0, 0)
+        cv2.imwrite(str(frame_dir / "frame_000000.png"), frame)
+
+        payload = {
+            "name": "Nhân vật #1",
+            "selection": {
+                "mode": "bounding_box",
+                "frame_index": 0,
+                "x": 60,
+                "y": 60,
+                "width": 80,
+                "height": 80,
+            },
+            "scene_id": 0,
+        }
+        r = client.post(f"/api/projects/{pid}/objects", json=payload)
+        assert r.status_code == 201
+        oid = r.json()["object_id"]
+
+        # Upload a replacement image
+        import base64
+        ok, enc = cv2.imencode(".png", np.full((64, 64, 3), 200, dtype=np.uint8))
+        assert ok
+        png_bytes = base64.b64decode(base64.b64encode(enc.tobytes()))
+        up = client.post(
+            f"/api/projects/{pid}/objects/{oid}/replacement",
+            files={"file": ("char.png", png_bytes, "image/png")},
+        )
+        assert up.status_code == 200
+
+        # GET the image — must be served
+        img = client.get(f"/api/projects/{pid}/objects/{oid}/replacement-image")
+        assert img.status_code == 200
+        assert img.headers["content-type"] == "image/png"
+        assert img.content[:8] == b"\x89PNG\r\n\x1a\n"
+
+        # Trailing slash variant too
+        img2 = client.get(f"/api/projects/{pid}/objects/{oid}/replacement-image/")
+        assert img2.status_code == 200

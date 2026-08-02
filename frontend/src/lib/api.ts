@@ -347,7 +347,8 @@ export const api = {
       {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
+        // Backend expects { replacement_config: {...} }
+        body: JSON.stringify({ replacement_config: settings }),
       },
     ),
 

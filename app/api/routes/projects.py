@@ -885,6 +885,37 @@ async def upload_replacement(
     return {"status": "ok", "asset_path": rel_path}
 
 
+@router.get("/{project_id}/objects/{object_id}/replacement-image")
+@router.get("/{project_id}/objects/{object_id}/replacement-image/")
+def get_replacement_image(project_id: str, object_id: str) -> FileResponse:
+    """Serve the uploaded replacement image for a tracked object."""
+    pwf = get_project_workflow()
+    try:
+        obj = pwf.get_tracked_object(project_id, object_id)
+    except (FileNotFoundError, KeyError) as e:
+        raise HTTPException(404, str(e)) from e
+
+    proj_dir = pwf._project_dir(project_id)
+
+    # Replacement file lives at objects/<object_id>/replacement.png (or .jpg/...)
+    obj_dir = proj_dir / "objects" / object_id
+    for candidate in sorted(obj_dir.glob("replacement.*")):
+        if candidate.is_file():
+            return FileResponse(candidate)
+
+    # Fall back to the asset_path saved on the object
+    asset = getattr(obj, "replacement_config", None)
+    asset_path = getattr(asset, "asset_path", "") if asset else ""
+    if asset_path and asset_path != "/replacements/test.png":
+        p = Path(asset_path)
+        if not p.is_absolute():
+            p = proj_dir / p
+        if p.is_file():
+            return FileResponse(p)
+
+    raise HTTPException(404, "Replacement image not found")
+
+
 @router.patch("/{project_id}/objects/{object_id}/replacement-settings")
 def update_replacement_settings(
     project_id: str, object_id: str, body: ReplacementSettingsRequest,
