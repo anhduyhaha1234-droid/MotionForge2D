@@ -366,13 +366,13 @@ export function ScreenB() {
                       : "Hộp"}
                   </button>
                   {t === "point" && (
-                    <p className="text-[10px] text-gray-500 mt-1">Click 1 điểm màu xanh trên thân nhân vật đối thủ.</p>
+                    <p className="text-[11px] text-gray-400 mt-1">Click 1 điểm màu xanh trên thân nhân vật đối thủ.</p>
                   )}
                   {t === "negative" && (
-                    <p className="text-[10px] text-gray-500 mt-1">Click điểm màu đỏ trên phông nền xung quanh để loại trừ.</p>
+                    <p className="text-[11px] text-gray-400 mt-1">Click điểm màu đỏ trên phông nền xung quanh để loại trừ.</p>
                   )}
                   {t === "bbox" && (
-                    <p className="text-[10px] text-gray-500 mt-1">Kéo ô hình chữ nhật bao trùm toàn thân nhân vật.</p>
+                    <p className="text-[11px] text-gray-400 mt-1">Kéo ô hình chữ nhật bao trùm toàn thân nhân vật.</p>
                   )}
                 </div>
               ))}
@@ -382,6 +382,7 @@ export function ScreenB() {
               >
                 Xóa
               </button>
+              <p className="text-[11px] text-gray-400 mt-1">Xóa hết điểm đã chấm để bắt đầu lại từ đầu.</p>
             </div>
           </div>
 
@@ -393,7 +394,7 @@ export function ScreenB() {
             >
               {previewMut.isPending ? "Đang tạo mask..." : "Xem mask"}
             </button>
-            <p className="text-[10px] text-gray-500 mt-1">Xem trước đường khoanh màu tím bao quanh nhân vật.</p>
+            <p className="text-[11px] text-gray-400 mt-1">Xem trước đường khoanh màu tím bao quanh nhân vật.</p>
 
             <button
               onClick={() => acceptMut.mutate()}
@@ -404,7 +405,7 @@ export function ScreenB() {
             >
               {acceptMut.isPending ? "Đang tách object..." : "Chấp nhận & Tách"}
             </button>
-            <p className="text-[10px] text-gray-500 mt-1">Xác nhận chọn & AI tự động theo vết (tracking) qua các frame.</p>
+            <p className="text-[11px] text-gray-400 mt-1">Xác nhận chọn & AI tự động theo vết (tracking) qua các frame.</p>
           </div>
 
           {/* Auto-Segment */}
@@ -416,7 +417,7 @@ export function ScreenB() {
             >
               {isAutoSegmenting ? "Đang quét..." : "🪄 Tự Động Bắt Tất Cả Nhân Vật"}
             </button>
-            <p className="text-[10px] text-gray-500 mt-1">AI tự động quét & bóc tách toàn bộ nhân vật, bàn ghế có trong cảnh mà không cần chấm điểm thủ công.</p>
+            <p className="text-[11px] text-gray-400 mt-1">AI tự động quét & bóc tách toàn bộ nhân vật, bàn ghế có trong cảnh mà không cần chấm điểm thủ công.</p>
             {autoObjects.length > 0 && (
               <div className="mt-3 space-y-1 max-h-40 overflow-y-auto">
                 <p className="text-xs text-gray-400 mb-1">Phát hiện {autoObjects.length} vật thể:</p>

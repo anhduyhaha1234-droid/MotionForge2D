@@ -593,12 +593,14 @@ export function ScreenD() {
             >
               {settingsMut.isPending ? "Đang lưu..." : "Áp dụng"}
             </button>
+            <p className="text-[11px] text-gray-400 mt-1">Lưu ảnh thay thế + vị trí nhân vật hiện tại.</p>
             <button
               onClick={() => resetReplacement()}
               className="w-full py-2 text-sm bg-gray-800 hover:bg-gray-700 rounded"
             >
               Đặt lại
             </button>
+            <p className="text-[11px] text-gray-400 mt-1">Xóa ảnh thay thế, quay về ảnh nhân vật gốc.</p>
             <button
               onClick={() => setScreen("render")}
               className="w-full py-2 text-sm bg-blue-700 hover:bg-blue-600 rounded"
@@ -606,6 +608,7 @@ export function ScreenD() {
             >
               Tiếp: Render →
             </button>
+            <p className="text-[11px] text-gray-400 mt-1">Chuyển sang bước render & ghép video hoàn chỉnh.</p>
           </div>
 
           {/* Bulk Character Mapping */}
@@ -624,6 +627,7 @@ export function ScreenD() {
             >
               {bulkMut.isPending ? "Đang áp dụng..." : "Áp dụng cho tất cả cảnh"}
             </button>
+            <p className="text-[11px] text-gray-400 mt-1">Gán ảnh nhân vật này cho mọi cảnh đang chọn — không cần làm lại từng cảnh.</p>
           </div>
 
           {/* Auto-Match Character */}
@@ -648,6 +652,7 @@ export function ScreenD() {
             >
               🪄 Auto-Match All Scenes
             </button>
+            <p className="text-[11px] text-gray-400 mt-1">AI tự tìm nhân vật giống vị trí/kích thước ở các cảnh khác và áp dụng cùng ảnh thay thế.</p>
           </div>
 
           {/* Dubbing Section */}

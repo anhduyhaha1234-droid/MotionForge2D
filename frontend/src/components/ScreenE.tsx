@@ -118,6 +118,7 @@ export function ScreenE() {
                 ? `Đang render preview... (${Math.round(previewJob?.progress ?? 0)}%)`
                 : "Render Preview"}
             </button>
+            <p className="text-[11px] text-gray-400 mt-1">Xem nhanh video mẫu trước khi xuất bản chính thức.</p>
 
             <button
               onClick={() => renderMut.mutate()}
@@ -128,6 +129,7 @@ export function ScreenE() {
                 ? `Đang render... (${Math.round(renderJob?.progress ?? 0)}%)`
                 : "Render Final"}
             </button>
+            <p className="text-[11px] text-gray-400 mt-1">Xuất video hoàn chỉnh theo định dạng đã chọn bên dưới.</p>
 
             <select
               value={renderFormat}
@@ -138,10 +140,12 @@ export function ScreenE() {
               <option value="webm">WebM (VP9)</option>
               <option value="gif">GIF</option>
             </select>
+            <p className="text-[11px] text-gray-400 mt-1">Chọn định dạng xuất: MP4 phổ biến nhất, GIF cho ảnh động.</p>
           </div>
 
           {/* Export ZIP */}
           {renderJob?.status === "completed" && projectId && (
+            <>
             <a
               href={api.exportProjectZip(projectId)}
               download
@@ -150,10 +154,13 @@ export function ScreenE() {
             >
               📦 Export Project ZIP
             </a>
+            <p className="text-[11px] text-gray-400 mt-1">Tải về gói ZIP gồm video, phụ đề SRT và audio dubbing.</p>
+            </>
           )}
 
           {/* Cleanup */}
           {projectId && (
+            <>
             <button
               onClick={() => cleanupMut.mutate()}
               disabled={cleanupMut.isPending}
@@ -161,6 +168,8 @@ export function ScreenE() {
             >
               {cleanupMut.isPending ? "Đang dọn dẹp..." : "🧹 Dọn dẹp file tạm"}
             </button>
+            <p className="text-[11px] text-gray-400 mt-1">Xóa frame tạm & cache để giải phóng ổ đĩa (giữ video thành phẩm).</p>
+            </>
           )}
 
           {/* Job status */}

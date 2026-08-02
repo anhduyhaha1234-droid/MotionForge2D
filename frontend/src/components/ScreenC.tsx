@@ -96,17 +96,20 @@ export function ScreenC() {
             >
               Thay ảnh →
             </button>
+            <p className="text-[11px] text-gray-400 mt-1">Chuyển sang bước thay nhân vật bằng ảnh PNG mới.</p>
             <button
               onClick={() => setScreen("selection")}
               className="w-full py-2 text-sm bg-gray-800 hover:bg-gray-700 rounded"
             >
               Sửa vùng chọn
             </button>
+            <p className="text-[11px] text-gray-400 mt-1">Quay lại chấm điểm lại vùng nhân vật nếu chưa ưng.</p>
             <button
               className="w-full py-2 text-sm bg-gray-800 hover:bg-gray-700 rounded text-red-400"
             >
               Xóa object
             </button>
+            <p className="text-[11px] text-gray-400 mt-1">Xóa nhân vật đã tách khỏi dự án này.</p>
           </div>
         </div>
 
