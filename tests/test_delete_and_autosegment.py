@@ -496,3 +496,68 @@ class TestDeleteSingleAndClear:
         # Trailing slash variant too
         img2 = client.get(f"/api/projects/{pid}/objects/{oid}/replacement-image/")
         assert img2.status_code == 200
+
+    def test_auto_match_fallback_when_no_motion(self, client: TestClient) -> None:
+        """auto-match returns 200 OK even when source.motion is None."""
+        import cv2
+        import numpy as np
+
+        create_resp = client.post("/api/projects", json={"name": "AutoMatch"})
+        pid = create_resp.json()["project_id"]
+
+        from app.api import deps
+        proj_root = deps._config.project_root
+
+        def make_frame(scene: int) -> None:
+            frame_dir = proj_root / "projects" / pid / "frames" / f"scene_{scene}"
+            frame_dir.mkdir(parents=True, exist_ok=True)
+            frame = np.full((200, 200, 3), 255, dtype=np.uint8)
+            frame[50:150, 50:150] = (0, 0, 0)
+            cv2.imwrite(str(frame_dir / "frame_000000.png"), frame)
+
+        make_frame(0)
+        make_frame(1)
+
+        payload = {
+            "name": "Nhân vật #1",
+            "selection": {
+                "mode": "bounding_box",
+                "frame_index": 0,
+                "x": 60,
+                "y": 60,
+                "width": 80,
+                "height": 80,
+            },
+            "scene_id": 0,
+        }
+        r1 = client.post(f"/api/projects/{pid}/objects", json=payload)
+        assert r1.status_code == 201
+        oid1 = r1.json()["object_id"]
+
+        # Second object in a DIFFERENT scene (no motion data either)
+        payload2 = {
+            "name": "Nhân vật #2",
+            "selection": {
+                "mode": "bounding_box",
+                "frame_index": 0,
+                "x": 70,
+                "y": 70,
+                "width": 80,
+                "height": 80,
+            },
+            "scene_id": 1,
+        }
+        r2 = client.post(f"/api/projects/{pid}/objects", json=payload2)
+        assert r2.status_code == 201
+        oid2 = r2.json()["object_id"]
+
+        # auto-match with NO motion data on source → must NOT 400
+        resp = client.post(f"/api/projects/{pid}/objects/{oid1}/auto-match")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "ok"
+        assert oid2 in body["matched"]
+
+        # Trailing slash variant
+        resp2 = client.post(f"/api/projects/{pid}/objects/{oid1}/auto-match/")
+        assert resp2.status_code == 200

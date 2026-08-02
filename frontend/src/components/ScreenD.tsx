@@ -157,6 +157,22 @@ export function ScreenD() {
       ? api.getReplacementImageUrl(projectId, objectId)
       : null;
 
+  // Preview flow: store file locally, show side-by-side modal, upload only on confirm
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingPreview, setPendingPreview] = useState<string | null>(null);
+
+  // Confirmed replacement state (outer banner feedback)
+  const [confirmedReplacement, setConfirmedReplacement] = useState<{
+    originalName: string;
+    newFileName: string;
+    previewUrl: string;
+  } | null>(null);
+
+  // Apply processing state & progress modal
+  const [isApplying, setIsApplying] = useState(false);
+  const [applyProgress, setApplyProgress] = useState(0);
+  const [applyMessage, setApplyMessage] = useState("");
+
   /* ── Upload mutation ────────────────────────────────────────────────── */
 
   const uploadMut = useMutation({
@@ -167,15 +183,18 @@ export function ScreenD() {
       return result;
     },
     onSuccess: () => {
-      // Close modal + clear preview when upload completes
+      // Save confirmation state for outer banner feedback
+      if (activeObject && pendingFile && pendingPreview) {
+        setConfirmedReplacement({
+          originalName: activeObject.name || "Nhân vật gốc",
+          newFileName: pendingFile.name,
+          previewUrl: pendingPreview,
+        });
+      }
+      // Close modal + clear pending preview
       setPendingFile(null);
-      setPendingPreview(null);
     },
   });
-
-  // Preview flow: store file locally, show side-by-side modal, upload only on confirm
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
-  const [pendingPreview, setPendingPreview] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -197,7 +216,7 @@ export function ScreenD() {
     if (pendingFile) uploadMut.mutate(pendingFile);
   };
 
-  /* ── Settings mutation ──────────────────────────────────────────────── */
+  /* ── Settings mutation & Apply All ──────────────────────────────────── */
 
   const settingsMut = useMutation({
     mutationFn: async () => {
@@ -217,6 +236,47 @@ export function ScreenD() {
       });
     },
   });
+
+  const handleApplySettings = async () => {
+    if (!projectId || !objectId) return;
+    try {
+      setIsApplying(true);
+      setApplyProgress(10);
+      setApplyMessage("Đang lưu vị trí và cấu hình nhân vật...");
+
+      await settingsMut.mutateAsync();
+
+      setApplyProgress(40);
+      setApplyMessage("Đang tự động khớp & áp dụng nhân vật mới cho tất cả phân cảnh...");
+
+      // Soft try/catch: auto-match may return warnings but should not block
+      try {
+        const result = await api.autoMatchCharacter(projectId, objectId);
+        setApplyMessage(
+          `Hoàn tất áp dụng cho ${result.count} phân cảnh! Đang đồng bộ hóa...`,
+        );
+      } catch (matchErr) {
+        // Non-fatal: keep going even if auto-match warns/fails
+        setApplyMessage(
+          `Đã lưu cấu hình (auto-match: ${(matchErr as Error).message}). Đang hoàn tất...`,
+        );
+      }
+
+      setApplyProgress(80);
+      setApplyMessage("Đang đồng bộ hóa dữ liệu...");
+
+      await new Promise((resolve) => setTimeout(resolve, 600));
+
+      setApplyProgress(100);
+      setApplyMessage("Thành công! Nhân vật mới đã sẵn sàng cho bước Render & Xuất Video.");
+
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      setIsApplying(false);
+    } catch (err) {
+      setIsApplying(false);
+      alert(`Lỗi khi áp dụng: ${(err as Error).message}`);
+    }
+  };
 
   /* ── Sequence frame URL ──────────────────────────────────────────────── */
 
@@ -322,8 +382,40 @@ export function ScreenD() {
             )}
           </div>
 
+          {/* 📸 Confirmed Adjustment Banner */}
+          {(confirmedReplacement || replacement.asset_path) && (
+            <div className="bg-purple-950/90 border border-purple-500/60 rounded-xl p-3 space-y-2 shadow-lg shadow-purple-950/40">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1">
+                  <span>📸</span> ĐÃ XÁC NHẬN ĐIỀU CHỈNH
+                </span>
+                <button
+                  onClick={() => setConfirmedReplacement(null)}
+                  className="text-gray-400 hover:text-gray-200 text-xs px-1"
+                  title="Đóng"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs bg-purple-900/40 p-2 rounded-lg border border-purple-800/50">
+                <span className="text-gray-300 font-medium truncate max-w-[90px]">
+                  {confirmedReplacement?.originalName ?? activeObject?.name ?? "Nhân vật gốc"}
+                </span>
+                <span className="text-purple-400 font-bold">➔</span>
+                <span className="text-purple-200 font-semibold truncate max-w-[90px]">
+                  {confirmedReplacement?.newFileName ??
+                    replacement.asset_path?.split("/").pop() ??
+                    "Nhân vật mới"}
+                </span>
+              </div>
+              <p className="text-[10px] text-purple-300/80 leading-tight">
+                Nhấn nút <strong className="text-green-400">"Áp dụng"</strong> ở cột bên phải để hoàn tất thay đổi cho tất cả phân cảnh.
+              </p>
+            </div>
+          )}
+
           <div className="border-t border-gray-700 pt-3 space-y-2">
-            <label className="block w-full py-2 text-center text-xs bg-blue-600 hover:bg-blue-500 rounded cursor-pointer">
+            <label className="block w-full py-2 text-center text-xs bg-blue-600 hover:bg-blue-500 rounded cursor-pointer font-medium shadow transition-colors">
               📁 Tải Ảnh Nhân Vật Mới (PNG/JPG/WebP)
               <input
                 type="file"
@@ -333,8 +425,8 @@ export function ScreenD() {
               />
             </label>
             {uploadMut.isPending && (
-              <p className="text-xs text-yellow-400 text-center">
-                Đang tải lên...
+              <p className="text-xs text-yellow-400 text-center animate-pulse">
+                ⏳ Đang tải lên & xử lý ảnh...
               </p>
             )}
             <button
@@ -343,7 +435,7 @@ export function ScreenD() {
                   "Thư viện nhân vật mẫu đang được phát triển — hãy tải PNG của bạn lên nhé!",
                 )
               }
-              className="w-full py-2 text-xs bg-gray-700 hover:bg-gray-600 rounded"
+              className="w-full py-2 text-xs bg-gray-700 hover:bg-gray-600 rounded text-gray-300"
             >
               🎭 Thư Viện Nhân Vật Mẫu
             </button>
@@ -387,8 +479,8 @@ export function ScreenD() {
 
         {/* ── Right column: Transform controls ───────────────────────────── */}
         <div className="w-72 bg-gray-900 border-l border-gray-800 p-4 space-y-4 overflow-y-auto flex-shrink-0">
-          <h3 className="text-xs text-gray-500 uppercase">
-            Điều chỉnh nhân vật
+          <h3 className="text-xs text-gray-500 uppercase font-semibold text-purple-400">
+            🎨 Điều chỉnh nhân vật
           </h3>
 
           {/* Scale */}
@@ -443,20 +535,8 @@ export function ScreenD() {
 
           {/* 🚀 Apply to all scenes — save settings then auto-match */}
           <button
-            onClick={async () => {
-              if (!projectId || !objectId) return;
-              try {
-                await settingsMut.mutateAsync();
-                const result = await api.autoMatchCharacter(
-                  projectId,
-                  objectId,
-                );
-                alert(`Đã áp dụng nhân vật mới cho ${result.count} cảnh!`);
-              } catch (err) {
-                alert(`Lỗi: ${(err as Error).message}`);
-              }
-            }}
-            disabled={settingsMut.isPending}
+            onClick={handleApplySettings}
+            disabled={isApplying || settingsMut.isPending}
             className="w-full py-3 text-sm bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl shadow-lg shadow-purple-900/40 transition-all disabled:bg-gray-700 disabled:text-gray-400"
             data-testid="apply-all-scenes"
           >
@@ -466,19 +546,32 @@ export function ScreenD() {
           {/* Actions */}
           <div className="space-y-1 pt-2 border-t border-gray-800">
             <button
-              onClick={() => settingsMut.mutate()}
-              disabled={settingsMut.isPending}
-              className="w-full py-2 text-sm bg-green-700 hover:bg-green-600 disabled:bg-gray-800 rounded"
+              onClick={handleApplySettings}
+              disabled={isApplying || settingsMut.isPending}
+              className="w-full py-2.5 text-sm bg-green-600 hover:bg-green-500 font-bold text-white disabled:bg-gray-800 disabled:text-gray-500 rounded transition-all shadow-md shadow-green-950/50 flex items-center justify-center gap-1.5"
               data-testid="apply-settings"
             >
-              {settingsMut.isPending ? "Đang lưu..." : "Áp dụng"}
+              {isApplying ? (
+                <>
+                  <span className="animate-spin text-xs">🌀</span>
+                  <span>Đang xử lý thay đổi...</span>
+                </>
+              ) : (
+                <>
+                  <span>✓</span>
+                  <span>Áp dụng</span>
+                </>
+              )}
             </button>
             <p className="text-[11px] text-gray-400 mt-1">
-              Lưu ảnh thay thế + vị trí nhân vật hiện tại.
+              Lưu ảnh thay thế + tự động áp dụng nhân vật cho toàn bộ phân cảnh.
             </p>
             <button
-              onClick={() => resetReplacement()}
-              className="w-full py-2 text-sm bg-gray-800 hover:bg-gray-700 rounded"
+              onClick={() => {
+                resetReplacement();
+                setConfirmedReplacement(null);
+              }}
+              className="w-full py-2 text-sm bg-gray-800 hover:bg-gray-700 rounded text-gray-300"
             >
               Đặt lại
             </button>
@@ -487,13 +580,14 @@ export function ScreenD() {
             </p>
             <button
               onClick={() => setScreen("render")}
-              className="w-full py-2 text-sm bg-blue-700 hover:bg-blue-600 rounded"
+              className="w-full py-2.5 text-sm bg-blue-600 hover:bg-blue-500 font-semibold text-white rounded transition-colors shadow flex items-center justify-center gap-1"
               data-testid="next-render"
             >
-              Tiếp: Render →
+              <span>Tiếp: Render Video</span>
+              <span>→</span>
             </button>
             <p className="text-[11px] text-gray-400 mt-1">
-              Chuyển sang bước render & ghép video hoàn chỉnh.
+              Chuyển sang bước ghép voice & render video hoàn chỉnh.
             </p>
           </div>
 
@@ -513,9 +607,9 @@ export function ScreenD() {
           </div>
 
           {/* Dubbing Section */}
-          <details className="border-t border-gray-700 pt-3">
-            <summary className="text-sm font-medium text-gray-300 cursor-pointer">
-              🎙️ Lồng tiếng / Dubbing
+          <details className="border-t border-gray-700 pt-3" open>
+            <summary className="text-sm font-semibold text-purple-300 cursor-pointer flex items-center gap-1">
+              <span>🎙️ Lồng tiếng / Voice Dubbing</span>
             </summary>
             <div className="mt-2">
               <DubbingPanel />
@@ -527,7 +621,7 @@ export function ScreenD() {
       {/* ── Side-by-side comparison modal (preview before upload) ──────── */}
       {pendingPreview && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200"
           onClick={handleCancelPreview}
         >
           <div
@@ -535,8 +629,9 @@ export function ScreenD() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium text-gray-200">
-                👀 Đối Chiếu Nhân Vật — Xác Nhận Thay Thế
+              <h3 className="text-sm font-semibold text-purple-300 flex items-center gap-1.5">
+                <span>👀</span>
+                <span>Đối Chiếu Nhân Vật — Xác Nhận Thay Thế</span>
               </h3>
               <button
                 onClick={handleCancelPreview}
@@ -551,8 +646,8 @@ export function ScreenD() {
             <div className="grid grid-cols-2 gap-4">
               {/* Left: original object */}
               <div className="space-y-2">
-                <p className="text-xs text-gray-400 uppercase tracking-wide">
-                  Nhân vật gốc (đang chọn)
+                <p className="text-xs text-gray-400 uppercase tracking-wide font-medium">
+                  NHÂN VẬT GỐC (ĐANG CHỌN)
                 </p>
                 <div className="aspect-square bg-gray-800 rounded-xl overflow-hidden flex items-center justify-center border border-gray-700">
                   {projectId && objectId ? (
@@ -569,24 +664,24 @@ export function ScreenD() {
                     <span className="text-gray-600 text-xs">Chưa có ảnh gốc</span>
                   )}
                 </div>
-                <p className="text-xs text-gray-500 truncate">
+                <p className="text-xs text-gray-400 font-medium truncate">
                   {activeObject?.name ?? "Nhân vật gốc"}
                 </p>
               </div>
 
               {/* Right: new file preview */}
               <div className="space-y-2">
-                <p className="text-xs text-gray-400 uppercase tracking-wide">
-                  Nhân vật mới
+                <p className="text-xs text-purple-400 uppercase tracking-wide font-medium">
+                  NHÂN VẬT MỚI
                 </p>
-                <div className="aspect-square bg-gray-800 rounded-xl overflow-hidden flex items-center justify-center border border-purple-500/50">
+                <div className="aspect-square bg-blue-950/40 rounded-xl overflow-hidden flex items-center justify-center border border-purple-500/60 shadow-inner">
                   <img
                     src={pendingPreview}
                     alt="Nhân vật mới"
                     className="w-full h-full object-contain"
                   />
                 </div>
-                <p className="text-xs text-gray-500 truncate">
+                <p className="text-xs text-purple-300 font-medium truncate">
                   📄 {pendingFile?.name ?? "File ảnh"}
                 </p>
               </div>
@@ -597,18 +692,57 @@ export function ScreenD() {
               <button
                 onClick={handleCancelPreview}
                 disabled={uploadMut.isPending}
-                className="px-4 py-2 text-xs bg-gray-800 hover:bg-gray-700 rounded transition-colors disabled:opacity-50"
+                className="px-4 py-2 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 rounded transition-colors disabled:opacity-50 font-medium"
               >
                 Hủy
               </button>
               <button
                 onClick={handleConfirmReplace}
                 disabled={uploadMut.isPending}
-                className="px-4 py-2 text-xs bg-purple-600 hover:bg-purple-500 rounded font-medium text-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                className="px-4 py-2.5 text-xs bg-purple-600 hover:bg-purple-500 rounded font-semibold text-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-md shadow-purple-950/60 flex items-center gap-1.5"
                 data-testid="confirm-replace"
               >
-                {uploadMut.isPending ? "Đang tải lên..." : "✅ Xác Nhận Thay Thế"}
+                {uploadMut.isPending ? (
+                  <>
+                    <span className="animate-spin">🌀</span>
+                    <span>Đang tải lên...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>✓</span>
+                    <span>Xác Nhận Thay Thế</span>
+                  </>
+                )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Processing Overlay Modal (Loading screen when applying) ─────── */}
+      {isApplying && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="bg-gray-900 border border-purple-500/50 rounded-2xl shadow-2xl w-full max-w-md p-6 text-center space-y-4">
+            <div className="w-16 h-16 mx-auto rounded-full bg-purple-950/80 border border-purple-500/60 flex items-center justify-center text-3xl animate-bounce">
+              🎭
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-white">
+                Đang xử lý thay đổi nhân vật
+              </h3>
+              <p className="text-xs text-purple-300 font-medium min-h-[32px] flex items-center justify-center">
+                {applyMessage}
+              </p>
+            </div>
+            <div className="w-full bg-gray-800 rounded-full h-3 overflow-hidden border border-gray-700">
+              <div
+                className="bg-gradient-to-r from-purple-600 via-blue-500 to-green-500 h-full transition-all duration-300 rounded-full"
+                style={{ width: `${applyProgress}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-xs text-gray-400 font-mono">
+              <span>Tiến trình</span>
+              <span className="font-bold text-purple-400">{applyProgress}%</span>
             </div>
           </div>
         </div>

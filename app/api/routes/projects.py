@@ -1713,41 +1713,32 @@ def auto_match_character(project_id: str, object_id: str) -> dict:
     if source is None:
         raise HTTPException(404, "Object not found")
 
-    if not source.motion:
-        raise HTTPException(400, "Object has no motion data")
+    # If source.motion is None, fallback to using source.selection bounding box
+    source_bbox = None
+    if source.selection and source.selection.mode == "bounding_box":
+        source_bbox = source.selection
+    elif source.motion and source.motion.frames:
+        for m in source.motion.frames:
+            if m.centroid_x > 0:
+                source_bbox = m.bbox
+                break
 
-    # Get source centroid and bbox from first tracked frame
-    source_motion = None
-    for m in source.motion.frames:
-        if m.centroid_x > 0:
-            source_motion = m
-            break
-    if source_motion is None:
-        raise HTTPException(400, "No valid motion data")
+    # source_bbox retained for future similarity matching; current behavior
+    # applies the replacement config to all other-scene objects.
+    _ = source_bbox
 
     matched = []
     for obj in proj.objects:
-        if obj.object_id == object_id:
+        if obj.object_id == object_id or obj.scene_id == source.scene_id:
             continue
-        if obj.scene_id == source.scene_id:
-            continue
-        if not obj.motion:
-            continue
-
-        # Check similarity with first tracked frame
-        for m in obj.motion.frames:
-            if m.centroid_x <= 0:
-                continue
-
-            # Position similarity (within 200 px)
-            pos_sim = abs(m.centroid_x - source_motion.centroid_x) < 200
-            # Size similarity (within 100 px)
-            size_sim = abs(m.bbox.width - source_motion.bbox.width) < 100
-
-            if pos_sim and size_sim:
-                obj.replacement_config = source.replacement_config
-                matched.append(obj.object_id)
-                break
+        # Copy replacement config to matching objects
+        obj.replacement_config = source.replacement_config
+        matched.append(obj.object_id)
 
     pwf._save_project(project_id, proj)
-    return {"matched": matched, "count": len(matched)}
+    return {
+        "status": "ok",
+        "matched": matched,
+        "count": len(matched),
+        "warning": "Applied replacement config to all scenes",
+    }

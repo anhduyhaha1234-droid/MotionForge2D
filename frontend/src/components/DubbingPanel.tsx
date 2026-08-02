@@ -22,6 +22,7 @@ export function DubbingPanel() {
   const [targetLang, setTargetLang] = useState("en");
   const [sourceLang, setSourceLang] = useState("vi");
   const [whisperModel, setWhisperModel] = useState("base");
+  const [dubbingMode, setDubbingMode] = useState<"original" | "ai">("ai");
   const [segments, setSegments] = useState<DubbingSegment[]>([]);
   const [step, setStep] = useState<"idle" | "separating" | "transcribing" | "translating" | "tts" | "done">("idle");
 
@@ -74,7 +75,46 @@ export function DubbingPanel() {
         🎙️ Lồng tiếng / Dubbing
       </h4>
 
-      {/* Source language */}
+      {/* Mode selector: Original track vs AI Dubbing */}
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => setDubbingMode("original")}
+          className={`px-2 py-2 rounded text-xs border transition-colors ${
+            dubbingMode === "original"
+              ? "bg-blue-700 border-blue-500 text-white"
+              : "bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700"
+          }`}
+        >
+          🎧 Voice Gốc
+          <span className="block text-[10px] opacity-80">Original Track</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setDubbingMode("ai")}
+          className={`px-2 py-2 rounded text-xs border transition-colors ${
+            dubbingMode === "ai"
+              ? "bg-purple-700 border-purple-500 text-white"
+              : "bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700"
+          }`}
+        >
+          🤖 Voice Dịch AI
+          <span className="block text-[10px] opacity-80">AI Dubbing</span>
+        </button>
+      </div>
+
+      {/* Info when Original track selected */}
+      {dubbingMode === "original" && (
+        <p className="text-[11px] text-gray-400 bg-gray-800/60 border border-gray-700 rounded p-2">
+          🎧 Giữ nguyên giọng gốc của video. Nếu muốn thay bằng giọng đọc AI,
+          chọn <strong className="text-purple-300">Voice Dịch AI</strong> bên trên.
+        </p>
+      )}
+
+      {/* AI-only options */}
+      {dubbingMode === "ai" && (
+        <>
+          {/* Source language */}
       <div>
         <label className="text-xs text-gray-400 block mb-1">
           Ngôn ngữ gốc
@@ -129,6 +169,8 @@ export function DubbingPanel() {
           <option value="medium">Medium (chính xác nhất)</option>
         </select>
       </div>
+        </>
+      )}
 
       {/* Run button */}
       <button
