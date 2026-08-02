@@ -9,8 +9,8 @@
  * Right:  4 transform sliders + apply-all action + scene/dubbing panels
  */
 
-import { useCallback, useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useProjectStore } from "@/stores/project";
 import { CompositeCanvas } from "@/components/CompositeCanvas";
@@ -182,6 +182,38 @@ export function ScreenD() {
   const [applyProgress, setApplyProgress] = useState(0);
   const [applyMessage, setApplyMessage] = useState("");
 
+  // Character preset library UI state
+  const [showCharLibrary, setShowCharLibrary] = useState(false);
+
+  const charPresets = useQuery({
+    queryKey: ["character-presets"],
+    queryFn: api.listCharacterPresets,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const presetMut = useMutation({
+    mutationFn: ({ setKey, pose }: { setKey: string; pose: string }) => {
+      if (!projectId) throw new Error("No project");
+      return api.applyCharacterPreset(projectId, setKey, pose);
+    },
+    onSuccess: (data) => {
+      // Update the replacement state so canvas redraws the new pose asset
+      setReplacement({
+        mode: "static_asset",
+        asset_path: data.asset_path,
+      });
+      setConfirmedReplacement({
+        originalName: activeObject?.name ?? "Nhân vật gốc",
+        newFileName: `🎭 ${data.set_key}/${data.pose}`,
+        previewUrl: "",
+      });
+    },
+  });
+
+  const handleApplyPreset = (setKey: string, pose: string) => {
+    presetMut.mutate({ setKey, pose });
+  };
+
   /* ── Upload mutation ────────────────────────────────────────────────── */
 
   const uploadMut = useMutation({
@@ -252,6 +284,30 @@ export function ScreenD() {
       });
     },
   });
+
+  // ── Auto-save settings on slider change (debounced 500ms) ──────────────
+  // Every transform tweak persists to the backend so the config survives
+  // reloads; "Áp dụng" then broadcasts the canonical config to all scenes.
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!projectId || !objectId) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      settingsMut.mutate();
+    }, 500);
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    replacement.scale,
+    replacement.rotation_offset_deg,
+    replacement.offset.x,
+    replacement.offset.y,
+    replacement.opacity,
+    projectId,
+    objectId,
+  ]);
 
   const handleApplySettings = async () => {
     if (!projectId || !objectId) return;
@@ -446,15 +502,57 @@ export function ScreenD() {
               </p>
             )}
             <button
-              onClick={() =>
-                alert(
-                  "Thư viện nhân vật mẫu đang được phát triển — hãy tải PNG của bạn lên nhé!",
-                )
-              }
-              className="w-full py-2 text-xs bg-gray-700 hover:bg-gray-600 rounded text-gray-300"
+              onClick={() => setShowCharLibrary((v) => !v)}
+              className="w-full py-2 text-xs bg-purple-700 hover:bg-purple-600 rounded text-white font-medium"
             >
-              🎭 Thư Viện Nhân Vật Mẫu
+              🎭 Thư Viện Nhân Vật Mẫu Đa Tư Thế
             </button>
+
+            {/* Character preset library */}
+            {showCharLibrary && (
+              <div className="space-y-3 pt-1">
+                {charPresets.isLoading && (
+                  <p className="text-xs text-gray-400 animate-pulse">
+                    ⏳ Đang tải thư viện...
+                  </p>
+                )}
+                {charPresets.error && (
+                  <p className="text-xs text-red-400">
+                    Không tải được thư viện: {(charPresets.error as Error).message}
+                  </p>
+                )}
+                {charPresets.data?.characters.map((set) => (
+                  <div
+                    key={set.id}
+                    className="bg-gray-800/70 rounded-lg p-2 border border-gray-700"
+                  >
+                    <p className="text-xs font-semibold text-purple-300 mb-1.5">
+                      {set.label}
+                    </p>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {set.poses.map((pose) => (
+                        <button
+                          key={pose.pose}
+                          onClick={() => handleApplyPreset(set.id, pose.pose)}
+                          disabled={presetMut.isPending}
+                          className="flex flex-col items-center gap-0.5 p-1 bg-gray-700/60 hover:bg-purple-600/50 rounded transition-colors disabled:opacity-50"
+                          title={pose.label}
+                        >
+                          <img
+                            src={api.getCharacterPresetImageUrl(set.id, pose.pose)}
+                            alt={pose.label}
+                            className="w-9 h-9 object-contain"
+                          />
+                          <span className="text-[9px] text-gray-300 leading-none">
+                            {pose.label}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Frame slider */}

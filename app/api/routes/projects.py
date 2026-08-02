@@ -131,6 +131,85 @@ def get_gpu_info_early() -> dict:
     }
 
 
+# ─── Character preset library (static routes — declared BEFORE /{project_id}) ─
+
+@router.get("/presets/characters")
+def list_character_presets_early() -> dict:
+    """List built-in multi-pose character presets (Boy Cool / Thỏ Cute / Gấu Nâu)."""
+    from app.services.preset_manager import get_preset_manager  # noqa: PLC0415
+
+    pm = get_preset_manager()
+    return {"status": "ok", "characters": pm.list_characters()}
+
+
+@router.get("/presets/characters/{set_key}/{pose}/image")
+def get_character_preset_image_early(set_key: str, pose: str) -> FileResponse:
+    """Serve a character preset PNG asset."""
+    from app.services.preset_manager import get_preset_manager  # noqa: PLC0415
+
+    pm = get_preset_manager()
+    path = pm.asset_path(set_key, pose)
+    if path is None:
+        raise HTTPException(404, "Character preset asset not found")
+    return FileResponse(str(path), media_type="image/png")
+
+
+@router.post("/{project_id}/presets/characters/{set_key}/{pose}/apply")
+@router.post("/{project_id}/presets/characters/{set_key}/{pose}/apply/")
+def apply_character_preset_early(
+    project_id: str, set_key: str, pose: str,
+) -> dict:
+    """Apply a character preset pose to the active object of a project.
+
+    Copies the preset PNG into the object's replacement slot and sets
+    mode=static_asset so CompositeCanvas renders it immediately.
+    """
+    from app.services.preset_manager import get_preset_manager  # noqa: PLC0415
+
+    pwf = get_project_workflow()
+    try:
+        proj = pwf.get_project(project_id)
+    except FileNotFoundError as err:
+        raise HTTPException(404, "Project not found") from err
+
+    # Active object = first object (ScreenD auto-selects objects[0])
+    if not proj.objects:
+        raise HTTPException(404, "No objects in project")
+    obj = proj.objects[0]
+
+    pm = get_preset_manager()
+    src = pm.asset_path(set_key, pose)
+    if src is None:
+        raise HTTPException(404, "Character preset asset not found")
+
+    proj_dir = pwf._project_dir(project_id)
+    obj_dir = proj_dir / "objects" / obj.object_id
+    obj_dir.mkdir(parents=True, exist_ok=True)
+
+    dest = obj_dir / "replacement.png"
+    shutil.copy2(str(src), str(dest))
+
+    if obj.replacement_config is None:
+        from app.schemas import ReplacementConfig
+
+        obj.replacement_config = ReplacementConfig(
+            mode="static_asset",
+            asset_path=f"objects/{obj.object_id}/replacement.png",
+        )
+    else:
+        obj.replacement_config.mode = "static_asset"
+        obj.replacement_config.asset_path = f"objects/{obj.object_id}/replacement.png"
+
+    pwf._save_project(project_id, proj)
+    return {
+        "status": "ok",
+        "object_id": obj.object_id,
+        "asset_path": obj.replacement_config.asset_path,
+        "pose": pose,
+        "set_key": set_key,
+    }
+
+
 @router.post("/{project_id}/video")
 @router.post("/{project_id}/video/")
 async def upload_video(project_id: str, file: UploadFile) -> dict:
@@ -1811,6 +1890,42 @@ def auto_match_character(project_id: str, object_id: str) -> dict:
                 source_bbox = m.bbox
                 break
 
+    # AI auto-pose matching: analyze the source bbox aspect ratio to pick the
+    # best preset pose, then auto-apply the correct pose to every scene.
+    from app.services.preset_manager import (  # noqa: PLC0415
+        CharacterPresetManager,
+        get_preset_manager,
+    )
+
+    pose_choice: str | None = None
+    if source_bbox is not None and getattr(source_bbox, "width", 0) > 0:
+        pose_choice = CharacterPresetManager.auto_pose_for_bbox(
+            float(source_bbox.width), float(source_bbox.height)
+        )
+        pm = get_preset_manager()
+        pose_asset = pm.asset_path("boy_cool", pose_choice)  # default set
+        if pose_asset is not None:
+            proj_dir = pwf._project_dir(project_id)
+            for obj in proj.objects:
+                if obj.object_id == object_id or obj.scene_id == source.scene_id:
+                    continue
+                obj_dir = proj_dir / "objects" / obj.object_id
+                obj_dir.mkdir(parents=True, exist_ok=True)
+                dest = obj_dir / "replacement.png"
+                shutil.copy2(str(pose_asset), str(dest))
+                if obj.replacement_config is None:
+                    from app.schemas import ReplacementConfig
+
+                    obj.replacement_config = ReplacementConfig(
+                        mode="static_asset",
+                        asset_path=f"objects/{obj.object_id}/replacement.png",
+                    )
+                else:
+                    obj.replacement_config.mode = "static_asset"
+                    obj.replacement_config.asset_path = (
+                        f"objects/{obj.object_id}/replacement.png"
+                    )
+
     # source_bbox retained for future similarity matching; current behavior
     # applies the replacement config to all other-scene objects.
     _ = source_bbox
@@ -1819,8 +1934,25 @@ def auto_match_character(project_id: str, object_id: str) -> dict:
     for obj in proj.objects:
         if obj.object_id == object_id or obj.scene_id == source.scene_id:
             continue
-        # Copy replacement config to matching objects
-        obj.replacement_config = source.replacement_config
+        # Copy replacement config to matching objects (pose asset included)
+        if obj.replacement_config is None:
+            from app.schemas import ReplacementConfig
+
+            obj.replacement_config = ReplacementConfig(
+                mode="static_asset",
+                asset_path=f"objects/{obj.object_id}/replacement.png",
+            )
+        else:
+            obj.replacement_config.mode = (
+                source.replacement_config.mode
+                if source.replacement_config
+                else "static_asset"
+            )
+            obj.replacement_config.asset_path = (
+                source.replacement_config.asset_path
+                if source.replacement_config
+                else f"objects/{obj.object_id}/replacement.png"
+            )
         matched.append(obj.object_id)
 
     pwf._save_project(project_id, proj)
@@ -1828,5 +1960,6 @@ def auto_match_character(project_id: str, object_id: str) -> dict:
         "status": "ok",
         "matched": matched,
         "count": len(matched),
+        "pose": pose_choice,
         "warning": "Applied replacement config to all scenes",
     }

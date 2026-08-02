@@ -563,6 +563,32 @@ export const api = {
       { method: "POST" },
     ),
 
+  // ─── Character Preset Library (multi-pose templates) ────────────────────
+
+  listCharacterPresets: () =>
+    apiFetch<{
+      status: string;
+      characters: {
+        id: string;
+        label: string;
+        poses: { pose: string; label: string; filename: string; url: string }[];
+      }[];
+    }>(`/api/projects/presets/characters`),
+
+  getCharacterPresetImageUrl: (setKey: string, pose: string) =>
+    `${API_BASE}/api/projects/presets/characters/${setKey}/${pose}/image`,
+
+  applyCharacterPreset: (projectId: string, setKey: string, pose: string) =>
+    apiFetch<{
+      status: string;
+      object_id: string;
+      asset_path: string;
+      pose: string;
+      set_key: string;
+    }>(`/api/projects/${projectId}/presets/characters/${setKey}/${pose}/apply`, {
+      method: "POST",
+    }),
+
   // ─── Multi-Format Render ────────────────────────────────────────────────
 
   renderWithFormat: (projectId: string, format: string) =>

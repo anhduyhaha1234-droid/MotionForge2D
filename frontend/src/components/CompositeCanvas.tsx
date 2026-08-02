@@ -94,7 +94,7 @@ function computeReplacementTransform(
   const anchorPxX = finalW * anchorX;
   const anchorPxY = finalH * anchorY;
 
-  // 6. Position
+  // 6. Position — actual coords = (centroid + offset), anchor at bottom
   const posX = cx - anchorPxX + rep.offset.x * frameW;
   const posY = cy - anchorPxY + rep.offset.y * frameH;
 

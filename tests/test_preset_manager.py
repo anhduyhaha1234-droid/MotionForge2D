@@ -1,177 +1,197 @@
-"""Tests for preset manager service."""
+"""Tests for the character preset library & AI auto-pose matching."""
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
-
-from app.workflow.preset_service import (
-    CharacterMapping,
-    PresetService,
-    ProjectPreset,
-)
+from fastapi.testclient import TestClient
 
 
-@pytest.fixture
-def svc() -> PresetService:
-    return PresetService()
+@pytest.fixture(scope="session")
+def client() -> TestClient:
+    from app.main import app
+
+    with TestClient(app) as c:
+        yield c
 
 
-@pytest.fixture
-def sample_preset() -> ProjectPreset:
-    return ProjectPreset(
-        name="Test Preset",
-        description="A test preset",
-        mappings=[
-            CharacterMapping(
-                original_name="Character A",
-                replacement_asset="assets/a.png",
-                replacement_config={"scale": 1.2, "opacity": 0.9},
-            ),
-            CharacterMapping(
-                original_name="Character B",
-                replacement_asset="assets/b.png",
-            ),
-        ],
-        dubbing_config={"target_lang": "en", "voice": "en-US-AriaNeural"},
-    )
+class TestPresetManager:
+    def test_auto_pose_for_bbox_wide(self) -> None:
+        """width > height * 1.1 → sitting (lying/wide pose)."""
+        from app.services.preset_manager import CharacterPresetManager
 
+        assert CharacterPresetManager.auto_pose_for_bbox(200, 100) == "sitting"
+        assert CharacterPresetManager.auto_pose_for_bbox(250, 200) == "sitting"
 
-class TestPresetSaveLoad:
-    def test_save_and_load(
-        self, svc: PresetService, sample_preset: ProjectPreset, tmp_path: Path,
-    ) -> None:
-        """Save and load roundtrip."""
-        path = svc.save_preset(sample_preset, tmp_path / "test.json")
-        assert path.exists()
+    def test_auto_pose_for_bbox_tall(self) -> None:
+        """height > width * 1.3 → standing (tall pose)."""
+        from app.services.preset_manager import CharacterPresetManager
 
-        loaded = svc.load_preset(path)
-        assert loaded.name == "Test Preset"
-        assert len(loaded.mappings) == 2
-        assert loaded.mappings[0].original_name == "Character A"
+        assert CharacterPresetManager.auto_pose_for_bbox(100, 200) == "standing"
+        assert CharacterPresetManager.auto_pose_for_bbox(100, 140) == "standing"
 
-    def test_list_presets(
-        self, svc: PresetService, sample_preset: ProjectPreset, tmp_path: Path,
-    ) -> None:
-        """List presets in directory."""
-        svc.save_preset(sample_preset, tmp_path / "preset_a.json")
-        svc.save_preset(sample_preset, tmp_path / "preset_b.json")
+    def test_auto_pose_for_bbox_balanced(self) -> None:
+        """Neither → talking (balanced pose)."""
+        from app.services.preset_manager import CharacterPresetManager
 
-        presets = svc.list_presets(tmp_path)
-        assert len(presets) == 2
+        assert CharacterPresetManager.auto_pose_for_bbox(100, 100) == "talking"
+        assert CharacterPresetManager.auto_pose_for_bbox(100, 110) == "talking"
 
-    def test_list_presets_empty_dir(
-        self, svc: PresetService, tmp_path: Path,
-    ) -> None:
-        """Listing presets from nonexistent dir returns empty."""
-        assert svc.list_presets(tmp_path / "nonexistent") == []
+    def test_auto_pose_zero_size(self) -> None:
+        """Zero/invalid sizes must not crash and return talking."""
+        from app.services.preset_manager import CharacterPresetManager
 
-    def test_load_nonexistent(self, svc: PresetService, tmp_path: Path) -> None:
-        """Loading nonexistent preset raises error."""
-        with pytest.raises(FileNotFoundError):
-            svc.load_preset(tmp_path / "nonexistent.json")
+        assert CharacterPresetManager.auto_pose_for_bbox(0, 0) == "talking"
+        assert CharacterPresetManager.auto_pose_for_bbox(-5, 100) == "talking"
 
+    def test_builtin_sets_cover_four_poses(self) -> None:
+        """Each built-in set has exactly sitting/standing/walking/talking."""
+        from app.services.preset_manager import BUILTIN_CHARACTERS
 
-class TestPresetApply:
-    def test_apply_matches_objects(self, svc: PresetService) -> None:
-        """Apply preset matches objects by name."""
-        from app.schemas import (
-            ReplacementConfig,
-            SelectionInput,
-            SelectionMode,
-            TrackedObject,
+        assert set(BUILTIN_CHARACTERS.keys()) == {"boy_cool", "tho_cute", "gau_nau"}
+        for key, spec in BUILTIN_CHARACTERS.items():
+            assert set(spec["poses"].keys()) == {
+                "sitting",
+                "standing",
+                "walking",
+                "talking",
+            }, key
+
+    def test_list_characters_endpoint(self, client: TestClient) -> None:
+        """GET /api/presets/characters returns 3 sets × 4 poses."""
+        r = client.get("/api/projects/presets/characters")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["status"] == "ok"
+        chars = body["characters"]
+        assert len(chars) == 3
+        labels = {c["label"] for c in chars}
+        assert labels == {"Bộ Boy Cool", "Bộ Thỏ Cute", "Bộ Gấu Nâu"}
+        for c in chars:
+            assert len(c["poses"]) == 4
+
+    def test_character_preset_image_endpoint(self, client: TestClient) -> None:
+        """GET preset image returns 200 image/png for every set+pose."""
+        r = client.get("/api/projects/presets/characters")
+        assert r.status_code == 200
+        for c in r.json()["characters"]:
+            for pose in c["poses"]:
+                img = client.get(
+                    f"/api/projects/presets/characters/{c['id']}/{pose['pose']}/image"
+                )
+                assert img.status_code == 200, (c["id"], pose["pose"])
+                assert img.headers["content-type"].startswith("image/png")
+
+    def test_apply_character_preset_endpoint(self, client: TestClient) -> None:
+        """POST apply copies the pose PNG and sets replacement_config."""
+        import cv2
+        import numpy as np
+
+        from app.api import deps
+
+        create = client.post("/api/projects", json={"name": "PresetApply"})
+        pid = create.json()["project_id"]
+
+        # Frame + object
+        proj_root = deps._config.project_root
+        frame_dir = proj_root / "projects" / pid / "frames" / "scene_0"
+        frame_dir.mkdir(parents=True, exist_ok=True)
+        frame = np.full((200, 200, 3), 255, dtype=np.uint8)
+        frame[50:150, 50:150] = (0, 0, 0)
+        cv2.imwrite(str(frame_dir / "frame_000000.png"), frame)
+
+        obj = client.post(
+            f"/api/projects/{pid}/objects",
+            json={
+                "name": "Nhân vật #1",
+                "selection": {
+                    "mode": "bounding_box",
+                    "frame_index": 0,
+                    "x": 60,
+                    "y": 60,
+                    "width": 80,
+                    "height": 80,
+                },
+                "scene_id": 0,
+            },
         )
+        assert obj.status_code == 201
+        oid = obj.json()["object_id"]
 
-        preset = ProjectPreset(
-            mappings=[
-                CharacterMapping(
-                    original_name="Hero",
-                    replacement_config={"scale": 1.5},
-                ),
-            ],
+        r = client.post(f"/api/projects/{pid}/presets/characters/boy_cool/sitting/apply")
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["status"] == "ok"
+        assert body["object_id"] == oid
+        assert body["pose"] == "sitting"
+        assert body["asset_path"] == f"objects/{oid}/replacement.png"
+
+        # The replacement PNG must exist on disk
+        repl = proj_root / "projects" / pid / "objects" / oid / "replacement.png"
+        assert repl.is_file()
+        assert repl.stat().st_size > 0
+
+        # Replacement image endpoint serves the preset
+        img = client.get(f"/api/projects/{pid}/objects/{oid}/replacement-image")
+        assert img.status_code == 200
+        assert img.headers["content-type"].startswith("image/png")
+
+    def test_auto_match_returns_pose(self, client: TestClient) -> None:
+        """auto-match now reports the AI-chosen pose based on bbox aspect."""
+        import cv2
+        import numpy as np
+
+        from app.api import deps
+
+        create = client.post("/api/projects", json={"name": "PoseMatch"})
+        pid = create.json()["project_id"]
+
+        proj_root = deps._config.project_root
+        frame_dir = proj_root / "projects" / pid / "frames" / "scene_0"
+        frame_dir.mkdir(parents=True, exist_ok=True)
+        frame = np.full((200, 200, 3), 255, dtype=np.uint8)
+        frame[50:150, 50:150] = (0, 0, 0)
+        cv2.imwrite(str(frame_dir / "frame_000000.png"), frame)
+
+        # Wide object (width 120 > height 60 * 1.1) → sitting
+        obj1 = client.post(
+            f"/api/projects/{pid}/objects",
+            json={
+                "name": "WideObj",
+                "selection": {
+                    "mode": "bounding_box",
+                    "frame_index": 0,
+                    "x": 40,
+                    "y": 90,
+                    "width": 120,
+                    "height": 60,
+                },
+                "scene_id": 0,
+            },
         )
+        assert obj1.status_code == 201
+        oid1 = obj1.json()["object_id"]
 
-        class FakeProject:
-            objects = [
-                TrackedObject(
-                    object_id="1",
-                    name="Hero",
-                    scene_id=0,
-                    selection=SelectionInput(
-                        mode=SelectionMode.POINT,
-                        frame_index=0, x=0.0, y=0.0,
-                    ),
-                    replacement_config=ReplacementConfig(),
-                ),
-                TrackedObject(
-                    object_id="2",
-                    name="Villain",
-                    scene_id=0,
-                    selection=SelectionInput(
-                        mode=SelectionMode.POINT,
-                        frame_index=0, x=0.0, y=0.0,
-                    ),
-                    replacement_config=ReplacementConfig(),
-                ),
-            ]
-
-        updated = svc.apply_preset_to_project(preset, FakeProject())
-        assert updated == 1
-        assert FakeProject.objects[0].replacement_config.scale == 1.5
-        assert FakeProject.objects[1].replacement_config.scale == 1.0  # unchanged
-
-    def test_apply_no_match(self, svc: PresetService) -> None:
-        """Apply preset returns 0 when no objects match."""
-        from app.schemas import (
-            ReplacementConfig,
-            SelectionInput,
-            SelectionMode,
-            TrackedObject,
+        # Tall object (width 40 < height 90 / 1.3) → standing in scene 1
+        obj2 = client.post(
+            f"/api/projects/{pid}/objects",
+            json={
+                "name": "TallObj",
+                "selection": {
+                    "mode": "bounding_box",
+                    "frame_index": 0,
+                    "x": 80,
+                    "y": 40,
+                    "width": 40,
+                    "height": 90,
+                },
+                "scene_id": 1,
+            },
         )
+        assert obj2.status_code == 201
 
-        preset = ProjectPreset(
-            mappings=[
-                CharacterMapping(
-                    original_name="Nonexistent",
-                    replacement_config={"scale": 2.0},
-                ),
-            ],
-        )
-
-        class FakeProject:
-            objects = [
-                TrackedObject(
-                    object_id="1",
-                    name="Hero",
-                    scene_id=0,
-                    selection=SelectionInput(
-                        mode=SelectionMode.POINT,
-                        frame_index=0, x=0.0, y=0.0,
-                    ),
-                    replacement_config=ReplacementConfig(),
-                ),
-            ]
-
-        updated = svc.apply_preset_to_project(preset, FakeProject())
-        assert updated == 0
-
-
-class TestCharacterMapping:
-    def test_defaults(self) -> None:
-        """CharacterMapping has sensible defaults."""
-        m = CharacterMapping()
-        assert m.original_name == ""
-        assert m.replacement_asset == ""
-        assert m.voice_config == {}
-        assert m.replacement_config == {}
-
-
-class TestProjectPreset:
-    def test_defaults(self) -> None:
-        """ProjectPreset has sensible defaults."""
-        p = ProjectPreset()
-        assert p.name == "Untitled Preset"
-        assert p.version == "1.0.0"
-        assert p.mappings == []
-        assert p.dubbing_config == {}
+        r = client.post(f"/api/projects/{pid}/objects/{oid1}/auto-match")
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["status"] == "ok"
+        assert body["pose"] == "sitting"
+        assert obj2.json()["object_id"] in body["matched"]
