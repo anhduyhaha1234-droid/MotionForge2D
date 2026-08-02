@@ -36,6 +36,12 @@ export function ScreenB() {
   const [imageLoaded, setImageLoaded] = useState(false);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const maskImageRef = useRef<HTMLImageElement | null>(null);
+  const [autoObjects, setAutoObjects] = useState<Array<{
+    object_index: number;
+    bbox: { x: number; y: number; width: number; height: number };
+    area: number;
+  }>>([]);
+  const [isAutoSegmenting, setIsAutoSegmenting] = useState(false);
 
   const meta = project?.video_metadata;
   const frameUrl = projectId
@@ -279,6 +285,19 @@ export function ScreenB() {
     setMaskPreview(null);
   };
 
+  const handleAutoSegment = async () => {
+    if (!projectId) return;
+    setIsAutoSegmenting(true);
+    try {
+      const result = await api.autoSegmentObjects(projectId, 0);
+      setAutoObjects(result.objects);
+    } catch (err) {
+      alert(`Lỗi: ${(err as Error).message}`);
+    } finally {
+      setIsAutoSegmenting(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-screen">
       {/* Top bar */}
@@ -364,6 +383,41 @@ export function ScreenB() {
             >
               {acceptMut.isPending ? "Đang tách object..." : "Chấp nhận & Tách"}
             </button>
+          </div>
+
+          {/* Auto-Segment */}
+          <div className="space-y-2">
+            <button
+              onClick={handleAutoSegment}
+              disabled={isAutoSegmenting}
+              className="w-full px-3 py-2 text-xs bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700 rounded transition-colors"
+            >
+              {isAutoSegmenting ? "Đang quét..." : "🪄 Tự Động Bắt Tất Cả Nhân Vật"}
+            </button>
+            {autoObjects.length > 0 && (
+              <div className="mt-3 space-y-1 max-h-40 overflow-y-auto">
+                <p className="text-xs text-gray-400 mb-1">Phát hiện {autoObjects.length} vật thể:</p>
+                {autoObjects.map((obj) => (
+                  <button
+                    key={obj.object_index}
+                    onClick={() => {
+                      // Set selection to this object's bbox centroid
+                      setSelection({
+                        mode: "bounding_box",
+                        frame_index: currentFrame,
+                        x: obj.bbox.x,
+                        y: obj.bbox.y,
+                        width: obj.bbox.width,
+                        height: obj.bbox.height,
+                      });
+                    }}
+                    className="w-full text-left px-2 py-1 bg-gray-800 hover:bg-gray-700 rounded text-xs"
+                  >
+                    Vật thể #{obj.object_index + 1} — {obj.bbox.width}×{obj.bbox.height}px
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Frame slider */}

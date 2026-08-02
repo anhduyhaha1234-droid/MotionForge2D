@@ -74,24 +74,30 @@ def list_all_projects() -> list[dict]:
     if not projects_dir.exists():
         return []
 
+    # Filter valid project directories (excluding dummy test projects)
     results = []
-    for proj_dir in sorted(projects_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
-        if not proj_dir.is_dir():
-            continue
-        project_json = proj_dir / "project.json"
-        if not project_json.exists():
-            continue
+    dirs = [d for d in projects_dir.iterdir() if d.is_dir() and (d / "project.json").exists()]
+    dirs.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+
+    for proj_dir in dirs:
         try:
-            data = json.loads(project_json.read_text(encoding="utf-8"))
+            data = json.loads((proj_dir / "project.json").read_text(encoding="utf-8"))
+            name = data.get("name", "")
+            # Skip dummy pytest projects named "Clip Test"
+            if name == "Clip Test":
+                continue
+
             results.append({
                 "project_id": proj_dir.name,
-                "name": data.get("name", ""),
+                "name": name or "Dự án MotionForge",
                 "task_status": data.get("task_status", "draft"),
                 "source_video": data.get("source_video", ""),
                 "scenes_count": len(data.get("scenes", [])),
                 "updated_at": data.get("updated_at", ""),
                 "created_at": data.get("created_at", ""),
             })
+            if len(results) >= 30:
+                break
         except Exception:
             continue
     return results
@@ -152,6 +158,24 @@ def trigger_ingest(project_id: str) -> dict:
     return job_response(info)
 
 
+@router.delete("/{project_id}")
+def delete_project(project_id: str) -> dict:
+    """Delete a project and purge all files from disk."""
+    import shutil
+
+    pwf = get_project_workflow()
+    try:
+        pwf.get_project(project_id)
+    except FileNotFoundError as err:
+        raise HTTPException(404, "Project not found") from err
+
+    proj_dir = pwf._project_dir(project_id)
+    if proj_dir.exists():
+        shutil.rmtree(proj_dir)
+
+    return {"ok": True, "deleted": project_id}
+
+
 @router.get("/{project_id}")
 def get_project(project_id: str) -> ProjectData:
     """Get project data."""
@@ -160,6 +184,96 @@ def get_project(project_id: str) -> ProjectData:
         return pwf.get_project(project_id)
     except FileNotFoundError as err:
         raise HTTPException(404, "Project not found") from err
+
+
+@router.post("/{project_id}/auto-segment-objects")
+def auto_segment_objects(
+    project_id: str,
+    scene_id: int = 0,
+    min_area: int = 500,
+    max_objects: int = 20,
+) -> dict:
+    """Auto-detect objects in a frame using OpenCV contour detection.
+
+    Returns list of detected objects with bounding boxes.
+    """
+    import cv2
+    import numpy as np  # noqa: F401
+
+    pwf = get_project_workflow()
+    try:
+        pwf.get_project(project_id)
+    except FileNotFoundError as err:
+        raise HTTPException(404, "Project not found") from err
+
+    proj_dir = pwf._project_dir(project_id)
+    frames_dir = proj_dir / "frames" / f"scene_{scene_id}"
+
+    # Find first frame
+    frame_path = find_frame_path(frames_dir, 0)
+    if frame_path is None:
+        # Try scene clip extraction
+        clip_path = proj_dir / "scenes" / f"scene_{scene_id:03d}.mp4"
+        if clip_path.exists():
+            from app.config import config as app_config  # noqa: PLC0415
+            from app.workflow.scene_chunking_service import SceneChunkingService  # noqa: PLC0415
+            svc = SceneChunkingService(app_config)
+            svc.extract_frames_on_demand(clip_path, frames_dir, format="jpg")
+            frame_path = find_frame_path(frames_dir, 0)
+
+    if frame_path is None:
+        raise HTTPException(404, "No frames found for this scene")
+
+    # Read frame and detect objects
+    img = cv2.imread(str(frame_path))
+    if img is None:
+        raise HTTPException(500, "Failed to read frame")
+
+    # Downsample for speed
+    h, w = img.shape[:2]
+    scale = 0.5
+    small = cv2.resize(img, (int(w * scale), int(h * scale)))
+
+    # Convert to grayscale and threshold
+    gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    _, thresh = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+
+    # Find contours
+    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    objects = []
+    for _i, contour in enumerate(contours[:max_objects]):
+        area = cv2.contourArea(contour)
+        if area < min_area:
+            continue
+
+        x, y, bw, bh = cv2.boundingRect(contour)
+        # Scale back to original resolution
+        objects.append({
+            "object_index": len(objects),
+            "bbox": {
+                "x": int(x / scale),
+                "y": int(y / scale),
+                "width": int(bw / scale),
+                "height": int(bh / scale),
+            },
+            "area": int(area / (scale * scale)),
+            "centroid": {
+                "x": int((x + bw / 2) / scale),
+                "y": int((y + bh / 2) / scale),
+            },
+        })
+
+    # Sort by area (largest first)
+    objects.sort(key=lambda o: o["area"], reverse=True)
+
+    return {
+        "scene_id": scene_id,
+        "frame_path": str(frame_path),
+        "objects_found": len(objects),
+        "objects": objects,
+    }
 
 
 @router.get("/{project_id}/scenes")

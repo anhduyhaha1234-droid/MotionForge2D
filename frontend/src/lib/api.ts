@@ -604,4 +604,25 @@ export const api = {
       `/api/projects/${projectId}/cleanup`,
       { method: "POST" },
     ),
+
+  deleteProject: (projectId: string) =>
+    apiFetch<{ ok: boolean; deleted: string }>(
+      `/api/projects/${projectId}`,
+      { method: "DELETE" },
+    ),
+
+  autoSegmentObjects: (projectId: string, sceneId = 0) =>
+    apiFetch<{
+      scene_id: number;
+      objects_found: number;
+      objects: Array<{
+        object_index: number;
+        bbox: { x: number; y: number; width: number; height: number };
+        area: number;
+        centroid: { x: number; y: number };
+      }>;
+    }>(
+      `/api/projects/${projectId}/auto-segment-objects?scene_id=${sceneId}`,
+      { method: "POST" },
+    ),
 };

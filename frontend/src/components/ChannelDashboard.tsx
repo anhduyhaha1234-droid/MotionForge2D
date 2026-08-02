@@ -251,6 +251,17 @@ export function ChannelDashboard({ isOpen, onClose, onResumeProject }: Props) {
                     >
                       ▶️ Tiếp tục làm việc
                     </button>
+
+                    <button
+                      onClick={async () => {
+                        if (!confirm(`Xóa dự án "${proj.name}"?`)) return;
+                        await api.deleteProject(proj.project_id);
+                        queryClient.invalidateQueries({ queryKey: ["channel-projects", activeChannelId] });
+                      }}
+                      className="px-2 py-1 text-[10px] bg-red-900/50 hover:bg-red-800 rounded text-red-300"
+                    >
+                      🗑️
+                    </button>
                   </div>
                 );
               })}

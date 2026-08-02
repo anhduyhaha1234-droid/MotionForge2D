@@ -16,10 +16,13 @@ import {
   ArrowRight,
   Layers,
   Wand2,
+  Play,
+  Clock,
+  Clapperboard,
 } from "lucide-react";
 
 export function ScreenA() {
-  const { projectId, setProjectId, setProject, setScreen } = useProjectStore();
+  const { projectId, setProjectId, setProject, setScreen, setScenes } = useProjectStore();
   const [projectName, setProjectName] = useState("Dự án MotionForge 01");
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -30,10 +33,10 @@ export function ScreenA() {
   const [showHelp, setShowHelp] = useState(false);
 
   // Recent projects query
-  const { data: recentProjects = [] } = useQuery({
+  const { data: recentProjects = [], refetch: refetchProjects } = useQuery({
     queryKey: ["recent-projects"],
     queryFn: () => api.listAllProjects(),
-    staleTime: 30000,
+    staleTime: 5000,
   });
 
   // File Selection
@@ -66,7 +69,33 @@ export function ScreenA() {
     }
   };
 
-  // Main Workflow Async Handler (Fixes race condition)
+  // Resume Existing Project Handler
+  const handleResumeProject = async (projId: string) => {
+    try {
+      setIsProcessing(true);
+      setStatusMessage("Đang tải dữ liệu dự án...");
+      setProjectId(projId);
+
+      const projData = await api.getProject(projId);
+      setProject(projData);
+
+      const sceneDetails = await api.getSceneDetails(projId);
+      setScenes(sceneDetails);
+
+      // Determine appropriate screen
+      if (sceneDetails.length > 0) {
+        setScreen("selection");
+      } else {
+        setScreen("start");
+      }
+    } catch (err) {
+      setErrorMessage(`Không thể mở lại dự án: ${(err as Error).message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Main Workflow Async Handler
   const handleStartWorkflow = useCallback(async () => {
     if (!videoFile) return;
 
@@ -82,7 +111,7 @@ export function ScreenA() {
       setProjectId(newProjId);
       setProgressPercent(30);
 
-      // Step 2: Upload Video (Sanitized Filename on Backend)
+      // Step 2: Upload Video
       setStatusMessage("Đang tải video lên hệ thống...");
       await api.uploadVideo(newProjId, videoFile);
       setProgressPercent(50);
@@ -93,9 +122,9 @@ export function ScreenA() {
       setProgressPercent(60);
 
       // Step 4: Poll Job Status until Completion
-      const maxAttempts = 300; // 5 minutes for long videos
+      const maxAttempts = 1000;
       for (let i = 0; i < maxAttempts; i++) {
-        await new Promise((r) => setTimeout(r, 1000));
+        await new Promise((r) => setTimeout(r, 300));
         const job = await api.getJob(ingestRes.job_id);
 
         const currentProg = 60 + Math.round((job.progress || 0) * 0.35);
@@ -107,7 +136,10 @@ export function ScreenA() {
           setStatusMessage("Phân tích hoàn tất! Đang chuyển sang bước tiếp theo...");
           const updatedProj = await api.getProject(newProjId);
           setProject(updatedProj);
+          const sceneDetails = await api.getSceneDetails(newProjId);
+          setScenes(sceneDetails);
           await api.updateTaskStatus(newProjId, "in_progress");
+          refetchProjects();
           setTimeout(() => setScreen("selection"), 600);
           return;
         }
@@ -118,210 +150,125 @@ export function ScreenA() {
       }
 
       throw new Error("Quá trình xử lý bị quá thời gian. Vui lòng thử lại.");
-    } catch (err: any) {
+    } catch (err) {
+      setErrorMessage((err as Error).message || "Đã xảy ra lỗi không xác định.");
       setIsProcessing(false);
-      setProgressPercent(0);
-      setErrorMessage(
-        err.message || "Đã xảy ra lỗi không xác định khi kết nối với server."
-      );
     }
-  }, [videoFile, projectName, setProjectId, setProject, setScreen]);
-
-  const fileSizeMB = videoFile
-    ? (videoFile.size / (1024 * 1024)).toFixed(1)
-    : "0";
+  }, [videoFile, projectName, setProjectId, setProject, setScenes, setScreen, refetchProjects]);
 
   return (
-    <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col justify-between p-4 sm:p-8 font-sans selection:bg-blue-500 selection:text-white">
-      {/* Background Decorative Glows */}
-      <div className="fixed top-0 left-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="fixed bottom-0 right-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
-
-      {/* Header & Stepper */}
-      <header className="max-w-5xl w-full mx-auto flex flex-col md:flex-row items-center justify-between gap-4 py-4 border-b border-slate-800/80">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between p-4 sm:p-8">
+      {/* Header Bar */}
+      <header className="max-w-5xl w-full mx-auto flex items-center justify-between py-4 border-b border-slate-800">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-900/40">
             <Film className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-bold bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+            <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 via-indigo-300 to-purple-400 bg-clip-text text-transparent">
               MotionForge 2D
             </h1>
             <p className="text-xs text-slate-400">
-              Nền tảng Re-skin & Localize Video Hoạt Hình AI
+              Nền tảng Tái tạo & Lồng tiếng Video Hoạt hình 2D Đa Ngôn Ngữ
             </p>
           </div>
         </div>
 
-        {/* Workflow Step Bar */}
-        <div className="flex items-center gap-2 bg-slate-900/80 border border-slate-800 px-4 py-2 rounded-full text-xs font-medium">
-          <span className="flex items-center gap-1.5 text-blue-400 font-semibold">
-            <span className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-[10px]">
-              1
-            </span>
-            Tải Video
-          </span>
-          <ArrowRight className="w-3.5 h-3.5 text-slate-600" />
-          <span className="text-slate-500">2. Chọn Vật Thể</span>
-          <ArrowRight className="w-3.5 h-3.5 text-slate-600" />
-          <span className="text-slate-500">3. Duyệt Tách</span>
-          <ArrowRight className="w-3.5 h-3.5 text-slate-600" />
-          <span className="text-slate-500">4. Thay Thế & Dịch Voice</span>
-          <ArrowRight className="w-3.5 h-3.5 text-slate-600" />
-          <span className="text-slate-500">5. Ghép MP4</span>
+        {/* Step Indicator */}
+        <div className="hidden md:flex items-center gap-2 text-xs text-slate-400 bg-slate-900/80 px-4 py-2 rounded-full border border-slate-800">
+          <span className="font-semibold text-blue-400">Bước 1: Khởi Tạo Dự Án</span>
+          <span>➔</span>
+          <span>Chọn Nhân Vật</span>
+          <span>➔</span>
+          <span>Thay Thế & Lồng Tiếng</span>
         </div>
       </header>
 
-      {/* Main Container */}
-      <main className="max-w-4xl w-full mx-auto my-8 space-y-6">
-        {/* Title Hero Banner */}
-        <div className="text-center space-y-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium mb-2">
-            <Sparkles className="w-3.5 h-3.5" /> Công nghệ AI SAM 2.1 + Local Inpainting + Dubbing
-          </div>
-          <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
-            Nhập Video & Bắt Đầu Dự Án Mới
-          </h2>
-          <p className="text-sm text-slate-400 max-w-xl mx-auto">
-            Tải lên video 2D của đối thủ để tự động chia phân cảnh, bóc tách nhân vật và chuẩn bị lồng tiếng AI sang thị trường quốc tế.
-          </p>
-        </div>
-
-        {/* Recent Projects Section */}
-        {recentProjects.length > 0 && (
-          <div className="mb-6">
-            <h3 className="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
-              📂 Dự án gần đây của bạn
-            </h3>
-            <div className="space-y-2 max-h-60 overflow-y-auto">
-              {recentProjects.slice(0, 10).map((proj) => {
-                const statusConfig: Record<string, { emoji: string; label: string; color: string }> = {
-                  draft: { emoji: "⚪", label: "Bản nháp", color: "text-gray-400" },
-                  in_progress: { emoji: "🟡", label: "Đang làm", color: "text-yellow-300" },
-                  ready_to_stitch: { emoji: "🔵", label: "Sẵn sàng ghép", color: "text-blue-300" },
-                  completed: { emoji: "🟢", label: "Hoàn thành", color: "text-green-300" },
-                };
-                const status = statusConfig[proj.task_status] ?? statusConfig.draft;
-
-                return (
-                  <div
-                    key={proj.project_id}
-                    className="flex items-center justify-between p-3 bg-slate-900/60 border border-slate-800 rounded-lg"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-gray-200 truncate">
-                        {proj.name}
-                      </div>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[10px]">{status.emoji} <span className={status.color}>{status.label}</span></span>
-                        <span className="text-[10px] text-gray-500">{proj.scenes_count} cảnh</span>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setProjectId(proj.project_id);
-                        api.getProject(proj.project_id).then((p) => {
-                          setProject(p);
-                          // Determine which screen to go to based on status
-                          if (proj.task_status === "completed") {
-                            setScreen("render");
-                          } else if (p.objects && p.objects.length > 0) {
-                            setScreen("replacement");
-                          } else if (p.scenes && p.scenes.length > 0) {
-                            setScreen("selection");
-                          } else {
-                            setScreen("selection");
-                          }
-                        });
-                      }}
-                      className="ml-3 px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-500 rounded transition-colors whitespace-nowrap"
-                    >
-                      ▶️ Tiếp tục
-                    </button>
-                  </div>
-                );
-              })}
+      {/* Main Content Area */}
+      <main className="max-w-5xl w-full mx-auto my-8 space-y-8">
+        <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 sm:p-8 space-y-6 shadow-2xl backdrop-blur-sm">
+          {/* Top Explanatory Header */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-blue-400" /> Tải Lên Video Hoạt Hình Đối Thủ
+              </h2>
+              <p className="text-xs text-slate-400">
+                Nhập tên dự án và chọn file video MP4 dài để AI tự động bóc tách phân cảnh & âm thanh
+              </p>
             </div>
+            <button
+              onClick={() => setShowHelp(!showHelp)}
+              className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 font-medium bg-blue-950/40 hover:bg-blue-900/40 px-3 py-1.5 rounded-lg border border-blue-800/40 transition-colors"
+            >
+              <HelpCircle className="w-3.5 h-3.5" /> {showHelp ? "Ẩn Hướng Dẫn" : "Hướng Dẫn Nút Bấm"}
+            </button>
           </div>
-        )}
 
-        {/* Project Form & Drag-and-Drop Card */}
-        <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
           {/* Project Name Input */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center justify-between">
-              <span>Tên dự án</span>
-              <span className="text-[11px] text-slate-500 font-normal">Tự động đặt tên file khi lưu</span>
+            <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+              Tên Dự Án Mục Tiêu:
             </label>
             <input
               type="text"
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
-              placeholder="Nhập tên dự án..."
-              className="w-full px-4 py-3 bg-slate-950/80 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all text-sm font-medium"
+              disabled={isProcessing}
+              placeholder="VD: Dự án Hoạt Hình Kênh 1..."
+              className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition-colors"
             />
           </div>
 
           {/* Video Dropzone */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center justify-between">
-              <span>Video Gốc MP4</span>
-              <button
-                type="button"
-                onClick={() => setShowHelp(!showHelp)}
-                className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors"
-              >
-                <HelpCircle className="w-3.5 h-3.5" /> Giải thích các nút?
-              </button>
+            <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+              File Video Đối Thủ (MP4):
             </label>
-
             <div
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              className={`relative border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-200 cursor-pointer ${
+              className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer ${
                 isDragging
-                  ? "border-blue-500 bg-blue-500/10 scale-[1.01]"
+                  ? "border-blue-500 bg-blue-950/20"
                   : videoFile
-                  ? "border-emerald-500/50 bg-emerald-500/5"
-                  : "border-slate-800 hover:border-slate-700 bg-slate-950/40 hover:bg-slate-950/80"
+                  ? "border-emerald-500/50 bg-emerald-950/10"
+                  : "border-slate-800 hover:border-slate-700 bg-slate-950/40"
               }`}
+              onClick={() => {
+                const el = document.getElementById("video-input-file");
+                if (el) el.click();
+              }}
             >
               <input
+                id="video-input-file"
                 type="file"
-                accept=".mp4,.mov,.avi,.mkv,video/mp4"
-                onChange={(e) => handleFileSelect(e.target.files?.[0] ?? null)}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                accept="video/mp4,video/quicktime,video/x-msvideo"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    handleFileSelect(e.target.files[0]);
+                  }
+                }}
+                className="hidden"
               />
 
               {videoFile ? (
-                <div className="flex flex-col items-center justify-center space-y-3">
-                  <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-12 h-12 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
                     <CheckCircle2 className="w-6 h-6" />
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold text-emerald-300 max-w-md truncate">
-                      {videoFile.name}
-                    </p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Kích thước: <span className="font-semibold text-slate-200">{fileSizeMB} MB</span> • Đã sẵn sàng phân tích
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setVideoFile(null);
-                    }}
-                    className="text-xs text-slate-400 hover:text-rose-400 underline transition-colors"
-                  >
-                    Chọn file khác
-                  </button>
+                  <p className="text-sm font-semibold text-emerald-300">
+                    {videoFile.name}
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    {(videoFile.size / (1024 * 1024)).toFixed(1)} MB • Bấm để chọn file khác
+                  </p>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center space-y-3 py-4">
-                  <div className="w-14 h-14 rounded-2xl bg-blue-600/10 text-blue-400 border border-blue-500/20 flex items-center justify-center shadow-inner">
-                    <Upload className="w-7 h-7" />
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400">
+                    <Upload className="w-6 h-6" />
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-slate-200">
@@ -341,7 +288,7 @@ export function ScreenA() {
             </div>
           </div>
 
-          {/* Help Explanation Card (Collapsible) */}
+          {/* Help Explanation Card */}
           {showHelp && (
             <div className="bg-blue-950/40 border border-blue-800/40 rounded-xl p-4 text-xs space-y-2 text-blue-200">
               <h4 className="font-semibold text-blue-300 flex items-center gap-1.5 text-sm">
@@ -349,15 +296,10 @@ export function ScreenA() {
               </h4>
               <ul className="space-y-1.5 list-disc list-inside text-slate-300">
                 <li>
-                  <strong className="text-blue-400">Nút "Bắt đầu Phân tích" (Start Process)</strong>: Tự động khởi chạy 3 tác vụ ngầm:
-                  <ol className="list-decimal list-inside ml-4 text-slate-400 space-y-0.5">
-                    <li>Lưu video an toàn vào thư mục dự án.</li>
-                    <li>Chạy AI PySceneDetect chia nhỏ video thành từng Cảnh (Scene).</li>
-                    <li>Bóc tách dải âm thanh gốc và chuẩn bị khung hình cho AI SAM 2.1.</li>
-                  </ol>
+                  <strong className="text-blue-400">Nút "Bắt đầu Phân tích"</strong>: Tự động cắt clip MP4 từng phân cảnh siêu tốc.
                 </li>
                 <li>
-                  <strong className="text-blue-400">Nút "Tải Preset"</strong>: Tự động gán cấu hình nhân vật/giọng đọc từ các video trước của cùng kênh đối thủ.
+                  <strong className="text-blue-400">Nút "▶️ Tiếp Tục" ở danh sách bên dưới</strong>: Mở lại dự án cũ dở dang để làm tiếp.
                 </li>
               </ul>
             </div>
@@ -412,6 +354,72 @@ export function ScreenA() {
             )}
           </button>
         </div>
+
+        {/* Recent Projects Section */}
+        {recentProjects.length > 0 && (
+          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <FolderOpen className="w-5 h-5 text-purple-400" /> Danh Sách Dự Án Đã Làm ({recentProjects.length})
+              </h3>
+              <span className="text-xs text-slate-400">
+                Bấm nút "▶️ Tiếp tục" để mở lại dự án dở dang
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto pr-1">
+              {recentProjects.map((p: ProjectSummary) => (
+                <div
+                  key={p.project_id}
+                  className="bg-slate-950/80 border border-slate-800 hover:border-purple-500/50 rounded-xl p-4 flex flex-col justify-between gap-3 transition-all group"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-mono text-purple-400 bg-purple-950/60 px-2 py-0.5 rounded border border-purple-800/40">
+                        ID: {p.project_id}
+                      </span>
+                      <span className="text-[11px] text-slate-500 flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {p.updated_at ? new Date(p.updated_at).toLocaleTimeString("vi-VN") : "Gần đây"}
+                      </span>
+                    </div>
+                    <h4 className="text-sm font-bold text-slate-100 truncate group-hover:text-purple-300 transition-colors">
+                      {p.name || "Dự án MotionForge"}
+                    </h4>
+                    <p className="text-xs text-slate-400 flex items-center gap-1.5">
+                      <Clapperboard className="w-3.5 h-3.5 text-blue-400" />
+                      {p.scenes_count} Phân Cảnh Bóc Tách
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleResumeProject(p.project_id)}
+                    className="w-full py-2.5 px-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-lg text-xs transition-all flex items-center justify-center gap-2 shadow-md shadow-purple-600/20"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-current" /> Mở Lại Dự Án Đang Làm
+                  </button>
+
+                  <button
+                    onClick={async () => {
+                      if (!confirm(`Xóa dự án "${p.name}"? Toàn bộ dữ liệu sẽ bị xóa vĩnh viễn.`)) return;
+                      try {
+                        await api.deleteProject(p.project_id);
+                        refetchProjects();
+                      } catch (err) {
+                        alert(`Lỗi: ${(err as Error).message}`);
+                      }
+                    }}
+                    className="ml-1 px-2 py-1.5 text-xs bg-red-900/50 hover:bg-red-800 rounded transition-colors text-red-300"
+                    title="Xóa dự án"
+                  >
+                    🗑️
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Preset Manager Integration */}
         {projectId && (
