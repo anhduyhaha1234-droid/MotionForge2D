@@ -916,6 +916,94 @@ def get_replacement_image(project_id: str, object_id: str) -> FileResponse:
     raise HTTPException(404, "Replacement image not found")
 
 
+@router.get("/{project_id}/objects/{object_id}/masks/{frame_index}")
+@router.get("/{project_id}/objects/{object_id}/masks/{frame_index}/")
+def get_object_mask_image(
+    project_id: str, object_id: str, frame_index: int,
+) -> FileResponse:
+    """Serve a mask image for a tracked object at a given frame."""
+    pwf = get_project_workflow()
+    proj_dir = pwf._project_dir(project_id)
+    mask_dir = proj_dir / "objects" / object_id / "masks"
+
+    candidates = [
+        mask_dir / f"mask_{frame_index}.png",
+        mask_dir / f"mask_{frame_index:06d}.png",
+        mask_dir / "initial_mask.png",
+    ]
+    for p in candidates:
+        if p.is_file():
+            return FileResponse(str(p), media_type="image/png")
+
+    # Fall back to any preview mask
+    if mask_dir.is_dir():
+        previews = sorted(mask_dir.glob("preview_mask_*.png"))
+        if previews:
+            return FileResponse(str(previews[0]), media_type="image/png")
+
+    raise HTTPException(404, f"Mask for frame {frame_index} not found")
+
+
+@router.get("/{project_id}/objects/{object_id}/inpainted/{frame_index}")
+@router.get("/{project_id}/objects/{object_id}/inpainted/{frame_index}/")
+def get_inpainted_frame(
+    project_id: str, object_id: str, frame_index: int,
+) -> FileResponse:
+    """Serve the inpainted (background-cleaned) frame for an object.
+
+    On demand: loads frame + mask, inpaints the masked region with
+    InpaintingService, writes to debug/, and returns the PNG.
+    """
+    from app.services.inpainting_service import InpaintingService  # noqa: PLC0415
+
+    pwf = get_project_workflow()
+    proj_dir = pwf._project_dir(project_id)
+    scene_dir = proj_dir / "frames" / "scene_0"
+    frame_path = find_frame_path(scene_dir, frame_index)
+    if frame_path is None:
+        raise HTTPException(404, f"Frame {frame_index} not found")
+
+    mask_dir = proj_dir / "objects" / object_id / "masks"
+    mask_candidates = [
+        mask_dir / f"mask_{frame_index}.png",
+        mask_dir / f"mask_{frame_index:06d}.png",
+        mask_dir / "initial_mask.png",
+    ]
+    mask_path = next((p for p in mask_candidates if p.is_file()), None)
+    if mask_path is None and mask_dir.is_dir():
+        previews = sorted(mask_dir.glob("preview_mask_*.png"))
+        if previews:
+            mask_path = previews[0]
+    if mask_path is None:
+        # No mask — fall back to original frame
+        media = "image/jpeg" if frame_path.suffix in (".jpg", ".jpeg") else "image/png"
+        return FileResponse(str(frame_path), media_type=media)
+
+    import cv2
+
+    frame = cv2.imread(str(frame_path))
+    if frame is None:
+        raise HTTPException(500, "Could not read frame")
+
+    mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
+    if mask is None:
+        raise HTTPException(500, "Could not read mask")
+
+    # Resize mask to frame if needed
+    if mask.shape[:2] != frame.shape[:2]:
+        mask = cv2.resize(mask, (frame.shape[1], frame.shape[0]))
+
+    svc = InpaintingService()
+    dilated = svc.dilate_mask(mask, kernel_size=5, iterations=2)
+    result = svc.inpaint_frame(frame, dilated, method="telea", radius=3)
+
+    out_dir = proj_dir / "debug"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / f"inpainted_{object_id}_{frame_index}.png"
+    cv2.imwrite(str(out_path), result)
+    return FileResponse(str(out_path), media_type="image/png")
+
+
 @router.patch("/{project_id}/objects/{object_id}/replacement-settings")
 def update_replacement_settings(
     project_id: str, object_id: str, body: ReplacementSettingsRequest,

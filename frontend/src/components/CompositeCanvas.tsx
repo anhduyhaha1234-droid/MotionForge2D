@@ -24,6 +24,7 @@ export interface CompositeObjectConfig {
 interface CompositeCanvasProps {
   frameUrl: string | null;
   maskUrl: string | null;
+  inpaintedUrl?: string | null;
   replacementUrl: string | null;
   sequenceFrameUrl: string | null;
   frameMotion: FrameMotion | null;
@@ -82,9 +83,16 @@ function computeReplacementTransform(
   const finalW = targetW * rep.scale;
   const finalH = targetH * rep.scale;
 
-  // 5. Anchor pixel offset
-  const anchorPxX = finalW * rep.anchor.x;
-  const anchorPxY = finalH * rep.anchor.y;
+  // 4b. Auto-anchor: default to bottom-center (0.5, 1.0) so the character's
+  // feet/hips sit exactly on the original surface. The stored default is
+  // center (0.5, 0.5); we lift it to the bottom anchor automatically unless
+  // the user has explicitly set a different anchor.
+  const autoBottom =
+    rep.anchor.x === 0.5 && (rep.anchor.y === 0.5 || rep.anchor.y === 1.0);
+  const anchorX = rep.anchor.x;
+  const anchorY = autoBottom ? 1.0 : rep.anchor.y;
+  const anchorPxX = finalW * anchorX;
+  const anchorPxY = finalH * anchorY;
 
   // 6. Position
   const posX = cx - anchorPxX + rep.offset.x * frameW;
@@ -121,6 +129,7 @@ function clipOpFor(mode: ClipMode): string {
 export function CompositeCanvas({
   frameUrl,
   maskUrl,
+  inpaintedUrl,
   replacementUrl,
   sequenceFrameUrl,
   frameMotion,
@@ -136,6 +145,7 @@ export function CompositeCanvas({
 
   const [frameImg, setFrameImg] = useState<HTMLImageElement | null>(null);
   const [maskImg, setMaskImg] = useState<HTMLImageElement | null>(null);
+  const [inpaintedImg, setInpaintedImg] = useState<HTMLImageElement | null>(null);
   const [repImg, setRepImg] = useState<HTMLImageElement | null>(null);
   const [sequenceFrameImg, setSequenceFrameImg] = useState<HTMLImageElement | null>(null);
   const [multiObjImgs, setMultiObjImgs] = useState<Map<string, HTMLImageElement>>(new Map());
@@ -165,6 +175,18 @@ export function CompositeCanvas({
     img.onerror = () => setMaskImg(null);
     img.src = maskUrl;
   }, [maskUrl]);
+
+  useEffect(() => {
+    if (!inpaintedUrl) {
+      setInpaintedImg(null);
+      return;
+    }
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => setInpaintedImg(img);
+    img.onerror = () => setInpaintedImg(null);
+    img.src = inpaintedUrl;
+  }, [inpaintedUrl]);
 
   useEffect(() => {
     if (!replacementUrl) {
@@ -343,13 +365,15 @@ export function CompositeCanvas({
 
     // "result" or "comparison" — draw composite
     const drawComposite = (offsetX: number) => {
-      // Background frame
-      if (frameImg) {
+      // Background layer: inpainted frame (original character removed) when
+      // available, else the plain frame.
+      const bgImg = inpaintedImg ?? frameImg;
+      if (bgImg) {
         layer.add(
           new Konva.Image({
             x: offsetX + ox,
             y: oy,
-            image: frameImg,
+            image: bgImg,
             width: dw,
             height: dh,
           }),
@@ -487,7 +511,7 @@ export function CompositeCanvas({
           fallbackW =
             (activeRepImg.naturalWidth / activeRepImg.naturalHeight) * fallbackH;
           const anchorPxX = fallbackW * replacement.anchor.x;
-          const anchorPxY = fallbackH * replacement.anchor.y;
+          const anchorPxY = fallbackH * (replacement.anchor.y === 0.5 ? 1.0 : replacement.anchor.y);
           tf = {
             x: cx - anchorPxX + replacement.offset.x * videoWidth,
             y: cy - anchorPxY + replacement.offset.y * videoHeight,
@@ -692,6 +716,7 @@ export function CompositeCanvas({
   }, [
     frameImg,
     maskImg,
+    inpaintedImg,
     repImg,
     sequenceFrameImg,
     frameMotion,

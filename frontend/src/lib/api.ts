@@ -381,6 +381,9 @@ export const api = {
   getReplacementImageUrl: (projectId: string, objectId: string) =>
     `${API_BASE}/api/projects/${projectId}/objects/${objectId}/replacement-image`,
 
+  getInpaintedFrameUrl: (projectId: string, objectId: string, frameIndex: number) =>
+    `${API_BASE}/api/projects/${projectId}/objects/${objectId}/inpainted/${frameIndex}`,
+
   getObjectCropUrl: (projectId: string, objectId: string) =>
     `${API_BASE}/api/projects/${projectId}/objects/${objectId}/crop`,
 

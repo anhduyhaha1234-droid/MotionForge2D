@@ -152,9 +152,18 @@ export function ScreenD() {
 
   /* ── Replacement image URL ──────────────────────────────────────────── */
 
+  // Cache-bust: append timestamp + asset_path version so the browser never
+  // serves a stale replacement image after a new upload.
   const replacementUrl =
     projectId && objectId && replacement.asset_path
-      ? api.getReplacementImageUrl(projectId, objectId)
+      ? `${api.getReplacementImageUrl(projectId, objectId)}?t=${Date.now()}&v=${encodeURIComponent(replacement.asset_path)}`
+      : null;
+
+  // Inpainted (background-cleaned) frame URL — shows the scene with the
+  // original character removed as the base layer.
+  const inpaintedUrl =
+    projectId && objectId
+      ? `${api.getInpaintedFrameUrl(projectId, objectId, currentFrame)}?t=${Date.now()}`
       : null;
 
   // Preview flow: store file locally, show side-by-side modal, upload only on confirm
@@ -474,6 +483,7 @@ export function ScreenD() {
           <CompositeCanvas
             frameUrl={frameUrl}
             maskUrl={maskUrl}
+            inpaintedUrl={inpaintedUrl}
             replacementUrl={replacementUrl}
             sequenceFrameUrl={sequenceFrameUrl}
             frameMotion={frameMotion}

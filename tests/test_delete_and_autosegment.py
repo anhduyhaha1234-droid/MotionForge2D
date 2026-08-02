@@ -307,6 +307,45 @@ class TestDeleteSingleAndClear:
         assert r.status_code == 201
         return r.json()["object_id"]
 
+    def _make_object_with_mask(self, client, pid: str) -> str:
+        """Create a synthetic frame + object + mask file, return object_id."""
+        import cv2
+        import numpy as np
+
+        from app.api import deps
+        proj_root = deps._config.project_root
+        frame_dir = proj_root / "projects" / pid / "frames" / "scene_0"
+        frame_dir.mkdir(parents=True, exist_ok=True)
+        frame = np.full((200, 200, 3), 255, dtype=np.uint8)
+        frame[50:150, 50:150] = (0, 0, 0)
+        cv2.imwrite(str(frame_dir / "frame_000000.png"), frame)
+
+        r = client.post(
+            f"/api/projects/{pid}/objects",
+            json={
+                "name": "MaskedObj",
+                "selection": {
+                    "mode": "bounding_box",
+                    "frame_index": 0,
+                    "x": 60,
+                    "y": 60,
+                    "width": 80,
+                    "height": 80,
+                },
+                "scene_id": 0,
+            },
+        )
+        assert r.status_code == 201
+        oid = r.json()["object_id"]
+
+        # Write a mask file
+        mask_dir = proj_root / "projects" / pid / "objects" / oid / "masks"
+        mask_dir.mkdir(parents=True, exist_ok=True)
+        mask = np.zeros((200, 200), dtype=np.uint8)
+        mask[60:140, 60:140] = 255
+        cv2.imwrite(str(mask_dir / "mask_000000.png"), mask)
+        return oid
+
     def test_delete_single_object(self, client: TestClient) -> None:
         """Deleting one object keeps the others."""
         create_resp = client.post("/api/projects", json={"name": "DelOne"})
@@ -561,3 +600,64 @@ class TestDeleteSingleAndClear:
         # Trailing slash variant
         resp2 = client.post(f"/api/projects/{pid}/objects/{oid1}/auto-match/")
         assert resp2.status_code == 200
+
+    def test_mask_and_inpainted_endpoints(self, client: TestClient) -> None:
+        """GET object mask image + inpainted frame must serve 200 image/png."""
+        create_resp = client.post("/api/projects", json={"name": "MaskTest"})
+        pid = create_resp.json()["project_id"]
+        oid = self._make_object_with_mask(client, pid)
+
+        # Mask image endpoint
+        r = client.get(f"/api/projects/{pid}/objects/{oid}/masks/0")
+        assert r.status_code == 200
+        assert r.headers["content-type"].startswith("image/png")
+
+        # Trailing slash variant
+        r2 = client.get(f"/api/projects/{pid}/objects/{oid}/masks/0/")
+        assert r2.status_code == 200
+
+        # Inpainted frame endpoint
+        r3 = client.get(f"/api/projects/{pid}/objects/{oid}/inpainted/0")
+        assert r3.status_code == 200
+        assert r3.headers["content-type"].startswith("image/png")
+
+        # Trailing slash variant
+        r4 = client.get(f"/api/projects/{pid}/objects/{oid}/inpainted/0/")
+        assert r4.status_code == 200
+
+    def test_mask_and_inpainted_fallback_without_mask(self, client: TestClient) -> None:
+        """When no mask exists, inpainted endpoint falls back to original frame."""
+        create_resp = client.post("/api/projects", json={"name": "MaskFallback"})
+        pid = create_resp.json()["project_id"]
+        # Create a frame so the inpainted endpoint can find it
+        import cv2
+        import numpy as np
+
+        from app.api import deps
+        proj_root = deps._config.project_root
+        frame_dir = proj_root / "projects" / pid / "frames" / "scene_0"
+        frame_dir.mkdir(parents=True, exist_ok=True)
+        frame = np.full((200, 200, 3), 255, dtype=np.uint8)
+        frame[50:150, 50:150] = (0, 0, 0)
+        cv2.imwrite(str(frame_dir / "frame_000000.png"), frame)
+        # Create an object but do NOT create a mask
+        payload = {
+            "name": "Vật thể #1",
+            "selection": {
+                "mode": "bounding_box",
+                "frame_index": 0,
+                "x": 100,
+                "y": 100,
+                "width": 60,
+                "height": 60,
+            },
+            "scene_id": 0,
+        }
+        r1 = client.post(f"/api/projects/{pid}/objects", json=payload)
+        assert r1.status_code == 201
+        oid = r1.json()["object_id"]
+
+        # Inpainted must still return 200 (fallback to original frame)
+        r3 = client.get(f"/api/projects/{pid}/objects/{oid}/inpainted/0")
+        assert r3.status_code == 200
+        assert r3.headers["content-type"].startswith("image/")
