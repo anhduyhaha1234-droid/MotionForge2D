@@ -52,8 +52,8 @@ Sprint numbers express dependency order. They do not promise fixed duration. A s
 | S01-T01 | Define approved SQLAlchemy domain contracts and migration policy | S00 exit | APPROVED |
 | S01-T02 | Bootstrap SQLite engine/session and schema-version migrations | S01-T01 | APPROVED |
 | S01-T03 | Implement managed artifact paths, atomic writes and safe Trash contract | S01-T02 | APPROVED |
-| S01-T04 | Build read-only legacy JSON inventory/import preview | S01-T02 | READY |
-| S01-T05 | Implement transactional legacy import with backup and migration tests | S01-T03,S01-T04 | PLANNED |
+| S01-T04 | Build read-only legacy JSON inventory/import preview | S01-T02 | APPROVED |
+| S01-T05 | Implement transactional legacy import with backup and migration tests | S01-T03,S01-T04 | READY |
 
 ### Sprint S02 - Durable processing
 

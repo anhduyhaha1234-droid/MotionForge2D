@@ -17,6 +17,17 @@ from app.persistence.engine import (
     create_engine_for_path,
     create_session_factory,
 )
+from app.persistence.legacy_preview import (
+    BLOCKER,
+    INFO,
+    WARNING,
+    LegacyPreview,
+    LegacyPreviewer,
+    LegacyPreviewError,
+    PathCheck,
+    PathIssue,
+    PreviewIssue,
+)
 from app.persistence.revision import (
     SCHEMA_REVISION_REFUSED_MESSAGE,
     assert_schema_revision_supported,
@@ -25,12 +36,21 @@ from app.persistence.revision import (
 )
 
 __all__ = [
+    "BLOCKER",
     "BUSY_TIMEOUT_MS",
     "FOREIGN_KEYS_PRAGMA",
+    "INFO",
     "SCHEMA_REVISION_REFUSED_MESSAGE",
+    "WARNING",
     "ArtifactWriteError",
+    "LegacyPreview",
+    "LegacyPreviewError",
+    "LegacyPreviewer",
     "ManagedPathError",
     "ManagedRoot",
+    "PathCheck",
+    "PathIssue",
+    "PreviewIssue",
     "RestoreResult",
     "TrashManifest",
     "TrashMoveResult",
