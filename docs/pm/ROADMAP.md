@@ -65,7 +65,9 @@ Sprint numbers express dependency order. They do not promise fixed duration. A s
 | S02-T02 | Persist job lifecycle and idempotency keys | S02-T01 | APPROVED |
 | S02-T03 | Worker executes/retries/cancels jobs outside HTTP request | S02-T02 | APPROVED |
 | S02-T04 | Restart reconciliation resumes or safely fails interrupted jobs | S02-T03 | APPROVED |
-| S02-T05 | Job API and backend integration tests cover recovery contract | S02-T04 | READY |
+| S02-T05 | Job API and backend integration tests cover recovery contract | S02-T04 | APPROVED |
+
+**Sprint status:** APPROVED — exit verified by quality-baseline run `20260804-000921` (7/7 gates PASS).
 
 **Epic exit:** migration fixtures pass; jobs and artifacts reconcile after forced close; no durable truth relies only on RAM/frontend storage.
 

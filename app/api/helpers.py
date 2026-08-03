@@ -27,7 +27,11 @@ def find_frame_path(scene_dir: Path, frame_index: int) -> Path | None:
 def job_response(info: JobInfo) -> dict[str, object]:
     """Serialize JobInfo with 'status' key for frontend compatibility.
 
-    Frontend expects 'status', backend model uses 'state'.
+    Frontend expects 'status', backend model uses 'state'.  The response
+    shape is preserved from the legacy service; additive durable fields
+    (``steps``, ``attempts``, ``outputs``) may appear but never change the
+    meaning of the legacy fields.  Internal ``fenced`` state is hidden by
+    the service (the reconciler resolves it before any poll observes it).
     """
     data: dict[str, object] = info.model_dump()
     data["status"] = data.pop("state")

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 import shutil
 import sys
@@ -85,7 +86,8 @@ def sample_mask() -> np.ndarray[Any, Any]:
 
 @pytest.fixture()
 def _patch_project_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
-    """Redirect project root to a temp dir so tests never write to real projects/.
+    """Redirect project root + durable DB to temp dirs so tests never write
+    to the real projects/ tree or the production database.
 
     Returns the test project root (contains projects/ subdir).
     """
@@ -95,6 +97,8 @@ def _patch_project_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path
 
     from app.api import deps
     from app.config import AppConfig
+    from app.persistence import create_engine_for_path, create_session_factory
+    from app.workflow.job_service import JobService
 
     test_config = AppConfig(
         project_root=test_root,
@@ -110,19 +114,60 @@ def _patch_project_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path
             fromlist=["ProjectWorkflowService"],
         ).ProjectWorkflowService(test_config),
     )
-    monkeypatch.setattr(
-        deps,
-        "_job_service",
-        __import__("app.workflow.job_service", fromlist=["JobService"]).JobService(),
+
+    # Durable job service bound to a temp database + temp managed root.
+    db_path = test_root / "data" / "test.db"
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    from alembic import command
+    from alembic.config import Config
+
+    project_root_dir = Path(__file__).resolve().parent.parent
+    cfg = Config(str(project_root_dir / "alembic.ini"))
+    cfg.set_main_option("script_location", str(project_root_dir / "migrations"))
+    cfg.set_main_option("sqlalchemy.url", f"sqlite:///{db_path.as_posix()}")
+    command.upgrade(cfg, "head")
+
+    factory = create_session_factory(create_engine_for_path(db_path))
+    svc = JobService(
+        factory,
+        worker=None,
+        managed_root=test_root / "artifacts",
     )
+    monkeypatch.setattr(deps, "_job_service", svc)
+    # Ensure the durable database the app lifespan may target is the test DB
+    # (TestClient triggers the lifespan; without this the lifespan would
+    # create/upgrade a real ``motionforge.db`` under the patched root).
+    monkeypatch.setattr(deps, "_lifecycle_db", db_path, raising=False)
     return test_root
 
 
 @pytest.fixture()
+def registered_test_job_type() -> str:
+    """A stable job type whose handler tests register on the injected worker.
+
+    After the closure-shim removal (PM CR4), tests must register an explicit
+    stable test job type/handler on the injected worker and submit a
+    versioned manifest — no unreconstructable callable is accepted.
+    """
+    return "TEST_SYNTH"
+
+
+@pytest.fixture()
 def client(_patch_project_root: Path):
-    """FastAPI test client with isolated project root (no disk pollution)."""
+    """FastAPI test client with isolated project root + durable DB."""
     from fastapi.testclient import TestClient
 
     from app.api.app import app
 
     return TestClient(app, raise_server_exceptions=False)
+
+
+@pytest.fixture(autouse=True)
+def _stop_test_workers():
+    """Stop any durable worker thread started by a test at teardown."""
+    yield
+    from app.api import deps
+
+    svc = deps._job_service
+    with contextlib.suppress(Exception):
+        svc.stop_worker(timeout=2.0)

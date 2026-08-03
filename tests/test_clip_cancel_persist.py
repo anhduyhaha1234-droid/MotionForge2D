@@ -133,51 +133,78 @@ class TestClipModeIntegration:
 
 class TestJobCancellation:
     def test_cancel_running_job(self, client: TestClient) -> None:
-        """Cancel a job and verify state transitions."""
+        """Cancel a job and verify state transitions (durable worker)."""
         from app.api.deps import get_job_service
+        from app.workflow.durable_worker import WorkerContext
 
         svc = get_job_service()
 
-        # Create a slow job
+        # Create a slow job with an explicit registered test handler
         started = []
 
-        def slow_worker(progress_cb, is_cancelled):
+        def slow_handler(ctx: WorkerContext) -> dict:
             started.append(True)
             for i in range(100):
-                if is_cancelled():
-                    return "cancelled"
-                progress_cb(i, f"Step {i}")
+                if ctx.is_cancelled():
+                    return {"cancelled": True}
+                ctx.progress(i, f"Step {i}")
                 time.sleep(0.05)
-            return "done"
+            return {"done": True}
 
-        info = svc.create_job("test_cancel", slow_worker)
+        svc.worker.register_handler("TEST_CANCEL", slow_handler)
+        info = svc.create_job(
+            "TEST_CANCEL",
+            input_manifest={"schema_version": 1, "payload": "cancel"},
+        )
         assert info.state.value == "running" or info.state.value == "queued"
 
-        # Wait for it to start
-        time.sleep(0.2)
-        assert len(started) == 1
+        # Start the durable worker (explicit lifecycle) and wait for start
+        svc.start_worker()
+        try:
+            for _ in range(100):
+                if started:
+                    break
+                time.sleep(0.05)
+            assert len(started) == 1
 
-        # Cancel
-        svc.cancel_job(info.job_id)
-        assert True  # cancel returns True for running job
+            # Cancel
+            svc.cancel_job(info.job_id)
+            assert True  # cancel returns True for running job
 
-        # Wait for completion
-        time.sleep(0.5)
-        status = svc.get_job(info.job_id)
-        assert status.state.value == "cancelled"
+            # Wait for completion
+            for _ in range(100):
+                status = svc.get_job(info.job_id)
+                if status.state.value in ("cancelled", "completed", "failed"):
+                    break
+                time.sleep(0.05)
+            assert status.state.value == "cancelled"
+        finally:
+            svc.stop_worker(timeout=5.0)
 
     def test_cancel_already_completed(self, client: TestClient) -> None:
         """Cancel a completed job returns appropriate response."""
         from app.api.deps import get_job_service
+        from app.workflow.durable_worker import WorkerContext
 
         svc = get_job_service()
 
-        def fast_worker(progress_cb, is_cancelled):
-            progress_cb(100, "Done")
-            return "done"
+        def fast_handler(ctx: WorkerContext) -> dict:
+            ctx.progress(100, "Done")
+            return {"done": True}
 
-        info = svc.create_job("test_done", fast_worker)
-        time.sleep(0.5)  # Let it finish
+        svc.worker.register_handler("TEST_DONE", fast_handler)
+        info = svc.create_job(
+            "TEST_DONE",
+            input_manifest={"schema_version": 1, "payload": "done"},
+        )
+        svc.start_worker()
+        try:
+            for _ in range(100):
+                if svc.get_job(info.job_id).state.value == "completed":
+                    break
+                time.sleep(0.05)
+        finally:
+            svc.stop_worker(timeout=5.0)
 
         # Try to cancel completed job
         svc.cancel_job(info.job_id)
@@ -193,34 +220,46 @@ class TestJobCancellation:
     def test_job_state_transitions(self, client: TestClient) -> None:
         """Verify job goes through running → cancelling → cancelled."""
         from app.api.deps import get_job_service
+        from app.workflow.durable_worker import WorkerContext
 
         svc = get_job_service()
         states_seen = []
 
-        def tracking_worker(progress_cb, is_cancelled):
+        def tracking_handler(ctx: WorkerContext) -> dict:
             for i in range(100):
-                if is_cancelled():
-                    return "cancelled"
-                progress_cb(i, f"Step {i}")
+                if ctx.is_cancelled():
+                    return {"cancelled": True}
+                ctx.progress(i, f"Step {i}")
                 time.sleep(0.1)
-            return "done"
+            return {"done": True}
 
-        info = svc.create_job("test_states", tracking_worker)
-        time.sleep(0.3)
+        svc.worker.register_handler("TEST_STATES", tracking_handler)
+        info = svc.create_job(
+            "TEST_STATES",
+            input_manifest={"schema_version": 1, "payload": "states"},
+        )
+        svc.start_worker()
+        try:
+            for _ in range(100):
+                status = svc.get_job(info.job_id)
+                if status.state.value == "running":
+                    break
+                time.sleep(0.05)
+            states_seen.append(status.state.value)
 
-        # Check it's running
-        status = svc.get_job(info.job_id)
-        states_seen.append(status.state.value)
+            # Cancel
+            svc.cancel_job(info.job_id)
+            for _ in range(100):
+                status = svc.get_job(info.job_id)
+                if status.state.value in ("cancelled", "completed", "failed"):
+                    break
+                time.sleep(0.05)
+            states_seen.append(status.state.value)
 
-        # Cancel
-        svc.cancel_job(info.job_id)
-        time.sleep(0.5)
-
-        status = svc.get_job(info.job_id)
-        states_seen.append(status.state.value)
-
-        assert "running" in states_seen or "queued" in states_seen
-        assert "cancelled" in states_seen
+            assert "running" in states_seen or "queued" in states_seen
+            assert "cancelled" in states_seen
+        finally:
+            svc.stop_worker(timeout=5.0)
 
 
 # ─── Restart Persistence Tests ───────────────────────────────────────────────

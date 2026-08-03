@@ -1,6 +1,12 @@
 """MotionForge 2D entry point.
 
 Run with: uvicorn app.main:app --reload
+
+The FastAPI lifespan (app/api/app.py) performs the explicit application
+lifecycle: bootstrap/upgrade the database, reconcile stale in-flight Jobs,
+start the durable worker, and on shutdown stop/join worker + reconciler.
+Importing this module never starts threads, opens sessions, or touches
+files (AC1 — no import-time side effects).
 """
 
 from __future__ import annotations

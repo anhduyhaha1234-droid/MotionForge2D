@@ -1,6 +1,6 @@
 # S02-T05 - Durable Job API cutover and recovery acceptance
 
-**Status:** READY
+**Status:** APPROVED
 **Epic:** E01 - Durable Domain, Persistence and Jobs
 **Sprint:** S02 - Durable processing
 **Gate:** G1 - Foundation green
@@ -33,6 +33,7 @@ remains only in RAM.
 ## Allowed write scope
 
 - `app/api/deps.py`
+- `app/api/app.py`
 - `app/api/helpers.py`
 - `app/api/routes/jobs.py`
 - `app/api/routes/projects.py`
@@ -44,9 +45,12 @@ remains only in RAM.
 - `app/persistence/jobs.py`
 - `app/persistence/__init__.py`
 - `app/main.py`
+- `app/lifecycle.py`
+- `app/workflow/job_handlers.py`
 - `tests/test_api.py`
 - `tests/test_clip_cancel_persist.py`
 - `tests/test_durable_job_api.py`
+- `tests/conftest.py`
 - `docs/architecture/DURABLE_JOB_API_CUTOVER.md`
 - `docs/pm/sessions/S02-T05-job-api-cutover/`
 

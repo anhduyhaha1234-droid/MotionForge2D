@@ -32,6 +32,7 @@ class JobStatus(str, Enum):
 
 
 class JobState(str, Enum):
+    PENDING = "pending"
     QUEUED = "queued"
     RUNNING = "running"
     CANCELLING = "cancelling"

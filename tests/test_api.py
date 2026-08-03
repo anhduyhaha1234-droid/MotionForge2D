@@ -45,12 +45,28 @@ def _patch_project_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path
             "app.workflow.project_workflow", fromlist=["ProjectWorkflowService"],
         ).ProjectWorkflowService(test_config),
     )
+    # Durable job service bound to a temp database (same bootstrap as the
+    # shared conftest fixture) so the local fixtures never touch the real
+    # production database.
+    from alembic import command
+    from alembic.config import Config
+
+    from app.persistence import create_engine_for_path, create_session_factory
+    from app.workflow.job_service import JobService
+
+    db_path = test_root / "data" / "test.db"
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    project_root_dir = Path(__file__).resolve().parent.parent
+    cfg = Config(str(project_root_dir / "alembic.ini"))
+    cfg.set_main_option("script_location", str(project_root_dir / "migrations"))
+    cfg.set_main_option("sqlalchemy.url", f"sqlite:///{db_path.as_posix()}")
+    command.upgrade(cfg, "head")
+    factory = create_session_factory(create_engine_for_path(db_path))
     monkeypatch.setattr(
         deps, "_job_service",
-        __import__(
-            "app.workflow.job_service", fromlist=["JobService"],
-        ).JobService(),
+        JobService(factory, managed_root=test_root / "artifacts"),
     )
+    monkeypatch.setattr(deps, "_lifecycle_db", db_path, raising=False)
     monkeypatch.setattr(
         deps, "_replacement_service",
         __import__(
@@ -395,15 +411,21 @@ class TestUpdateReplacement:
 class TestJobStatus:
     def test_job_status(self, client: TestClient) -> None:
         from app.api import deps
+        from app.workflow.durable_worker import WorkerContext
 
         job_svc = deps._job_service
 
-        def dummy_worker(progress_cb, is_cancelled):
-            progress_cb(50, "Halfway")
-            return "done"
+        def dummy_handler(ctx: WorkerContext) -> dict:
+            ctx.progress(50, "Halfway")
+            return {"ok": True}
 
-        info = job_svc.create_job("test", dummy_worker)
-        time.sleep(0.1)
+        # Explicit stable test job type registered on the injected worker
+        # (PM CR4: no closure shim — registered handler + versioned manifest).
+        job_svc.worker.register_handler("TEST_SYNTH", dummy_handler)
+        info = job_svc.create_job(
+            "TEST_SYNTH",
+            input_manifest={"schema_version": 1, "payload": "status"},
+        )
 
         resp = client.get(f"/api/jobs/{info.job_id}")
         assert resp.status_code == 200
@@ -419,41 +441,68 @@ class TestJobStatus:
 class TestJobCancel:
     def test_job_cancel(self, client: TestClient) -> None:
         from app.api import deps
+        from app.workflow.durable_worker import WorkerContext
 
         job_svc = deps._job_service
 
-        def slow_worker(progress_cb, is_cancelled):
+        def slow_handler(ctx: WorkerContext) -> dict:
             for i in range(100):
-                if is_cancelled():
-                    return ""
-                progress_cb(float(i), f"Step {i}")
+                if ctx.is_cancelled():
+                    return {"cancelled": True}
+                ctx.progress(float(i), f"Step {i}")
                 time.sleep(0.01)
-            return "done"
+            return {"done": True}
 
-        info = job_svc.create_job("slow_test", slow_worker)
-        time.sleep(0.05)
-
-        resp = client.post(f"/api/jobs/{info.job_id}/cancel")
-        assert resp.status_code == 200
-        assert resp.json()["status"] == "cancel_requested"
-
-        time.sleep(0.3)
-        final = job_svc.get_job(info.job_id)
-        assert final is not None
-        assert final.state in (
-            JobState.CANCELLED, JobState.CANCELLING, JobState.COMPLETED,
+        job_svc.worker.register_handler("TEST_SLOW", slow_handler)
+        info = job_svc.create_job(
+            "TEST_SLOW",
+            input_manifest={"schema_version": 1, "payload": "cancel"},
         )
+        job_svc.start_worker()
+        try:
+            resp = client.post(f"/api/jobs/{info.job_id}/cancel")
+            assert resp.status_code == 200
+            assert resp.json()["status"] == "cancel_requested"
+
+            for _ in range(200):
+                final = job_svc.get_job(info.job_id)
+                if final.state in (
+                    JobState.CANCELLED, JobState.CANCELLING, JobState.COMPLETED,
+                ):
+                    break
+                time.sleep(0.05)
+            assert final is not None
+            assert final.state in (
+                JobState.CANCELLED, JobState.CANCELLING, JobState.COMPLETED,
+            )
+        finally:
+            job_svc.stop_worker(timeout=5.0)
 
     def test_cancel_already_completed(self, client: TestClient) -> None:
         from app.api import deps
+        from app.workflow.durable_worker import WorkerContext
 
         job_svc = deps._job_service
 
-        def quick_worker(progress_cb, is_cancelled):
-            return "done"
+        def quick_handler(ctx: WorkerContext) -> dict:
+            return {"done": True}
 
-        info = job_svc.create_job("quick", quick_worker)
-        time.sleep(0.2)
+        job_svc.worker.register_handler("TEST_QUICK", quick_handler)
+        info = job_svc.create_job(
+            "TEST_QUICK",
+            input_manifest={"schema_version": 1, "payload": "quick"},
+        )
+        # The durable worker must actually run before we can expect the job
+        # to be terminal.  Start the worker (explicit lifecycle), wait for
+        # completion, then stop it.
+        job_svc.start_worker()
+        try:
+            for _ in range(100):
+                if job_svc.get_job(info.job_id).state == JobState.COMPLETED:
+                    break
+                time.sleep(0.05)
+        finally:
+            job_svc.stop_worker(timeout=5.0)
 
         resp = client.post(f"/api/jobs/{info.job_id}/cancel")
         assert resp.status_code == 400

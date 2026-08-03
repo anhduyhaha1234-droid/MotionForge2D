@@ -5,7 +5,6 @@ from __future__ import annotations
 import base64
 import shutil
 import uuid
-from collections.abc import Callable
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, UploadFile
@@ -14,10 +13,7 @@ from pydantic import BaseModel, Field
 
 from app.api.deps import (
     get_config,
-    get_final_render_service,
     get_job_service,
-    get_object_extraction_service,
-    get_preview_render_service,
     get_project_workflow,
     get_replacement_service,
     get_segmentation_service,
@@ -243,25 +239,29 @@ async def upload_video(project_id: str, file: UploadFile) -> dict[str, object]:
 @router.post("/{project_id}/ingest")
 @router.post("/{project_id}/ingest/")
 def trigger_ingest(project_id: str) -> dict[str, object]:
-    """Trigger ingest (probe + scene detect + frame extract). Returns a job."""
-    from app.workflow.ingest_service import IngestService
+    """Trigger ingest (probe + scene detect + frame extract). Returns a job.
 
+    Durable submission (S02-T05): the request only writes an input-manifest
+    Job row; the registered ``ingest`` handler runs in the durable worker
+    (AC2/AC6 — no long operation inside the HTTP request).
+    """
     pwf = get_project_workflow()
     try:
         pwf.get_project(project_id)
     except FileNotFoundError as err:
         raise HTTPException(404, "Project not found") from err
 
-    svc = IngestService(get_project_workflow()._config, pwf)
     job_svc = get_job_service()
-
-    def worker(
-        progress_cb: Callable[[float, str], None],
-        is_cancelled: Callable[[], bool],
-    ) -> object:
-        return svc.ingest(project_id, progress_cb, is_cancelled)
-
-    info = job_svc.create_job("ingest", worker)
+    info = job_svc.create_job(
+        "ingest",
+        input_manifest={
+            "project_id": project_id,
+        },
+        workspace_id="default",
+        owner_type="project",
+        owner_id=project_id,
+        idempotency_key=f"ingest:{project_id}",
+    )
     return job_response(info)
 
 
@@ -814,10 +814,13 @@ def create_object(project_id: str, body: CreateObjectRequest) -> dict[str, objec
 @router.post("/{project_id}/objects/{object_id}/propagate")
 @router.post("/{project_id}/objects/{object_id}/propagate/")
 def propagate_object(project_id: str, object_id: str) -> dict[str, object]:
-    """Propagate masks for a tracked object. Returns a job."""
-    import cv2
+    """Propagate masks for a tracked object. Returns a job.
 
-    from app.services.motion_extraction import compute_scene_motion, smooth_motion
+    Durable submission (S02-T05): the request validates inputs and writes an
+    input-manifest Job row; the registered ``propagate`` handler runs in the
+    durable worker (AC2/AC6).
+    """
+    import cv2  # noqa: PLC0415
 
     pwf = get_project_workflow()
     proj_dir = pwf._project_dir(project_id)
@@ -879,65 +882,24 @@ def propagate_object(project_id: str, object_id: str) -> dict[str, object]:
     frames_dir = proj_dir / "frames" / f"scene_{scene_id}"
     frame_paths = sorted(frames_dir.glob("frame_*.png"))
     if not frame_paths:
+        frame_paths = sorted(frames_dir.glob("frame_*.jpg"))
+    if not frame_paths:
         raise HTTPException(400, f"No frames found for scene {scene_id}")
 
-    initial_mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
-    if initial_mask is None:
-        raise HTTPException(500, "Failed to load initial mask")
-
-    sel_idx = min(obj.selection.frame_index, len(frame_paths) - 1)
-    scene_frame_start = int(frame_paths[0].stem.split("_")[1])
-    list_idx = sel_idx - scene_frame_start
-    list_idx = max(0, min(list_idx, len(frame_paths) - 1))
-
-    seg_svc = get_segmentation_service()
-    obj_ext_svc = get_object_extraction_service()
     job_svc = get_job_service()
-
-    def worker(
-        progress_cb: Callable[[float, str], None],
-        is_cancelled: Callable[[], bool],
-    ) -> object:
-        def seg_progress(pct: float, msg: str) -> None:
-            progress_cb(pct * 0.6, msg)
-
-        masks = seg_svc.propagate_masks(
-            frame_paths, initial_mask, list_idx,
-            backend="sam2", progress_cb=seg_progress,
-            is_cancelled=is_cancelled,
-        )
-
-        if is_cancelled():
-            return ""
-
-        progress_cb(65, "Computing motion data")
-        motion = compute_scene_motion(masks, sel_idx, list_idx)
-        motion.scene_id = scene_id
-        motion_smoothed = smooth_motion(motion.frames)
-
-        from app.schemas import SceneMotion
-
-        final_motion = SceneMotion(
-            scene_id=scene_id,
-            frames=motion_smoothed,
-            reference_bbox=motion.reference_bbox,
-        )
-
-        pwf.update_object(project_id, object_id, motion=final_motion)
-
-        if is_cancelled():
-            return ""
-
-        progress_cb(80, "Extracting object crops")
-        obj_with_motion = pwf.get_tracked_object(project_id, object_id)
-        obj_ext_svc.extract_crops(
-            project_id, proj_dir, obj_with_motion, frame_paths, masks,
-        )
-
-        progress_cb(100, "Propagation complete")
-        return str(proj_dir / "objects" / object_id)
-
-    info = job_svc.create_job("propagate", worker)
+    info = job_svc.create_job(
+        "propagate",
+        input_manifest={
+            "project_id": project_id,
+            "object_id": object_id,
+            "scene_id": scene_id,
+            "frame_count": len(frame_paths),
+        },
+        workspace_id="default",
+        owner_type="project",
+        owner_id=project_id,
+        idempotency_key=f"propagate:{project_id}:{object_id}",
+    )
     return job_response(info)
 
 
@@ -1141,9 +1103,13 @@ def update_replacement_settings(
 @router.post("/{project_id}/preview")
 @router.post("/{project_id}/preview/")
 def render_preview(project_id: str, object_id: str = "") -> dict[str, object]:
-    """Render a preview video. Returns a job."""
+    """Render a preview video. Returns a job.
+
+    Durable submission (S02-T05): the request validates inputs and writes an
+    input-manifest Job row; the registered ``preview`` handler runs in the
+    durable worker (AC2/AC6).
+    """
     pwf = get_project_workflow()
-    proj_dir = pwf._project_dir(project_id)
 
     try:
         project = pwf.get_project(project_id)
@@ -1158,18 +1124,22 @@ def render_preview(project_id: str, object_id: str = "") -> dict[str, object]:
     except (FileNotFoundError, KeyError) as e:
         raise HTTPException(404, str(e)) from e
 
-    preview_svc = get_preview_render_service()
+    if obj.motion is None or not obj.motion.frames:
+        raise HTTPException(400, "Object has no motion data. Run propagation first.")
+
     job_svc = get_job_service()
-
-    def worker(
-        progress_cb: Callable[[float, str], None],
-        is_cancelled: Callable[[], bool],
-    ) -> object:
-        return preview_svc.render_preview(
-            proj_dir, project, obj, progress_cb, is_cancelled,
-        )
-
-    info = job_svc.create_job("preview", worker)
+    info = job_svc.create_job(
+        "preview",
+        input_manifest={
+            "project_id": project_id,
+            "object_id": object_id,
+            "scene_id": obj.scene_id,
+        },
+        workspace_id="default",
+        owner_type="project",
+        owner_id=project_id,
+        idempotency_key=f"preview:{project_id}:{object_id}",
+    )
     return job_response(info)
 
 
@@ -1178,9 +1148,13 @@ def render_preview(project_id: str, object_id: str = "") -> dict[str, object]:
 def render_final(
     project_id: str, object_id: str = "", format: str = "mp4",
 ) -> dict[str, object]:
-    """Render the final video in specified format (mp4/webm/gif). Returns a job."""
+    """Render the final video in specified format (mp4/webm/gif). Returns a job.
+
+    Durable submission (S02-T05): the request validates inputs and writes an
+    input-manifest Job row; the registered ``render`` handler runs in the
+    durable worker (AC2/AC6).
+    """
     pwf = get_project_workflow()
-    proj_dir = pwf._project_dir(project_id)
 
     try:
         project = pwf.get_project(project_id)
@@ -1195,18 +1169,23 @@ def render_final(
     except (FileNotFoundError, KeyError) as e:
         raise HTTPException(404, str(e)) from e
 
-    final_svc = get_final_render_service()
+    if obj.motion is None or not obj.motion.frames:
+        raise HTTPException(400, "Object has no motion data. Run propagation first.")
+
     job_svc = get_job_service()
-
-    def worker(
-        progress_cb: Callable[[float, str], None],
-        is_cancelled: Callable[[], bool],
-    ) -> object:
-        return final_svc.render_final(
-            proj_dir, project, obj, progress_cb, is_cancelled,
-        )
-
-    info = job_svc.create_job("render", worker)
+    info = job_svc.create_job(
+        "render",
+        input_manifest={
+            "project_id": project_id,
+            "object_id": object_id,
+            "scene_id": obj.scene_id,
+            "format": format,
+        },
+        workspace_id="default",
+        owner_type="project",
+        owner_id=project_id,
+        idempotency_key=f"render:{project_id}:{object_id}:{format}",
+    )
     return job_response(info)
 
 
