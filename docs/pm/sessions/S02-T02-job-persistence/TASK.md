@@ -1,6 +1,6 @@
 # S02-T02 - Durable job schema and lifecycle repository
 
-**Status:** READY
+**Status:** APPROVED
 **Epic:** E01 - Durable Domain, Persistence and Jobs
 **Sprint:** S02 - Durable processing
 **Gate:** G1 - Foundation green
@@ -20,7 +20,7 @@ current runtime job API.
 4. `app/persistence/models.py`
 5. `app/persistence/database.py`
 6. `app/persistence/migrations.py`
-7. `app/persistence/alembic/versions/`
+7. `migrations/versions/`
 8. `tests/test_persistence_bootstrap.py`
 9. `app/workflow/job_service.py` (compatibility boundary only)
 
@@ -29,8 +29,9 @@ current runtime job API.
 - `app/persistence/models.py`
 - `app/persistence/jobs.py`
 - `app/persistence/__init__.py`
-- `app/persistence/alembic/versions/`
+- `migrations/versions/`
 - `tests/test_durable_job_persistence.py`
+- `tests/test_persistence_bootstrap.py`
 - `docs/architecture/DURABLE_JOB_PERSISTENCE.md`
 - `docs/pm/sessions/S02-T02-job-persistence/`
 

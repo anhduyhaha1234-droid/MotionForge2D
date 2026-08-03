@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from sqlalchemy import (
     CheckConstraint,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -30,14 +31,24 @@ __all__ = [
     "ARTIFACT_STATES",
     "CHANNEL_ROLES",
     "CHANNEL_STATUSES",
+    "JOB_ACTORS",
+    "JOB_STATES",
+    "JOB_STEP_STATES",
+    "LEGACY_IMPORT_STATUSES",
     "OWNER_TYPES",
     "PROJECT_STATUSES",
+    "RESOURCE_CLASSES",
     "SCENE_STATUSES",
+    "STEP_TYPES",
     "VIDEO_PIPELINE_STATES",
-    "Base",
     "Artifact",
     "ArtifactOwner",
     "Channel",
+    "Job",
+    "JobAttempt",
+    "JobEvent",
+    "JobLease",
+    "JobStep",
     "LegacyImport",
     "Project",
     "Scene",
@@ -78,6 +89,29 @@ ARTIFACT_KINDS = ("video", "image", "audio", "document", "other")
 ARTIFACT_STATES = ("staging", "ready", "trash", "missing", "failed")
 OWNER_TYPES = ("channel", "project", "video_item", "scene", "artifact")
 LEGACY_IMPORT_STATUSES = ("previewed", "importing", "completed", "failed", "rolled_back")
+JOB_STATES = (
+    "pending",
+    "queued",
+    "running",
+    "cancelling",
+    "cancelled",
+    "completed",
+    "failed",
+    "fenced",
+)
+JOB_STEP_STATES = (
+    "pending",
+    "ready",
+    "running",
+    "cancelling",
+    "cancelled",
+    "completed",
+    "failed",
+    "skipped",
+)
+RESOURCE_CLASSES = ("cpu_light", "cpu_heavy", "gpu", "io")
+STEP_TYPES = ("sync", "async")
+JOB_ACTORS = ("worker", "scheduler", "api", "reconciler", "system")
 
 
 def utc_now() -> datetime:
@@ -142,6 +176,7 @@ class Workspace(TimestampMixin, Base):
     channels: Mapped[list[Channel]] = relationship(back_populates="workspace")
     projects: Mapped[list[Project]] = relationship(back_populates="workspace")
     artifacts: Mapped[list[Artifact]] = relationship(back_populates="workspace")
+    jobs: Mapped[list[Job]] = relationship(back_populates="workspace")
 
 
 class Channel(ArchivableMixin, Base):
@@ -402,3 +437,269 @@ class LegacyImport(Base):
         DateTime(timezone=True), default=utc_now, nullable=False
     )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+# ── Durable job entities (S02-T02, DURABLE_JOB_CONTRACT V1.1) ────────────────
+
+
+class Job(TimestampMixin, Base):
+    """Durable unit of user-visible work (approved DURABLE_JOB_CONTRACT V1.1).
+
+    Terminal rows are immutable: no field changes, no re-run, no delete.
+    Retry/restart of a terminal Job is a new successor Job linked through
+    ``predecessor_job_id`` (contract §4.5-4, §6.4, §8.5).  Uniqueness: one
+    active or completed Job per ``(workspace_id, idempotency_key)``.
+    """
+
+    __tablename__ = "job"
+    __table_args__ = (
+        Index(
+            "uq_job_idempotency_key",
+            "workspace_id",
+            "idempotency_key",
+            "input_generation",
+            unique=True,
+            sqlite_where=sa_text(
+                "idempotency_key IS NOT NULL AND state NOT IN ('failed','cancelled')"
+            ),
+        ),
+        UniqueConstraint("predecessor_job_id", name="uq_job_predecessor_job_id"),
+        CheckConstraint(
+            "state IN ('pending','queued','running','cancelling','cancelled',"
+            "'completed','failed','fenced')",
+            name="ck_job_state",
+        ),
+        CheckConstraint(
+            "resource_class IN ('cpu_light','cpu_heavy','gpu','io')",
+            name="ck_job_resource_class",
+        ),
+        CheckConstraint("priority BETWEEN 0 AND 100", name="ck_job_priority_range"),
+        CheckConstraint("max_attempts >= 1", name="ck_job_max_attempts_positive"),
+        CheckConstraint("attempt >= 0", name="ck_job_attempt_nonneg"),
+        CheckConstraint("progress >= 0 AND progress <= 100", name="ck_job_progress_range"),
+        CheckConstraint("length(job_type) > 0", name="ck_job_type_nonempty"),
+        CheckConstraint("length(owner_type) > 0", name="ck_job_owner_type_nonempty"),
+        CheckConstraint("length(owner_id) > 0", name="ck_job_owner_id_nonempty"),
+        CheckConstraint(
+            "finished_at IS NULL OR started_at IS NOT NULL",
+            name="ck_job_finished_requires_started",
+        ),
+        CheckConstraint("revision > 0", name="ck_job_revision_positive"),
+        Index("ix_job_workspace_key", "workspace_id", "idempotency_key"),
+        Index("ix_job_workspace_state", "workspace_id", "state"),
+        Index("ix_job_queue", "state", "priority", "created_at"),
+        Index("ix_job_owner", "owner_type", "owner_id"),
+        Index("ix_job_parent", "parent_job_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    job_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    owner_type: Mapped[str] = mapped_column(String(24), nullable=False)
+    owner_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    parent_job_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("job.id", ondelete="RESTRICT")
+    )
+    predecessor_job_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("job.id", ondelete="RESTRICT")
+    )
+    state: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+    resource_class: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="cpu_light"
+    )
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, default=50)
+    max_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
+    attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    idempotency_key: Mapped[str | None] = mapped_column(String(255))
+    input_generation: Mapped[str | None] = mapped_column(String(64))
+    input_manifest_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    progress: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    error_json: Mapped[str | None] = mapped_column(Text)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    workspace: Mapped[Workspace] = relationship(back_populates="jobs")
+    steps: Mapped[list[JobStep]] = relationship(
+        back_populates="job", order_by="JobStep.position"
+    )
+    attempts: Mapped[list[JobAttempt]] = relationship(back_populates="job")
+    events: Mapped[list[JobEvent]] = relationship(back_populates="job")
+    lease: Mapped[JobLease | None] = relationship(back_populates="job")
+
+
+class JobStep(TimestampMixin, Base):
+    """Ordered, resumable unit inside a Job (checkpoint boundary)."""
+
+    __tablename__ = "job_step"
+    __table_args__ = (
+        UniqueConstraint("job_id", "step_code", name="uq_job_step_job_code"),
+        UniqueConstraint("job_id", "position", name="uq_job_step_job_position"),
+        CheckConstraint(
+            "state IN ('pending','ready','running','cancelling','cancelled',"
+            "'completed','failed','skipped')",
+            name="ck_job_step_state",
+        ),
+        CheckConstraint("step_type IN ('sync','async')", name="ck_job_step_type"),
+        CheckConstraint(
+            "resource_class IN ('cpu_light','cpu_heavy','gpu','io')",
+            name="ck_job_step_resource_class",
+        ),
+        CheckConstraint("position >= 0", name="ck_job_step_position_nonneg"),
+        CheckConstraint("priority BETWEEN 0 AND 100", name="ck_job_step_priority_range"),
+        CheckConstraint("weight >= 0", name="ck_job_step_weight_nonneg"),
+        CheckConstraint("attempt >= 0", name="ck_job_step_attempt_nonneg"),
+        CheckConstraint("max_attempts >= 1", name="ck_job_step_max_attempts_positive"),
+        CheckConstraint(
+            "progress >= 0 AND progress <= 100", name="ck_job_step_progress_range"
+        ),
+        CheckConstraint(
+            "finished_at IS NULL OR started_at IS NOT NULL",
+            name="ck_job_step_finished_requires_started",
+        ),
+        CheckConstraint("revision > 0", name="ck_job_step_revision_positive"),
+        Index("ix_job_step_job_position", "job_id", "position"),
+        Index("ix_job_step_job_state", "job_id", "state"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    job_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("job.id", ondelete="RESTRICT"), nullable=False
+    )
+    step_code: Mapped[str] = mapped_column(String(128), nullable=False)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    step_type: Mapped[str] = mapped_column(String(16), nullable=False, default="sync")
+    depends_on_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    state: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+    resource_class: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="cpu_light"
+    )
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, default=50)
+    weight: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    max_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
+    checkpoint_json: Mapped[str | None] = mapped_column(Text)
+    progress: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    error_json: Mapped[str | None] = mapped_column(Text)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    job: Mapped[Job] = relationship(back_populates="steps")
+
+
+class JobAttempt(Base):
+    """Append-only record of one JobStep execution (contract §8.2)."""
+
+    __tablename__ = "job_attempt"
+    __table_args__ = (
+        UniqueConstraint(
+            "job_id", "step_id", "attempt", name="uq_job_attempt_job_step_number"
+        ),
+        UniqueConstraint(
+            "job_id", "step_code", "attempt", name="uq_job_attempt_job_code_number"
+        ),
+        CheckConstraint("attempt >= 1", name="ck_job_attempt_number_positive"),
+        CheckConstraint("length(worker_id) > 0", name="ck_job_attempt_worker_nonempty"),
+        CheckConstraint("length(fence_token) > 0", name="ck_job_attempt_token_nonempty"),
+        CheckConstraint(
+            "finished_at IS NULL OR started_at IS NOT NULL",
+            name="ck_job_attempt_finished_requires_started",
+        ),
+        Index("ix_job_attempt_job_step", "job_id", "step_id", "attempt"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    job_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("job.id", ondelete="RESTRICT"), nullable=False
+    )
+    step_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("job_step.id", ondelete="RESTRICT")
+    )
+    step_code: Mapped[str] = mapped_column(String(128), nullable=False)
+    attempt: Mapped[int] = mapped_column(Integer, nullable=False)
+    worker_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    fence_token: Mapped[str] = mapped_column(String(64), nullable=False)
+    result_json: Mapped[str | None] = mapped_column(Text)
+    error_json: Mapped[str | None] = mapped_column(Text)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    job: Mapped[Job] = relationship(back_populates="attempts")
+
+
+class JobEvent(Base):
+    """Append-only state-transition log (contract §10.2)."""
+
+    __tablename__ = "job_event"
+    __table_args__ = (
+        CheckConstraint("length(event_type) > 0", name="ck_job_event_type_nonempty"),
+        CheckConstraint(
+            "actor IN ('worker','scheduler','api','reconciler','system')",
+            name="ck_job_event_actor",
+        ),
+        Index("ix_job_event_job_created", "job_id", "created_at"),
+        Index("ix_job_event_job_step", "job_id", "step_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    job_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("job.id", ondelete="RESTRICT"), nullable=False
+    )
+    step_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("job_step.id", ondelete="RESTRICT")
+    )
+    step_code: Mapped[str | None] = mapped_column(String(128))
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    from_state: Mapped[str | None] = mapped_column(String(16))
+    to_state: Mapped[str | None] = mapped_column(String(16))
+    actor: Mapped[str] = mapped_column(String(32), nullable=False)
+    worker_id: Mapped[str | None] = mapped_column(String(128))
+    fence_token: Mapped[str | None] = mapped_column(String(64))
+    reason_code: Mapped[str | None] = mapped_column(String(64))
+    revision: Mapped[int | None] = mapped_column(Integer)
+    details_json: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+
+    job: Mapped[Job] = relationship(back_populates="events")
+
+
+class JobLease(TimestampMixin, Base):
+    """Exclusive claim by one worker over a Job for a bounded time window."""
+
+    __tablename__ = "job_lease"
+    __table_args__ = (
+        CheckConstraint("lease_version >= 1", name="ck_job_lease_version_positive"),
+        CheckConstraint("length(worker_id) > 0", name="ck_job_lease_worker_nonempty"),
+        CheckConstraint("length(fence_token) > 0", name="ck_job_lease_token_nonempty"),
+        CheckConstraint("ttl_seconds > 0", name="ck_job_lease_ttl_positive"),
+        CheckConstraint(
+            "expires_at >= acquired_at", name="ck_job_lease_expires_after_acquired"
+        ),
+        CheckConstraint(
+            "heartbeat_at >= acquired_at", name="ck_job_lease_heartbeat_after_acquired"
+        ),
+    )
+
+    job_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("job.id", ondelete="RESTRICT"), primary_key=True
+    )
+    worker_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    lease_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    fence_token: Mapped[str] = mapped_column(String(64), nullable=False)
+    acquired_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    heartbeat_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    ttl_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=60)
+
+    job: Mapped[Job] = relationship(back_populates="lease")

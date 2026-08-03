@@ -24,7 +24,7 @@ from pathlib import Path
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -60,6 +60,11 @@ def _alembic_config(database_path: Path) -> Config:
 def _upgrade_to_head(database_path: Path) -> None:
     """Run ``alembic upgrade head`` against the temporary database."""
     command.upgrade(_alembic_config(database_path), "head")
+
+
+def _upgrade_to_revision(database_path: Path, revision: str) -> None:
+    """Run ``alembic upgrade <revision>`` against the temporary database."""
+    command.upgrade(_alembic_config(database_path), revision)
 
 
 @pytest.fixture()
@@ -123,12 +128,30 @@ def test_busy_timeout_is_bounded(upgraded_db: Path) -> None:
 
 # ── AC3: schema shape ────────────────────────────────────────────────────────
 
+#: All tables present at the S02 head (S01 eight + the five durable job tables).
+S02_HEAD_TABLES = {
+    "workspace",
+    "channel",
+    "project",
+    "video_item",
+    "scene",
+    "artifact",
+    "artifact_owner",
+    "legacy_import",
+    "job",
+    "job_step",
+    "job_attempt",
+    "job_event",
+    "job_lease",
+    "alembic_version",
+}
+
 
 def test_initial_schema_has_expected_tables(upgraded_db: Path) -> None:
-    """The migrated schema contains the eight approved S01 tables."""
+    """The migrated head schema contains the approved S01 tables."""
     engine = create_engine_for_path(upgraded_db)
     tables = set(inspect(engine).get_table_names())
-    assert tables == {
+    assert {
         "workspace",
         "channel",
         "project",
@@ -138,31 +161,45 @@ def test_initial_schema_has_expected_tables(upgraded_db: Path) -> None:
         "artifact_owner",
         "legacy_import",
         "alembic_version",
-    }
+    } <= tables
 
 
-def test_no_job_tables(upgraded_db: Path) -> None:
-    """Job tables are intentionally deferred to S02 and must not exist yet."""
+def test_head_includes_durable_job_tables(upgraded_db: Path) -> None:
+    """The S02 head includes the five durable job tables (S02-T02)."""
     engine = create_engine_for_path(upgraded_db)
     tables = set(inspect(engine).get_table_names())
+    assert {
+        "job",
+        "job_step",
+        "job_attempt",
+        "job_event",
+        "job_lease",
+    } <= tables
+
+
+def test_s01_revision_has_no_job_tables(db_path: Path) -> None:
+    """Job tables were absent at the S01 revision (upgrade-to-S01 proof).
+
+    The S01 revision alone must not contain Job tables; the S02 migration
+    adds them.  Upgrading exactly to ``a1b2c3d4e5f6`` proves the S01 schema
+    shape is preserved and the durable job tables arrive only at the S02
+    head.
+    """
+    _upgrade_to_revision(db_path, "a1b2c3d4e5f6")
+    engine = create_engine_for_path(db_path)
+    tables = set(inspect(engine).get_table_names())
     assert not any("job" in name for name in tables), "Job tables are out of S01 scope"
+    # And the S01 revision is the app's supported predecessor.
+    with engine.connect() as conn:
+        version = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
+    assert version == "a1b2c3d4e5f6"
 
 
 def test_no_api_cutover_tables(upgraded_db: Path) -> None:
     """No API/session tables outside the approved contract exist."""
     engine = create_engine_for_path(upgraded_db)
     tables = set(inspect(engine).get_table_names())
-    unexpected = tables - {
-        "workspace",
-        "channel",
-        "project",
-        "video_item",
-        "scene",
-        "artifact",
-        "artifact_owner",
-        "legacy_import",
-        "alembic_version",
-    }
+    unexpected = tables - S02_HEAD_TABLES
     assert not unexpected, f"unexpected tables: {sorted(unexpected)}"
 
 
