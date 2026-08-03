@@ -82,7 +82,7 @@ Sprint numbers express dependency order. They do not promise fixed duration. A s
 
 | Task ID | Session outcome | Depends on | Status |
 |---|---|---|---|
-| S03-T01 | Channel CRUD with source/production role and validation | E01 | PLANNED |
+| S03-T01 | Channel CRUD with source/production role and validation | E01 | READY |
 | S03-T02 | Project CRUD with source and production channel relationships | S03-T01 | PLANNED |
 | S03-T03 | Video Item lifecycle, ordering and per-video status | S03-T02 | PLANNED |
 | S03-T04 | Project summary/read-model API for dashboard | S03-T03 | PLANNED |
