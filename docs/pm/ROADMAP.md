@@ -61,8 +61,8 @@ Sprint numbers express dependency order. They do not promise fixed duration. A s
 
 | Task ID | Session outcome | Depends on | Status |
 |---|---|---|---|
-| S02-T01 | Define Job, JobStep, Artifact and error/retry state machine | S01 exit | PLANNED |
-| S02-T02 | Persist job lifecycle and idempotency keys | S02-T01 | PLANNED |
+| S02-T01 | Define Job, JobStep, Artifact and error/retry state machine | S01 exit | APPROVED |
+| S02-T02 | Persist job lifecycle and idempotency keys | S02-T01 | READY |
 | S02-T03 | Worker executes/retries/cancels jobs outside HTTP request | S02-T02 | PLANNED |
 | S02-T04 | Restart reconciliation resumes or safely fails interrupted jobs | S02-T03 | PLANNED |
 | S02-T05 | Job API and backend integration tests cover recovery contract | S02-T04 | PLANNED |
