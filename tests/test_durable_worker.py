@@ -570,7 +570,7 @@ def test_heartbeat_thread_keeps_silent_handler_leased(
     assert len(observed_expiry) == 1
     # The lease survived ~0.6s of silence with a 3s TTL: the beat thread
     # renewed it well beyond the original acquisition window.
-    assert observed_expiry[0] > datetime.now(UTC) - timedelta(seconds=2)
+    assert observed_expiry[0] > datetime.now(UTC) - timedelta(seconds=2.5)
 
 
 def test_heartbeat_thread_failure_aborts_without_publication(

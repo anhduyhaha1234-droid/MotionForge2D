@@ -82,7 +82,6 @@ __all__ = [
     "parse_json",
     "terminal_job_states",
 ]
-
 #: Stable error codes surfaced by the repository (contract §10.1).
 INVALID_STATE_TRANSITION_CODE = "INVALID_STATE_TRANSITION"
 IDEMPOTENCY_KEY_IN_USE_CODE = "IDEMPOTENCY_KEY_IN_USE"
@@ -102,7 +101,7 @@ JOB_TRANSITIONS: dict[str, frozenset[str]] = {
     "queued": frozenset({"running", "cancelling", "cancelled"}),
     "running": frozenset({"cancelling", "completed", "failed", "fenced", "cancelled"}),
     "cancelling": frozenset({"running", "cancelled", "failed", "fenced"}),
-    "fenced": frozenset({"queued", "failed"}),
+    "fenced": frozenset({"queued", "failed", "cancelled"}),
     # Terminal states: no outgoing transitions (immutable rows).
     "cancelled": frozenset(),
     "completed": frozenset(),
@@ -632,6 +631,7 @@ class JobRepository:
             actor=actor,
             reason_code=None,
             revision=job.revision,
+            details={"manifest_fingerprint": self._fingerprint(input_manifest)},
         )
         return _job_record(job)
 
@@ -764,6 +764,7 @@ class JobRepository:
             actor=actor,
             reason_code=None,
             revision=successor.revision,
+            details={"manifest_fingerprint": self._fingerprint(input_manifest)},
         )
         return _job_record(successor)
 
@@ -1160,6 +1161,66 @@ class JobRepository:
         self._session.flush()
         return _attempt_record(row)
 
+    def latest_attempt_number(self, job_id: str, step_id: str) -> int:
+        """Return the highest attempt row number for ``(job, step)`` (0 if none).
+
+        Attempt rows are append-only and unique per ``(job_id, step_id,
+        attempt)`` (contract §8.2).  A worker re-claiming a Job after a
+        reconciler requeue numbers its per-claim attempts from this durable
+        base, so no attempt row is ever duplicated across claims.
+        """
+        job = self._session.get(Job, job_id)
+        if job is None:
+            raise JobNotFoundError(f"Job {job_id!r} not found")
+        step = self._session.get(JobStep, step_id)
+        if step is None:
+            raise JobStepNotFoundError(f"JobStep {step_id!r} not found")
+        return int(
+            self._session.scalar(
+                select(JobAttempt.attempt)
+                .where(
+                    JobAttempt.job_id == job_id,
+                    JobAttempt.step_id == step_id,
+                )
+                .order_by(JobAttempt.attempt.desc())
+                .limit(1)
+            )
+            or 0
+        )
+
+    # ── Attempt accounting (reconciler authority, contract §8.2) ─────────────
+
+    def bump_job_attempt(self, job_id: str) -> int:
+        """Increment the Job-level attempt counter (reconciler requeue).
+
+        Contract §8.2: every re-claim (requeue after fence) increments the
+        attempt counter in the same transaction that acquires the lease.  The
+        reconciler performs the bump in the same transaction as the
+        ``fenced -> queued`` transition so attempt accounting is atomic with
+        the state change.  The bump is unconditional (no revision guard): the
+        reconciler has already verified the Job is in ``fenced``/``queued``
+        and holds the only writer path for that row.
+        """
+        job = self._session.get(Job, job_id)
+        if job is None:
+            raise JobNotFoundError(f"Job {job_id!r} not found")
+        job.attempt += 1
+        return job.attempt
+
+    def bump_step_attempt(self, step_id: str) -> int:
+        """Increment a JobStep's attempt counter (reconciler requeue).
+
+        The step counter tracks the number of times the step has been
+        (re)claimed since its last ``completed``; the worker's per-claim
+        attempt rows (attempt 1..N within a claim) are numbered from this
+        durable base so no attempt row is ever duplicated across claims.
+        """
+        step = self._session.get(JobStep, step_id)
+        if step is None:
+            raise JobStepNotFoundError(f"JobStep {step_id!r} not found")
+        step.attempt += 1
+        return step.attempt
+
     # ── Progress / checkpoint / error envelopes ─────────────────────────────
 
     def update_progress(
@@ -1437,6 +1498,31 @@ class JobRepository:
         lease.expires_at = now
         lease.heartbeat_at = now
 
+    def invalidate_lease(self, job_id: str) -> LeaseRecord | None:
+        """Atomically invalidate a Job's lease row (contract §5.3-2).
+
+        This is the reconciler's fencing primitive: it replaces the current
+        ``fence_token`` with a unique sentinel (the token is the enforcement
+        point, §5.3-1, so the old worker's every subsequent write is rejected
+        with ``FENCED_WORKER``) and marks the lease released
+        (``expires_at = now``) so it can be re-claimed from the current
+        checkpoint.  ``lease_version`` is NOT bumped: the lease row is
+        *retired*, not re-acquired — a re-claim by a new worker later bumps
+        the version and issues a fresh token.  The sentinel is a non-empty
+        random value because the schema CHECK ``ck_job_lease_token_nonempty``
+        forbids an empty token.  The caller owns the transaction; the
+        invalidation commits with the caller's ``fenced`` state transition
+        (one atomic unit per Job, contract §5.3-2).
+        """
+        lease = self._session.get(JobLease, job_id)
+        if lease is None:
+            return None
+        now = datetime.now(UTC)
+        lease.fence_token = f"fenced:{uuid.uuid4().hex}"
+        lease.expires_at = now
+        lease.heartbeat_at = now
+        return _lease_record(lease)
+
     def get_lease(self, job_id: str) -> LeaseRecord | None:
         """Return the current lease row, or None when the Job has no lease."""
         lease = self._session.get(JobLease, job_id)
@@ -1529,6 +1615,20 @@ class JobRepository:
         if lease is not None and lease.fence_token == fence_token:
             return lease.worker_id
         return None
+
+    @staticmethod
+    def _fingerprint(manifest: dict[str, Any] | None) -> str:
+        """Stable fingerprint of an input manifest (contract §8.1).
+
+        Recorded on the ``created`` event so the reconciler can fail closed
+        with ``INPUT_CHANGED`` if a Job's manifest is ever mutated after
+        creation (manifests are immutable by contract; the fingerprint is the
+        durable baseline).
+        """
+        import hashlib
+
+        canonical = json.dumps(manifest or {}, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
     def _validate_job_attributes(
         self,

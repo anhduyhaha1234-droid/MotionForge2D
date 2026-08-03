@@ -696,6 +696,11 @@ class DurableWorker:
         mid-step.
         """
         step_attempt = 0
+        # Durable base for per-claim attempt rows (contract §8.2): after a
+        # reconciler requeue the per-step attempt counter was bumped, so this
+        # claim's rows are numbered from that base and never collide with the
+        # previous claim's rows — replay cannot duplicate effects or attempts.
+        attempt_base = repo.latest_attempt_number(job.id, step.id)
         while True:
             current = repo.get_step(step.id)
             if current.state in TERMINAL_STATES:
@@ -722,8 +727,11 @@ class DurableWorker:
 
             step_attempt += 1
             job_now = repo.get_job(job.id)
+            # Per-claim attempt rows are numbered from the durable per-step
+            # attempt counter captured at claim time (attempt_base) so rows
+            # never collide across claims (contract §8.2).
             ctx = self._make_context(
-                job_now, current, step_attempt, token
+                job_now, current, attempt_base + step_attempt, token
             )
             try:
                 result = entry.handler(ctx)

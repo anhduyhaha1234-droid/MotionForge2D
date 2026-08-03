@@ -1,6 +1,6 @@
 # S02-T04 - Restart reconciliation and safe resume
 
-**Status:** READY
+**Status:** APPROVED
 **Epic:** E01 - Durable Domain, Persistence and Jobs
 **Sprint:** S02 - Durable processing
 **Gate:** G1 - Foundation green

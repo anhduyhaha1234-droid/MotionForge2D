@@ -129,6 +129,8 @@ __all__ = [
     "TrashMoveResult",
     "assert_schema_revision_supported",
     "backup_manifest_name",
+    "bump_job_attempt",
+    "bump_step_attempt",
     "confirmation_token",
     "create_engine_for_path",
     "create_job_revision",
