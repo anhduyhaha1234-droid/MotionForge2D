@@ -17,6 +17,18 @@ from app.persistence.engine import (
     create_engine_for_path,
     create_session_factory,
 )
+from app.persistence.legacy_import import (
+    BACKUP_MANIFEST_NAME,
+    BackupEntry,
+    BackupManifest,
+    ImportResult,
+    LegacyImporter,
+    LegacyImportError,
+    LegacyImportRefused,
+    LegacyImportRefusedError,
+    backup_manifest_name,
+    confirmation_token,
+)
 from app.persistence.legacy_preview import (
     BLOCKER,
     INFO,
@@ -36,6 +48,7 @@ from app.persistence.revision import (
 )
 
 __all__ = [
+    "BACKUP_MANIFEST_NAME",
     "BLOCKER",
     "BUSY_TIMEOUT_MS",
     "FOREIGN_KEYS_PRAGMA",
@@ -43,6 +56,13 @@ __all__ = [
     "SCHEMA_REVISION_REFUSED_MESSAGE",
     "WARNING",
     "ArtifactWriteError",
+    "BackupEntry",
+    "BackupManifest",
+    "ImportResult",
+    "LegacyImportError",
+    "LegacyImportRefused",
+    "LegacyImportRefusedError",
+    "LegacyImporter",
     "LegacyPreview",
     "LegacyPreviewError",
     "LegacyPreviewer",
@@ -55,6 +75,8 @@ __all__ = [
     "TrashManifest",
     "TrashMoveResult",
     "assert_schema_revision_supported",
+    "backup_manifest_name",
+    "confirmation_token",
     "create_engine_for_path",
     "create_session_factory",
     "database_schema_revision",
