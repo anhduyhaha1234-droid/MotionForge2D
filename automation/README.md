@@ -2,6 +2,8 @@
 
 Orchestrator này tự động hóa việc mở và tiếp tục Hermes session nhưng không thay thế PM gate.
 
+Mọi session được cấu hình ở reasoning effort `max`; không dùng mức `medium`.
+
 ## Bất biến
 
 - Một Task ID mới luôn tạo một Hermes session mới.
