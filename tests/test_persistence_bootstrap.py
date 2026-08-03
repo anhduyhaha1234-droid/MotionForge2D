@@ -840,6 +840,180 @@ def test_s03t02_head_table_set_unchanged(tmp_path: Path) -> None:
     assert tables == S02_HEAD_TABLES, f"unexpected schema drift: {tables - S02_HEAD_TABLES}"
 
 
+def _seed_video_item_for_upgrade(
+    session: Session,
+    *,
+    workspace_id: str = "default",
+    project_name: str = "S03-T03 Project",
+    video_title: str = "S03-T03 Video",
+) -> tuple[str, str, str]:
+    """Seed one fully-populated Video Item exactly as the current head
+    allows (Channel reference, probe metadata, resume data, archived
+    state, timestamps/revision/position) and return
+    (video_id, project_id, source_channel_id)."""
+    ws = session.get(Workspace, workspace_id)
+    if ws is None:
+        ws = Workspace(id=workspace_id, name=workspace_id)
+        session.add(ws)
+        session.flush()
+    src = Channel(workspace_id=workspace_id, role="source", name="Video Src")
+    session.add(src)
+    session.flush()
+    project = Project(
+        workspace_id=workspace_id,
+        name=project_name,
+        source_channel_id=src.id,
+    )
+    session.add(project)
+    session.flush()
+    video = VideoItem(
+        project_id=project.id,
+        title=video_title,
+        position=0,
+        status="archived",
+        source_channel_id=src.id,
+        duration_ms=120_000,
+        width=1920,
+        height=1080,
+        fps_num=30,
+        fps_den=1,
+        resume_step="scene-review",
+        resume_payload_json='{"tab":"scenes","scene":2}',
+    )
+    session.add(video)
+    session.flush()
+    video.revision = 7
+    # Explicit, DISTINGUISHABLE timestamps (correction round 2): each is a
+    # deliberate timezone-normalization check value.  SQLite stores these
+    # as ISO-8601 UTC text and returns naive datetimes; the documented
+    # normalization is ``dt.replace(tzinfo=UTC)`` on read.  The stored text
+    # is preserved byte-identically through a no-op upgrade.
+    from datetime import UTC, datetime
+
+    video.created_at = datetime(2026, 1, 3, 4, 5, 6, 123456, tzinfo=UTC)
+    video.updated_at = datetime(2026, 2, 4, 5, 6, 7, 654321, tzinfo=UTC)
+    video.archived_at = datetime(2026, 3, 5, 6, 7, 8, 321098, tzinfo=UTC)
+    session.commit()
+    return video.id, project.id, src.id
+
+
+def test_upgrade_from_current_head_noop_preserves_full_video_item(
+    tmp_path: Path,
+) -> None:
+    """AC8 (S03-T03 evidence): a current-head/no-op upgrade preserves a
+    fully-populated Video Item exactly.
+
+    Builds a database at the current head (``1c9f2a4b7d8e``), seeds a
+    Video Item with a Channel reference, probe metadata, resume data,
+    archived state, EXPLICIT distinguishable timestamps and a custom
+    revision/position, snapshots EVERY column, re-runs ``alembic upgrade
+    head`` through a FRESH engine (a no-op on the same revision), and
+    proves the full before/after record matches exactly and the migration
+    head is unchanged.
+
+    Timestamp comparison (documented SQLite normalization): SQLite stores
+    ``DateTime(timezone=True)`` columns as ISO-8601 UTC text and returns
+    naive datetimes on read.  The comparison therefore normalizes both
+    sides with ``dt.replace(tzinfo=UTC)`` and asserts equality of the
+    normalized aware datetimes (plus a raw equality check of the stored
+    ISO text for byte-identical preservation).
+    """
+    from datetime import UTC, datetime
+
+    from app.persistence.revision import (
+        database_schema_revision,
+        max_supported_schema_revision,
+    )
+
+    db = tmp_path / "s03t03_head_noop.db"
+    _upgrade_to_revision(db, "1c9f2a4b7d8e")
+    engine = create_engine_for_path(db)
+    with Session(engine) as session:
+        video_id, project_id, channel_id = _seed_video_item_for_upgrade(session)
+        video = session.get(VideoItem, video_id)
+        assert video is not None
+        before = _snapshot_video_item(video)
+
+    # Re-run upgrade head through a FRESH engine (no-op on the same head).
+    engine.dispose()
+    _upgrade_to_head(db)
+
+    engine2 = create_engine_for_path(db)
+    with Session(engine2) as session:
+        loaded = session.get(VideoItem, video_id)
+        assert loaded is not None
+        after = _snapshot_video_item(loaded)
+        assert after == before, f"no-op upgrade changed the record:\n{after!r}\n{before!r}"
+        # The seeded timestamps survive exactly (normalized to UTC-aware).
+        assert loaded.created_at.replace(tzinfo=UTC) == datetime(
+            2026, 1, 3, 4, 5, 6, 123456, tzinfo=UTC
+        )
+        assert loaded.updated_at.replace(tzinfo=UTC) == datetime(
+            2026, 2, 4, 5, 6, 7, 654321, tzinfo=UTC
+        )
+        assert loaded.archived_at is not None
+        assert loaded.archived_at.replace(tzinfo=UTC) == datetime(
+            2026, 3, 5, 6, 7, 8, 321098, tzinfo=UTC
+        )
+        # The channel reference still resolves.
+        assert session.get(Channel, channel_id) is not None
+        # Position uniqueness across the project is preserved.
+        assert session.scalar(
+            select(VideoItem.id).where(
+                VideoItem.project_id == project_id, VideoItem.position == 0
+            )
+        ) == video_id
+    # Migration head is unchanged after the no-op upgrade.
+    assert database_schema_revision(engine2) == max_supported_schema_revision(
+        PROJECT_ROOT / "migrations"
+    )
+    assert database_schema_revision(engine2) == "1c9f2a4b7d8e"
+
+
+def _snapshot_video_item(video: VideoItem) -> dict[str, object]:
+    """Snapshot EVERY persisted column of a VideoItem as a comparable dict.
+
+    Timestamps are normalized with the documented SQLite rule
+    (``dt.replace(tzinfo=UTC)``) so the raw naive datetimes returned by
+    SQLite compare exactly to the aware values seeded before the upgrade.
+    """
+    from datetime import UTC
+
+    return {
+        "id": video.id,
+        "project_id": video.project_id,
+        "legacy_id": video.legacy_id,
+        "title": video.title,
+        "position": video.position,
+        "status": video.status,
+        "source_artifact_id": video.source_artifact_id,
+        "source_channel_id": video.source_channel_id,
+        "duration_ms": video.duration_ms,
+        "width": video.width,
+        "height": video.height,
+        "fps_num": video.fps_num,
+        "fps_den": video.fps_den,
+        "resume_step": video.resume_step,
+        "resume_payload_json": video.resume_payload_json,
+        "created_at": (
+            video.created_at.replace(tzinfo=UTC)
+            if video.created_at is not None
+            else None
+        ),
+        "updated_at": (
+            video.updated_at.replace(tzinfo=UTC)
+            if video.updated_at is not None
+            else None
+        ),
+        "archived_at": (
+            video.archived_at.replace(tzinfo=UTC)
+            if video.archived_at is not None
+            else None
+        ),
+        "revision": video.revision,
+    }
+
+
 def test_orm_metadata_index_ddl_matches_migration(tmp_path: Path) -> None:
     """PM2 finding 1: ORM metadata compiles the SAME DDL as the migration.
 

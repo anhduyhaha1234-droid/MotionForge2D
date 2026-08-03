@@ -868,7 +868,8 @@ def test_concurrent_rename_to_one_free_name_exactly_one_wins(
     b_id, _ = _seed_channel(db_path, "Rename B")
     engine = create_engine_for_path(db_path)
 
-    barrier = threading.Barrier(2)
+    start_barrier = threading.Barrier(2)
+    precheck_barrier = threading.Barrier(2)
     results: list[str] = []
     lock = threading.Lock()
 
@@ -881,6 +882,11 @@ def test_concurrent_rename_to_one_free_name_exactly_one_wins(
         res = orig_find(self, workspace_id, role, name)
         with lock:
             results.append(f"precheck:{name}:{res.id if res is not None else None}")
+        # Do not let either writer reach UPDATE until both pre-check reads
+        # have completed.  This makes the intended race deterministic and
+        # proves that the unique-index backstop, rather than a later
+        # pre-check, rejects the loser.
+        precheck_barrier.wait(timeout=10)
         return res
 
     ChannelRepository._find_active_by_name = spy_find  # type: ignore[method-assign]
@@ -891,7 +897,7 @@ def test_concurrent_rename_to_one_free_name_exactly_one_wins(
                 repo = ChannelRepository(session)
                 # read active; the name pre-check sees no blocker yet
                 repo.get_channel(cid, DEFAULT_WORKSPACE_ID)
-                barrier.wait()  # both have read active, neither renamed
+                start_barrier.wait(timeout=10)  # both have read active, neither renamed
                 repo.update_channel(
                     cid,
                     DEFAULT_WORKSPACE_ID,
@@ -910,7 +916,7 @@ def test_concurrent_rename_to_one_free_name_exactly_one_wins(
             with Session(engine) as session:
                 repo = ChannelRepository(session)
                 repo.get_channel(cid, DEFAULT_WORKSPACE_ID)
-                barrier.wait()
+                start_barrier.wait(timeout=10)
                 repo.update_channel(
                     cid,
                     DEFAULT_WORKSPACE_ID,

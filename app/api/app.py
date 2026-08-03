@@ -18,7 +18,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import deps
-from app.api.routes import channels, durable_projects, frames, jobs, projects
+from app.api.routes import (
+    channels,
+    durable_projects,
+    durable_videos,
+    frames,
+    jobs,
+    projects,
+)
 from app.lifecycle import Lifecycle, default_database_path
 from app.persistence import create_engine_for_path, create_session_factory
 
@@ -83,6 +90,10 @@ app.include_router(channels.router)
 # Durable Project API (S03-T02) — isolated under /api/v2/projects, never
 # shadows the legacy /api/projects router (AC7 namespace isolation).
 app.include_router(durable_projects.router)
+# Durable Video Item API (S03-T03) — nested under the UUID-constrained
+# /api/v2/projects/{project_id:uuid}/videos namespace, disjoint from every
+# legacy route (AC1/AC9 namespace isolation).
+app.include_router(durable_videos.router)
 
 
 @app.get("/health")

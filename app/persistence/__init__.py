@@ -102,12 +102,29 @@ from app.persistence.revision import (
     database_schema_revision,
     max_supported_schema_revision,
 )
+from app.persistence.videos import (
+    ARCHIVED_VIDEO_STATUS,
+    VIDEO_PIPELINE_STATES,
+    AppendRetryError,
+    ReorderValidationError,
+    VideoConflictError,
+    VideoItemRecord,
+    VideoItemRepository,
+    VideoItemService,
+    VideoNotFoundError,
+    normalize_video_title,
+)
+from app.persistence.videos import (
+    ChannelReferenceError as VideoChannelReferenceError,
+)
 
 __all__ = [
     "ACTIVE_PROJECT_STATUS",
     "ACTIVE_STATUS",
     "ARCHIVED_PROJECT_STATUS",
     "ARCHIVED_STATUS",
+    "ARCHIVED_VIDEO_STATUS",
+    "AppendRetryError",
     "ArtifactReferenceError",
     "BACKUP_MANIFEST_NAME",
     "BLOCKER",
@@ -170,11 +187,19 @@ __all__ = [
     "ProjectRecord",
     "ProjectRepository",
     "ProjectService",
+    "ReorderValidationError",
     "RestoreResult",
     "StepInput",
     "StepRecord",
     "TrashManifest",
     "TrashMoveResult",
+    "VIDEO_PIPELINE_STATES",
+    "VideoChannelReferenceError",
+    "VideoConflictError",
+    "VideoItemRecord",
+    "VideoItemRepository",
+    "VideoItemService",
+    "VideoNotFoundError",
     "assert_schema_revision_supported",
     "backup_manifest_name",
     "bump_job_attempt",
@@ -190,6 +215,7 @@ __all__ = [
     "normalize_channel_name",
     "normalize_managed_path",
     "normalize_project_name",
+    "normalize_video_title",
     "parse_json",
     "terminal_job_states",
 ]

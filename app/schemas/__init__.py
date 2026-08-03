@@ -532,6 +532,177 @@ class ProjectListResponse(BaseModel):
     projects: list[DurableProjectData] = Field(default_factory=list)
 
 
+# ─── Durable Video Item DTOs (S03-T03) ──────────────────────────────────────
+
+#: Approved durable Video Item pipeline states
+#: (PERSISTENCE_DOMAIN_CONTRACT §4 ``video_item``).
+VIDEO_PIPELINE_STATUS_VALUES = (
+    "imported",
+    "analyzing",
+    "objects_ready",
+    "mapping_required",
+    "demo_required",
+    "demo_approved",
+    "applying_reskin",
+    "needs_review",
+    "ready_to_export",
+    "rendering",
+    "completed",
+    "failed",
+    "archived",
+)
+
+
+class VideoItemStatus(str, Enum):
+    """Exact approved Video Item pipeline states (contract §4)."""
+
+    IMPORTED = "imported"
+    ANALYZING = "analyzing"
+    OBJECTS_READY = "objects_ready"
+    MAPPING_REQUIRED = "mapping_required"
+    DEMO_REQUIRED = "demo_required"
+    DEMO_APPROVED = "demo_approved"
+    APPLYING_RESKIN = "applying_reskin"
+    NEEDS_REVIEW = "needs_review"
+    READY_TO_EXPORT = "ready_to_export"
+    RENDERING = "rendering"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    ARCHIVED = "archived"
+
+
+class VideoItemData(BaseModel):
+    """API DTO for a durable Video Item row.
+
+    Never exposes ORM objects or absolute paths.  ``workspace_id`` is
+    the explicit ownership key; ``revision`` is the optimistic-
+    concurrency token required by every business update (AC4).  Probe
+    metadata (``duration_ms``, ``width``, ``height``, ``fps_num``,
+    ``fps_den``) is read-only in this task (S05 owns import/probing).
+    """
+
+    video_item_id: str
+    project_id: str
+    workspace_id: str
+    title: str
+    position: int
+    status: VideoItemStatus = VideoItemStatus.IMPORTED
+    source_artifact_id: str | None = None
+    source_channel_id: str | None = None
+    duration_ms: int | None = None
+    width: int | None = None
+    height: int | None = None
+    fps_num: int | None = None
+    fps_den: int | None = None
+    resume_step: str | None = None
+    archived_at: str | None = None
+    created_at: str
+    updated_at: str
+    revision: int = 1
+
+    @classmethod
+    def from_row(cls, row: Any) -> VideoItemData:
+        """Map a repository read record (DTO boundary: no ORM escape)."""
+        return cls(
+            video_item_id=row.id,
+            project_id=row.project_id,
+            workspace_id=row.workspace_id,
+            title=row.title,
+            position=row.position,
+            status=VideoItemStatus(row.status),
+            source_artifact_id=row.source_artifact_id,
+            source_channel_id=row.source_channel_id,
+            duration_ms=row.duration_ms,
+            width=row.width,
+            height=row.height,
+            fps_num=row.fps_num,
+            fps_den=row.fps_den,
+            resume_step=row.resume_step,
+            archived_at=_dt_iso_optional(row.archived_at),
+            created_at=_dt_iso(row.created_at),
+            updated_at=_dt_iso(row.updated_at),
+            revision=row.revision,
+        )
+
+
+class VideoItemCreate(BaseModel):
+    """Create payload (AC1/AC2).  Position is assigned automatically.
+
+    Probe metadata (``duration_ms``, ``width``, ``height``, ``fps_num``,
+    ``fps_den``) is read-only in this task (S05 owns import and media
+    probing) and therefore NOT part of the public create payload; the
+    request model forbids unknown fields so a client that tries to write
+    probe data gets an explicit 422 instead of silent acceptance.  The
+    fields remain in the read DTO (``VideoItemData``) for later S05
+    population.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    title: str = Field(min_length=1, max_length=240)
+    source_channel_id: str | None = None
+    resume_step: str | None = None
+
+    @field_validator("title")
+    @classmethod
+    def _title_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("title must not be blank")
+        return value
+
+
+class VideoItemUpdate(BaseModel):
+    """Update payload — must carry the expected revision (AC4).
+
+    Nullable fields distinguish **omitted** (no change) from explicit
+    JSON ``null`` (clear the stored value) via ``model_fields_set``.
+    Generic PATCH can never enter or leave ``archived`` (archive is the
+    only removal path); ``status: archived``/``status: active`` from an
+    archived row are 422/409 respectively.
+    """
+
+    title: str | None = Field(default=None, min_length=1, max_length=240)
+    status: VideoItemStatus | None = None
+    source_channel_id: str | None = None
+    resume_step: str | None = None
+    revision: int = Field(ge=1)
+
+    @field_validator("title")
+    @classmethod
+    def _title_not_blank(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("title must not be blank")
+        return value
+
+
+class VideoItemArchiveRequest(BaseModel):
+    """Archive payload — expected revision required (atomic CAS, AC4/AC5)."""
+
+    revision: int = Field(ge=1)
+
+
+class VideoItemReorderRequest(BaseModel):
+    """Atomic full-list reorder payload (AC3/AC4).
+
+    Carries the expected Project revision (the Project row is bumped
+    once per accepted reorder) and the COMPLETE set of active Video Item
+    ids exactly once, in the desired order.  Missing/extra/duplicate or
+    cross-project ids are rejected before any write (no partial writes).
+    """
+
+    project_revision: int = Field(ge=1)
+    video_item_ids: list[str] = Field(min_length=0)
+
+
+class VideoListResponse(BaseModel):
+    """List response: ordered by position; archived excluded by default."""
+
+    project_id: str
+    workspace_id: str
+    active_only: bool = True
+    videos: list[VideoItemData] = Field(default_factory=list)
+
+
 class ProjectData(BaseModel):
     """Top-level project state, serializable to JSON.
 

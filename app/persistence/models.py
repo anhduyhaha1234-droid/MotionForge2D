@@ -29,6 +29,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 __all__ = [
     "ARTIFACT_KINDS",
     "ARTIFACT_STATES",
+    "ARCHIVED_VIDEO_STATUS",
     "CHANNEL_ROLES",
     "CHANNEL_STATUSES",
     "JOB_ACTORS",
@@ -84,6 +85,8 @@ VIDEO_PIPELINE_STATES = (
     "failed",
     "archived",
 )
+#: Convenience constant: the archive terminal state of a Video Item.
+ARCHIVED_VIDEO_STATUS = "archived"
 SCENE_STATUSES = ("pending", "draft", "approved")
 ARTIFACT_KINDS = ("video", "image", "audio", "document", "other")
 ARTIFACT_STATES = ("staging", "ready", "trash", "missing", "failed")

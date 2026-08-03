@@ -1,6 +1,6 @@
 # S03-T03 - Durable Video Item lifecycle and ordering
 
-**Status:** READY
+**Status:** APPROVED
 **Epic:** E02 - Production Management and Product Shell
 **Sprint:** S03 - Production management API
 **Gate:** G2 - Production shell
@@ -41,6 +41,10 @@ Use only the isolated namespace
 - Title is trimmed, non-empty, maximum 240 characters.
 - Position is non-negative and unique within a Project. Create appends at the
   end. Active list is ordered by position and excludes archived by default.
+  Logical active order is gap-tolerant after archive: archive preserves
+  positions and reorder maps the requested active order onto the sorted
+  existing active position slots, so a reorder never collides with an
+  archived row and never rewrites archived positions.
 - Generic PATCH must not enter or leave archived. Archive is idempotent and
   preserves all metadata and relationships.
 - New source Channel assignment requires active, same workspace, `source`
@@ -67,7 +71,12 @@ Use only the isolated namespace
 
 1. Durable CRUD/list/read/archive/reorder works only under the v2 namespace.
 2. DTO/status/title/position contract is exact and leaks no ORM/path objects.
-3. Append/reorder produce stable contiguous ordering without duplicates/gaps.
+3. Append/reorder maintain a stable logical active ordering: every
+   position is a unique non-negative integer within its Project, append
+   goes after the current max, reorder maps the requested active order
+   onto the existing active position slots (preserving archived
+   positions and introducing no new gaps), and the active list is
+   ordered by position then creation time.
 4. PATCH/archive/reorder CAS is atomic; stale/conflicting requests are 409.
 5. Archive is idempotent, timestamp-safe, and never cascades/hard-deletes.
 6. Workspace, Project, Channel, and cross-project ownership return safe 404/422.
@@ -83,4 +92,3 @@ Use only the isolated namespace
 Likely owned files: new Video Item repository/router/tests/API doc plus minimal
 registration/schema/bootstrap changes. Do not modify `channels.json`. Do not
 commit. Leave implementation `SUBMITTED` for PM review.
-
