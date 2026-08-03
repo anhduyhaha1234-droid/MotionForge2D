@@ -1,6 +1,6 @@
 # S02-T03 - Durable worker execution, retry and cancellation
 
-**Status:** READY
+**Status:** APPROVED
 **Epic:** E01 - Durable Domain, Persistence and Jobs
 **Sprint:** S02 - Durable processing
 **Gate:** G1 - Foundation green

@@ -63,8 +63,8 @@ Sprint numbers express dependency order. They do not promise fixed duration. A s
 |---|---|---|---|
 | S02-T01 | Define Job, JobStep, Artifact and error/retry state machine | S01 exit | APPROVED |
 | S02-T02 | Persist job lifecycle and idempotency keys | S02-T01 | APPROVED |
-| S02-T03 | Worker executes/retries/cancels jobs outside HTTP request | S02-T02 | READY |
-| S02-T04 | Restart reconciliation resumes or safely fails interrupted jobs | S02-T03 | PLANNED |
+| S02-T03 | Worker executes/retries/cancels jobs outside HTTP request | S02-T02 | APPROVED |
+| S02-T04 | Restart reconciliation resumes or safely fails interrupted jobs | S02-T03 | READY |
 | S02-T05 | Job API and backend integration tests cover recovery contract | S02-T04 | PLANNED |
 
 **Epic exit:** migration fixtures pass; jobs and artifacts reconcile after forced close; no durable truth relies only on RAM/frontend storage.
