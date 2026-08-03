@@ -7,8 +7,9 @@ Backward compatible: can load v1.0.0 projects via migration.
 from __future__ import annotations
 
 from enum import Enum
+from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 # ─── Enums ────────────────────────────────────────────────────────────────────
 
@@ -274,6 +275,137 @@ class ChannelWorkspace(BaseModel):
     target_lang: str = "en"
     default_preset_id: str = ""
     created_at: str = ""
+
+
+# ─── Durable Channel DTOs (S03-T01) ──────────────────────────────────────────
+
+class ChannelRole(str, Enum):
+    """Approved channel roles (PERSISTENCE_DOMAIN_CONTRACT §4)."""
+    SOURCE = "source"
+    PRODUCTION = "production"
+
+
+class ChannelStatus(str, Enum):
+    """Approved channel lifecycle states (contract §4)."""
+    ACTIVE = "active"
+    ARCHIVED = "archived"
+
+
+class ChannelData(BaseModel):
+    """API DTO for a durable Channel row.
+
+    Never exposes ORM objects or absolute paths.  ``workspace_id`` is the
+    explicit ownership key; ``revision`` is the optimistic-concurrency
+    token required by every business update (AC4).
+    """
+    channel_id: str
+    workspace_id: str
+    name: str
+    role: ChannelRole
+    description: str = ""
+    color: str | None = None
+    avatar_artifact_id: str | None = None
+    target_language: str | None = None
+    default_output_profile: str | None = None
+    status: ChannelStatus = ChannelStatus.ACTIVE
+    archived_at: str | None = None
+    created_at: str
+    updated_at: str
+    revision: int = 1
+
+    @classmethod
+    def from_row(cls, row: Any) -> ChannelData:
+        """Map a repository read record (DTO boundary: no ORM escape)."""
+        return cls(
+            channel_id=row.id,
+            workspace_id=row.workspace_id,
+            name=row.name,
+            role=ChannelRole(row.role),
+            description=row.description or "",
+            color=row.color,
+            avatar_artifact_id=row.avatar_artifact_id,
+            target_language=row.target_language,
+            default_output_profile=row.default_output_profile,
+            status=ChannelStatus(row.status),
+            archived_at=_dt_iso_optional(row.archived_at),
+            created_at=_dt_iso(row.created_at),
+            updated_at=_dt_iso(row.updated_at),
+            revision=row.revision,
+        )
+
+
+class ChannelCreate(BaseModel):
+    """Create payload (AC1/AC3)."""
+    name: str = Field(min_length=1, max_length=200)
+    role: ChannelRole = ChannelRole.SOURCE
+    description: str = ""
+    color: str | None = None
+    avatar_artifact_id: str | None = None
+    target_language: str | None = None
+    default_output_profile: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def _name_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("name must not be blank")
+        return value
+
+
+class ChannelUpdate(BaseModel):
+    """Update payload — must carry the expected revision (AC4).
+
+    Nullable metadata fields distinguish **omitted** (no change) from
+    explicit JSON ``null`` (clear the stored value) via
+    ``model_fields_set``.  ``revision`` is required (optimistic
+    concurrency).
+    """
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = None
+    color: str | None = None
+    avatar_artifact_id: str | None = None
+    target_language: str | None = None
+    default_output_profile: str | None = None
+    revision: int = Field(ge=1)
+
+    @field_validator("name")
+    @classmethod
+    def _name_not_blank(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("name must not be blank")
+        return value
+
+
+class ChannelArchiveRequest(BaseModel):
+    """Archive payload — expected revision required (atomic CAS, AC4/AC5)."""
+    revision: int = Field(ge=1)
+
+
+class ChannelListResponse(BaseModel):
+    """List response: ``active_only`` excludes archived by default (AC5)."""
+    workspace_id: str
+    active_only: bool = True
+    channels: list[ChannelData] = Field(default_factory=list)
+
+
+def _dt_iso(value: Any) -> str:
+    """Serialize a REQUIRED timestamp as an ISO-8601 UTC string.
+
+    SQLite may return naive datetimes; normalize to UTC-aware so the wire
+    format is always ``...Z``-equivalent (``+00:00`` suffix).
+    """
+    if getattr(value, "tzinfo", None) is None:
+        from datetime import UTC
+
+        value = value.replace(tzinfo=UTC)
+    return str(value.isoformat())
+
+
+def _dt_iso_optional(value: Any) -> str | None:
+    """Serialize an OPTIONAL timestamp: None → JSON null (never "")."""
+    if value is None:
+        return None
+    return _dt_iso(value)
 
 
 # ─── Project ──────────────────────────────────────────────────────────────────

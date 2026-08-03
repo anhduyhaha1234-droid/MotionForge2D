@@ -63,6 +63,10 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ALEMBIC_INI = PROJECT_ROOT / "alembic.ini"
 S01_REVISION = "a1b2c3d4e5f6"
 JOB_HEAD_REVISION = "23b308b1fd0b"
+# NOTE (PM review round 3): do NOT hard-code later heads here.  The
+# durable-job tests resolve the current Alembic head dynamically and prove
+# JOB_HEAD_REVISION is an ancestor of it, so future migrations cannot
+# break these tests.
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -287,11 +291,28 @@ def test_orm_matches_migrated_schema(upgraded_db: Path) -> None:
 
 
 def test_head_revision_is_durable_job_schema(upgraded_db: Path) -> None:
-    """AC1: the head revision is the S02 job migration."""
+    """AC1: the head revision includes the S02 job migration.
+
+    Future-safe (PM review round 3 finding 3): resolve the Alembic
+    CURRENT head dynamically instead of hard-coding S03 as the permanent
+    head; prove the S02 job revision is an ancestor of whatever the head
+    is today, so adding later migrations cannot break this test.
+    """
+    from alembic.script import ScriptDirectory
+
+    script = ScriptDirectory(str(PROJECT_ROOT / "migrations"))
+    current_head = script.get_current_head()
+    assert current_head is not None
+
     engine = create_engine_for_path(upgraded_db)
     with engine.connect() as conn:
         version = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
-    assert version == JOB_HEAD_REVISION
+    # The database is upgraded to the current head...
+    assert version == current_head
+    # ...and the S02 job revision is an ancestor of that head.
+    ancestors = {rev.revision for rev in script.walk_revisions(base=JOB_HEAD_REVISION)}
+    assert JOB_HEAD_REVISION in ancestors
+    assert current_head in ancestors
 
 
 # ── AC2: migration safety ────────────────────────────────────────────────────

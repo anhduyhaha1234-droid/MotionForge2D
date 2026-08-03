@@ -134,6 +134,10 @@ def _patch_project_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path
         managed_root=test_root / "artifacts",
     )
     monkeypatch.setattr(deps, "_job_service", svc)
+    # Reset the lazy channel-service singleton so it rebinds to the new
+    # durable DB path for this test (the singleton caches its session
+    # factory across tests otherwise).
+    monkeypatch.setattr(deps, "_channel_service", None, raising=False)
     # Ensure the durable database the app lifespan may target is the test DB
     # (TestClient triggers the lifespan; without this the lifespan would
     # create/upgrade a real ``motionforge.db`` under the patched root).

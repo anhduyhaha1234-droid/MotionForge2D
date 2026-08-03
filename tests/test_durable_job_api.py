@@ -261,10 +261,17 @@ def test_initialize_existing_s01_db_backs_up_before_upgrade(tmp_path: Path) -> N
     svc._database_path = db  # noqa: SLF001
     svc.initialize()
 
-    # head now
+    # head now — resolve the CURRENT Alembic head dynamically so future
+    # migrations don't hard-break this test (PM review round 3 finding 3)
+    from alembic.script import ScriptDirectory
+
+    script = ScriptDirectory(str(Path(__file__).resolve().parent.parent / "migrations"))
+    current_head = script.get_current_head()
+    assert current_head is not None
+
     from app.persistence import database_schema_revision
 
-    assert database_schema_revision(create_engine_for_path(db)) == "23b308b1fd0b"
+    assert database_schema_revision(create_engine_for_path(db)) == current_head
     # a verified backup exists matching the PRE-upgrade bytes
     backups = list(db.parent.glob(f"{db.name}.bak-*"))
     assert len(backups) == 1

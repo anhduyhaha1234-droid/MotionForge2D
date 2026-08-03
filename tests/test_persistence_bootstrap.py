@@ -24,7 +24,7 @@ from pathlib import Path
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import inspect, text
+from sqlalchemy import inspect, select, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -34,6 +34,10 @@ from app.persistence import (
     FOREIGN_KEYS_PRAGMA,
     create_engine_for_path,
     create_session_factory,
+)
+from app.persistence.channels import (
+    DEFAULT_WORKSPACE_ID,
+    ChannelRepository,
 )
 from app.persistence.models import (
     Channel,
@@ -409,3 +413,348 @@ def test_current_revision_is_supported(upgraded_db: Path) -> None:
         script_location=PROJECT_ROOT / "migrations",
         database_path=upgraded_db,
     )
+
+
+# ── AC7: upgrade-from-S02 preservation (S03-T01) ─────────────────────────────
+
+
+def _insert_s02_channel(
+    session: Session,
+    *,
+    workspace_id: str = "default",
+    role: str = "source",
+    name: str = "S02 Channel",
+    legacy_id: str | None = None,
+) -> str:
+    """Insert a channel row exactly as S02's schema allowed (no S03 code)."""
+    ws = session.get(Workspace, workspace_id)
+    if ws is None:
+        ws = Workspace(id=workspace_id, name=workspace_id)
+        session.add(ws)
+        session.flush()
+    channel = Channel(
+        workspace_id=workspace_id,
+        legacy_id=legacy_id,
+        role=role,
+        name=name,
+        status="active",
+    )
+    session.add(channel)
+    session.flush()
+    return channel.id
+
+
+def test_upgrade_from_s02_preserves_all_channel_rows(tmp_path: Path) -> None:
+    """AC7: migrating a database from the S02 head preserves every row.
+
+    Builds a database at the S02 head (``23b308b1fd0b``), inserts channel
+    rows through the raw ORM (exactly the S02-era shape), upgrades to the
+    S03 head, then proves row identity + required data survived.
+    """
+    db = tmp_path / "s02_to_s03.db"
+    _upgrade_to_revision(db, "23b308b1fd0b")
+    engine = create_engine_for_path(db)
+    with Session(engine) as session:
+        ids = [
+            _insert_s02_channel(session, role="source", name="Src A", legacy_id="legacy-src-a"),
+            _insert_s02_channel(session, role="production", name="Prod A"),
+            _insert_s02_channel(
+                session, role="source", name="Archived Src", legacy_id="legacy-arch"
+            ),
+        ]
+        # Archive one row the S02 way (raw field update — S03 archive API
+        # did not exist at S02, this is the pre-cutover state).
+        archived = session.get(Channel, ids[2])
+        assert archived is not None
+        archived.status = "archived"
+        session.commit()
+        before = {
+            c.id: (c.workspace_id, c.role, c.name, c.status, c.revision)
+            for c in session.scalars(select(Channel)).all()
+        }
+
+    # S03 head upgrade: revision chain a1b2c3d4e5f6 -> 23b308b1fd0b -> head.
+    _upgrade_to_head(db)
+
+    engine2 = create_engine_for_path(db)
+    with Session(engine2) as session:
+        after = {
+            c.id: (c.workspace_id, c.role, c.name, c.status, c.revision)
+            for c in session.scalars(select(Channel)).all()
+        }
+    assert len(after) == len(before) == 3
+    assert after == before, "S02 channel rows were altered by the S03 upgrade"
+    # The S03 head is still the max supported revision (no schema drift).
+    from app.persistence.revision import (
+        database_schema_revision,
+        max_supported_schema_revision,
+    )
+
+    assert database_schema_revision(engine2) == max_supported_schema_revision(
+        PROJECT_ROOT / "migrations"
+    )
+
+
+def test_upgrade_from_s02_preserves_referencing_project_rows(tmp_path: Path) -> None:
+    """AC7: S02 rows referencing channels (FK RESTRICT) survive the upgrade."""
+    db = tmp_path / "s02_to_s03_projects.db"
+    _upgrade_to_revision(db, "23b308b1fd0b")
+    engine = create_engine_for_path(db)
+    with Session(engine) as session:
+        ws = Workspace(id="default", name="default")
+        session.add(ws)
+        session.flush()
+        src = Channel(workspace_id="default", role="source", name="Src")
+        prod = Channel(workspace_id="default", role="production", name="Prod")
+        session.add_all([src, prod])
+        session.flush()
+        project = Project(
+            workspace_id="default",
+            name="S02 Project",
+            source_channel_id=src.id,
+            production_channel_id=prod.id,
+        )
+        session.add(project)
+        session.commit()
+        project_id = project.id
+
+    _upgrade_to_head(db)
+
+    engine2 = create_engine_for_path(db)
+    with Session(engine2) as session:
+        loaded = session.get(Project, project_id)
+        assert loaded is not None
+        assert loaded.name == "S02 Project"
+        assert loaded.source_channel_id is not None
+        assert loaded.production_channel_id is not None
+        assert session.get(Channel, loaded.source_channel_id) is not None
+        assert session.get(Channel, loaded.production_channel_id) is not None
+
+
+def test_s03_head_reuses_s01_channel_schema_no_new_tables(tmp_path: Path) -> None:
+    """S03 adds no schema: the head table set is identical to S02's."""
+    _upgrade_to_head(tmp_path / "s03_head.db")
+    engine = create_engine_for_path(tmp_path / "s03_head.db")
+    tables = set(inspect(engine).get_table_names())
+    assert tables == S02_HEAD_TABLES, f"unexpected schema drift: {tables - S02_HEAD_TABLES}"
+    # The durable channel repository works directly on the S01 channel table.
+    with Session(engine) as session:
+        session.add(Workspace(id=DEFAULT_WORKSPACE_ID, name=DEFAULT_WORKSPACE_ID))
+        session.commit()
+        repo = ChannelRepository(session)
+        record = repo.create_channel(
+            workspace_id=DEFAULT_WORKSPACE_ID,
+            role="source",
+            name="Repo-Proven Channel",
+        )
+        session.commit()
+        assert record.status == "active"
+        assert record.revision == 1
+
+
+def test_s03_head_index_is_active_only_and_case_insensitive(tmp_path: Path) -> None:
+    """The S03 partial unique index is active-only and lower(name)-based."""
+    _upgrade_to_head(tmp_path / "s03_index.db")
+    engine = create_engine_for_path(tmp_path / "s03_index.db")
+    with Session(engine) as session:
+        session.add(Workspace(id="default", name="default"))
+        session.commit()
+        repo = ChannelRepository(session)
+        a = repo.create_channel(
+            workspace_id="default", role="source", name="Reusable Name"
+        )
+        session.commit()
+        # Archive -> same name is immediately creatable (active-only)
+        repo.archive_channel(a.id, "default", expected_revision=1)
+        session.commit()
+        b = repo.create_channel(
+            workspace_id="default", role="source", name="Reusable Name"
+        )
+        session.commit()
+        assert b.id != a.id
+        # Case-variant active create is rejected by the index backstop
+        from app.persistence.channels import NameConflictError
+
+        with pytest.raises(NameConflictError):
+            repo.create_channel(
+                workspace_id="default", role="source", name="reusable name"
+            )
+            session.commit()
+
+
+def test_upgrade_from_s02_preserves_referenced_archived_channel(
+    tmp_path: Path,
+) -> None:
+    """PM1: an archived channel referenced by a project survives S02→head.
+
+    The S03 migration rebuilds the channel table (batch copy-and-move);
+    FK references from project rows must survive the table swap.
+    """
+    db = tmp_path / "s02_to_s03_archived_ref.db"
+    _upgrade_to_revision(db, "23b308b1fd0b")
+    engine = create_engine_for_path(db)
+    with Session(engine) as session:
+        ws = Workspace(id="default", name="default")
+        session.add(ws)
+        session.flush()
+        archived_src = Channel(
+            workspace_id="default", role="source", name="Archived Src"
+        )
+        session.add(archived_src)
+        session.flush()
+        archived_src.status = "archived"
+        project = Project(
+            workspace_id="default",
+            name="S02 Ref Archived",
+            source_channel_id=archived_src.id,
+        )
+        session.add(project)
+        session.commit()
+        archived_id = archived_src.id
+        project_id = project.id
+
+    _upgrade_to_head(db)
+
+    engine2 = create_engine_for_path(db)
+    with Session(engine2) as session:
+        loaded = session.get(Project, project_id)
+        assert loaded is not None
+        assert loaded.source_channel_id == archived_id
+        archived = session.get(Channel, archived_id)
+        assert archived is not None
+        assert archived.status == "archived"
+        assert archived.name == "Archived Src"
+
+
+def test_s03_upgrade_preserves_fk_integrity(tmp_path: Path) -> None:
+    """PM2 finding 5: after S02→head upgrade, FKs are active and clean.
+
+    ``PRAGMA foreign_keys`` must be 1 on every connection and
+    ``PRAGMA foreign_key_check`` must report zero violations, including
+    the project/video_item references to channel rows rebuilt by the
+    batch migration.
+    """
+    db = tmp_path / "s02_to_s03_fk.db"
+    _upgrade_to_revision(db, "23b308b1fd0b")
+    engine = create_engine_for_path(db)
+    with Session(engine) as session:
+        ws = Workspace(id="default", name="default")
+        session.add(ws)
+        session.flush()
+        src = Channel(workspace_id="default", role="source", name="Src")
+        session.add(src)
+        session.flush()
+        project = Project(
+            workspace_id="default",
+            name="FK Project",
+            source_channel_id=src.id,
+        )
+        session.add(project)
+        session.flush()
+        video = VideoItem(
+            project_id=project.id,
+            title="FK Video",
+            position=0,
+            source_channel_id=src.id,
+        )
+        session.add(video)
+        session.commit()
+
+    _upgrade_to_head(db)
+
+    engine2 = create_engine_for_path(db)
+    with engine2.connect() as conn:
+        fk = conn.exec_driver_sql("PRAGMA foreign_keys").scalar()
+        assert fk == 1, "foreign keys must be enabled after the upgrade"
+        violations = conn.exec_driver_sql("PRAGMA foreign_key_check").fetchall()
+        assert violations == [], f"FK violations after S03 upgrade: {violations}"
+
+
+def test_s03_head_descends_from_s02_revision() -> None:
+    """PM2 finding 6: the S03 head provably descends from the S02 head.
+
+    Uses the Alembic revision graph (ScriptDirectory) to walk the new
+    head's ancestry and prove ``23b308b1fd0b`` is an ancestor — not just
+    a different revision string.
+    """
+    from alembic.script import ScriptDirectory
+
+    script = ScriptDirectory(str(PROJECT_ROOT / "migrations"))
+    head = script.get_current_head()
+    assert head is not None
+    assert head == "1c9f2a4b7d8e"
+    ancestry: set[str] = set()
+    for rev in script.walk_revisions(base="23b308b1fd0b", head=head):
+        ancestry.add(rev.revision)
+    assert "23b308b1fd0b" in ancestry
+    assert "1c9f2a4b7d8e" in ancestry
+
+
+def test_orm_metadata_index_ddl_matches_migration(tmp_path: Path) -> None:
+    """PM2 finding 1: ORM metadata compiles the SAME DDL as the migration.
+
+    The index must use the real column expression ``lower(name)`` — not
+    the string literal ``lower('name')``.  Creating a schema purely from
+    ORM metadata must enforce case-variant active uniqueness while
+    allowing archived-name reuse.
+    """
+    from sqlalchemy.schema import CreateIndex
+
+    from app.persistence.channels import ChannelRepository
+    from app.persistence.models import Base
+
+    idx = next(
+        i for i in Channel.__table__.indexes
+        if i.name == "uq_channel_active_workspace_role_name"
+    )
+    ddl = str(CreateIndex(idx).compile(dialect=sqlite_dialect()))
+    assert "lower(name)" in ddl
+    assert "lower('name')" not in ddl
+    # The migration DDL (already applied by the head upgrade) is identical.
+    with create_engine_for_path(_head_db(tmp_path)).connect() as conn:
+        migrated = conn.exec_driver_sql(
+            "SELECT sql FROM sqlite_master WHERE type='index' AND "
+            "name='uq_channel_active_workspace_role_name'"
+        ).scalar()
+    assert migrated is not None
+    assert "lower(name)" in migrated
+    assert "lower('name')" not in migrated
+
+    # Create a schema purely from ORM metadata and prove the invariant.
+    meta_db = tmp_path / "orm_meta.db"
+    meta_engine = create_engine_for_path(meta_db)
+    Base.metadata.create_all(meta_engine)
+    with Session(meta_engine) as session:
+        session.add(Workspace(id="default", name="default"))
+        session.commit()
+        repo = ChannelRepository(session)
+        a = repo.create_channel(
+            workspace_id="default", role="source", name="Meta Name"
+        )
+        session.commit()
+        repo.archive_channel(a.id, "default", expected_revision=1)
+        session.commit()
+        b = repo.create_channel(
+            workspace_id="default", role="source", name="Meta Name"
+        )
+        session.commit()
+        assert b.id != a.id  # archived-name reuse succeeds
+        from app.persistence.channels import NameConflictError
+
+        with pytest.raises(NameConflictError):
+            repo.create_channel(
+                workspace_id="default", role="source", name="meta name"
+            )
+            session.commit()
+
+
+def sqlite_dialect():
+    import sqlalchemy as sa
+
+    return sa.dialects.sqlite.dialect()
+
+
+def _head_db(tmp_path: Path) -> Path:
+    db = tmp_path / "orm_meta_head.db"
+    _upgrade_to_head(db)
+    return db

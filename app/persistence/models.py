@@ -184,7 +184,12 @@ class Channel(ArchivableMixin, Base):
 
     __tablename__ = "channel"
     __table_args__ = (
-        UniqueConstraint("workspace_id", "role", "name", name="uq_channel_workspace_role_name"),
+        # Uniqueness of ACTIVE channel names is enforced by the partial
+        # unique index ``uq_channel_active_workspace_role_name`` (S03-T01
+        # migration 1c9f2a4b7d8e): case-insensitive (lower(name)) and
+        # active-only (status='active').  The legacy unconditional
+        # constraint was dropped by that migration so archived names can
+        # be reused by a new active channel.
         UniqueConstraint(
             "workspace_id", "legacy_id", name="uq_channel_workspace_legacy_id"
         ),
@@ -194,6 +199,15 @@ class Channel(ArchivableMixin, Base):
         CheckConstraint("status IN ('active', 'archived')", name="ck_channel_status"),
         CheckConstraint("revision > 0", name="ck_channel_revision_positive"),
         Index("ix_channel_workspace_role_name", "workspace_id", "role", "name"),
+        Index(
+            "uq_channel_active_workspace_role_name",
+            "workspace_id",
+            "role",
+            sa_text("lower(name)"),
+            unique=True,
+            sqlite_where=sa_text("status = 'active'"),
+            postgresql_where=sa_text("status = 'active'"),
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)

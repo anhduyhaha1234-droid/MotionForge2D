@@ -18,7 +18,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import deps
-from app.api.routes import frames, jobs, projects
+from app.api.routes import channels, frames, jobs, projects
 from app.lifecycle import Lifecycle, default_database_path
 from app.persistence import create_engine_for_path, create_session_factory
 
@@ -79,6 +79,7 @@ app.add_middleware(
 app.include_router(projects.router)
 app.include_router(jobs.router)
 app.include_router(frames.router)
+app.include_router(channels.router)
 
 
 @app.get("/health")
