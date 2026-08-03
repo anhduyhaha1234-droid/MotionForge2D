@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import shutil
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, UploadFile
@@ -23,10 +24,13 @@ from app.api.deps import (
 )
 from app.api.helpers import find_frame_path, job_response
 from app.schemas import (
+    BoundingBox,
     ObjectKind,
     ProjectData,
     ReplacementConfig,
+    ReplacementMode,
     SceneInfo,
+    SceneStatus,
     SelectionInput,
     TrackedObject,
 )
@@ -66,7 +70,7 @@ class ReplacementSettingsRequest(BaseModel):
 # ─── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.get("")
-def list_all_projects() -> list[dict]:
+def list_all_projects() -> list[dict[str, object]]:
     """List all projects on disk with summary info."""
     import json
 
@@ -76,10 +80,10 @@ def list_all_projects() -> list[dict]:
         return []
 
     # Filter valid project directories (excluding dummy test projects)
-    results = []
+    results: list[dict[str, object]] = []
     dirs = [d for d in projects_dir.iterdir() if d.is_dir() and (d / "project.json").exists()]
     # Sort: scenes_count desc first (real projects), then by mtime
-    def _sort_key(p):
+    def _sort_key(p: Path) -> tuple[int, float]:
         try:
             data = json.loads((p / "project.json").read_text(encoding="utf-8"))
             return (len(data.get("scenes", [])), p.stat().st_mtime)
@@ -119,7 +123,7 @@ def create_project(body: CreateProjectRequest) -> CreateProjectResponse:
 
 
 @router.get("/gpu-info")
-def get_gpu_info_early() -> dict:
+def get_gpu_info_early() -> dict[str, object]:
     """Check GPU encoder availability (declared early to avoid path conflict)."""
     from app.services.gpu_encoder import detect_nvenc  # noqa: PLC0415
 
@@ -134,7 +138,7 @@ def get_gpu_info_early() -> dict:
 # ─── Character preset library (static routes — declared BEFORE /{project_id}) ─
 
 @router.get("/presets/characters")
-def list_character_presets_early() -> dict:
+def list_character_presets_early() -> dict[str, object]:
     """List built-in multi-pose character presets (Boy Cool / Thỏ Cute / Gấu Nâu)."""
     from app.services.preset_manager import get_preset_manager  # noqa: PLC0415
 
@@ -158,7 +162,7 @@ def get_character_preset_image_early(set_key: str, pose: str) -> FileResponse:
 @router.post("/{project_id}/presets/characters/{set_key}/{pose}/apply/")
 def apply_character_preset_early(
     project_id: str, set_key: str, pose: str,
-) -> dict:
+) -> dict[str, object]:
     """Apply a character preset pose to the active object of a project.
 
     Copies the preset PNG into the object's replacement slot and sets
@@ -193,11 +197,11 @@ def apply_character_preset_early(
         from app.schemas import ReplacementConfig
 
         obj.replacement_config = ReplacementConfig(
-            mode="static_asset",
-            asset_path=f"objects/{obj.object_id}/replacement.png",
+            mode=ReplacementMode.STATIC_ASSET,
+            assetPath=f"objects/{obj.object_id}/replacement.png",
         )
     else:
-        obj.replacement_config.mode = "static_asset"
+        obj.replacement_config.mode = ReplacementMode.STATIC_ASSET
         obj.replacement_config.asset_path = f"objects/{obj.object_id}/replacement.png"
 
     pwf._save_project(project_id, proj)
@@ -212,7 +216,7 @@ def apply_character_preset_early(
 
 @router.post("/{project_id}/video")
 @router.post("/{project_id}/video/")
-async def upload_video(project_id: str, file: UploadFile) -> dict:
+async def upload_video(project_id: str, file: UploadFile) -> dict[str, object]:
     """Upload a video file for the project."""
     import re
     pwf = get_project_workflow()
@@ -238,7 +242,7 @@ async def upload_video(project_id: str, file: UploadFile) -> dict:
 
 @router.post("/{project_id}/ingest")
 @router.post("/{project_id}/ingest/")
-def trigger_ingest(project_id: str) -> dict:
+def trigger_ingest(project_id: str) -> dict[str, object]:
     """Trigger ingest (probe + scene detect + frame extract). Returns a job."""
     from app.workflow.ingest_service import IngestService
 
@@ -251,7 +255,10 @@ def trigger_ingest(project_id: str) -> dict:
     svc = IngestService(get_project_workflow()._config, pwf)
     job_svc = get_job_service()
 
-    def worker(progress_cb, is_cancelled):
+    def worker(
+        progress_cb: Callable[[float, str], None],
+        is_cancelled: Callable[[], bool],
+    ) -> object:
         return svc.ingest(project_id, progress_cb, is_cancelled)
 
     info = job_svc.create_job("ingest", worker)
@@ -260,7 +267,7 @@ def trigger_ingest(project_id: str) -> dict:
 
 @router.delete("/{project_id}")
 @router.delete("/{project_id}/")
-def delete_project(project_id: str) -> dict:
+def delete_project(project_id: str) -> dict[str, object]:
     """Delete a project and purge all files from disk."""
     import shutil
 
@@ -294,7 +301,7 @@ def auto_segment_objects(
     scene_id: int = 0,
     min_area: int = 300,
     max_objects: int = 20,
-) -> dict:
+) -> dict[str, object]:
     """Auto-detect objects in a frame using OpenCV contour detection.
 
     Returns list of detected objects with bounding boxes.
@@ -346,7 +353,7 @@ def auto_segment_objects(
     # Find contours
     contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    objects = []
+    objects: list[dict[str, object]] = []
     for _i, contour in enumerate(contours[:max_objects]):
         area = cv2.contourArea(contour)
         if area < min_area:
@@ -367,8 +374,9 @@ def auto_segment_objects(
         try:
             crop_img = img[full_y : full_y + full_h, full_x : full_x + full_w]
             if crop_img.size > 0:
-                _, buf = cv2.imencode(".png", crop_img)
-                crop_png_base64 = base64.b64encode(buf).decode("utf-8")
+                ok_flag, buf = cv2.imencode(".png", crop_img)
+                if ok_flag:
+                    crop_png_base64 = base64.b64encode(buf.tobytes()).decode("utf-8")
         except Exception:
             crop_png_base64 = ""
 
@@ -397,7 +405,13 @@ def auto_segment_objects(
         })
 
     # Sort by area (largest first)
-    objects.sort(key=lambda o: o["area"], reverse=True)
+    def _area_key(item: dict[str, object]) -> int:
+        area = item["area"]
+        if isinstance(area, int):
+            return area
+        raise TypeError(f"unexpected area type: {type(area)!r}")
+
+    objects.sort(key=_area_key, reverse=True)
 
     return {
         "scene_id": scene_id,
@@ -419,7 +433,7 @@ def list_scenes(project_id: str) -> list[SceneInfo]:
 
 
 @router.get("/{project_id}/scenes/{scene_id}/objects")
-def get_scene_objects(project_id: str, scene_id: int) -> list[dict]:
+def get_scene_objects(project_id: str, scene_id: int) -> list[dict[str, object]]:
     """Get all tracked objects in a specific scene."""
     pwf = get_project_workflow()
     try:
@@ -433,7 +447,7 @@ def get_scene_objects(project_id: str, scene_id: int) -> list[dict]:
 
 @router.get("/{project_id}/objects")
 @router.get("/{project_id}/objects/")
-def list_objects(project_id: str) -> list[dict]:
+def list_objects(project_id: str) -> list[dict[str, object]]:
     """List all tracked objects with thumbnail (base64 PNG) for UI display."""
     import base64
 
@@ -444,7 +458,7 @@ def list_objects(project_id: str) -> list[dict]:
         raise HTTPException(404, "Project not found") from err
 
     proj_dir = pwf._project_dir(project_id)
-    results = []
+    results: list[dict[str, object]] = []
     for obj in proj.objects:
         item = obj.model_dump(by_alias=True)
         # Attach thumbnail base64 if thumbnail.png exists
@@ -464,7 +478,7 @@ def list_objects(project_id: str) -> list[dict]:
 
 @router.delete("/{project_id}/objects")
 @router.delete("/{project_id}/objects/")
-def clear_objects(project_id: str) -> dict:
+def clear_objects(project_id: str) -> dict[str, object]:
     """Delete all tracked objects for a project (reset objects list)."""
     pwf = get_project_workflow()
     try:
@@ -486,7 +500,7 @@ def clear_objects(project_id: str) -> dict:
 
 @router.delete("/{project_id}/objects/{object_id}")
 @router.delete("/{project_id}/objects/{object_id}/")
-def delete_single_object(project_id: str, object_id: str) -> dict:
+def delete_single_object(project_id: str, object_id: str) -> dict[str, object]:
     """Delete a single tracked object by ID."""
     pwf = get_project_workflow()
     try:
@@ -523,7 +537,7 @@ def get_frame(project_id: str, frame_index: int, scene_id: int = 0) -> FileRespo
 
 @router.post("/{project_id}/objects/preview-mask")
 @router.post("/{project_id}/objects/preview-mask/")
-def preview_mask(project_id: str, body: PreviewMaskRequest) -> dict:
+def preview_mask(project_id: str, body: PreviewMaskRequest) -> dict[str, object]:
     """Preview mask for a selection on a frame."""
     pwf = get_project_workflow()
     proj_dir = pwf._project_dir(project_id)
@@ -593,10 +607,14 @@ def _auto_crop_object(
         h, w = frame.shape[:2]
 
         if selection.mode == "bounding_box":
+            sel_w = selection.width
+            sel_h = selection.height
+            if sel_w is None or sel_h is None:
+                return None
             x = max(0, int(selection.x) - pad)
             y = max(0, int(selection.y) - pad)
-            bw = int(selection.width) + 2 * pad
-            bh = int(selection.height) + 2 * pad
+            bw = int(sel_w) + 2 * pad
+            bh = int(sel_h) + 2 * pad
         else:
             # Point mode: use a 160x160 window centered on the point
             cx, cy = int(selection.x), int(selection.y)
@@ -650,7 +668,7 @@ def get_object_crop(project_id: str, object_id: str) -> FileResponse:
 
 @router.post("/{project_id}/objects", status_code=201)
 @router.post("/{project_id}/objects/", status_code=201)
-def create_object(project_id: str, body: CreateObjectRequest) -> dict:
+def create_object(project_id: str, body: CreateObjectRequest) -> dict[str, object]:
     """Create a tracked object."""
     import cv2
     import numpy as np
@@ -671,12 +689,23 @@ def create_object(project_id: str, body: CreateObjectRequest) -> dict:
             if existing.scene_id != body.scene_id:
                 continue
             es = existing.selection
-            if es.mode == "bounding_box" and sel.mode == "bounding_box":
+            es_w = es.width
+            es_h = es.height
+            sel_w = sel.width
+            sel_h = sel.height
+            if (
+                es.mode == "bounding_box"
+                and sel.mode == "bounding_box"
+                and es_w is not None
+                and es_h is not None
+                and sel_w is not None
+                and sel_h is not None
+            ):
                 if (
                     abs(es.x - sel.x) < 20
                     and abs(es.y - sel.y) < 20
-                    and abs(es.width - sel.width) < 30
-                    and abs(es.height - sel.height) < 30
+                    and abs(es_w - sel_w) < 30
+                    and abs(es_h - sel_h) < 30
                     and abs(es.frame_index - sel.frame_index) < 3
                 ):
                     return {
@@ -705,12 +734,17 @@ def create_object(project_id: str, body: CreateObjectRequest) -> dict:
     if not obj_name or obj_name.lower() in ("test", "object", "vật thể", "nhân vật"):
         selection = body.selection
         if selection.mode == "bounding_box":
-            sw = int(selection.width)
-            sh = int(selection.height)
+            sel_w = selection.width
+            sel_h = selection.height
+            if sel_w is not None and sel_h is not None:
+                sw = int(sel_w)
+                sh = int(sel_h)
+            else:
+                sw, sh = 160, 160
         else:
             sw, sh = 160, 160
-        existing = [o for o in pwf.get_project(project_id).objects]
-        idx = len(existing) + 1
+        existing_objects = [o for o in pwf.get_project(project_id).objects]
+        idx = len(existing_objects) + 1
         obj_name = f"Vật thể #{idx} ({sw}×{sh}px)"
 
     obj = TrackedObject(
@@ -779,7 +813,7 @@ def create_object(project_id: str, body: CreateObjectRequest) -> dict:
 
 @router.post("/{project_id}/objects/{object_id}/propagate")
 @router.post("/{project_id}/objects/{object_id}/propagate/")
-def propagate_object(project_id: str, object_id: str) -> dict:
+def propagate_object(project_id: str, object_id: str) -> dict[str, object]:
     """Propagate masks for a tracked object. Returns a job."""
     import cv2
 
@@ -860,8 +894,11 @@ def propagate_object(project_id: str, object_id: str) -> dict:
     obj_ext_svc = get_object_extraction_service()
     job_svc = get_job_service()
 
-    def worker(progress_cb, is_cancelled):
-        def seg_progress(pct, msg):
+    def worker(
+        progress_cb: Callable[[float, str], None],
+        is_cancelled: Callable[[], bool],
+    ) -> object:
+        def seg_progress(pct: float, msg: str) -> None:
             progress_cb(pct * 0.6, msg)
 
         masks = seg_svc.propagate_masks(
@@ -905,7 +942,7 @@ def propagate_object(project_id: str, object_id: str) -> dict:
 
 
 @router.get("/{project_id}/objects/{object_id}")
-def get_object(project_id: str, object_id: str) -> dict:
+def get_object(project_id: str, object_id: str) -> dict[str, object]:
     """Get tracked object with motion data."""
     pwf = get_project_workflow()
     try:
@@ -916,7 +953,7 @@ def get_object(project_id: str, object_id: str) -> dict:
 
 
 @router.get("/{project_id}/objects/{object_id}/gallery")
-def get_gallery(project_id: str, object_id: str) -> dict:
+def get_gallery(project_id: str, object_id: str) -> dict[str, object]:
     """Get gallery manifest for a tracked object."""
     import json as json_mod
 
@@ -928,14 +965,17 @@ def get_gallery(project_id: str, object_id: str) -> dict:
         raise HTTPException(404, "Gallery not found. Run propagation first.")
 
     with open(manifest_path) as f:
-        return json_mod.load(f)
+        data = json_mod.load(f)
+    if not isinstance(data, dict):
+        raise HTTPException(500, "Gallery manifest is corrupt")
+    return data
 
 
 @router.post("/{project_id}/objects/{object_id}/replacement")
 @router.post("/{project_id}/objects/{object_id}/replacement/")
 async def upload_replacement(
     project_id: str, object_id: str, file: UploadFile,
-) -> dict:
+) -> dict[str, object]:
     """Upload a replacement PNG for a tracked object."""
     pwf = get_project_workflow()
     try:
@@ -1086,7 +1126,7 @@ def get_inpainted_frame(
 @router.patch("/{project_id}/objects/{object_id}/replacement-settings")
 def update_replacement_settings(
     project_id: str, object_id: str, body: ReplacementSettingsRequest,
-) -> dict:
+) -> dict[str, object]:
     """Update replacement transform settings."""
     rep_svc = get_replacement_service()
     try:
@@ -1100,7 +1140,7 @@ def update_replacement_settings(
 
 @router.post("/{project_id}/preview")
 @router.post("/{project_id}/preview/")
-def render_preview(project_id: str, object_id: str = "") -> dict:
+def render_preview(project_id: str, object_id: str = "") -> dict[str, object]:
     """Render a preview video. Returns a job."""
     pwf = get_project_workflow()
     proj_dir = pwf._project_dir(project_id)
@@ -1121,7 +1161,10 @@ def render_preview(project_id: str, object_id: str = "") -> dict:
     preview_svc = get_preview_render_service()
     job_svc = get_job_service()
 
-    def worker(progress_cb, is_cancelled):
+    def worker(
+        progress_cb: Callable[[float, str], None],
+        is_cancelled: Callable[[], bool],
+    ) -> object:
         return preview_svc.render_preview(
             proj_dir, project, obj, progress_cb, is_cancelled,
         )
@@ -1134,7 +1177,7 @@ def render_preview(project_id: str, object_id: str = "") -> dict:
 @router.post("/{project_id}/render/")
 def render_final(
     project_id: str, object_id: str = "", format: str = "mp4",
-) -> dict:
+) -> dict[str, object]:
     """Render the final video in specified format (mp4/webm/gif). Returns a job."""
     pwf = get_project_workflow()
     proj_dir = pwf._project_dir(project_id)
@@ -1155,7 +1198,10 @@ def render_final(
     final_svc = get_final_render_service()
     job_svc = get_job_service()
 
-    def worker(progress_cb, is_cancelled):
+    def worker(
+        progress_cb: Callable[[float, str], None],
+        is_cancelled: Callable[[], bool],
+    ) -> object:
         return final_svc.render_final(
             proj_dir, project, obj, progress_cb, is_cancelled,
         )
@@ -1176,7 +1222,7 @@ class DubbingRequest(BaseModel):
 
 @router.post("/{project_id}/dubbing/separate")
 @router.post("/{project_id}/dubbing/separate/")
-def separate_audio(project_id: str, scene_id: int) -> dict:
+def separate_audio(project_id: str, scene_id: int) -> dict[str, object]:
     """Separate scene audio into vocal and background tracks."""
     from app.workflow.audio_dubbing_service import AudioDubbingService  # noqa: PLC0415
 
@@ -1206,7 +1252,7 @@ def separate_audio(project_id: str, scene_id: int) -> dict:
 def transcribe_scene(
     project_id: str, scene_id: int,
     source_lang: str = "vi", whisper_model: str = "base",
-) -> dict:
+) -> dict[str, object]:
     """Transcribe scene vocal track to text."""
     from app.workflow.audio_dubbing_service import AudioDubbingService  # noqa: PLC0415
 
@@ -1236,7 +1282,7 @@ def transcribe_scene(
 def translate_subtitles(
     project_id: str, scene_id: int,
     target_lang: str = "en", source_lang: str = "auto",
-) -> dict:
+) -> dict[str, object]:
     """Translate scene subtitles to target language."""
     from app.workflow.audio_dubbing_service import AudioDubbingService  # noqa: PLC0415
 
@@ -1269,7 +1315,7 @@ def generate_tts(
     project_id: str, scene_id: int,
     target_lang: str = "en",
     tts_voice: str = "en-US-AriaNeural",
-) -> dict:
+) -> dict[str, object]:
     """Generate TTS audio for translated segments."""
     from app.workflow.audio_dubbing_service import AudioDubbingService  # noqa: PLC0415
 
@@ -1303,7 +1349,7 @@ def generate_tts(
 def remux_dubbed_audio(
     project_id: str, scene_id: int,
     tts_voice: str = "en-US-AriaNeural",
-) -> dict:
+) -> dict[str, object]:
     """Remux TTS with background music into final dubbed audio."""
     from app.workflow.audio_dubbing_service import AudioDubbingService  # noqa: PLC0415
 
@@ -1341,7 +1387,7 @@ def remux_dubbed_audio(
 
 @router.post("/{project_id}/dubbing/full")
 @router.post("/{project_id}/dubbing/full/")
-def full_dubbing_pipeline(project_id: str, body: DubbingRequest) -> dict:
+def full_dubbing_pipeline(project_id: str, body: DubbingRequest) -> dict[str, object]:
     """Run full dubbing pipeline for a scene."""
     from app.workflow.audio_dubbing_service import AudioDubbingService  # noqa: PLC0415
 
@@ -1380,7 +1426,7 @@ class SceneStatusUpdate(BaseModel):
 
 @router.post("/{project_id}/scenes/chunk")
 @router.post("/{project_id}/scenes/chunk/")
-def chunk_scenes(project_id: str, threshold: float = 27.0) -> dict:
+def chunk_scenes(project_id: str, threshold: float = 27.0) -> dict[str, object]:
     """Re-chunk video into scenes and extract per-scene audio."""
     from app.workflow.scene_chunking_service import SceneChunkingService
 
@@ -1391,7 +1437,10 @@ def chunk_scenes(project_id: str, threshold: float = 27.0) -> dict:
     except FileNotFoundError as err:
         raise HTTPException(404, "Project not found") from err
 
-    video_path = Path(proj.video_metadata.file_path)
+    video_metadata = proj.video_metadata
+    if video_metadata is None or not video_metadata.file_path:
+        raise HTTPException(400, "Video file not found")
+    video_path = Path(video_metadata.file_path)
     if not video_path.exists():
         raise HTTPException(400, "Video file not found")
 
@@ -1412,7 +1461,7 @@ def chunk_scenes(project_id: str, threshold: float = 27.0) -> dict:
 
 
 @router.get("/{project_id}/scenes/details")
-def get_scene_details(project_id: str) -> list[dict]:
+def get_scene_details(project_id: str) -> list[dict[str, object]]:
     """Get scene details with status."""
     pwf = get_project_workflow()
     try:
@@ -1426,7 +1475,7 @@ def get_scene_details(project_id: str) -> list[dict]:
 @router.patch("/{project_id}/scenes/{scene_id}/status")
 def update_scene_status(
     project_id: str, scene_id: int, body: SceneStatusUpdate,
-) -> dict:
+) -> dict[str, object]:
     """Update a scene's status (pending/draft/approved)."""
     pwf = get_project_workflow()
     try:
@@ -1441,7 +1490,7 @@ def update_scene_status(
     found = False
     for sd in proj.scene_details:
         if sd.scene_id == scene_id:
-            sd.status = body.status
+            sd.status = SceneStatus(body.status)
             sd.notes = body.notes
             found = True
             break
@@ -1475,7 +1524,7 @@ def get_scene_audio(project_id: str, scene_id: int) -> FileResponse:
 @router.post("/{project_id}/scenes/{scene_id}/extract-frames/")
 def extract_scene_frames(
     project_id: str, scene_id: int, format: str = "jpg",
-) -> dict:
+) -> dict[str, object]:
     """Extract frames from a scene clip on-demand.
 
     Only called when user opens/selects a scene. Much faster than
@@ -1510,7 +1559,7 @@ def extract_scene_frames(
 
 @router.post("/{project_id}/scenes/stitch")
 @router.post("/{project_id}/scenes/stitch/")
-def stitch_scenes(project_id: str) -> dict:
+def stitch_scenes(project_id: str) -> dict[str, object]:
     """Stitch all approved scenes into final video."""
     from app.workflow.scene_stitch_service import SceneStitchService
 
@@ -1550,7 +1599,7 @@ class BulkMappingRequest(BaseModel):
 @router.post("/{project_id}/objects/{object_id}/apply-bulk/")
 def apply_bulk_mapping(
     project_id: str, object_id: str, body: BulkMappingRequest,
-) -> dict:
+) -> dict[str, object]:
     """Apply an object's replacement config to multiple scenes."""
     pwf = get_project_workflow()
     try:
@@ -1597,7 +1646,7 @@ class SavePresetRequest(BaseModel):
 @router.post("/{project_id}/presets/save/")
 def save_project_preset(
     project_id: str, body: SavePresetRequest,
-) -> dict:
+) -> dict[str, object]:
     """Save current project configuration as a preset."""
     from app.workflow.preset_service import (  # noqa: PLC0415
         CharacterMapping,
@@ -1638,7 +1687,7 @@ def save_project_preset(
 
 
 @router.get("/{project_id}/presets")
-def list_project_presets(project_id: str) -> list[dict]:
+def list_project_presets(project_id: str) -> list[dict[str, object]]:
     """List all presets for a project."""
     from app.workflow.preset_service import PresetService  # noqa: PLC0415
 
@@ -1657,7 +1706,7 @@ def list_project_presets(project_id: str) -> list[dict]:
 
 @router.post("/{project_id}/presets/{preset_filename}/apply")
 @router.post("/{project_id}/presets/{preset_filename}/apply/")
-def apply_preset(project_id: str, preset_filename: str) -> dict:
+def apply_preset(project_id: str, preset_filename: str) -> dict[str, object]:
     """Apply a preset to the current project."""
     from app.workflow.preset_service import PresetService  # noqa: PLC0415
 
@@ -1746,7 +1795,7 @@ class UpdateTaskStatusRequest(BaseModel):
 
 @router.post("/channels")
 @router.post("/channels/")
-def create_channel(body: CreateChannelRequest) -> dict:
+def create_channel(body: CreateChannelRequest) -> dict[str, object]:
     """Create a new channel workspace."""
     from app.workflow.channel_service import ChannelService  # noqa: PLC0415
 
@@ -1761,7 +1810,7 @@ def create_channel(body: CreateChannelRequest) -> dict:
 
 
 @router.get("/channels")
-def list_channels() -> list[dict]:
+def list_channels() -> list[dict[str, object]]:
     """List all channel workspaces."""
     from app.workflow.channel_service import ChannelService  # noqa: PLC0415
 
@@ -1771,7 +1820,7 @@ def list_channels() -> list[dict]:
 
 
 @router.get("/channels/{channel_id}/projects")
-def get_channel_projects(channel_id: str) -> list[dict]:
+def get_channel_projects(channel_id: str) -> list[dict[str, object]]:
     """List projects in a channel."""
     from app.workflow.channel_service import ChannelService  # noqa: PLC0415
 
@@ -1786,7 +1835,7 @@ def get_channel_projects(channel_id: str) -> list[dict]:
 
 @router.delete("/channels/{channel_id}")
 @router.delete("/channels/{channel_id}/")
-def delete_channel(channel_id: str) -> dict:
+def delete_channel(channel_id: str) -> dict[str, object]:
     """Delete a channel workspace."""
     from app.workflow.channel_service import ChannelService  # noqa: PLC0415
 
@@ -1798,7 +1847,7 @@ def delete_channel(channel_id: str) -> dict:
 
 
 @router.patch("/{project_id}/task-status")
-def update_task_status(project_id: str, body: UpdateTaskStatusRequest) -> dict:
+def update_task_status(project_id: str, body: UpdateTaskStatusRequest) -> dict[str, object]:
     """Update project task status."""
     valid = {"draft", "in_progress", "ready_to_stitch", "completed"}
     if body.task_status not in valid:
@@ -1816,7 +1865,7 @@ def update_task_status(project_id: str, body: UpdateTaskStatusRequest) -> dict:
 
 
 @router.patch("/{project_id}/assign-channel")
-def assign_channel(project_id: str, channel_id: str) -> dict:
+def assign_channel(project_id: str, channel_id: str) -> dict[str, object]:
     """Assign a project to a channel."""
     pwf = get_project_workflow()
     try:
@@ -1833,7 +1882,7 @@ def assign_channel(project_id: str, channel_id: str) -> dict:
 
 @router.post("/{project_id}/cleanup")
 @router.post("/{project_id}/cleanup/")
-def cleanup_project(project_id: str) -> dict:
+def cleanup_project(project_id: str) -> dict[str, object]:
     """Clean up temp files and debug artifacts."""
     from app.services.cleanup_service import CleanupService  # noqa: PLC0415
 
@@ -1859,7 +1908,7 @@ def cleanup_project(project_id: str) -> dict:
 
 @router.post("/{project_id}/objects/{object_id}/auto-match")
 @router.post("/{project_id}/objects/{object_id}/auto-match/")
-def auto_match_character(project_id: str, object_id: str) -> dict:
+def auto_match_character(project_id: str, object_id: str) -> dict[str, object]:
     """Auto-match character across all scenes using bbox similarity.
 
     Finds objects in other scenes with similar position/size and
@@ -1881,7 +1930,7 @@ def auto_match_character(project_id: str, object_id: str) -> dict:
         raise HTTPException(404, "Object not found")
 
     # If source.motion is None, fallback to using source.selection bounding box
-    source_bbox = None
+    source_bbox: SelectionInput | BoundingBox | None = None
     if source.selection and source.selection.mode == "bounding_box":
         source_bbox = source.selection
     elif source.motion and source.motion.frames:
@@ -1898,7 +1947,11 @@ def auto_match_character(project_id: str, object_id: str) -> dict:
     )
 
     pose_choice: str | None = None
-    if source_bbox is not None and getattr(source_bbox, "width", 0) > 0:
+    if (
+        source_bbox is not None
+        and source_bbox.width is not None
+        and source_bbox.width > 0
+    ):
         # Pass centroid + bbox position so the AI can also detect a
         # "looking away" pose (centroid far from bbox center → back).
         centroid_x: float | None = None
@@ -1910,16 +1963,16 @@ def auto_match_character(project_id: str, object_id: str) -> dict:
                 if m.centroid_x > 0:
                     centroid_x = m.centroid_x
                     centroid_y = m.centroid_y
-                    bbox_x = m.bbox.x if m.bbox else None
-                    bbox_y = m.bbox.y if m.bbox else None
+                    bbox_x = m.bbox.x
+                    bbox_y = m.bbox.y
                     break
         elif source.selection and source.selection.mode == "bounding_box":
             bbox_x = source.selection.x
             bbox_y = source.selection.y
 
         pose_choice = CharacterPresetManager.auto_pose_for_bbox(
-            float(source_bbox.width),
-            float(source_bbox.height),
+            float(source_bbox.width) if source_bbox.width is not None else 0.0,
+            float(source_bbox.height) if source_bbox.height is not None else 0.0,
             centroid_x=centroid_x,
             centroid_y=centroid_y,
             bbox_x=bbox_x,
@@ -1940,11 +1993,11 @@ def auto_match_character(project_id: str, object_id: str) -> dict:
                     from app.schemas import ReplacementConfig
 
                     obj.replacement_config = ReplacementConfig(
-                        mode="static_asset",
-                        asset_path=f"objects/{obj.object_id}/replacement.png",
+                        mode=ReplacementMode.STATIC_ASSET,
+                        assetPath=f"objects/{obj.object_id}/replacement.png",
                     )
                 else:
-                    obj.replacement_config.mode = "static_asset"
+                    obj.replacement_config.mode = ReplacementMode.STATIC_ASSET
                     obj.replacement_config.asset_path = (
                         f"objects/{obj.object_id}/replacement.png"
                     )
@@ -1953,7 +2006,7 @@ def auto_match_character(project_id: str, object_id: str) -> dict:
     # applies the replacement config to all other-scene objects.
     _ = source_bbox
 
-    matched = []
+    matched: list[str] = []
     for obj in proj.objects:
         if obj.object_id == object_id or obj.scene_id == source.scene_id:
             continue
@@ -1962,14 +2015,14 @@ def auto_match_character(project_id: str, object_id: str) -> dict:
             from app.schemas import ReplacementConfig
 
             obj.replacement_config = ReplacementConfig(
-                mode="static_asset",
-                asset_path=f"objects/{obj.object_id}/replacement.png",
+                mode=ReplacementMode.STATIC_ASSET,
+                assetPath=f"objects/{obj.object_id}/replacement.png",
             )
         else:
             obj.replacement_config.mode = (
                 source.replacement_config.mode
                 if source.replacement_config
-                else "static_asset"
+                else ReplacementMode.STATIC_ASSET
             )
             obj.replacement_config.asset_path = (
                 source.replacement_config.asset_path

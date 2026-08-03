@@ -110,7 +110,7 @@ export function AssemblyModal({ isOpen, onClose }: Props) {
         <div className="bg-purple-950/20 border border-purple-800/30 rounded-xl p-3 text-xs text-purple-200 space-y-1">
           <p className="font-semibold text-purple-300">💡 Hướng dẫn nút ghép video:</p>
           <p className="text-slate-300">
-            Nút <strong className="text-emerald-400">"Đồng ý ghép Video hoàn chỉnh"</strong> chỉ sáng khi bạn đã bấm <strong className="text-emerald-400">"Duyệt Cảnh"</strong> cho 100% các phân cảnh trên giao diện.
+            Nút <strong className="text-emerald-400">&quot;Đồng ý ghép Video hoàn chỉnh&quot;</strong> chỉ sáng khi bạn đã bấm <strong className="text-emerald-400">&quot;Duyệt Cảnh&quot;</strong> cho 100% các phân cảnh trên giao diện.
           </p>
         </div>
 

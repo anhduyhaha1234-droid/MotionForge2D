@@ -15,14 +15,23 @@ from app.schemas import ChannelWorkspace
 class ChannelService:
     """CRUD for channel workspaces."""
 
-    def __init__(self, config: AppConfig) -> None:
+    def __init__(
+        self,
+        config: AppConfig,
+        channels_file: Path | None = None,
+    ) -> None:
         self._config = config
-        self._channels_file = config.project_root / "channels.json"
+        # Test isolation hook: tests may inject a temporary channels file.
+        # Default preserves the production behavior (root channels.json).
+        self._channels_file = channels_file or (config.project_root / "channels.json")
 
     def _load_all(self) -> list[dict[str, Any]]:
         if not self._channels_file.exists():
             return []
-        return json.loads(self._channels_file.read_text(encoding="utf-8"))
+        data = json.loads(self._channels_file.read_text(encoding="utf-8"))
+        if not isinstance(data, list):
+            raise ValueError(f"Invalid channels file (expected a JSON list): {self._channels_file}")
+        return data
 
     def _save_all(self, channels: list[dict[str, Any]]) -> None:
         self._channels_file.write_text(
@@ -75,13 +84,13 @@ class ChannelService:
 
     def get_projects_for_channel(
         self, channel_id: str, project_root: Path,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """List all projects belonging to a channel."""
         projects_dir = project_root / "projects"
         if not projects_dir.exists():
             return []
 
-        results = []
+        results: list[dict[str, Any]] = []
         for proj_dir in projects_dir.iterdir():
             if not proj_dir.is_dir():
                 continue

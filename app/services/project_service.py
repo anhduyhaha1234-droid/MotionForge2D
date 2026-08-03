@@ -5,7 +5,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from app.schemas import ProjectData, SceneInfo, SceneMotion, TrackedObject, VideoMetadata
+from app.schemas import (
+    ProjectData,
+    SceneDetail,
+    SceneInfo,
+    SceneMotion,
+    TrackedObject,
+    VideoMetadata,
+)
 
 
 class ProjectService:
@@ -57,11 +64,10 @@ class ProjectService:
         self.data.scenes = scenes
         self.save()
 
-    def set_scene_details(self, scene_details: list) -> None:
+    def set_scene_details(self, scene_details: list[SceneDetail]) -> None:
         """Update scene details list in the project."""
         self.data.scene_details = scene_details
         # Also update scenes list for backward compatibility
-        from app.schemas import SceneInfo
         self.data.scenes = [
             SceneInfo(
                 scene_id=sd.scene_id,
@@ -81,7 +87,7 @@ class ProjectService:
         self.data.objects.append(obj)
         self.save()
 
-    def update_object_motion(self, object_id: str, motion: SceneMotion) -> None:  # type: ignore[name-defined]
+    def update_object_motion(self, object_id: str, motion: SceneMotion) -> None:
         """Attach motion data to a tracked object."""
         for obj in self.data.objects:
             if obj.object_id == object_id:

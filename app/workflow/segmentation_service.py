@@ -30,7 +30,7 @@ class SegmentationService:
         if frame is None:
             raise FileNotFoundError(f"Frame not found: {frame_path}")
 
-        kwargs: dict = {}
+        kwargs: dict[str, object] = {}
         if backend == "sam2":
             kwargs = {
                 "model_cfg": self._config.sam2_model_cfg,
@@ -72,7 +72,7 @@ class SegmentationService:
         if progress_cb:
             progress_cb(30, "Running propagation")
 
-        kwargs: dict = {}
+        kwargs: dict[str, object] = {}
         if backend == "sam2":
             kwargs = {
                 "model_cfg": self._config.sam2_model_cfg,

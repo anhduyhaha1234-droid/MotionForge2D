@@ -385,8 +385,9 @@ def create_segmentation_adapter(
         A SegmentationAdapter instance.
     """
     if backend == "sam2":
-        return SAM2Adapter(**kwargs)  # type: ignore[arg-type]
+        adapter_cls: type[SegmentationAdapter] = SAM2Adapter
     elif backend == "contour":
-        return SimpleContourAdapter(**kwargs)  # type: ignore[arg-type]
+        adapter_cls = SimpleContourAdapter
     else:
         raise ValueError(f"Unknown segmentation backend: {backend}")
+    return adapter_cls(**kwargs)

@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import fs from "fs";
 import path from "path";
 import { execSync } from "child_process";
 
@@ -8,7 +9,6 @@ const VIDEO_PATH = path.join(FIXTURE_DIR, "test-2s.mp4");
 /* ── Setup: generate a tiny test video ──────────────────────────────────── */
 
 test.beforeAll(() => {
-  const fs = require("fs");
   if (!fs.existsSync(FIXTURE_DIR)) fs.mkdirSync(FIXTURE_DIR, { recursive: true });
   if (!fs.existsSync(VIDEO_PATH)) {
     try {

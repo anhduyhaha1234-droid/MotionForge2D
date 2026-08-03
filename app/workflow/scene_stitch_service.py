@@ -8,6 +8,7 @@ from pathlib import Path
 
 from app.config import AppConfig
 from app.schemas import SceneDetail
+from app.services.ffmpeg_utils import find_ffmpeg
 
 
 class SceneStitchService:
@@ -147,10 +148,5 @@ class SceneStitchService:
         return output_path
 
     def _find_ffmpeg(self) -> str:
-        ffmpeg = shutil.which("ffmpeg")
-        if ffmpeg:
-            return ffmpeg
-        win_path = Path(r"C:\Users\Admin\AppData\Local\Microsoft\WinGet\Links\ffmpeg.exe")
-        if win_path.exists():
-            return str(win_path)
-        raise FileNotFoundError("ffmpeg not found")
+        """Find FFmpeg binary via the shared discovery authority."""
+        return find_ffmpeg()

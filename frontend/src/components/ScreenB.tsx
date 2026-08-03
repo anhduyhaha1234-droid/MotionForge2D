@@ -8,7 +8,6 @@ import {
   createViewportTransform,
   canvasToSource,
   sourceToCanvas,
-  scaleToCanvas,
 } from "@/lib/coordinates";
 
 type Tool = "point" | "negative" | "bbox";
@@ -19,8 +18,6 @@ export function ScreenB() {
     project,
     currentFrame,
     setCurrentFrame,
-    selection,
-    setSelection,
     maskPreview,
     setMaskPreview,
     activeObject,
@@ -121,33 +118,9 @@ export function ScreenB() {
     ? api.getFrameUrl(projectId, currentFrame)
     : null;
 
-  // Load frame image
-  useEffect(() => {
-    if (!frameUrl) return;
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      imageRef.current = img;
-      setImageLoaded(true);
-    };
-    img.src = frameUrl;
-  }, [frameUrl]);
-
-  // Load mask preview
-  useEffect(() => {
-    if (!maskPreview) {
-      maskImageRef.current = null;
-      return;
-    }
-    const img = new Image();
-    img.onload = () => {
-      maskImageRef.current = img;
-      drawCanvas();
-    };
-    img.src = `data:image/png;base64,${maskPreview}`;
-  }, [maskPreview]);
-
-  // Draw canvas
+  // Draw canvas — declared BEFORE the image-loading effects so their
+  // onload closures capture the stable, declared reference (React Compiler:
+  // no access-before-declaration).
   const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
@@ -207,7 +180,36 @@ export function ScreenB() {
       ctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
       ctx.setLineDash([]);
     }
+    // NOTE: maskPreview intentionally kept in deps — when the preview is
+    // cleared (null), drawCanvas identity must change so the draw effect
+    // re-runs and repaints without the stale mask overlay.
   }, [meta, points, bbox, maskPreview]);
+
+  // Load frame image
+  useEffect(() => {
+    if (!frameUrl) return;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      imageRef.current = img;
+      setImageLoaded(true);
+    };
+    img.src = frameUrl;
+  }, [frameUrl]);
+
+  // Load mask preview
+  useEffect(() => {
+    if (!maskPreview) {
+      maskImageRef.current = null;
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      maskImageRef.current = img;
+      drawCanvas();
+    };
+    img.src = `data:image/png;base64,${maskPreview}`;
+  }, [maskPreview, drawCanvas]);
 
   useEffect(() => {
     drawCanvas();
@@ -452,7 +454,7 @@ export function ScreenB() {
 
           <h3 className="text-xs text-gray-500 uppercase mb-2">🎯 Vật thể phát hiện</h3>
           {autoObjects.length === 0 ? (
-            <p className="text-xs text-gray-600">Chưa quét. Bấm "🪄 Tự Động Bắt" ở bên phải để tìm nhân vật & vật thể.</p>
+            <p className="text-xs text-gray-600">Chưa quét. Bấm &quot;🪄 Tự Động Bắt&quot; ở bên phải để tìm nhân vật &amp; vật thể.</p>
           ) : (
             <div className="space-y-1">
               {autoObjects.map((obj) => (

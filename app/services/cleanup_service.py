@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
+from typing import Any
 
 
 class CleanupService:
@@ -15,7 +16,7 @@ class CleanupService:
         keep_renders: bool = True,
         keep_audio: bool = True,
         keep_presets: bool = True,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Clean up temp files in a project directory.
 
         Removes:

@@ -20,6 +20,19 @@ MotionForge 2D lets you:
 - **CUDA-capable GPU** (optional, for SAM 2.1; CPU fallback available)
 - **8GB+ RAM** recommended
 
+### Installing FFmpeg
+
+MotionForge locates `ffmpeg` and `ffprobe` at runtime — no hard-coded
+install path is assumed. Install FFmpeg any way you like, then make sure
+MotionForge can find it (see [FFmpeg configuration](#ffmpeg-configuration)):
+
+- **Windows**: `winget install Gyan.FFmpeg` (adds both `ffmpeg.exe` and
+  `ffprobe.exe` to `%LOCALAPPDATA%\Microsoft\WinGet\Links`)
+- **Ubuntu/Debian**: `sudo apt install ffmpeg`
+- **macOS**: `brew install ffmpeg`
+- **Any OS**: download a build from <https://ffmpeg.org/download.html> and
+  put it in a directory on your `PATH`
+
 ## Quick Start
 
 ```bash
@@ -34,8 +47,9 @@ bash scripts/setup.sh
 python -m venv .venv
 source .venv/bin/activate  # Linux/macOS
 pip install -e ".[dev]"
-pip install git+https://github.com/facebookresearch/sam2.git
-bash scripts/download_models.sh
+pip install -e ".[dubbing]"  # optional: audio dubbing (edge-tts, Whisper, translation)
+pip install git+https://github.com/facebookresearch/sam2.git  # optional: SAM 2 segmentation
+bash scripts/download_models.sh  # optional: SAM 2 model checkpoints
 ```
 
 ## Running the Spike
@@ -144,6 +158,54 @@ Environment variables:
 | `MOTIONFORGE_ROOT` | Project root directory | `~/MotionForge2D` |
 | `MOTIONFORGE_MODELS` | Model checkpoints directory | `~/MotionForge2D/models_checkpoints` |
 | `MOTIONFORGE_OUTPUT` | Output directory | `~/MotionForge2D/output` |
+| `MOTIONFORGE_FFMPEG` | Full path to the `ffmpeg` executable | auto-discovered |
+| `MOTIONFORGE_FFPROBE` | Full path to the `ffprobe` executable | auto-discovered |
+
+## FFmpeg configuration
+
+MotionForge discovers `ffmpeg` and `ffprobe` once through a shared
+resolution order in `app/services/ffmpeg_utils.py`. Every service imports
+this authority; there are no per-service hard-coded paths.
+
+Resolution order (first match wins):
+
+1. **Environment override** — `MOTIONFORGE_FFMPEG` / `MOTIONFORGE_FFPROBE`
+   must point to an executable-suitable file (Windows: a `.exe` file;
+   POSIX: a regular file with execute permission). A set-but-invalid
+   override (missing file, non-executable text file, unsupported suffix)
+   raises an actionable error; it never silently falls back.
+2. **`PATH`** — the executables are found via the system `PATH`.
+3. **WinGet Links (Windows)** — `%LOCALAPPDATA%\Microsoft\WinGet\Links`,
+   where `winget install Gyan.FFmpeg` places `ffmpeg.exe`/`ffprobe.exe`.
+4. **Portable app-managed location** — reserved; no such contract exists in
+   the repo yet. When a portable bundle is added, it is resolved here and
+   documented in this section.
+5. **Actionable error** — install guidance, no guessed machine paths.
+
+Example — point MotionForge at a specific FFmpeg build:
+
+```bash
+export MOTIONFORGE_FFMPEG=/opt/ffmpeg/bin/ffmpeg
+export MOTIONFORGE_FFPROBE=/opt/ffmpeg/bin/ffprobe
+```
+
+## Dubbing dependencies (Phase 2, optional)
+
+Audio dubbing (vocal separation, speech-to-text, translation, TTS) is a
+Phase 2 feature. Its runtime dependencies are declared in the optional
+`dubbing` group and are NOT installed by default:
+
+```bash
+pip install -e ".[dubbing]"
+```
+
+- `edge-tts` — text-to-speech (imported at module load; importing
+  `AudioDubbingService` without it raises an actionable error)
+- `openai-whisper` — speech-to-text (lazy-imported inside `transcribe()`)
+- `deep-translator` — segment translation (lazy-imported inside
+  `translate_segments()`)
+
+Core (Phase 1) installs do not require any of these packages.
 
 ## Project JSON Format
 

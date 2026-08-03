@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { api, type GalleryFrame } from "@/lib/api";
 import { useProjectStore } from "@/stores/project";
 
@@ -27,7 +26,7 @@ export function ScreenC() {
   useEffect(() => {
     if (!projectId || !objectId) return;
     api.getGallery(projectId, objectId).then(setGallery).catch(console.error);
-  }, [projectId, objectId]);
+  }, [projectId, objectId, setGallery]);
 
   const representativeFrames = gallery?.crops ?? [];
 

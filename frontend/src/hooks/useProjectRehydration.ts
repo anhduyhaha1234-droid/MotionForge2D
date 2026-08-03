@@ -58,7 +58,9 @@ export function useProjectRehydration() {
   useEffect(() => {
     const session = loadSession();
     if (!session?.projectId) {
-      setIsRehydrating(false);
+      // No stored session: nothing to rehydrate. Defer the state flip out of
+      // the effect body (React Compiler: no synchronous setState in effects).
+      queueMicrotask(() => setIsRehydrating(false));
       return;
     }
 

@@ -13,7 +13,6 @@ import {
   AlertCircle,
   HelpCircle,
   FolderOpen,
-  ArrowRight,
   Layers,
   Wand2,
   Play,
@@ -296,10 +295,10 @@ export function ScreenA() {
               </h4>
               <ul className="space-y-1.5 list-disc list-inside text-slate-300">
                 <li>
-                  <strong className="text-blue-400">Nút "Bắt đầu Phân tích"</strong>: Tự động cắt clip MP4 từng phân cảnh siêu tốc.
+                  <strong className="text-blue-400">Nút &quot;Bắt đầu Phân tích&quot;</strong>: Tự động cắt clip MP4 từng phân cảnh siêu tốc.
                 </li>
                 <li>
-                  <strong className="text-blue-400">Nút "▶️ Tiếp Tục" ở danh sách bên dưới</strong>: Mở lại dự án cũ dở dang để làm tiếp.
+                  <strong className="text-blue-400">Nút &quot;▶️ Tiếp Tục&quot; ở danh sách bên dưới</strong>: Mở lại dự án cũ dở dang để làm tiếp.
                 </li>
               </ul>
             </div>
@@ -363,7 +362,7 @@ export function ScreenA() {
                 <FolderOpen className="w-5 h-5 text-purple-400" /> Danh Sách Dự Án Đã Làm ({recentProjects.length})
               </h3>
               <span className="text-xs text-slate-400">
-                Bấm nút "▶️ Tiếp tục" để mở lại dự án dở dang
+                Bấm nút &quot;▶️ Tiếp tục&quot; để mở lại dự án dở dang
               </span>
             </div>
 

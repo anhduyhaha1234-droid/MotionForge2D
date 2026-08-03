@@ -10,7 +10,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Konva from "konva";
 import { createViewportTransform } from "@/lib/coordinates";
-import type { FrameMotion, ReplacementConfig, ClipMode } from "@/lib/api";
+import type { FrameMotion, ReplacementConfig } from "@/lib/api";
 
 /* ── Types ─────────────────────────────────────────────────────────────── */
 
@@ -42,6 +42,30 @@ interface TransformResult {
   height: number;
   rotation: number;
   opacity: number;
+}
+
+/** A loaded image paired with the URL that produced it. */
+interface LoadedImage {
+  url: string;
+  img: HTMLImageElement;
+}
+
+/**
+ * Derive the effective image for a prop URL.
+ *
+ * The loaded record is only usable while it was produced by the exact URL
+ * currently passed as a prop. If the URL changed, became empty, or no image
+ * has loaded yet, the result is null — so a stale image can never be drawn
+ * for a URL that no longer matches (immediate null semantics, no timing
+ * dependence and no setState-in-effect).
+ */
+function effectiveImage(
+  loaded: { url: string; img: HTMLImageElement } | null,
+  currentUrl: string | null | undefined,
+): HTMLImageElement | null {
+  if (!currentUrl) return null;
+  if (!loaded || loaded.url !== currentUrl) return null;
+  return loaded.img;
 }
 
 /* ── Transform math ────────────────────────────────────────────────────── */
@@ -111,19 +135,6 @@ function computeReplacementTransform(
   };
 }
 
-/* ── Clip helper ───────────────────────────────────────────────────────── */
-
-function clipOpFor(mode: ClipMode): string {
-  switch (mode) {
-    case "asset_alpha":
-      return "source-over";
-    case "original_mask":
-      return "destination-in";
-    case "intersection":
-      return "source-in";
-  }
-}
-
 /* ── Component ─────────────────────────────────────────────────────────── */
 
 export function CompositeCanvas({
@@ -143,71 +154,68 @@ export function CompositeCanvas({
   const stageRef = useRef<Konva.Stage | null>(null);
   const layerRef = useRef<Konva.Layer | null>(null);
 
-  const [frameImg, setFrameImg] = useState<HTMLImageElement | null>(null);
-  const [maskImg, setMaskImg] = useState<HTMLImageElement | null>(null);
-  const [inpaintedImg, setInpaintedImg] = useState<HTMLImageElement | null>(null);
-  const [repImg, setRepImg] = useState<HTMLImageElement | null>(null);
-  const [sequenceFrameImg, setSequenceFrameImg] = useState<HTMLImageElement | null>(null);
-  const [multiObjImgs, setMultiObjImgs] = useState<Map<string, HTMLImageElement>>(new Map());
+  const [frameImg, setFrameImg] = useState<LoadedImage | null>(null);
+  const [maskImg, setMaskImg] = useState<LoadedImage | null>(null);
+  const [inpaintedImg, setInpaintedImg] = useState<LoadedImage | null>(null);
+  const [repImg, setRepImg] = useState<LoadedImage | null>(null);
+  const [sequenceFrameImg, setSequenceFrameImg] = useState<LoadedImage | null>(null);
+  const [multiObjImgs, setMultiObjImgs] = useState<Map<string, LoadedImage>>(new Map());
+
+  // Effective images derived from the URL-paired loaded records. A null or
+  // changed URL immediately yields null (see effectiveImage), so stale assets
+  // are never drawn — no synchronous setState in effect bodies required.
+  const effFrameImg = effectiveImage(frameImg, frameUrl);
+  const effMaskImg = effectiveImage(maskImg, maskUrl);
+  const effInpaintedImg = effectiveImage(inpaintedImg, inpaintedUrl);
+  const effRepImg = effectiveImage(repImg, replacementUrl);
+  const effSequenceFrameImg = effectiveImage(sequenceFrameImg, sequenceFrameUrl);
 
   /* ── Load images ─────────────────────────────────────────────────────── */
+  // Each effect only kicks off an async image load. Loaded records are
+  // associated with the exact URL that produced them; the effective-image
+  // derivation above guards rendering against URL changes/empties.
 
   useEffect(() => {
-    if (!frameUrl) {
-      setFrameImg(null);
-      return;
-    }
+    if (!frameUrl) return;
     const img = new window.Image();
     img.crossOrigin = "anonymous";
-    img.onload = () => setFrameImg(img);
+    img.onload = () => setFrameImg({ url: frameUrl, img });
     img.onerror = () => setFrameImg(null);
     img.src = frameUrl;
   }, [frameUrl]);
 
   useEffect(() => {
-    if (!maskUrl) {
-      setMaskImg(null);
-      return;
-    }
+    if (!maskUrl) return;
     const img = new window.Image();
     img.crossOrigin = "anonymous";
-    img.onload = () => setMaskImg(img);
+    img.onload = () => setMaskImg({ url: maskUrl, img });
     img.onerror = () => setMaskImg(null);
     img.src = maskUrl;
   }, [maskUrl]);
 
   useEffect(() => {
-    if (!inpaintedUrl) {
-      setInpaintedImg(null);
-      return;
-    }
+    if (!inpaintedUrl) return;
     const img = new window.Image();
     img.crossOrigin = "anonymous";
-    img.onload = () => setInpaintedImg(img);
+    img.onload = () => setInpaintedImg({ url: inpaintedUrl, img });
     img.onerror = () => setInpaintedImg(null);
     img.src = inpaintedUrl;
   }, [inpaintedUrl]);
 
   useEffect(() => {
-    if (!replacementUrl) {
-      setRepImg(null);
-      return;
-    }
+    if (!replacementUrl) return;
     const img = new window.Image();
     img.crossOrigin = "anonymous";
-    img.onload = () => setRepImg(img);
+    img.onload = () => setRepImg({ url: replacementUrl, img });
     img.onerror = () => setRepImg(null);
     img.src = replacementUrl;
   }, [replacementUrl]);
 
   useEffect(() => {
-    if (!sequenceFrameUrl) {
-      setSequenceFrameImg(null);
-      return;
-    }
+    if (!sequenceFrameUrl) return;
     const img = new window.Image();
     img.crossOrigin = "anonymous";
-    img.onload = () => setSequenceFrameImg(img);
+    img.onload = () => setSequenceFrameImg({ url: sequenceFrameUrl, img });
     img.onerror = () => setSequenceFrameImg(null);
     img.src = sequenceFrameUrl;
   }, [sequenceFrameUrl]);
@@ -215,26 +223,20 @@ export function CompositeCanvas({
   /* ── Load multi-object images ─────────────────────────────────────────── */
 
   useEffect(() => {
-    if (!allObjects || allObjects.length === 0) {
-      setMultiObjImgs(new Map());
-      return;
-    }
+    if (!allObjects || allObjects.length === 0) return;
 
-    const newMap = new Map<string, HTMLImageElement>();
+    const newMap = new Map<string, LoadedImage>();
     let loaded = 0;
     const total = allObjects.filter((o) => o.replacementUrl).length;
 
-    if (total === 0) {
-      setMultiObjImgs(new Map());
-      return;
-    }
+    if (total === 0) return;
 
     for (const obj of allObjects) {
       if (!obj.replacementUrl) continue;
       const img = new window.Image();
       img.crossOrigin = "anonymous";
       img.onload = () => {
-        newMap.set(obj.objectId, img);
+        newMap.set(obj.objectId, { url: obj.replacementUrl!, img });
         loaded++;
         if (loaded === total) {
           setMultiObjImgs(new Map(newMap));
@@ -303,7 +305,8 @@ export function CompositeCanvas({
     const oy = vt.offsetY;
 
     // Choose active replacement image based on mode
-    const activeRepImg = replacement.mode === "frame_sequence" ? sequenceFrameImg : repImg;
+    const activeRepImg =
+      replacement.mode === "frame_sequence" ? effSequenceFrameImg : effRepImg;
 
     // Checkerboard background
     const bgGroup = new Konva.Group({ x: ox, y: oy, width: dw, height: dh });
@@ -327,11 +330,11 @@ export function CompositeCanvas({
 
     // Helper: draw frame image scaled to viewport
     const drawFrame = () => {
-      if (!frameImg) return;
+      if (!effFrameImg) return;
       const konvaImg = new Konva.Image({
         x: ox,
         y: oy,
-        image: frameImg,
+        image: effFrameImg,
         width: dw,
         height: dh,
       });
@@ -346,11 +349,11 @@ export function CompositeCanvas({
 
     if (previewMode === "mask") {
       drawFrame();
-      if (maskImg) {
+      if (effMaskImg) {
         const m = new Konva.Image({
           x: ox,
           y: oy,
-          image: maskImg,
+          image: effMaskImg,
           width: dw,
           height: dh,
           opacity: 0.5,
@@ -367,7 +370,7 @@ export function CompositeCanvas({
     const drawComposite = (offsetX: number) => {
       // Background layer: inpainted frame (original character removed) when
       // available, else the plain frame.
-      const bgImg = inpaintedImg ?? frameImg;
+      const bgImg = effInpaintedImg ?? effFrameImg;
       if (bgImg) {
         layer.add(
           new Konva.Image({
@@ -381,14 +384,14 @@ export function CompositeCanvas({
       }
 
       // Mask overlay (semi-transparent green)
-      if (maskImg) {
+      if (effMaskImg) {
         // We'll tint green by drawing a green rect then the mask on top
         // Actually, just show the mask at low opacity
         layer.add(
           new Konva.Image({
             x: offsetX + ox,
             y: oy,
-            image: maskImg,
+            image: effMaskImg,
             width: dw,
             height: dh,
             opacity: 0.35,
@@ -399,7 +402,15 @@ export function CompositeCanvas({
       // Multi-object mode: render all objects when allObjects is provided
       if (allObjects && allObjects.length > 0) {
         for (const obj of allObjects) {
-          const objImg = multiObjImgs.get(obj.objectId);
+          // Only render the object's replacement while its entry was loaded
+          // from the exact URL currently configured for it. Removed objects,
+          // or objects whose replacement URL changed/emptied, never render a
+          // stale asset.
+          const entry = multiObjImgs.get(obj.objectId);
+          const objImg =
+            entry && obj.replacementUrl && entry.url === obj.replacementUrl
+              ? entry.img
+              : null;
           if (!objImg || !obj.motion || !obj.replacement) continue;
 
           const tf = computeReplacementTransform(
@@ -493,8 +504,8 @@ export function CompositeCanvas({
         // Fallback placement variables (used for bbox when no motion)
         let fallbackW = 0;
         let fallbackH = 0;
-        let cx = videoWidth / 2;
-        let cy = videoHeight / 2;
+        const cx = videoWidth / 2;
+        const cy = videoHeight / 2;
         if (effMotion) {
           tf = computeReplacementTransform(
             effMotion,
@@ -583,22 +594,8 @@ export function CompositeCanvas({
           }),
         );
 
-        // Anchor point marker
-        const anchorAbsX =
-          ((effMotion ? effMotion.centroid_x : cx) - tf.width * replacement.anchor.x +
-            replacement.offset.x * videoWidth) *
-            vt.scale +
-          offsetX +
-          ox +
-          (tf.width * replacement.anchor.x * vt.scale);
-        const anchorAbsY =
-          ((effMotion ? effMotion.centroid_y : cy) - tf.height * replacement.anchor.y +
-            replacement.offset.y * videoHeight) *
-            vt.scale +
-          oy +
-          (tf.height * replacement.anchor.y * vt.scale);
-        // The anchor point is at the centroid in source coords
-        // Actually, the anchor point on the asset that aligns with centroid:
+        // The anchor point is at the centroid in source coords.
+        // (anchorAbsX/anchorAbsY were computed but never rendered — removed.)
         const anchorOnScreenX = (effMotion ? effMotion.centroid_x : cx) * vt.scale + offsetX + ox;
         const anchorOnScreenY = (effMotion ? effMotion.centroid_y : cy) * vt.scale + oy;
         layer.add(
@@ -638,12 +635,12 @@ export function CompositeCanvas({
       const halfW = stageW / 2;
 
       // ── Left half: original (no overlay) ──
-      if (frameImg) {
+      if (effFrameImg) {
         layer.add(
           new Konva.Image({
             x: ox,
             y: oy,
-            image: frameImg,
+            image: effFrameImg,
             width: halfW - ox,
             height: dh,
             crop: { x: 0, y: 0, width: videoWidth / 2, height: videoHeight },
@@ -714,11 +711,11 @@ export function CompositeCanvas({
 
     layer.batchDraw();
   }, [
-    frameImg,
-    maskImg,
-    inpaintedImg,
-    repImg,
-    sequenceFrameImg,
+    effFrameImg,
+    effMaskImg,
+    effInpaintedImg,
+    effRepImg,
+    effSequenceFrameImg,
     frameMotion,
     replacement,
     videoWidth,

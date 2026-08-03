@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type ChannelWorkspace, type ChannelProject } from "@/lib/api";
+import { api, type ChannelProject } from "@/lib/api";
 import { useProjectStore } from "@/stores/project";
 
 const STATUS_CONFIG: Record<

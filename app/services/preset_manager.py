@@ -15,14 +15,34 @@ original character's bounding box:
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TypedDict
 
 import cv2
 import numpy as np
 
 from app.schemas import CharacterPosePaths, CharacterReferencePack
 
-# Built-in character reference packs: id → {name, poses: {pose: filename}}
-BUILTIN_CHARACTERS: dict[str, dict[str, object]] = {
+
+class CharacterSpec(TypedDict):
+    """Static description of a built-in character reference pack."""
+
+    label: str
+    poses: dict[str, str]
+
+
+# Built-in character reference packs: id → {name, poses}
+BUILTIN_CHARACTERS: dict[str, CharacterSpec] = {
+    "dan_choi": {
+        "label": "Dân Chơi (Streetwear)",
+        "poses": {
+            "sitting": "dan_choi_sitting.png",
+            "standing": "dan_choi_standing.png",
+            "three_quarter": "dan_choi_three_quarter.png",
+            "walking": "dan_choi_walking.png",
+            "talking": "dan_choi_talking.png",
+            "back": "dan_choi_back.png",
+        },
+    },
     "boy_hacker": {
         "label": "Boy Hacker",
         "poses": {
@@ -270,12 +290,12 @@ class CharacterPresetManager:
 
     # ── Listing ───────────────────────────────────────────────────────────
 
-    def list_characters(self) -> list[dict]:
+    def list_characters(self) -> list[dict[str, object]]:
         """Return all built-in character sets with their poses."""
         self.ensure_assets()
-        result = []
+        result: list[dict[str, object]] = []
         for key, spec in BUILTIN_CHARACTERS.items():
-            poses = []
+            poses: list[dict[str, str]] = []
             for pose, filename in spec["poses"].items():
                 poses.append(
                     {

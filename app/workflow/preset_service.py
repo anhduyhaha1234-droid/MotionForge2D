@@ -51,11 +51,11 @@ class PresetService:
         data = json.loads(preset_path.read_text(encoding="utf-8"))
         return ProjectPreset.model_validate(data)
 
-    def list_presets(self, presets_dir: Path) -> list[dict]:
+    def list_presets(self, presets_dir: Path) -> list[dict[str, Any]]:
         """List all presets in a directory."""
         if not presets_dir.exists():
             return []
-        presets: list[dict] = []
+        presets: list[dict[str, Any]] = []
         for p in sorted(presets_dir.glob("*.json")):
             try:
                 preset = self.load_preset(p)

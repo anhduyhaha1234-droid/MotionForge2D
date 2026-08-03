@@ -4,9 +4,34 @@ from __future__ import annotations
 
 import asyncio
 import subprocess
+from collections.abc import Sequence
 from pathlib import Path
+from typing import Any, TypedDict
 
-import edge_tts
+from app.services.ffmpeg_utils import find_ffmpeg, find_ffprobe
+
+
+class SegmentDict(TypedDict):
+    """A subtitle/dubbing segment: start, end, and text (seconds)."""
+
+    start: float
+    end: float
+    text: str
+
+
+class TranslatedSegmentDict(SegmentDict):
+    """A translated segment: original text plus the translation."""
+
+    original: str
+
+
+try:
+    import edge_tts
+except ImportError as _exc:  # pragma: no cover - exercised only when edge-tts absent
+    raise ImportError(
+        "edge-tts is required for audio dubbing (Phase 2 feature). "
+        "Install it with: pip install -e \".[dubbing]\""
+    ) from _exc
 
 
 class AudioDubbingService:
@@ -67,7 +92,7 @@ class AudioDubbingService:
         vocal_path: Path,
         language: str = "vi",
         model_size: str = "base",
-    ) -> list[dict]:
+    ) -> list[SegmentDict]:
         """Transcribe vocal track using Whisper.
 
         Args:
@@ -87,7 +112,7 @@ class AudioDubbingService:
             task="transcribe",
         )
 
-        segments = []
+        segments: list[SegmentDict] = []
         for seg in result["segments"]:
             segments.append({
                 "start": round(seg["start"], 3),
@@ -99,7 +124,7 @@ class AudioDubbingService:
 
     def segments_to_srt(
         self,
-        segments: list[dict],
+        segments: Sequence[SegmentDict],
         output_path: Path,
     ) -> Path:
         """Convert segments to SRT subtitle file.
@@ -135,10 +160,10 @@ class AudioDubbingService:
 
     def translate_segments(
         self,
-        segments: list[dict],
+        segments: Sequence[SegmentDict],
         target_lang: str = "en",
         source_lang: str = "auto",
-    ) -> list[dict]:
+    ) -> list[TranslatedSegmentDict]:
         """Translate segment texts to target language.
 
         Args:
@@ -153,7 +178,7 @@ class AudioDubbingService:
 
         translator = GoogleTranslator(source=source_lang, target=target_lang)
 
-        translated = []
+        translated: list[TranslatedSegmentDict] = []
         # Batch translate for efficiency
         texts = [seg["text"] for seg in segments]
         translated_texts = translator.translate_batch(texts)
@@ -205,7 +230,7 @@ class AudioDubbingService:
 
     def tts_segments(
         self,
-        segments: list[dict],
+        segments: Sequence[SegmentDict],
         output_dir: Path,
         voice: str = "en-US-AriaNeural",
     ) -> list[Path]:
@@ -322,7 +347,7 @@ class AudioDubbingService:
     def remux_audio(
         self,
         tts_paths: list[Path],
-        segments: list[dict],
+        segments: Sequence[SegmentDict],
         bgm_path: Path,
         output_path: Path,
         total_duration: float | None = None,
@@ -391,7 +416,7 @@ class AudioDubbingService:
         target_lang: str = "en",
         whisper_model: str = "base",
         tts_voice: str = "en-US-AriaNeural",
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Full dubbing pipeline for a scene.
 
         Args:
@@ -439,28 +464,12 @@ class AudioDubbingService:
         }
 
     def _find_ffmpeg(self) -> str:
-        """Find FFmpeg binary."""
-        import shutil  # noqa: PLC0415
-
-        ffmpeg = shutil.which("ffmpeg")
-        if ffmpeg:
-            return ffmpeg
-        win_path = Path(r"C:\Users\Admin\AppData\Local\Microsoft\WinGet\Links\ffmpeg.exe")
-        if win_path.exists():
-            return str(win_path)
-        raise FileNotFoundError("ffmpeg not found")
+        """Find FFmpeg binary via the shared discovery authority."""
+        return find_ffmpeg()
 
     def _find_ffprobe(self) -> str:
-        """Find ffprobe binary."""
-        import shutil  # noqa: PLC0415
-
-        ffprobe = shutil.which("ffprobe")
-        if ffprobe:
-            return ffprobe
-        win_path = Path(r"C:\Users\Admin\AppData\Local\Microsoft\WinGet\Links\ffprobe.exe")
-        if win_path.exists():
-            return str(win_path)
-        raise FileNotFoundError("ffprobe not found")
+        """Find FFprobe binary via the shared discovery authority."""
+        return find_ffprobe()
 
     def _calculate_speech_rate(
         self,

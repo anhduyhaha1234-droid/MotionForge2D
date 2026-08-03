@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "hermes_command": "hermes",
+  "provider": "custom",
+  "model": "hermes",
+  "max_turns": 120,
+  "timeout_minutes": 90,
+  "max_correction_attempts": 3,
+  "require_checkpoints": true,
+  "source_tag": "cli",
+  "runtime_root": "output/pm-automation"
+}

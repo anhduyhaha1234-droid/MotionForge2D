@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import shutil
 import subprocess
 from pathlib import Path
 
 from app.config import AppConfig
 from app.schemas import SceneDetail, SceneStatus
+from app.services.ffmpeg_utils import find_ffmpeg, find_ffprobe
 from app.services.scene_detection import detect_scenes
 
 
@@ -181,22 +181,9 @@ class SceneChunkingService:
         return "audio" in result.stdout
 
     def _find_ffmpeg(self) -> str:
-        """Find FFmpeg binary."""
-        ffmpeg = shutil.which("ffmpeg")
-        if ffmpeg:
-            return ffmpeg
-        # Try Windows path
-        win_path = Path(r"C:\Users\Admin\AppData\Local\Microsoft\WinGet\Links\ffmpeg.exe")
-        if win_path.exists():
-            return str(win_path)
-        raise FileNotFoundError("ffmpeg not found")
+        """Find FFmpeg binary via the shared discovery authority."""
+        return find_ffmpeg()
 
     def _find_ffprobe(self) -> str:
-        """Find FFprobe binary."""
-        ffprobe = shutil.which("ffprobe")
-        if ffprobe:
-            return ffprobe
-        win_path = Path(r"C:\Users\Admin\AppData\Local\Microsoft\WinGet\Links\ffprobe.exe")
-        if win_path.exists():
-            return str(win_path)
-        raise FileNotFoundError("ffprobe not found")
+        """Find FFprobe binary via the shared discovery authority."""
+        return find_ffprobe()

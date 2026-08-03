@@ -328,32 +328,41 @@ class DubbingResult(BaseModel):
     original_srt: str = ""
     translated_srt: str = ""
     final_audio: str = ""
-    segments: list[dict] = Field(default_factory=list)
+    segments: list[dict[str, object]] = Field(default_factory=list)
 
 
 # ─── Migration ────────────────────────────────────────────────────────────────
 
-def migrate_v1_to_v2(data: dict) -> dict:
+def migrate_v1_to_v2(data: dict[str, object]) -> dict[str, object]:
     """Migrate a v1.0.0 project dict to v2.0.0.
 
     Adds default values for new fields without breaking existing data.
     """
-    if data.get("version", "1.0.0") >= "2.0.0":
+    version = data.get("version", "1.0.0")
+    if not isinstance(version, str) or version >= "2.0.0":
         return data  # Already v2+
 
     data["version"] = "2.0.0"
 
-    for obj in data.get("objects", []):
-        motion = obj.get("motion")
-        if motion:
-            motion.setdefault("tracking_backend", "unknown")
-            motion.setdefault("model_version", "")
-            motion.setdefault("anchor", {"x": 0.5, "y": 0.5})
-            for frame in motion.get("frames", []):
-                frame.setdefault("confidence", 1.0)
-                frame.setdefault("occluded", False)
-                frame.setdefault("needs_review", False)
-                frame.setdefault("mask_path", None)
-        obj.setdefault("replacement_config", None)
+    objects = data.get("objects", [])
+    if isinstance(objects, list):
+        for obj in objects:
+            if not isinstance(obj, dict):
+                continue
+            motion = obj.get("motion")
+            if isinstance(motion, dict):
+                motion.setdefault("tracking_backend", "unknown")
+                motion.setdefault("model_version", "")
+                motion.setdefault("anchor", {"x": 0.5, "y": 0.5})
+                frames = motion.get("frames", [])
+                if isinstance(frames, list):
+                    for frame in frames:
+                        if not isinstance(frame, dict):
+                            continue
+                        frame.setdefault("confidence", 1.0)
+                        frame.setdefault("occluded", False)
+                        frame.setdefault("needs_review", False)
+                        frame.setdefault("mask_path", None)
+            obj.setdefault("replacement_config", None)
 
     return data

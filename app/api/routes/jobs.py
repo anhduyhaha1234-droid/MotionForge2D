@@ -11,7 +11,7 @@ router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
 
 @router.get("/{job_id}")
-def get_job_status(job_id: str) -> dict:
+def get_job_status(job_id: str) -> dict[str, object]:
     """Get job status."""
     job_svc = get_job_service()
     info = job_svc.get_job(job_id)
@@ -21,7 +21,7 @@ def get_job_status(job_id: str) -> dict:
 
 
 @router.post("/{job_id}/cancel")
-def cancel_job(job_id: str) -> dict:
+def cancel_job(job_id: str) -> dict[str, object]:
     """Cancel a running job."""
     job_svc = get_job_service()
     success = job_svc.cancel_job(job_id)

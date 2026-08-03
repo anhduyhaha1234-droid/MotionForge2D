@@ -39,7 +39,7 @@ export function DubbingPanel() {
       setStep("transcribing");
 
       // Step 2: Transcribe
-      const transcribeResult = await api.transcribeScene(
+      await api.transcribeScene(
         projectId, activeSceneId, sourceLang, whisperModel,
       );
 

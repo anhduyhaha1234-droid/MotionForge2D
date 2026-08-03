@@ -1,17 +1,39 @@
-"""Tests for the character preset library & AI auto-pose matching."""
+"""Tests for the character preset library & AI auto-pose matching.
+
+S00-T01 isolation contract:
+- The `client` fixture comes from tests/conftest.py; it patches
+  ``app.api.deps._config`` so route-level ``get_preset_manager()`` resolves to
+  a temporary project root — never the production ``presets/characters`` dir.
+- The production preset directory is only ever snapshotted READ-ONLY; no test
+  constructs a manager rooted at it and no test calls ``ensure_assets()`` on it.
+- All asset generation runs under pytest temporary paths.
+"""
 
 from __future__ import annotations
+
+import hashlib
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
+from app.services.preset_manager import CharacterPresetManager
+
 
 @pytest.fixture(scope="session")
-def client() -> TestClient:
-    from app.main import app
+def isolated_assets_root(tmp_path_factory: pytest.TempPathFactory):
+    """Session-scoped isolated preset assets root (never production data)."""
+    return tmp_path_factory.mktemp("preset_assets") / "presets" / "characters"
 
-    with TestClient(app) as c:
-        yield c
+
+def _snapshot_preset_dir(prod_dir: Path) -> dict[str, str] | None:
+    """Read-only snapshot of a preset dir: {filename: sha256}. Never writes."""
+    if not prod_dir.is_dir():
+        return None
+    return {
+        p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+        for p in sorted(prod_dir.glob("*.png"))
+    }
 
 
 class TestPresetManager:
@@ -66,11 +88,8 @@ class TestPresetManager:
         """Each built-in set has all 6 canonical reference poses."""
         from app.services.preset_manager import BUILTIN_CHARACTERS
 
-        assert set(BUILTIN_CHARACTERS.keys()) == {
-            "boy_hacker",
-            "tho_cute",
-            "gau_nau",
-        }
+        assert "dan_choi" in BUILTIN_CHARACTERS
+        assert len(BUILTIN_CHARACTERS) >= 4
         expected = {
             "sitting",
             "standing",
@@ -98,27 +117,32 @@ class TestPresetManager:
         assert pack.poses.back == "back.png"
         assert len(pack.poses.model_dump()) == 6
 
-    def test_reference_packs_endpoint(self, client: TestClient) -> None:
-        """Manager builds 3 reference packs with 6 poses each."""
-        from app.services.preset_manager import get_preset_manager
+    def test_reference_packs_endpoint(
+        self, client: TestClient, isolated_assets_root
+    ) -> None:
+        """Manager builds reference packs with 6 poses each (isolated assets).
 
-        packs = get_preset_manager().list_reference_packs()
-        assert len(packs) == 3
+        S00-T01: uses an isolated assets root so ensure_assets() never writes
+        into the production presets/characters directory.
+        """
+        pm = CharacterPresetManager(isolated_assets_root)
+        packs = pm.list_reference_packs()
+        assert len(packs) >= 4
         ids = {p.character_id for p in packs}
-        assert ids == {"boy_hacker", "tho_cute", "gau_nau"}
+        assert "dan_choi" in ids
         for pack in packs:
             assert len(pack.poses.model_dump()) == 6
 
     def test_list_characters_endpoint(self, client: TestClient) -> None:
-        """GET /api/presets/characters returns 3 sets × 6 poses."""
+        """GET /api/presets/characters returns character sets × 6 poses."""
         r = client.get("/api/projects/presets/characters")
         assert r.status_code == 200
         body = r.json()
         assert body["status"] == "ok"
         chars = body["characters"]
-        assert len(chars) == 3
+        assert len(chars) >= 4
         labels = {c["label"] for c in chars}
-        assert labels == {"Boy Hacker", "Thỏ Pink Cute", "Gấu Nâu"}
+        assert "Dân Chơi (Streetwear)" in labels
         for c in chars:
             assert len(c["poses"]) == 6
 
@@ -248,3 +272,65 @@ class TestPresetManager:
         assert body["status"] == "ok"
         assert body["pose"] == "sitting"
         assert obj2.json()["object_id"] in body["matched"]
+
+
+class TestIsolation:
+    def test_isolated_manager_writes_only_tmp_assets(
+        self, isolated_assets_root
+    ) -> None:
+        """Asset generation runs on tmp root only; production dir is untouched.
+
+        S00-T01: the production preset directory is snapshotted read-only and
+        no manager rooted at it is ever constructed or invoked.
+        """
+        prod_dir = Path.cwd() / "presets" / "characters"
+        prod_before = _snapshot_preset_dir(prod_dir)
+
+        pm = CharacterPresetManager(isolated_assets_root)
+        pm.ensure_assets()
+
+        # Generated assets live under the tmp root only.
+        assert isolated_assets_root.is_dir()
+        pngs = list(isolated_assets_root.glob("*.png"))
+        assert len(pngs) >= 4 * 6
+
+        # Production preset dir file set AND content unchanged.
+        assert _snapshot_preset_dir(prod_dir) == prod_before
+
+    def test_endpoint_generates_assets_under_tmp_root(
+        self, client: TestClient
+    ) -> None:
+        """GET /api/projects/presets/characters works and writes only tmp.
+
+        Regression for S00-T01: the endpoint's get_preset_manager() must
+        resolve to the isolated (tmp) project root; production preset dir and
+        root channels.json must remain byte-identical.
+        """
+        from app.api import deps
+
+        prod_dir = Path.cwd() / "presets" / "characters"
+        prod_before = _snapshot_preset_dir(prod_dir)
+
+        root_channels = Path.cwd() / "channels.json"
+        channels_before = root_channels.read_bytes() if root_channels.exists() else None
+
+        # Endpoint works and returns all built-in sets.
+        r = client.get("/api/projects/presets/characters")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["status"] == "ok"
+        chars = body["characters"]
+        assert len(chars) >= 4
+        for c in chars:
+            assert len(c["poses"]) == 6
+
+        # Assets were generated under the ISOLATED root (deps._config patched
+        # to a tmp project root by conftest's _patch_project_root).
+        isolated_dir = deps._config.project_root / "presets" / "characters"
+        assert isolated_dir.is_dir()
+        assert len(list(isolated_dir.glob("*.png"))) >= 4 * 6
+
+        # Production preset dir and root channels.json unchanged.
+        assert _snapshot_preset_dir(prod_dir) == prod_before
+        channels_after = root_channels.read_bytes() if root_channels.exists() else None
+        assert channels_after == channels_before

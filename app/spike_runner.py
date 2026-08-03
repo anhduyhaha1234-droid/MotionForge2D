@@ -22,6 +22,7 @@ import logging
 import time
 import tracemalloc
 from pathlib import Path
+from typing import Any
 
 import cv2
 import numpy as np
@@ -92,7 +93,7 @@ def run_spike(
     backend: str = "contour",
     output_dir: str | None = None,
     project_name: str = "spike_project",
-) -> dict:
+) -> dict[str, Any]:
     """Run the full vertical spike pipeline.
 
     Returns:
@@ -105,7 +106,7 @@ def run_spike(
     out_dir = Path(output_dir) if output_dir else config.output_dir
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    results: dict = {"steps": {}}
+    results: dict[str, Any] = {"steps": {}}
     timings: dict[str, float] = {}
 
     # ─── Start tracking ───────────────────────────────────────────────────
@@ -192,6 +193,8 @@ def run_spike(
         logger.info(f"  Using bbox ({bbox_x},{bbox_y},{bbox_w},{bbox_h}) at frame {sel_idx}")
     else:
         # Auto-detect: find centroid of largest region
+        if sel_frame is None:
+            raise RuntimeError(f"Could not read selection frame: {frame_paths[sel_idx]}")
         cx, cy = find_centroid_of_largest_region(sel_frame)
         selection = SelectionInput(
             mode=SelectionMode.POINT,
@@ -207,7 +210,7 @@ def run_spike(
     logger.info(f"Step 6: Segmenting with {backend} backend...")
     t0 = time.perf_counter()
 
-    seg_kwargs: dict = {}
+    seg_kwargs: dict[str, object] = {}
     if backend == "sam2":
         seg_kwargs = {
             "model_cfg": config.sam2_model_cfg,
@@ -216,6 +219,8 @@ def run_spike(
     seg_adapter = create_segmentation_adapter(backend=backend, **seg_kwargs)
 
     # Generate initial mask
+    if sel_frame is None:
+        raise RuntimeError(f"Could not read selection frame: {frame_paths[sel_idx]}")
     initial_mask = seg_adapter.segment_frame(sel_frame, selection)
     timings["segment_initial"] = time.perf_counter() - t0
     logger.info(f"  Initial mask generated: {np.count_nonzero(initial_mask)} nonzero pixels")
@@ -232,7 +237,12 @@ def run_spike(
     t0 = time.perf_counter()
 
     # Load all frames
-    all_frames = [cv2.imread(str(p)) for p in frame_paths]
+    all_frames: list[np.ndarray] = []
+    for p in frame_paths:
+        img = cv2.imread(str(p))
+        if img is None:
+            raise RuntimeError(f"Could not read frame: {p}")
+        all_frames.append(img)
 
     # Propagate masks
     masks = seg_adapter.propagate_masks(all_frames, initial_mask, sel_idx)

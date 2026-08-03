@@ -33,6 +33,6 @@ app.include_router(frames.router)
 @app.get("/api/v1/health")
 @app.head("/health")
 @app.head("/api/v1/health")
-def health_check() -> dict:
+def health_check() -> dict[str, str]:
     """Health check endpoint."""
     return {"status": "ok", "service": "motionforge-2d"}

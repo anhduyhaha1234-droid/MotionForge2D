@@ -152,18 +152,20 @@ export function ScreenD() {
 
   /* ── Replacement image URL ──────────────────────────────────────────── */
 
-  // Cache-bust: append timestamp + asset_path version so the browser never
-  // serves a stale replacement image after a new upload.
+  // Cache-bust: append a nonce + asset_path version so the browser never
+  // serves a stale replacement image after a new upload. The nonce is bumped
+  // after uploads/preset applies (never during render — keeps render pure).
+  const [reloadNonce, setReloadNonce] = useState(0);
   const replacementUrl =
     projectId && objectId && replacement.asset_path
-      ? `${api.getReplacementImageUrl(projectId, objectId)}?t=${Date.now()}&v=${encodeURIComponent(replacement.asset_path)}`
+      ? `${api.getReplacementImageUrl(projectId, objectId)}?t=${reloadNonce}&v=${encodeURIComponent(replacement.asset_path)}`
       : null;
 
   // Inpainted (background-cleaned) frame URL — shows the scene with the
   // original character removed as the base layer.
   const inpaintedUrl =
     projectId && objectId
-      ? `${api.getInpaintedFrameUrl(projectId, objectId, currentFrame)}?t=${Date.now()}`
+      ? `${api.getInpaintedFrameUrl(projectId, objectId, currentFrame)}?t=${reloadNonce}`
       : null;
 
   // Preview flow: store file locally, show side-by-side modal, upload only on confirm
@@ -202,6 +204,7 @@ export function ScreenD() {
         mode: "static_asset",
         asset_path: data.asset_path,
       });
+      setReloadNonce((n) => n + 1);
       setConfirmedReplacement({
         originalName: activeObject?.name ?? "Nhân vật gốc",
         newFileName: `🎭 ${data.set_key}/${data.pose}`,
@@ -232,6 +235,8 @@ export function ScreenD() {
           previewUrl: pendingPreview,
         });
       }
+      // Bump nonce so the new replacement image is fetched fresh (cache-bust)
+      setReloadNonce((n) => n + 1);
       // Close modal + clear pending preview
       setPendingFile(null);
     },
@@ -481,7 +486,7 @@ export function ScreenD() {
                 </span>
               </div>
               <p className="text-[10px] text-purple-300/80 leading-tight">
-                Nhấn nút <strong className="text-green-400">"Áp dụng"</strong> ở cột bên phải để hoàn tất thay đổi cho tất cả phân cảnh.
+                Nhấn nút <strong className="text-green-400">&quot;Áp dụng&quot;</strong> ở cột bên phải để hoàn tất thay đổi cho tất cả phân cảnh.
               </p>
             </div>
           )}

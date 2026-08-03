@@ -24,11 +24,11 @@ def find_frame_path(scene_dir: Path, frame_index: int) -> Path | None:
     return None
 
 
-def job_response(info: JobInfo) -> dict:
+def job_response(info: JobInfo) -> dict[str, object]:
     """Serialize JobInfo with 'status' key for frontend compatibility.
 
     Frontend expects 'status', backend model uses 'state'.
     """
-    data = info.model_dump()
+    data: dict[str, object] = info.model_dump()
     data["status"] = data.pop("state")
     return data

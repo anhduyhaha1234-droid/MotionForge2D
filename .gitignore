@@ -30,6 +30,7 @@ htmlcov/
 # Output (generated artifacts)
 output/
 output_m05/
+output/quality-baseline/
 projects/
 
 # Model checkpoints (large binaries)

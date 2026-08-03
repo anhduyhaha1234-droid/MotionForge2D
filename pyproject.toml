@@ -37,6 +37,11 @@ dev = [
 sam2 = [
     "SAM-2>=1.0",
 ]
+dubbing = [
+    "edge-tts>=7.0",
+    "openai-whisper>=20240601",
+    "deep-translator>=1.11",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]
