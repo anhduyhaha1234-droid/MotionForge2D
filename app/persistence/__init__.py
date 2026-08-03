@@ -84,6 +84,18 @@ from app.persistence.legacy_preview import (
     PathIssue,
     PreviewIssue,
 )
+from app.persistence.projects import (
+    ACTIVE_PROJECT_STATUS,
+    ARCHIVED_PROJECT_STATUS,
+    PROJECT_STATUSES,
+    ChannelReferenceError,
+    ProjectConflictError,
+    ProjectNotFoundError,
+    ProjectRecord,
+    ProjectRepository,
+    ProjectService,
+    normalize_project_name,
+)
 from app.persistence.revision import (
     SCHEMA_REVISION_REFUSED_MESSAGE,
     assert_schema_revision_supported,
@@ -92,7 +104,9 @@ from app.persistence.revision import (
 )
 
 __all__ = [
+    "ACTIVE_PROJECT_STATUS",
     "ACTIVE_STATUS",
+    "ARCHIVED_PROJECT_STATUS",
     "ARCHIVED_STATUS",
     "ArtifactReferenceError",
     "BACKUP_MANIFEST_NAME",
@@ -107,6 +121,7 @@ __all__ = [
     "INFO",
     "INVALID_STATE_TRANSITION_CODE",
     "LEASE_CONFLICT_CODE",
+    "PROJECT_STATUSES",
     "SCHEMA_REVISION_REFUSED_MESSAGE",
     "TERMINAL_STATES",
     "WARNING",
@@ -119,6 +134,7 @@ __all__ = [
     "ChannelRecord",
     "ChannelRepository",
     "ChannelService",
+    "ChannelReferenceError",
     "EventRecord",
     "FencedWorkerError",
     "IdempotencyKeyInUse",
@@ -149,6 +165,11 @@ __all__ = [
     "PathCheck",
     "PathIssue",
     "PreviewIssue",
+    "ProjectConflictError",
+    "ProjectNotFoundError",
+    "ProjectRecord",
+    "ProjectRepository",
+    "ProjectService",
     "RestoreResult",
     "StepInput",
     "StepRecord",
@@ -168,6 +189,7 @@ __all__ = [
     "max_supported_schema_revision",
     "normalize_channel_name",
     "normalize_managed_path",
+    "normalize_project_name",
     "parse_json",
     "terminal_job_states",
 ]

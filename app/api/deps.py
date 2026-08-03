@@ -22,6 +22,7 @@ from app.workflow.segmentation_service import SegmentationService
 
 if TYPE_CHECKING:
     from app.persistence.channels import ChannelService
+    from app.persistence.projects import ProjectService
     from app.workflow.job_service import JobService
 
 # Singletons shared across the application
@@ -32,6 +33,7 @@ _config: AppConfig = config
 #: side effects (AC1).
 _job_service: JobService | None = None
 _channel_service: ChannelService | None = None
+_project_service: ProjectService | None = None
 _project_wf = ProjectWorkflowService(_config)
 _seg_service = SegmentationService(_config)
 _obj_extraction = ObjectExtractionService()
@@ -81,6 +83,35 @@ def get_channel_service() -> ChannelService:
             )
         _channel_service = ChannelService(factory)
     return _channel_service
+
+
+def get_project_service() -> ProjectService:
+    """Return the process-wide durable ProjectService (lazy).
+
+    The session factory resolves from the durable database the app
+    lifecycle initializes (same path as :func:`get_channel_service`);
+    tests inject ``deps._lifecycle_db`` / a patched ``deps._job_service``
+    so the project service always targets the same isolated database.
+    Laziness means importing this module constructs nothing.
+    """
+    global _project_service
+    if _project_service is None:
+        from app.persistence import create_engine_for_path, create_session_factory
+        from app.persistence.projects import ProjectService
+
+        job_service = get_job_service()
+        session_factory = getattr(job_service, "_session_factory", None)
+        if session_factory is not None:
+            factory = session_factory
+        else:
+            injected = getattr(_config, "project_root", None)
+            from app.lifecycle import default_database_path
+
+            factory = create_session_factory(
+                create_engine_for_path(default_database_path(injected))
+            )
+        _project_service = ProjectService(factory)
+    return _project_service
 
 
 def get_project_workflow() -> ProjectWorkflowService:

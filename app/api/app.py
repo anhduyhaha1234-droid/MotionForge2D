@@ -18,7 +18,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import deps
-from app.api.routes import channels, frames, jobs, projects
+from app.api.routes import channels, durable_projects, frames, jobs, projects
 from app.lifecycle import Lifecycle, default_database_path
 from app.persistence import create_engine_for_path, create_session_factory
 
@@ -80,6 +80,9 @@ app.include_router(projects.router)
 app.include_router(jobs.router)
 app.include_router(frames.router)
 app.include_router(channels.router)
+# Durable Project API (S03-T02) — isolated under /api/v2/projects, never
+# shadows the legacy /api/projects router (AC7 namespace isolation).
+app.include_router(durable_projects.router)
 
 
 @app.get("/health")

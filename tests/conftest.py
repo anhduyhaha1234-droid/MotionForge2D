@@ -138,6 +138,8 @@ def _patch_project_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path
     # durable DB path for this test (the singleton caches its session
     # factory across tests otherwise).
     monkeypatch.setattr(deps, "_channel_service", None, raising=False)
+    # Reset the lazy durable project-service singleton the same way.
+    monkeypatch.setattr(deps, "_project_service", None, raising=False)
     # Ensure the durable database the app lifespan may target is the test DB
     # (TestClient triggers the lifespan; without this the lifespan would
     # create/upgrade a real ``motionforge.db`` under the patched root).

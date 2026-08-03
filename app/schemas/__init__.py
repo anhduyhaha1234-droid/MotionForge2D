@@ -410,6 +410,128 @@ def _dt_iso_optional(value: Any) -> str | None:
 
 # ─── Project ──────────────────────────────────────────────────────────────────
 
+#: Approved durable Project lifecycle states (PERSISTENCE_DOMAIN_CONTRACT §4).
+PROJECT_STATUS_VALUES = (
+    "draft",
+    "active",
+    "needs_review",
+    "rendering",
+    "completed",
+    "archived",
+)
+
+
+class ProjectStatus(str, Enum):
+    """Approved project statuses (contract §4)."""
+
+    DRAFT = "draft"
+    ACTIVE = "active"
+    NEEDS_REVIEW = "needs_review"
+    RENDERING = "rendering"
+    COMPLETED = "completed"
+    ARCHIVED = "archived"
+
+
+class DurableProjectData(BaseModel):
+    """API DTO for a durable Project row.
+
+    Never exposes ORM objects or absolute paths.  ``workspace_id`` is the
+    explicit ownership key; ``revision`` is the optimistic-concurrency
+    token required by every business update (AC4).  Channel references are
+    exposed as plain ids (``source_channel_id`` / ``production_channel_id``).
+    """
+
+    project_id: str
+    workspace_id: str
+    name: str
+    description: str = ""
+    status: ProjectStatus = ProjectStatus.DRAFT
+    source_channel_id: str | None = None
+    production_channel_id: str | None = None
+    default_output_profile: str | None = None
+    resume_step: str | None = None
+    archived_at: str | None = None
+    created_at: str
+    updated_at: str
+    revision: int = 1
+
+    @classmethod
+    def from_row(cls, row: Any) -> DurableProjectData:
+        """Map a repository read record (DTO boundary: no ORM escape)."""
+        return cls(
+            project_id=row.id,
+            workspace_id=row.workspace_id,
+            name=row.name,
+            description=row.description or "",
+            status=ProjectStatus(row.status),
+            source_channel_id=row.source_channel_id,
+            production_channel_id=row.production_channel_id,
+            default_output_profile=row.default_output_profile,
+            resume_step=row.resume_step,
+            archived_at=_dt_iso_optional(row.archived_at),
+            created_at=_dt_iso(row.created_at),
+            updated_at=_dt_iso(row.updated_at),
+            revision=row.revision,
+        )
+
+
+class ProjectCreate(BaseModel):
+    """Create payload (AC1/AC2)."""
+
+    name: str = Field(min_length=1, max_length=200)
+    description: str = ""
+    source_channel_id: str | None = None
+    production_channel_id: str | None = None
+    default_output_profile: str | None = None
+    resume_step: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def _name_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("name must not be blank")
+        return value
+
+
+class ProjectUpdate(BaseModel):
+    """Update payload — must carry the expected revision (AC4).
+
+    Nullable fields distinguish **omitted** (no change) from explicit
+    JSON ``null`` (clear the stored value) via ``model_fields_set``.
+    Channel references are nullable/clearable (AC3).
+    """
+
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = None
+    status: ProjectStatus | None = None
+    source_channel_id: str | None = None
+    production_channel_id: str | None = None
+    default_output_profile: str | None = None
+    resume_step: str | None = None
+    revision: int = Field(ge=1)
+
+    @field_validator("name")
+    @classmethod
+    def _name_not_blank(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("name must not be blank")
+        return value
+
+
+class ProjectArchiveRequest(BaseModel):
+    """Archive payload — expected revision required (atomic CAS, AC4/AC5)."""
+
+    revision: int = Field(ge=1)
+
+
+class ProjectListResponse(BaseModel):
+    """List response: ``active_only`` excludes archived by default (AC5)."""
+
+    workspace_id: str
+    active_only: bool = True
+    projects: list[DurableProjectData] = Field(default_factory=list)
+
+
 class ProjectData(BaseModel):
     """Top-level project state, serializable to JSON.
 

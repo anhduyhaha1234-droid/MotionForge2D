@@ -690,6 +690,156 @@ def test_s03_head_descends_from_s02_revision() -> None:
     assert "1c9f2a4b7d8e" in ancestry
 
 
+# ── AC8: S03-T02 upgrade-from-S03-T01-head preservation ──────────────────────
+#
+# S03-T02 adds NO migration: the S01 ``project`` table already enforces
+# the approved project contract (name 1-200 CHECK, exact status CHECK,
+# revision>0 CHECK, RESTRICT FKs to workspace/channel).  These tests
+# prove an upgrade from the S03-T01 head to the current head preserves
+# every Project/Channel row and their references, and that no schema
+# drift (new tables) was introduced.
+
+
+def test_s03t02_no_migration_needed_head_unchanged() -> None:
+    """AC8: the S03-T02 head is the S03-T01 head (no new migration)."""
+    from alembic.script import ScriptDirectory
+
+    script = ScriptDirectory(str(PROJECT_ROOT / "migrations"))
+    head = script.get_current_head()
+    assert head is not None
+    assert head == "1c9f2a4b7d8e", (
+        "S03-T02 must not add a migration: the existing schema already "
+        "enforces the project contract (PERSISTENCE_DOMAIN_CONTRACT §4)."
+    )
+
+
+def test_upgrade_from_s03t01_preserves_project_rows(tmp_path: Path) -> None:
+    """AC8: upgrading a S03-T01-head database preserves Project/Channel rows.
+
+    Builds a database at the S03-T01 head (``1c9f2a4b7d8e``), inserts
+    project rows with channel references, re-runs ``alembic upgrade head``
+    (a no-op on the same revision), and proves row identity + required
+    data + FK references survived byte-identically.
+    """
+    db = tmp_path / "s03t01_to_head.db"
+    _upgrade_to_revision(db, "1c9f2a4b7d8e")
+    engine = create_engine_for_path(db)
+    with Session(engine) as session:
+        ws = Workspace(id="default", name="default")
+        session.add(ws)
+        session.flush()
+        src = Channel(workspace_id="default", role="source", name="Src")
+        prod = Channel(workspace_id="default", role="production", name="Prod")
+        session.add_all([src, prod])
+        session.flush()
+        project = Project(
+            workspace_id="default",
+            name="S03-T02 Project",
+            description="keep me",
+            status="needs_review",
+            source_channel_id=src.id,
+            production_channel_id=prod.id,
+            default_output_profile="1080p",
+            resume_step="scene-review",
+        )
+        session.add(project)
+        session.commit()
+        project_id = project.id
+        src_id = src.id
+        prod_id = prod.id
+        before = {
+            p.id: (
+                p.workspace_id,
+                p.name,
+                p.description,
+                p.status,
+                p.source_channel_id,
+                p.production_channel_id,
+                p.default_output_profile,
+                p.resume_step,
+                p.revision,
+            )
+            for p in session.scalars(select(Project)).all()
+        }
+
+    _upgrade_to_head(db)
+
+    engine2 = create_engine_for_path(db)
+    with Session(engine2) as session:
+        loaded = session.get(Project, project_id)
+        assert loaded is not None
+        assert loaded.name == "S03-T02 Project"
+        assert loaded.status == "needs_review"
+        assert loaded.source_channel_id == src_id
+        assert loaded.production_channel_id == prod_id
+        assert session.get(Channel, src_id) is not None
+        assert session.get(Channel, prod_id) is not None
+        after = {
+            p.id: (
+                p.workspace_id,
+                p.name,
+                p.description,
+                p.status,
+                p.source_channel_id,
+                p.production_channel_id,
+                p.default_output_profile,
+                p.resume_step,
+                p.revision,
+            )
+            for p in session.scalars(select(Project)).all()
+        }
+    assert after == before, "S03-T01-head project rows were altered"
+
+
+def test_upgrade_from_s03t01_preserves_archived_project_and_references(
+    tmp_path: Path,
+) -> None:
+    """AC8: archived projects and archived channel references survive."""
+    db = tmp_path / "s03t01_to_head_archived.db"
+    _upgrade_to_revision(db, "1c9f2a4b7d8e")
+    engine = create_engine_for_path(db)
+    with Session(engine) as session:
+        ws = Workspace(id="default", name="default")
+        session.add(ws)
+        session.flush()
+        archived_src = Channel(
+            workspace_id="default", role="source", name="Archived Src"
+        )
+        session.add(archived_src)
+        session.flush()
+        archived_src.status = "archived"
+        project = Project(
+            workspace_id="default",
+            name="Archived Project",
+            status="archived",
+            source_channel_id=archived_src.id,
+        )
+        session.add(project)
+        session.commit()
+        project_id = project.id
+        archived_src_id = archived_src.id
+
+    _upgrade_to_head(db)
+
+    engine2 = create_engine_for_path(db)
+    with Session(engine2) as session:
+        loaded = session.get(Project, project_id)
+        assert loaded is not None
+        assert loaded.status == "archived"
+        assert loaded.source_channel_id == archived_src_id
+        archived = session.get(Channel, archived_src_id)
+        assert archived is not None
+        assert archived.status == "archived"
+
+
+def test_s03t02_head_table_set_unchanged(tmp_path: Path) -> None:
+    """AC8: the S03-T02 head adds no tables (no schema drift)."""
+    _upgrade_to_head(tmp_path / "s03t02_head.db")
+    engine = create_engine_for_path(tmp_path / "s03t02_head.db")
+    tables = set(inspect(engine).get_table_names())
+    assert tables == S02_HEAD_TABLES, f"unexpected schema drift: {tables - S02_HEAD_TABLES}"
+
+
 def test_orm_metadata_index_ddl_matches_migration(tmp_path: Path) -> None:
     """PM2 finding 1: ORM metadata compiles the SAME DDL as the migration.
 
