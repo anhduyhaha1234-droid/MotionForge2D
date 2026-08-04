@@ -16,8 +16,8 @@ $popupScript = Join-Path $repoRoot "scripts\show-hermes-autopilot-popup.ps1"
 Set-Location $repoRoot
 
 if ($WaitForProcessId -gt 0) {
-    Add-Content $logPath "$(Get-Date -Format o) waiting_for_pid=$WaitForProcessId"
     Wait-Process -Id $WaitForProcessId -ErrorAction SilentlyContinue
+    Add-Content $logPath "$(Get-Date -Format o) wait_complete_pid=$WaitForProcessId"
 }
 
 for ($turn = 1; $turn -le $MaxTurns; $turn++) {
