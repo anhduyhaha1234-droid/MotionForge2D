@@ -20,3 +20,7 @@ the following messages require attention:
 The durable latest notification is mirrored at
 `output/HERMES_AUTOPILOT_NOTIFICATION.md`. A missing notification means work is
 continuing normally; it is not a failure.
+
+For `DECISION_NEEDED`, `AUTOPILOT_BLOCKED`, and final readiness, Autopilot also
+opens a persistent Windows popup that stays visible until acknowledged. Popup
+implementation: `scripts/show-hermes-autopilot-popup.ps1`.

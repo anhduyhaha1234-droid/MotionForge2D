@@ -12,6 +12,7 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $statePath = Join-Path $repoRoot "docs\pm\AUTOPILOT_STATE.json"
 $logPath = Join-Path $repoRoot "output\hermes-autopilot.log"
 $notificationPath = Join-Path $repoRoot "output\HERMES_AUTOPILOT_NOTIFICATION.md"
+$popupScript = Join-Path $repoRoot "scripts\show-hermes-autopilot-popup.ps1"
 Set-Location $repoRoot
 
 if ($WaitForProcessId -gt 0) {
@@ -31,6 +32,10 @@ for ($turn = 1; $turn -le $MaxTurns; $turn++) {
                 "Open Codex and send: Review tổng thể MotionForge2D và bàn giao bản sử dụng được."
             ) -join [Environment]::NewLine
             Set-Content -Path $notificationPath -Encoding utf8 -Value $notification
+            Start-Process powershell -ArgumentList @(
+                "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $popupScript,
+                "-Type", "READY"
+            ) -WindowStyle Hidden | Out-Null
             exit 0
         }
     }
@@ -44,6 +49,11 @@ for ($turn = 1; $turn -le $MaxTurns; $turn++) {
             "Ask Codex: Kiểm tra blocker Autopilot và tiếp tục."
         ) -join [Environment]::NewLine
         Set-Content -Path $notificationPath -Encoding utf8 -Value $notification
+        Start-Process powershell -ArgumentList @(
+            "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $popupScript,
+            "-Type", "BLOCKED", "-Task", "$($state.active_task)",
+            "-Message", "$($state.blocker)"
+        ) -WindowStyle Hidden | Out-Null
         exit 2
     }
 
