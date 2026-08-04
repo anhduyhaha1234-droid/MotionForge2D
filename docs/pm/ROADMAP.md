@@ -94,7 +94,7 @@ Sprint numbers express dependency order. They do not promise fixed duration. A s
 | Task ID | Session outcome | Depends on | Status |
 |---|---|---|---|
 | S04-T01 | Establish UI tokens, layout primitives and Vietnamese product navigation | S03-T04 | APPROVED |
-| S04-T02 | Home dashboard lists projects, next actions and active jobs | S04-T01 | PLANNED |
+| S04-T02 | Home dashboard lists projects, next actions and active jobs | S04-T01 | APPROVED |
 | S04-T03 | Channel management UX with empty/loading/error states | S04-T02 | PLANNED |
 | S04-T04 | Project Detail manages Video Items, channels and outputs | S04-T02,S03-T04 | PLANNED |
 | S04-T05 | Guided Project Shell persists step readiness and resume location | S04-T04 | PLANNED |
