@@ -1,0 +1,63 @@
+param(
+    [Parameter(Mandatory = $true)]
+    [string]$SessionId,
+    [ValidateSet("A", "B", "C", "D", "FINAL", "ALL")]
+    [string]$ThroughPhase = "ALL",
+    [int]$MaxTurns = 200,
+    [int]$WaitForProcessId = 0
+)
+
+$ErrorActionPreference = "Stop"
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
+$statePath = Join-Path $repoRoot "docs\pm\AUTOPILOT_STATE.json"
+$logPath = Join-Path $repoRoot "output\hermes-autopilot.log"
+$notificationPath = Join-Path $repoRoot "output\HERMES_AUTOPILOT_NOTIFICATION.md"
+Set-Location $repoRoot
+
+if ($WaitForProcessId -gt 0) {
+    Add-Content $logPath "$(Get-Date -Format o) waiting_for_pid=$WaitForProcessId"
+    Wait-Process -Id $WaitForProcessId -ErrorAction SilentlyContinue
+}
+
+for ($turn = 1; $turn -le $MaxTurns; $turn++) {
+    $state = Get-Content $statePath -Raw -Encoding utf8 | ConvertFrom-Json
+    if ($state.status -eq "SUCCESS") {
+        if ($ThroughPhase -eq "ALL" -or $state.phase -eq $ThroughPhase) {
+            Add-Content $logPath "$(Get-Date -Format o) SUCCESS phase=$($state.phase)"
+            Set-Content -Path $notificationPath -Encoding utf8 -Value @"
+🏁 PROJECT_READY_FOR_CODEX_REVIEW
+
+Hermes completed the selected roadmap scope and final quality evidence.
+Open Codex and send: `Review tổng thể MotionForge2D và bàn giao bản sử dụng được.`
+"@
+            exit 0
+        }
+    }
+    if ($state.status -eq "BLOCKED") {
+        Add-Content $logPath "$(Get-Date -Format o) BLOCKED $($state.blocker)"
+        Set-Content -Path $notificationPath -Encoding utf8 -Value @"
+🛑 AUTOPILOT_BLOCKED $($state.active_task)
+
+$($state.blocker)
+
+Ask Codex: `Kiểm tra blocker Autopilot và tiếp tục`.
+"@
+        exit 2
+    }
+
+    $prompt = @"
+Continue MotionForge2D autonomously using the motionforge-autopilot skill.
+Read docs/pm/AUTOPILOT_STATE.json and current repository evidence first.
+Runner target is phase $ThroughPhase. Complete the next durable checkpoint,
+update state atomically, and continue through ordinary failures. Do not merely
+report progress. End only with the skill's CHECKPOINT/SUCCESS/BLOCKED contract.
+"@
+    Add-Content $logPath "$(Get-Date -Format o) turn=$turn session=$SessionId phase=$($state.phase) task=$($state.active_task)"
+    & hermes --resume $SessionId --skills motionforge-autopilot --oneshot $prompt --pass-session-id *>> $logPath
+    if ($LASTEXITCODE -ne 0) {
+        Add-Content $logPath "$(Get-Date -Format o) hermes_exit=$LASTEXITCODE; retrying same durable state"
+    }
+}
+
+Add-Content $logPath "$(Get-Date -Format o) BLOCKED max_turns=$MaxTurns"
+exit 3
