@@ -20,6 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import deps
 from app.api.routes import (
     channels,
+    durable_characters,
     durable_projects,
     durable_videos,
     frames,
@@ -94,6 +95,7 @@ app.include_router(durable_projects.router)
 # /api/v2/projects/{project_id:uuid}/videos namespace, disjoint from every
 # legacy route (AC1/AC9 namespace isolation).
 app.include_router(durable_videos.router)
+app.include_router(durable_characters.router)
 
 
 @app.get("/health")

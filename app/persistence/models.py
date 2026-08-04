@@ -27,23 +27,14 @@ from sqlalchemy import (
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 __all__ = [
-    "ARTIFACT_KINDS",
-    "ARTIFACT_STATES",
-    "ARCHIVED_VIDEO_STATUS",
-    "CHANNEL_ROLES",
-    "CHANNEL_STATUSES",
-    "JOB_ACTORS",
-    "JOB_STATES",
-    "JOB_STEP_STATES",
-    "LEGACY_IMPORT_STATUSES",
-    "OWNER_TYPES",
-    "PROJECT_STATUSES",
-    "RESOURCE_CLASSES",
-    "SCENE_STATUSES",
-    "STEP_TYPES",
-    "VIDEO_PIPELINE_STATES",
-    "Artifact",
-    "ArtifactOwner",
+    "CHARACTER_STATUSES",
+    "CHARACTER_SYMMETRIES",
+    "CHARACTER_TYPES",
+    "CORE_POSE_SLOTS",
+    "PACK_STATUSES",
+    "Character",
+    "CharacterAsset",
+    "CharacterPackVersion",
     "Channel",
     "Job",
     "JobAttempt",
@@ -87,6 +78,11 @@ VIDEO_PIPELINE_STATES = (
 )
 #: Convenience constant: the archive terminal state of a Video Item.
 ARCHIVED_VIDEO_STATUS = "archived"
+CHARACTER_STATUSES = ("draft", "generating", "needs_review", "ready", "archived")
+CHARACTER_TYPES = ("character", "prop", "other")
+CHARACTER_SYMMETRIES = ("symmetric", "asymmetric")
+PACK_STATUSES = ("draft", "validating", "ready", "published", "archived")
+CORE_POSE_SLOTS = ("front", "three_quarter", "side", "back", "sitting", "walking")
 SCENE_STATUSES = ("pending", "draft", "approved")
 ARTIFACT_KINDS = ("video", "image", "audio", "document", "other")
 ARTIFACT_STATES = ("staging", "ready", "trash", "missing", "failed")
@@ -180,6 +176,7 @@ class Workspace(TimestampMixin, Base):
     projects: Mapped[list[Project]] = relationship(back_populates="workspace")
     artifacts: Mapped[list[Artifact]] = relationship(back_populates="workspace")
     jobs: Mapped[list[Job]] = relationship(back_populates="workspace")
+    characters: Mapped[list[Character]] = relationship(back_populates="workspace")
 
 
 class Channel(ArchivableMixin, Base):
@@ -720,3 +717,142 @@ class JobLease(TimestampMixin, Base):
     ttl_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=60)
 
     job: Mapped[Job] = relationship(back_populates="lease")
+
+
+class Character(ArchivableMixin, Base):
+    """Reusable workspace character asset definition."""
+
+    __tablename__ = "character"
+    __table_args__ = (
+        CheckConstraint("length(name) > 0", name="ck_character_name_nonempty"),
+        CheckConstraint("length(name) <= 200", name="ck_character_name_len"),
+        CheckConstraint("length(code) > 0", name="ck_character_code_nonempty"),
+        CheckConstraint("length(code) <= 64", name="ck_character_code_len"),
+        CheckConstraint(
+            "character_type IN ('character','prop','other')",
+            name="ck_character_type",
+        ),
+        CheckConstraint(
+            "symmetry IN ('symmetric','asymmetric')",
+            name="ck_character_symmetry",
+        ),
+        CheckConstraint(
+            "status IN ('draft','generating','needs_review','ready','archived')",
+            name="ck_character_status",
+        ),
+        CheckConstraint("revision > 0", name="ck_character_revision_positive"),
+        Index(
+            "uq_character_active_workspace_code",
+            "workspace_id",
+            sa_text("lower(code)"),
+            unique=True,
+            postgresql_where=sa_text("status != 'archived'"),
+            sqlite_where=sa_text("status != 'archived'"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    code: Mapped[str] = mapped_column(String(64), nullable=False)
+    character_type: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="character"
+    )
+    symmetry: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="symmetric"
+    )
+    status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="draft"
+    )
+    default_version_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey(
+            "character_pack_version.id",
+            ondelete="RESTRICT",
+            use_alter=True,
+            name="fk_character_default_version",
+        ),
+    )
+    description: Mapped[str | None] = mapped_column(Text)
+    revision: Mapped[int] = mapped_column(
+        Integer, default=1, server_default=sa_text("1"), nullable=False
+    )
+
+    workspace: Mapped[Workspace] = relationship(back_populates="characters")
+    versions: Mapped[list[CharacterPackVersion]] = relationship(
+        back_populates="character",
+        foreign_keys="[CharacterPackVersion.character_id]",
+    )
+
+
+class CharacterPackVersion(ArchivableMixin, Base):
+    """Versioned pose pack for a Character."""
+
+    __tablename__ = "character_pack_version"
+    __table_args__ = (
+        UniqueConstraint(
+            "character_id", "version", name="uq_pack_version_character_version"
+        ),
+        CheckConstraint("version > 0", name="ck_pack_version_positive"),
+        CheckConstraint(
+            "status IN ('draft','validating','ready','published','archived')",
+            name="ck_pack_version_status",
+        ),
+        CheckConstraint("revision > 0", name="ck_pack_version_revision_positive"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    character_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("character.id", ondelete="RESTRICT"), nullable=False
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="draft"
+    )
+    validation_json: Mapped[str | None] = mapped_column(Text)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revision: Mapped[int] = mapped_column(
+        Integer, default=1, server_default=sa_text("1"), nullable=False
+    )
+
+    character: Mapped[Character] = relationship(
+        back_populates="versions",
+        foreign_keys=[character_id],
+    )
+    workspace: Mapped[Workspace] = relationship()
+    assets: Mapped[list[CharacterAsset]] = relationship(back_populates="pack_version")
+
+
+class CharacterAsset(TimestampMixin, Base):
+    """Pose asset slot attachment referencing an Artifact."""
+
+    __tablename__ = "character_asset"
+    __table_args__ = (
+        UniqueConstraint(
+            "pack_version_id", "pose_slot", name="uq_character_asset_version_pose_slot"
+        ),
+        CheckConstraint("length(pose_slot) > 0", name="ck_character_asset_pose_slot_nonempty"),
+        CheckConstraint("length(pose_slot) <= 64", name="ck_character_asset_pose_slot_len"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    pack_version_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("character_pack_version.id", ondelete="RESTRICT"), nullable=False
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    pose_slot: Mapped[str] = mapped_column(String(64), nullable=False)
+    artifact_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("artifact.id", ondelete="RESTRICT"), nullable=False
+    )
+
+    pack_version: Mapped[CharacterPackVersion] = relationship(back_populates="assets")
+    artifact: Mapped[Artifact] = relationship()
+    workspace: Mapped[Workspace] = relationship()
+

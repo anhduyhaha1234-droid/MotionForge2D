@@ -11,7 +11,11 @@ database are created only by the explicit application lifecycle
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Generator
+from typing import TYPE_CHECKING, Annotated
+
+from fastapi import Depends
+from sqlalchemy.orm import Session
 
 from app.config import AppConfig, config
 from app.workflow.object_extraction_service import ObjectExtractionService
@@ -167,3 +171,24 @@ def get_preview_render_service() -> PreviewRenderService:
 
 def get_final_render_service() -> FinalRenderService:
     return _final_render
+
+
+def get_db_session() -> Generator[Session, None, None]:
+    """Yield a database Session from the process-wide session factory."""
+    job_service = get_job_service()
+    session_factory = getattr(job_service, "_session_factory", None)
+    if session_factory is None:
+        from app.lifecycle import default_database_path
+        from app.persistence import create_engine_for_path, create_session_factory
+
+        session_factory = create_session_factory(
+            create_engine_for_path(default_database_path())
+        )
+    session = session_factory()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
+SessionDep = Annotated[Session, Depends(get_db_session)]

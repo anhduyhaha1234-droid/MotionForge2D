@@ -393,6 +393,9 @@ def test_no_worker_or_api_cutover_tables(upgraded_db: Path) -> None:
         "job_attempt",
         "job_event",
         "job_lease",
+        "character",
+        "character_pack_version",
+        "character_asset",
     }
     assert not unexpected, f"unexpected tables: {sorted(unexpected)}"
 

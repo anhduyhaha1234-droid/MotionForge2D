@@ -149,6 +149,11 @@ S02_HEAD_TABLES = {
     "job_lease",
     "alembic_version",
 }
+S06_HEAD_TABLES = S02_HEAD_TABLES | {
+    "character",
+    "character_pack_version",
+    "character_asset",
+}
 
 
 def test_initial_schema_has_expected_tables(upgraded_db: Path) -> None:
@@ -203,7 +208,7 @@ def test_no_api_cutover_tables(upgraded_db: Path) -> None:
     """No API/session tables outside the approved contract exist."""
     engine = create_engine_for_path(upgraded_db)
     tables = set(inspect(engine).get_table_names())
-    unexpected = tables - S02_HEAD_TABLES
+    unexpected = tables - S06_HEAD_TABLES
     assert not unexpected, f"unexpected tables: {sorted(unexpected)}"
 
 
@@ -536,7 +541,7 @@ def test_s03_head_reuses_s01_channel_schema_no_new_tables(tmp_path: Path) -> Non
     _upgrade_to_head(tmp_path / "s03_head.db")
     engine = create_engine_for_path(tmp_path / "s03_head.db")
     tables = set(inspect(engine).get_table_names())
-    assert tables == S02_HEAD_TABLES, f"unexpected schema drift: {tables - S02_HEAD_TABLES}"
+    assert tables == S06_HEAD_TABLES, f"unexpected schema drift: {tables - S06_HEAD_TABLES}"
     # The durable channel repository works directly on the S01 channel table.
     with Session(engine) as session:
         session.add(Workspace(id=DEFAULT_WORKSPACE_ID, name=DEFAULT_WORKSPACE_ID))
@@ -682,12 +687,12 @@ def test_s03_head_descends_from_s02_revision() -> None:
     script = ScriptDirectory(str(PROJECT_ROOT / "migrations"))
     head = script.get_current_head()
     assert head is not None
-    assert head == "1c9f2a4b7d8e"
+    assert head == "d5e6f7a8b9c0"
     ancestry: set[str] = set()
     for rev in script.walk_revisions(base="23b308b1fd0b", head=head):
         ancestry.add(rev.revision)
     assert "23b308b1fd0b" in ancestry
-    assert "1c9f2a4b7d8e" in ancestry
+    assert "d5e6f7a8b9c0" in ancestry
 
 
 # ── AC8: S03-T02 upgrade-from-S03-T01-head preservation ──────────────────────
@@ -707,7 +712,7 @@ def test_s03t02_no_migration_needed_head_unchanged() -> None:
     script = ScriptDirectory(str(PROJECT_ROOT / "migrations"))
     head = script.get_current_head()
     assert head is not None
-    assert head == "1c9f2a4b7d8e", (
+    assert head == "d5e6f7a8b9c0", (
         "S03-T02 must not add a migration: the existing schema already "
         "enforces the project contract (PERSISTENCE_DOMAIN_CONTRACT §4)."
     )
@@ -837,7 +842,7 @@ def test_s03t02_head_table_set_unchanged(tmp_path: Path) -> None:
     _upgrade_to_head(tmp_path / "s03t02_head.db")
     engine = create_engine_for_path(tmp_path / "s03t02_head.db")
     tables = set(inspect(engine).get_table_names())
-    assert tables == S02_HEAD_TABLES, f"unexpected schema drift: {tables - S02_HEAD_TABLES}"
+    assert tables == S06_HEAD_TABLES, f"unexpected schema drift: {tables - S06_HEAD_TABLES}"
 
 
 def _seed_video_item_for_upgrade(
@@ -967,7 +972,7 @@ def test_upgrade_from_current_head_noop_preserves_full_video_item(
     assert database_schema_revision(engine2) == max_supported_schema_revision(
         PROJECT_ROOT / "migrations"
     )
-    assert database_schema_revision(engine2) == "1c9f2a4b7d8e"
+    assert database_schema_revision(engine2) == "d5e6f7a8b9c0"
 
 
 def _snapshot_video_item(video: VideoItem) -> dict[str, object]:
