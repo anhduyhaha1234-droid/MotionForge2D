@@ -3,7 +3,7 @@
 **Owner:** Hermes skill `motionforge-autopilot`
 **Human review policy:** autonomous task/phase execution; one independent Codex
 audit after Hermes reports final SUCCESS or a requested phase boundary.
-**Pinned coding model:** `ocg/qwen3.7-max` (Hermes MAX); no medium/free fallback.
+**Pinned coding model:** `ocg/deepseek-v4-flash` with Hermes `reasoning_effort: max`; no medium/free fallback.
 
 ## Phase plan
 

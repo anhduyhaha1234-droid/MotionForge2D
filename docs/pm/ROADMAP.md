@@ -85,7 +85,9 @@ Sprint numbers express dependency order. They do not promise fixed duration. A s
 | S03-T01 | Channel CRUD with source/production role and validation | E01 | APPROVED |
 | S03-T02 | Project CRUD with source and production channel relationships | S03-T01 | APPROVED |
 | S03-T03 | Video Item lifecycle, ordering and per-video status | S03-T02 | APPROVED |
-| S03-T04 | Project summary/read-model API for dashboard | S03-T03 | READY |
+| S03-T04 | Project summary/read-model API for dashboard | S03-T03 | APPROVED |
+
+**Sprint status:** APPROVED — exit verified by quality-baseline run `20260804-110540` (7/7 gates PASS).
 
 ### Sprint S04 - New UI shell
 

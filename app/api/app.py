@@ -21,6 +21,7 @@ from app.api import deps
 from app.api.routes import (
     channels,
     durable_projects,
+    durable_summaries,
     durable_videos,
     frames,
     jobs,
@@ -94,6 +95,9 @@ app.include_router(durable_projects.router)
 # /api/v2/projects/{project_id:uuid}/videos namespace, disjoint from every
 # legacy route (AC1/AC9 namespace isolation).
 app.include_router(durable_videos.router)
+# Durable Project summary read model (S03-T04) — read-only collection and
+# item routes under the isolated /api/v2/projects namespace.
+app.include_router(durable_summaries.router)
 
 
 @app.get("/health")

@@ -11,9 +11,13 @@ database are created only by the explicit application lifecycle
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Callable, Iterator
+from typing import TYPE_CHECKING, Annotated
+
+from fastapi import Depends
 
 from app.config import AppConfig, config
+from app.persistence.summaries import SummaryRepository
 from app.workflow.object_extraction_service import ObjectExtractionService
 from app.workflow.project_workflow import ProjectWorkflowService
 from app.workflow.render_service import FinalRenderService, PreviewRenderService
@@ -21,6 +25,8 @@ from app.workflow.replacement_service import ReplacementService
 from app.workflow.segmentation_service import SegmentationService
 
 if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
     from app.persistence.channels import ChannelService
     from app.persistence.projects import ProjectService
     from app.persistence.videos import VideoItemService
@@ -143,6 +149,65 @@ def get_video_service() -> VideoItemService:
             )
         _video_service = VideoItemService(factory)
     return _video_service
+
+
+def get_summary_repository() -> Iterator[SummaryRepository]:
+    """Yield a request-bounded, read-only SummaryRepository (lazy).
+
+    The repository is bound to ONE consistent Session per request — the
+    single read boundary the read-model contract requires (AC1/AC9) —
+    and the session is closed when the request ends.  The factory
+    resolves from the durable database the app lifecycle initializes
+    (tests inject ``deps._lifecycle_db`` / a patched ``deps._job_service``
+    so it targets the same isolated database).  The repository never
+    commits — reads only.
+
+    **Explicit read snapshot (CORRECTION P1.4).**  A single SQLAlchemy
+    Session does NOT by itself prove one SQLite snapshot for many
+    SELECTs (SQLite begins deferred read transactions lazily, so
+    separate statements may observe different committed versions).
+    This dependency therefore begins an explicit transaction at the
+    request boundary and closes it with ``rollback()`` — every SELECT
+    of the request runs inside ONE SQLite snapshot, and the rollback
+    guarantees zero writes escape.  Laziness means importing this module
+    constructs nothing (S02-T05 AC1 pattern).
+    """
+    job_service = get_job_service()
+    session_factory = getattr(job_service, "_session_factory", None)
+    if session_factory is not None:
+        factory: Callable[[], Session] = session_factory
+    else:
+        from app.persistence import create_engine_for_path, create_session_factory
+
+        injected = getattr(_config, "project_root", None)
+        from app.lifecycle import default_database_path
+
+        factory = create_session_factory(
+            create_engine_for_path(default_database_path(injected))
+        )
+    with factory() as session:
+        # CORRECTION P1.4: explicit read transaction => one SQLite snapshot
+        # for the whole request; rollback closes it without any write.
+        #
+        # IMPORTANT: SQLAlchemy's SQLite dialect (pysqlite legacy mode)
+        # treats ``session.begin()`` as a no-op at the DBAPI level — the
+        # underlying connection stays in implicit autocommit and SELECTs
+        # never hold a shared lock, so a concurrent writer could commit
+        # BETWEEN two reads of this request and the summary would be
+        # mixed-time.  Issuing a literal ``BEGIN`` on the driver
+        # connection opens a REAL SQLite read transaction: the snapshot
+        # starts at the first read and the shared lock blocks writers
+        # until ``ROLLBACK``.
+        connection = session.connection()
+        connection.exec_driver_sql("BEGIN")
+        try:
+            yield SummaryRepository(session)
+        finally:
+            session.rollback()
+
+
+#: FastAPI dependency marker: one request-bounded summary repository.
+SummaryRepositoryDep = Annotated[SummaryRepository, Depends(get_summary_repository)]
 
 
 def get_project_workflow() -> ProjectWorkflowService:

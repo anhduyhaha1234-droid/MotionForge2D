@@ -1,6 +1,6 @@
 # S03-T04 - Project summary read model for dashboard
 
-**Status:** READY
+**Status:** APPROVED
 **Epic:** E02 - Production Management and Product Shell
 **Sprint:** S03 - Production management API
 **Gate:** G2 - Production shell

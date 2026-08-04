@@ -5,7 +5,7 @@ param(
     [string]$ThroughPhase = "ALL",
     [int]$MaxTurns = 200,
     [int]$WaitForProcessId = 0,
-    [string]$HermesModel = "ocg/qwen3.7-max"
+    [string]$HermesModel = "ocg/deepseek-v4-flash"
 )
 
 $ErrorActionPreference = "Stop"

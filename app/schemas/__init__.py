@@ -703,6 +703,226 @@ class VideoListResponse(BaseModel):
     videos: list[VideoItemData] = Field(default_factory=list)
 
 
+# ─── Project Summary DTOs (S03-T04) ──────────────────────────────────────────
+
+#: Exact 13-state Video Item pipeline (contract §4) — reused as the
+#: ``by_status`` map keys, including zeroes (read-model contract).
+VIDEO_SUMMARY_STATUS_VALUES = VIDEO_PIPELINE_STATUS_VALUES
+
+
+class NextActionCode(str, Enum):
+    """Semantic next-action codes returned by the backend (never prose).
+
+    Codes are stable and state-driven; the UI owns localization.  ``none``
+    is the honest default when no action is actionable (archived Project,
+    no active videos, everything complete).
+    """
+
+    NONE = "none"
+    ANALYZE_VIDEO = "analyze_video"
+    MAP_OBJECTS = "map_objects"
+    CREATE_DEMO = "create_demo"
+    APPLY_RESKIN = "apply_reskin"
+    REVIEW_WORK = "review_work"
+    EXPORT_VIDEO = "export_video"
+    RETRY_FAILED = "retry_failed"
+
+
+class NextActionBlocker(str, Enum):
+    """Blocker codes for disabled future capabilities (capability honesty).
+
+    Backend returns codes only; unavailable future capabilities remain
+    disabled with an explicit blocker instead of being advertised as
+    enabled (AC4).
+    """
+
+    QC_UNAVAILABLE = "qc_unavailable"
+    OUTPUT_UNAVAILABLE = "output_unavailable"
+    CAPABILITY_UNAVAILABLE = "capability_unavailable"
+
+
+class NextActionData(BaseModel):
+    """One deterministic semantic next action (AC4)."""
+
+    code: NextActionCode = NextActionCode.NONE
+    video_item_id: str | None = None
+    enabled: bool = False
+    blocker: NextActionBlocker | None = None
+
+
+class ChannelSummaryData(BaseModel):
+    """Display-only Channel reference (id + name; no role revalidation).
+
+    Archived referenced Channels remain visible (AC8); the summary never
+    revalidates a channel role or status.
+    """
+
+    channel_id: str
+    name: str
+    role: str
+    status: str
+
+
+class VideoCountsData(BaseModel):
+    """Video Item counts with all 13 statuses including zeroes (AC3).
+
+    ``completion_percent`` is ``completed / active * 100`` and is zero
+    when there are no active videos (CORRECTION P1.3) — the DTO never
+    invents ordinal pipeline progress.
+    """
+
+    active: int = 0
+    archived: int = 0
+    total: int = 0
+    completed: int = 0
+    attention: int = 0
+    completion_percent: float = 0.0
+    by_status: dict[str, int] = Field(default_factory=dict)
+
+
+class ActiveJobData(BaseModel):
+    """A bounded newest-first active Job owned by the Project or its
+    Video Items (AC5).  Exposes no internal/error JSON."""
+
+    job_id: str
+    job_type: str
+    owner_type: str
+    owner_id: str
+    state: str
+    progress: float = 0.0
+    created_at: str | None = None
+
+
+class StorageData(BaseModel):
+    """Known managed storage for the Project's owned Artifacts (AC6)."""
+
+    total_bytes: int = 0
+    artifact_count: int = 0
+    ready_count: int = 0
+    missing_count: int = 0
+    trash_count: int = 0
+    unknown_size_count: int = 0
+
+
+class ProjectSummaryData(BaseModel):
+    """Read-only Project summary for the dashboard (AC1/AC2).
+
+    Never exposes ORM objects, internal JSON, absolute paths, or
+    sensitive job errors.  ``workspace_id`` is the explicit ownership
+    key; ``revision`` is the optimistic-concurrency token.
+    """
+
+    project_id: str
+    workspace_id: str
+    name: str
+    description: str = ""
+    status: ProjectStatus = ProjectStatus.DRAFT
+    revision: int = 1
+    created_at: str
+    updated_at: str
+    archived_at: str | None = None
+    source_channel: ChannelSummaryData | None = None
+    production_channel: ChannelSummaryData | None = None
+    video_counts: VideoCountsData
+    next_action: NextActionData
+    active_jobs: list[ActiveJobData] = Field(default_factory=list)
+    active_job_count: int = 0
+    last_activity_at: str | None = None
+    storage: StorageData
+
+    @classmethod
+    def from_record(cls, record: Any) -> ProjectSummaryData:
+        """Map a repository read record (DTO boundary: no ORM escape)."""
+        return cls(
+            project_id=record.project_id,
+            workspace_id=record.workspace_id,
+            name=record.name,
+            description=record.description or "",
+            status=ProjectStatus(record.status),
+            revision=record.revision,
+            created_at=_dt_iso(record.created_at),
+            updated_at=_dt_iso(record.updated_at),
+            archived_at=_dt_iso_optional(record.archived_at),
+            source_channel=_channel_summary(record.source_channel),
+            production_channel=_channel_summary(record.production_channel),
+            video_counts=VideoCountsData(
+                active=record.video_counts.active,
+                archived=record.video_counts.archived,
+                total=record.video_counts.total,
+                completed=record.video_counts.completed,
+                attention=record.video_counts.attention,
+                completion_percent=record.video_counts.completion_percent,
+                by_status=record.video_counts.by_status,
+            ),
+            next_action=NextActionData(
+                code=NextActionCode(record.next_action),
+                video_item_id=record.next_action_video_item_id,
+                enabled=record.next_action_enabled,
+                blocker=(
+                    NextActionBlocker(record.next_action_blocker)
+                    if record.next_action_blocker is not None
+                    else None
+                ),
+            ),
+            active_jobs=[
+                ActiveJobData(
+                    job_id=job.job_id,
+                    job_type=job.job_type,
+                    owner_type=job.owner_type,
+                    owner_id=job.owner_id,
+                    state=job.state,
+                    progress=job.progress,
+                    created_at=_dt_iso_optional(job.created_at),
+                )
+                for job in record.active_jobs
+            ],
+            active_job_count=record.active_job_count,
+            last_activity_at=_dt_iso_optional(record.last_activity_at),
+            storage=StorageData(
+                total_bytes=record.storage.total_bytes,
+                artifact_count=record.storage.artifact_count,
+                ready_count=record.storage.ready_count,
+                missing_count=record.storage.missing_count,
+                trash_count=record.storage.trash_count,
+                unknown_size_count=record.storage.unknown_size_count,
+            ),
+        )
+
+
+def _channel_summary(
+    record: Any,
+) -> ChannelSummaryData | None:
+    """Map a Channel display record (None stays None)."""
+    if record is None:
+        return None
+    return ChannelSummaryData(
+        channel_id=record.channel_id,
+        name=record.name,
+        role=record.role,
+        status=record.status,
+    )
+
+
+class ProjectSummaryListResponse(BaseModel):
+    """Collection response with deterministic ordering/pagination (AC7).
+
+    ``active_only`` reflects the default filter (archived excluded);
+    ``limit``/``offset`` echo the request so the client can paginate
+    deterministically.  ``total`` is the number of rows on the requested
+    page, and ``has_more`` is ``True`` only when the page is full (a
+    bound, not an estimate).
+    """
+
+    workspace_id: str
+    active_only: bool = True
+    status: str | None = None
+    limit: int
+    offset: int
+    total: int
+    has_more: bool = False
+    summaries: list[ProjectSummaryData] = Field(default_factory=list)
+
+
 class ProjectData(BaseModel):
     """Top-level project state, serializable to JSON.
 
