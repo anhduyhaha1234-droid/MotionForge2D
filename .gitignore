@@ -31,7 +31,7 @@ htmlcov/
 output/
 output_m05/
 output/quality-baseline/
-projects/
+/projects/
 
 # Model checkpoints (large binaries)
 models_checkpoints/*.pt
