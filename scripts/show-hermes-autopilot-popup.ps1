@@ -10,23 +10,23 @@ $shell = New-Object -ComObject WScript.Shell
 
 switch ($Type) {
     "READY" {
-        $title = "MotionForge2D - Sẵn sàng review"
-        $body = "Hermes đã hoàn thành roadmap và kiểm tra cuối.`n`nMở Codex và gửi:`nReview tổng thể MotionForge2D và bàn giao bản sử dụng được."
+        $title = "MotionForge2D - Ready for final review"
+        $body = "Hermes completed the roadmap and final quality checks.`n`nOpen Codex and send:`nReview tong the MotionForge2D va ban giao ban su dung duoc."
         $icon = 64
     }
     "BLOCKED" {
-        $title = "MotionForge2D - Autopilot cần Codex"
-        $body = "Hermes đang bị chặn tại $Task.`n`n$Message`n`nMở Codex và gửi:`nKiểm tra blocker Autopilot và tiếp tục."
+        $title = "MotionForge2D - Autopilot needs Codex"
+        $body = "Hermes is blocked at $Task.`n`n$Message`n`nOpen Codex and send:`nKiem tra blocker Autopilot va tiep tuc."
         $icon = 48
     }
     "DECISION" {
-        $title = "MotionForge2D - Cần quyết định"
-        $body = "Hermes cần quyết định tại $Task.`n`n$Message`n`nMở session MF-Autopilot-Main hoặc gọi Codex."
+        $title = "MotionForge2D - Decision needed"
+        $body = "Hermes needs a decision at $Task.`n`n$Message`n`nOpen MF-Autopilot-Main or ask Codex."
         $icon = 32
     }
     default {
         $title = "MotionForge2D - Popup test"
-        $body = "Popup Autopilot hoạt động.`n`nKhi thấy popup BLOCKED hoặc READY, hãy mở Codex và gửi đúng câu được hiển thị."
+        $body = "The Autopilot popup works.`n`nWhen a BLOCKED or READY popup appears, open Codex and send the exact displayed sentence."
         $icon = 64
     }
 }
