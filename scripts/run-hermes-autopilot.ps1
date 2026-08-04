@@ -4,7 +4,8 @@ param(
     [ValidateSet("A", "B", "C", "D", "FINAL", "ALL")]
     [string]$ThroughPhase = "ALL",
     [int]$MaxTurns = 200,
-    [int]$WaitForProcessId = 0
+    [int]$WaitForProcessId = 0,
+    [string]$HermesModel = "ocg/qwen3.7-max"
 )
 
 $ErrorActionPreference = "Stop"
@@ -65,7 +66,7 @@ for ($turn = 1; $turn -le $MaxTurns; $turn++) {
         "report progress. End only with the skill's CHECKPOINT/SUCCESS/BLOCKED contract."
     ) -join [Environment]::NewLine
     Add-Content $logPath "$(Get-Date -Format o) turn=$turn session=$SessionId phase=$($state.phase) task=$($state.active_task)"
-    & hermes --resume $SessionId --skills motionforge-autopilot --oneshot $prompt --pass-session-id *>> $logPath
+    & hermes -m $HermesModel --resume $SessionId --skills motionforge-autopilot --oneshot $prompt --pass-session-id *>> $logPath
     if ($LASTEXITCODE -ne 0) {
         Add-Content $logPath "$(Get-Date -Format o) hermes_exit=$LASTEXITCODE; retrying same durable state"
     }
