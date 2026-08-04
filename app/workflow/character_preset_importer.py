@@ -1,18 +1,27 @@
 """Preset character asset importer workflow (S06-T02).
 
-Imports pre-existing preset assets into draft Character packs without mutating
-original source files, calculating SHA256 checksums and creating ready Artifacts.
+Imports pre-existing preset pose assets into a new draft Character pack:
+
+- Copies files into managed storage (``artifacts/characters/``) without ever
+  mutating the original preset source files.
+- Registers a managed ``Artifact`` row (state ``ready``) for every copied file
+  with its SHA-256 checksum and byte size.
+- Creates a draft ``Character`` plus its first ``CharacterPackVersion`` (v1).
+- Attaches every available pose asset to its ``pose_slot`` (``front``,
+  ``three_quarter``, ``side``, ``back``, ``sitting``, ``walking``).
+
+The caller owns transaction commit; this service only flushes so the returned
+records and artifact IDs are usable before commit.
 """
 
 from __future__ import annotations
 
-import hashlib
-import shutil
 import uuid
 from pathlib import Path
 
 from sqlalchemy.orm import Session
 
+from app.persistence.artifacts import ManagedRoot
 from app.persistence.characters import (
     CharacterRecord,
     CharacterRepository,
@@ -21,13 +30,17 @@ from app.persistence.characters import (
 )
 from app.persistence.models import CORE_POSE_SLOTS, Artifact
 
+#: Image extension → MIME type used for registered Artifact rows.
+_MIME_BY_SUFFIX: dict[str, str] = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
+}
 
-def _sha256_file(path: Path) -> str:
-    h = hashlib.sha256()
-    with path.open("rb") as f:
-        while chunk := f.read(65536):
-            h.update(chunk)
-    return h.hexdigest()
+#: Extensions probed when no explicit pose mapping entry is provided.
+_POSE_EXTENSIONS: tuple[str, ...] = (".png", ".jpg", ".jpeg", ".webp")
 
 
 class CharacterPresetImporter:
@@ -55,20 +68,27 @@ class CharacterPresetImporter:
             name: Character display name.
             code: Unique character code.
             preset_dir: Directory containing preset pose image files.
-            pose_mapping: Optional map of pose_slot -> filename (e.g. {'front': 'pose_0.png'}).
-                Defaults to slot_name + '.png' or '.jpg'.
-            character_type: 'character', 'prop', or 'other'.
-            symmetry: 'symmetric' or 'asymmetric'.
+            pose_mapping: Optional map of pose_slot -> filename (e.g.
+                ``{'front': 'pose_0.png'}``). Defaults to ``<slot>.png`` /
+                ``.jpg`` / ``.jpeg`` / ``.webp`` discovery.
+            character_type: ``'character'``, ``'prop'``, or ``'other'``.
+            symmetry: ``'symmetric'`` or ``'asymmetric'``.
             description: Optional character description.
 
         Returns:
-            Tuple of (CharacterRecord, PackVersionRecord).
+            Tuple of (CharacterRecord, PackVersionRecord) with attached assets.
+
+        Raises:
+            FileNotFoundError: if *preset_dir* does not exist.
+            CharacterCodeConflictError: if *code* is already active in the
+                workspace.
         """
         if not preset_dir.is_dir():
             raise FileNotFoundError(f"Preset directory {preset_dir} does not exist")
 
         _ensure_workspace(self._session, workspace_id)
         repo = CharacterRepository(self._session)
+        managed = ManagedRoot(self._storage_root)
 
         # 1. Create draft Character
         char_record = repo.create_character(
@@ -85,45 +105,28 @@ class CharacterPresetImporter:
 
         # 3. Process pose slots
         mapping = pose_mapping or {}
-        dest_dir = self._storage_root / "characters" / workspace_id / char_record.id
-        dest_dir.mkdir(parents=True, exist_ok=True)
-
         for slot in CORE_POSE_SLOTS:
-            # Find candidate file
-            candidate_name = mapping.get(slot)
-            src_file: Path | None = None
-            if candidate_name:
-                cand = preset_dir / candidate_name
-                if cand.is_file():
-                    src_file = cand
-            else:
-                for ext in [".png", ".jpg", ".jpeg", ".webp"]:
-                    cand = preset_dir / f"{slot}{ext}"
-                    if cand.is_file():
-                        src_file = cand
-                        break
-
+            src_file = self._find_pose_file(preset_dir, slot, mapping)
             if src_file is None:
                 continue
 
-            # Copy file to managed storage without mutating original
+            # Copy file into managed storage; the original is only read.
             dest_filename = f"{slot}_{uuid.uuid4().hex[:8]}{src_file.suffix}"
-            dest_path = dest_dir / dest_filename
-            shutil.copy2(src_file, dest_path)
-
-            # Register Artifact
-            sha = _sha256_file(dest_path)
-            size = dest_path.stat().st_size
             rel_path = f"characters/{workspace_id}/{char_record.id}/{dest_filename}"
+            with src_file.open("rb") as stream:
+                sha256, size_bytes = managed.atomic_write_stream(rel_path, stream)
 
+            # Register Artifact in state ready
             art = Artifact(
                 workspace_id=workspace_id,
                 kind="image",
                 relative_path=rel_path,
                 state="ready",
-                sha256=sha,
-                size_bytes=size,
-                mime_type="image/png" if src_file.suffix == ".png" else "image/jpeg",
+                sha256=sha256,
+                size_bytes=size_bytes,
+                mime_type=_MIME_BY_SUFFIX.get(
+                    src_file.suffix.lower(), "application/octet-stream"
+                ),
             )
             self._session.add(art)
             self._session.flush()
@@ -139,3 +142,19 @@ class CharacterPresetImporter:
         # Refetch pack version with attached assets
         updated_ver = repo.get_pack_version(ver_record.id, workspace_id)
         return char_record, updated_ver
+
+    def _find_pose_file(
+        self, preset_dir: Path, slot: str, mapping: dict[str, str]
+    ) -> Path | None:
+        """Locate the preset source file for a pose slot, if present."""
+        candidate_name = mapping.get(slot)
+        if candidate_name:
+            candidate = preset_dir / candidate_name
+            if candidate.is_file():
+                return candidate
+            return None
+        for ext in _POSE_EXTENSIONS:
+            candidate = preset_dir / f"{slot}{ext}"
+            if candidate.is_file():
+                return candidate
+        return None
