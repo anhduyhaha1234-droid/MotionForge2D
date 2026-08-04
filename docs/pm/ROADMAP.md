@@ -130,7 +130,7 @@ Sprint numbers express dependency order. They do not promise fixed duration. A s
 
 | Task ID | Session outcome | Depends on | Status |
 |---|---|---|---|
-| S06-T01 | Character, Pack Version, Asset and pose-slot domain/API | E01 | PLANNED |
+| S06-T01 | Character, Pack Version, Asset and pose-slot domain/API | E01 | READY |
 | S06-T02 | Import existing preset assets into draft packs without mutating originals | S06-T01 | PLANNED |
 | S06-T03 | Six required poses, transparency/resolution and completeness validation | S06-T02 | PLANNED |
 | S06-T04 | Character Library browse/search/filter/detail UI | S06-T03,S04-T01 | PLANNED |
