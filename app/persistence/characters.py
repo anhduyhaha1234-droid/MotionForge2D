@@ -53,9 +53,15 @@ class PackVersionImmutableError(CharacterError):
 class PublishValidationFailedError(CharacterError):
     """Publish gate rejected due to missing Core slots or invalid assets."""
 
-    def __init__(self, message: str, missing_slots: list[str]) -> None:
+    def __init__(
+        self,
+        message: str,
+        missing_slots: list[str] | None = None,
+        errors: list[str] | None = None,
+    ) -> None:
         super().__init__(message)
-        self.missing_slots = missing_slots
+        self.missing_slots = list(missing_slots or [])
+        self.errors = list(errors or [])
 
 
 @dataclass(frozen=True)

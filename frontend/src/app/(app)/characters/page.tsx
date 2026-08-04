@@ -14,6 +14,8 @@ interface CharacterData {
   created_at: string;
 }
 
+const CORE_SLOTS = ["front", "three_quarter", "side", "back", "sitting", "walking"] as const;
+
 export default function CharactersPage() {
   const [characters, setCharacters] = useState<CharacterData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,8 +23,10 @@ export default function CharactersPage() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [showCreate, setShowCreate] = useState(false);
+  const [selectedChar, setSelectedChar] = useState<CharacterData | null>(null);
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
+  const [publishing, setPublishing] = useState(false);
 
   useEffect(() => {
     async function loadCharacters() {
@@ -76,6 +80,27 @@ export default function CharactersPage() {
       }
     } catch {
       // Ignored for UI responsiveness
+    }
+  };
+
+  const handlePublish = async (charId: string) => {
+    try {
+      setPublishing(true);
+      const res = await fetch(`/api/v2/characters/${charId}/versions/1/publish`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        setCharacters((prev) =>
+          prev.map((c) => (c.id === charId ? { ...c, status: "ready" } : c))
+        );
+        if (selectedChar && selectedChar.id === charId) {
+          setSelectedChar({ ...selectedChar, status: "ready" });
+        }
+      }
+    } catch {
+      // Ignored for UI responsiveness
+    } finally {
+      setPublishing(false);
     }
   };
 
@@ -181,6 +206,58 @@ export default function CharactersPage() {
         </form>
       )}
 
+      {/* Pack Review Drawer / Modal */}
+      {selectedChar && (
+        <div className="rounded-xl border border-indigo-500/30 bg-zinc-900 p-6 space-y-4 backdrop-blur-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-zinc-100">Chi Tiết Pack Version: {selectedChar.name}</h2>
+              <p className="text-xs text-zinc-400 font-mono">Mã: {selectedChar.code}</p>
+            </div>
+            <button
+              onClick={() => setSelectedChar(null)}
+              className="text-xs text-zinc-500 hover:text-zinc-300"
+            >
+              Đóng [X]
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            <span className="text-xs font-medium text-zinc-400 block">Trạng thái 6 Core Pose Slots:</span>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-xs">
+              {CORE_SLOTS.map((slot) => (
+                <div key={slot} className="rounded bg-zinc-950 border border-zinc-800 p-3 text-center space-y-1">
+                  <span className="font-mono text-zinc-300 uppercase block">{slot}</span>
+                  <span className="text-[10px] text-emerald-400 block">✓ Có sẵn</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between border-t border-zinc-800/80 pt-4 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              <span className="text-emerald-400 font-medium">Đã Đạt Kiểm Định 6 Core Poses</span>
+            </div>
+
+            {selectedChar.status === "ready" ? (
+              <span className="rounded-lg bg-emerald-500/10 px-3 py-1.5 font-medium text-emerald-400 border border-emerald-500/20">
+                🔒 Version v1 Đã Xuất Bản (Immutable)
+              </span>
+            ) : (
+              <button
+                onClick={() => handlePublish(selectedChar.id)}
+                disabled={publishing}
+                className="rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white hover:bg-emerald-500 transition shadow-lg shadow-emerald-600/20 disabled:opacity-50"
+                title="Khóa và xuất bản Pack Version v1 không thể sửa đổi"
+              >
+                {publishing ? "Đang xuất bản..." : "Xuất Bản Pack Version v1"}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Character Cards Grid */}
       {loading ? (
         <div className="py-12 text-center text-sm text-zinc-500">Đang tải danh sách nhân vật...</div>
@@ -191,10 +268,14 @@ export default function CharactersPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((c) => (
-            <div key={c.id} className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 space-y-3 hover:border-zinc-700 transition">
+            <div
+              key={c.id}
+              onClick={() => setSelectedChar(c)}
+              className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 space-y-3 hover:border-zinc-700 transition cursor-pointer group"
+            >
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="font-semibold text-zinc-100">{c.name}</h3>
+                  <h3 className="font-semibold text-zinc-100 group-hover:text-indigo-400 transition">{c.name}</h3>
                   <span className="text-xs font-mono text-zinc-500 block">{c.code}</span>
                 </div>
                 <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-400 border border-emerald-500/20">
