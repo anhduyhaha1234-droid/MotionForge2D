@@ -3,13 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { FolderOpen, Home, Radio, Users } from "lucide-react";
+import { Boxes, FolderOpen, Home, Radio, UploadCloud, Users } from "lucide-react";
 import { api } from "@/lib/api";
 
 const items = [
   { href: "/", label: "Trang chủ", icon: Home },
+  { href: "/import-analyze", label: "Nhập & Phân tích", icon: UploadCloud },
   { href: "/channels", label: "Kênh", icon: Radio },
   { href: "/projects", label: "Dự án", icon: FolderOpen },
+  { href: "/object-gallery", label: "Thư viện đối tượng", icon: Boxes },
   { href: "/characters", label: "Thư viện nhân vật", icon: Users },
 ];
 

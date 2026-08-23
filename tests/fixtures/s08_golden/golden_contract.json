@@ -1,0 +1,86 @@
+{
+  "schema_version": 2,
+  "task": "S08-T06",
+  "correction": "FINDING G — TRUE VERTICAL GOLDEN (Codex CHANGES_REQUESTED)",
+  "contract_written": "2026-08-17T12:00:00Z",
+  "refrozen_before_run": true,
+  "description": "REFROZEN deterministic golden contract for the TRUE-VERTICAL S08 sprint exit. The grouping engine was externally recalibrated to confidence-band v2 (app/services/object_grouping.py, DEFAULT_CALIBRATION_VERSION='2') and a NEW QA-only cross-scene-identity extraction provider was added (server policy 'deterministic-identity' in app/services/object_extraction.py). Expected truth and metric thresholds below are re-derived ANALYTICALLY from those two deterministic algorithms BEFORE any run — never from observed output — and the contract SHA-256 is asserted at test load so any post-hoc edit fails. No threshold may be tuned after observing results. No user data: every value is a synthetic fixture constant.",
+  "policy": {
+    "extraction_provider": "deterministic-identity",
+    "extractor_version": "1.0.0",
+    "grouping_algorithm": "role-fingerprint",
+    "grouping_algorithm_version": "1",
+    "grouping_calibration_version": "2",
+    "decision_threshold": 0.5,
+    "generation_1": "1",
+    "fixture_video": "frontend/e2e/fixtures/s08t04-scenes-8s.mp4 (4 real scenes via the real scene detector)"
+  },
+  "provider_world": {
+    "expected_scene_count": 4,
+    "expected_candidates_from_extractor": [
+      { "index": 0, "name": "Hero", "scene": "s1", "bbox_x": 100, "confidence": 0.68 },
+      { "index": 1, "name": "Twin", "scene": "s1", "bbox_x": 400, "confidence": 0.70 },
+      { "index": 2, "name": "Hero", "scene": "s2", "bbox_x": 110, "confidence": 0.74 },
+      { "index": 3, "name": "Twin", "scene": "s2", "bbox_x": 405, "confidence": 0.70 },
+      { "index": 4, "name": "Hero", "scene": "s3", "bbox_x": 105, "confidence": 0.80 },
+      { "index": 5, "name": "Hero", "scene": "s3", "bbox_x": 900, "confidence": 0.62 },
+      { "index": 6, "name": "Villain", "scene": "s4", "bbox_x": 105, "confidence": 0.86 }
+    ]
+  },
+  "object_truth": {
+    "object_labels": {
+      "role0": "A", "role2": "A", "role4": "A",
+      "role5": "B",
+      "role6": "C",
+      "role1": "D", "role3": "E"
+    },
+    "scenario_cases": {
+      "same_object_across_scenes": "extractor 'Hero' recurs in s1/s2/s3 with a consistent footprint (object A)",
+      "similar_different_objects": "extractor emits a second 'Hero' in s3 at a disjoint footprint (object B); the same-name disjoint CO-OCCURRING pair is suppressed by calibration v2, the two temporally-disjoint pairs are 0.45 advisories",
+      "false_grouping": "v1 'Villain' in s4 matches the hero footprint temporally-disjoint (3x 0.6 ambiguity FPs) and the two 'Twin' roles (objects D/E) get a confident 0.9 FALSE suggestion",
+      "low_confidence_review": "0.45 and 0.6 suggestions are review-facing; nothing auto-confirms",
+      "required_merge": "merge role0+role2 (object A) through the real T03 merge API",
+      "required_split": "injected erroneous merge of Twin roles (D+E) corrected by the real T03 split",
+      "duplicate_display_names_and_rename": "rename role5 'Hero'->'HeroSidekick' through the T05 correction API; the role_id stays stable; the display name is never identity",
+      "source_replacement": "upload a new single-scene fixture + re-analyze -> new generation; new DISCOVER run isolated; current lookup filtered by generation",
+      "restart": "a fresh app process over the SAME root/DB resumes; extraction re-submit is idempotent (reused); curated state + media persist",
+      "queued_and_running_cancel": "queued cancel drains to terminal cancelled with zero effects (S08-R01 engine fix); running cancel covered by the focused suites",
+      "retry_successor": "re-submit after cancel completes with exactly one effect set; the cancelled predecessor stays immutable",
+      "correction_media_refresh": "a geometry correction (occurrence bbox edit) regenerates the role's thumbnail/mask; the content endpoint serves the NEW decodable bytes after completion AND after app restart; unaffected roles' artifact hashes are byte-identical"
+    }
+  },
+  "expected_initial_generation": {
+    "suggestion_count": 9,
+    "confidence_multiset": { "0.9": 4, "0.6": 3, "0.45": 2 },
+    "truth_same_pairs": 3,
+    "truth_different_pairs": 18,
+    "tp": 3, "fp": 4, "fn": 0, "tn": 14,
+    "predicted_metrics": {
+      "grouping_precision": 0.428571,
+      "grouping_recall": 1.0,
+      "proposal_false_merge_rate": 0.222222,
+      "review_low_confidence_rate": 0.222222
+    }
+  },
+  "thresholds": {
+    "grouping_precision_min": 0.40,
+    "grouping_recall_min": 0.95,
+    "proposal_false_merge_rate_max": 0.25,
+    "executed_false_split_rate_max": 0.05,
+    "review_low_confidence_rate_max": 0.30,
+    "post_curation_false_merge_rate_max": 0.0,
+    "post_curation_false_split_rate_max": 0.0,
+    "recompute_scope_ratio_max": 0.5,
+    "runtime_per_scenario_max_s": 300.0,
+    "repeatability": "exact metric-vector equality across two independent vertical runs (rate/count/confidence values only; no ids/timestamps)"
+  },
+  "metrics_separation": {
+    "groups": ["deterministic_contract_correctness", "provider_cross_scene_identity", "grouping", "calibration"],
+    "honesty_notes": [
+      "deterministic_contract_correctness: boolean exact-match of the observed initial generation vs pre-recorded predictions (multiset/counts/confidences); this is a PIPELINE-correctness signal, not model quality.",
+      "provider_cross_scene_identity: whether the deterministic-identity extractor emitted exactly the predicted roles/names/confidences/stable ids — a QA-provider-contract signal.",
+      "grouping: precision/recall/false-merge/false-split/review-rate measured against the OBJECT-LEVEL truth labels of THIS synthetic dataset only.",
+      "calibration: Brier score + ECE computed on the suggestion confidences (label = truth-same) but reported INFORMATIONAL ONLY — N=9 is far below the ~100 needed for a statistically meaningful calibration estimate; NO threshold is applied and no real-world accuracy is claimed."
+    ]
+  }
+}

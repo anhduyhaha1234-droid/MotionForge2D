@@ -18,6 +18,7 @@ under production project/user data.
 
 from __future__ import annotations
 
+import shutil
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -149,6 +150,34 @@ S02_HEAD_TABLES = {
     "job_lease",
     "alembic_version",
 }
+S06_HEAD_TABLES = S02_HEAD_TABLES | {
+    "character",
+    "character_pack_version",
+    "character_asset",
+}
+S08_HEAD_TABLES = S06_HEAD_TABLES | {
+    "object_role",
+    "object_occurrence",
+    "object_grouping_suggestion",
+    "object_role_operation",
+    "object_correction",
+    "object_role_artifact",
+    # S08-A02 structural-evidence bridge (R1) — four new tables.
+    "occurrence_segment",
+    "segment_motion",
+    "scene_graph_occlusion",
+    "scene_graph_contact",
+    # S07-T01 project cast mapping
+    "project_cast_mapping",
+    # S09 additive tables (S09-T00-I04): reskin config + apply checkpoint,
+    # structural-lock manifest, and per-segment render route. The structural
+    # lock manifest itself is the structural_lock_manifest table; unknown
+    # tables still fail the equality/diff assertions below.
+    "reskin_config",
+    "apply_checkpoint",
+    "structural_lock_manifest",
+    "segment_render_route",
+}
 
 
 def test_initial_schema_has_expected_tables(upgraded_db: Path) -> None:
@@ -199,12 +228,29 @@ def test_s01_revision_has_no_job_tables(db_path: Path) -> None:
     assert version == "a1b2c3d4e5f6"
 
 
-def test_no_api_cutover_tables(upgraded_db: Path) -> None:
-    """No API/session tables outside the approved contract exist."""
+def test_no_api_cutover_tables(upgraded_db: Path, tmp_path: Path) -> None:
+    """No API/session tables outside the approved contract exist.
+
+    S09-T00-I04 adversarial control: after the clean-DB assertion passes, a
+    fake unknown table is planted into a COPY of the database and the same
+    unexpected-tables logic must FAIL on the copy — proving normalization
+    does not swallow unknown-table drift.
+    """
     engine = create_engine_for_path(upgraded_db)
     tables = set(inspect(engine).get_table_names())
-    unexpected = tables - S02_HEAD_TABLES
+    unexpected = tables - S08_HEAD_TABLES
     assert not unexpected, f"unexpected tables: {sorted(unexpected)}"
+
+    planted_copy = tmp_path / "planted_unknown_table.db"
+    shutil.copyfile(upgraded_db, planted_copy)
+    planted_engine = create_engine_for_path(planted_copy)
+    with planted_engine.begin() as conn:
+        conn.execute(text("CREATE TABLE sneaky_unknown_table_9d2f (id INTEGER)"))
+    planted_tables = set(inspect(planted_engine).get_table_names())
+    planted_unexpected = planted_tables - S08_HEAD_TABLES
+    assert planted_unexpected == {"sneaky_unknown_table_9d2f"}, (
+        f"adversarial table not detected: {sorted(planted_unexpected)}"
+    )
 
 
 # ── AC4: fresh upgrade twice ─────────────────────────────────────────────────
@@ -532,11 +578,11 @@ def test_upgrade_from_s02_preserves_referencing_project_rows(tmp_path: Path) -> 
 
 
 def test_s03_head_reuses_s01_channel_schema_no_new_tables(tmp_path: Path) -> None:
-    """S03 adds no schema: the head table set is identical to S02's."""
+    """Head is S02's tables plus approved S06 characters and S08 objects."""
     _upgrade_to_head(tmp_path / "s03_head.db")
     engine = create_engine_for_path(tmp_path / "s03_head.db")
     tables = set(inspect(engine).get_table_names())
-    assert tables == S02_HEAD_TABLES, f"unexpected schema drift: {tables - S02_HEAD_TABLES}"
+    assert tables == S08_HEAD_TABLES, f"unexpected schema drift: {tables - S08_HEAD_TABLES}"
     # The durable channel repository works directly on the S01 channel table.
     with Session(engine) as session:
         session.add(Workspace(id=DEFAULT_WORKSPACE_ID, name=DEFAULT_WORKSPACE_ID))
@@ -680,14 +726,20 @@ def test_s03_head_descends_from_s02_revision() -> None:
     from alembic.script import ScriptDirectory
 
     script = ScriptDirectory(str(PROJECT_ROOT / "migrations"))
-    head = script.get_current_head()
-    assert head is not None
-    assert head == "1c9f2a4b7d8e"
+    heads = sorted(script.get_heads())
+    # S09-T00-I04: live head discovery (runtime contract). The single-head
+    # guard is stricter than the old pinned string: a merged second head fails.
+    assert len(heads) == 1, f"expected exactly one Alembic head, got {heads}"
+    head = heads[0]
     ancestry: set[str] = set()
     for rev in script.walk_revisions(base="23b308b1fd0b", head=head):
         ancestry.add(rev.revision)
     assert "23b308b1fd0b" in ancestry
-    assert "1c9f2a4b7d8e" in ancestry
+    assert "d5e6f7a8b9c0" in ancestry
+    assert "e7f8a9b0c1d2" in ancestry
+    assert "f2a3b4c5d6e7" in ancestry
+    assert "f3a4b5c6d7e8" in ancestry
+    assert "f4a5b6c7d8e9" in ancestry
 
 
 # ── AC8: S03-T02 upgrade-from-S03-T01-head preservation ──────────────────────
@@ -701,16 +753,17 @@ def test_s03_head_descends_from_s02_revision() -> None:
 
 
 def test_s03t02_no_migration_needed_head_unchanged() -> None:
-    """AC8: the S03-T02 head is the S03-T01 head (no new migration)."""
+    """S03-T02 added no revision; current S08 head retains S03 ancestry."""
     from alembic.script import ScriptDirectory
 
     script = ScriptDirectory(str(PROJECT_ROOT / "migrations"))
-    head = script.get_current_head()
-    assert head is not None
-    assert head == "1c9f2a4b7d8e", (
-        "S03-T02 must not add a migration: the existing schema already "
-        "enforces the project contract (PERSISTENCE_DOMAIN_CONTRACT §4)."
-    )
+    heads = sorted(script.get_heads())
+    # S09-T00-I04: live head discovery (runtime contract); single-head guard.
+    assert len(heads) == 1, f"expected exactly one Alembic head, got {heads}"
+    head = heads[0]
+    ancestry = {rev.revision for rev in script.walk_revisions(base="1c9f2a4b7d8e", head=head)}
+    assert "1c9f2a4b7d8e" in ancestry
+    assert "d5e6f7a8b9c0" in ancestry
 
 
 def test_upgrade_from_s03t01_preserves_project_rows(tmp_path: Path) -> None:
@@ -833,11 +886,11 @@ def test_upgrade_from_s03t01_preserves_archived_project_and_references(
 
 
 def test_s03t02_head_table_set_unchanged(tmp_path: Path) -> None:
-    """AC8: the S03-T02 head adds no tables (no schema drift)."""
+    """S03-T02 adds no tables beyond the approved S06/S08 schema."""
     _upgrade_to_head(tmp_path / "s03t02_head.db")
     engine = create_engine_for_path(tmp_path / "s03t02_head.db")
     tables = set(inspect(engine).get_table_names())
-    assert tables == S02_HEAD_TABLES, f"unexpected schema drift: {tables - S02_HEAD_TABLES}"
+    assert tables == S08_HEAD_TABLES, f"unexpected schema drift: {tables - S08_HEAD_TABLES}"
 
 
 def _seed_video_item_for_upgrade(
@@ -964,10 +1017,13 @@ def test_upgrade_from_current_head_noop_preserves_full_video_item(
             )
         ) == video_id
     # Migration head is unchanged after the no-op upgrade.
+    # S09-T00-I04: the live runtime contract above is the assertion; the
+    # brittle hard-coded duplicate is removed (not weakened — the equality
+    # with ScriptDirectory-derived max_supported_schema_revision fails on
+    # any head change or unknown DB revision).
     assert database_schema_revision(engine2) == max_supported_schema_revision(
         PROJECT_ROOT / "migrations"
     )
-    assert database_schema_revision(engine2) == "1c9f2a4b7d8e"
 
 
 def _snapshot_video_item(video: VideoItem) -> dict[str, object]:
@@ -1082,3 +1138,182 @@ def _head_db(tmp_path: Path) -> Path:
     db = tmp_path / "orm_meta_head.db"
     _upgrade_to_head(db)
     return db
+
+
+# ── S06 correction: character.default_version_id FK integrity ────────────────
+
+
+def test_character_default_version_fk_present_in_schema(upgraded_db: Path) -> None:
+    """character.default_version_id is a real FK to character_pack_version.id.
+
+    Contract evidence: the migrated schema declares the FK with the ORM's
+    constraint name (fk_character_default_version) and ondelete RESTRICT.
+    """
+    engine = create_engine_for_path(upgraded_db)
+    with engine.connect() as conn:
+        rows = conn.exec_driver_sql(
+            "PRAGMA foreign_key_list('character')"
+        ).all()
+    fks = [r for r in rows if r[3] == "default_version_id"]
+    assert len(fks) == 1, f"expected one default_version_id FK, got {rows}"
+    table, to, on_delete = fks[0][2], fks[0][4], fks[0][6]
+    assert table == "character_pack_version"
+    assert to == "id"
+    assert on_delete == "RESTRICT"
+
+
+def test_character_default_version_fk_name_matches_orm(db_path: Path) -> None:
+    """The migration's FK name matches the ORM constraint (no drift).
+
+    The ORM declares ``Character.default_version_id`` with
+    ``ForeignKey('character_pack_version.id', use_alter=True,
+    name='fk_character_default_version')``; the migration must create the
+    same named constraint so ``alembic check`` sees no schema drift.
+    """
+    from app.persistence.models import Character
+
+    fk = next(
+        fk for fk in Character.__table__.foreign_keys
+        if fk.parent.name == "default_version_id"
+    )
+    assert fk.name == "fk_character_default_version"
+    assert fk.target_fullname == "character_pack_version.id"
+    assert fk.ondelete == "RESTRICT"
+    assert fk.use_alter is True
+
+
+def test_character_default_version_fk_enforced(upgraded_db: Path) -> None:
+    """A character referencing a nonexistent default version must fail."""
+    from app.persistence.models import Character
+
+    engine = create_engine_for_path(upgraded_db)
+    with Session(engine) as session:
+        ws = Workspace(name="FK Enforce Workspace")
+        session.add(ws)
+        session.flush()
+        orphan = Character(
+            workspace_id=ws.id,
+            name="Orphan Default",
+            code="orphan_default",
+            default_version_id="ffffffff-ffff-ffff-ffff-ffffffffffff",
+        )
+        session.add(orphan)
+        with pytest.raises(IntegrityError):
+            session.commit()
+
+
+def test_character_default_version_fk_accepts_valid_reference(
+    upgraded_db: Path,
+) -> None:
+    """A character referencing a real pack version commits cleanly."""
+    from app.persistence.models import Character, CharacterPackVersion
+
+    engine = create_engine_for_path(upgraded_db)
+    with Session(engine) as session:
+        ws = Workspace(name="FK Valid Workspace")
+        session.add(ws)
+        session.flush()
+        char = Character(workspace_id=ws.id, name="Valid Default", code="valid_default")
+        session.add(char)
+        session.flush()
+        char_id = char.id  # capture before expire_on_commit expires attrs
+        version = CharacterPackVersion(
+            character_id=char_id, workspace_id=ws.id, version=1
+        )
+        session.add(version)
+        session.flush()
+        version_id = version.id
+        char.default_version_id = version_id
+        session.commit()
+
+    # Reopen: the reference survives.
+    engine2 = create_engine_for_path(upgraded_db)
+    with Session(engine2) as session:
+        loaded = session.get(Character, char_id)
+        assert loaded is not None
+        assert loaded.default_version_id == version_id
+
+
+def test_character_schema_upgrade_twice_includes_fk(tmp_path: Path) -> None:
+    """Two independent fresh upgrades both carry the default_version FK."""
+    first = tmp_path / "fk_first.db"
+    second = tmp_path / "fk_second.db"
+    for db in (first, second):
+        _upgrade_to_head(db)
+        engine = create_engine_for_path(db)
+        with engine.connect() as conn:
+            rows = conn.exec_driver_sql(
+                "PRAGMA foreign_key_list('character')"
+            ).all()
+        fks = [r for r in rows if r[3] == "default_version_id"]
+        assert len(fks) == 1
+        assert fks[0][2] == "character_pack_version"
+
+
+# ── S06-C2 correction: active code uniqueness index survives batch rebuild ────
+
+
+def test_active_code_index_sql_present_after_fresh_upgrade(upgraded_db: Path) -> None:
+    """The batch FK rebuild must not drop the partial/expression index.
+
+    SQLite reflection skips expression-based partial indexes during the
+    batch table rebuild, so the migration re-creates
+    ``uq_character_active_workspace_code`` explicitly.  Fresh upgrade must
+    leave the index in sqlite_master with lower(code) + partial WHERE.
+    """
+    engine = create_engine_for_path(upgraded_db)
+    with engine.connect() as conn:
+        sql = conn.exec_driver_sql(
+            "SELECT sql FROM sqlite_master WHERE type='index' "
+            "AND name='uq_character_active_workspace_code'"
+        ).scalar()
+    assert sql is not None, "uq_character_active_workspace_code missing after upgrade"
+    assert "lower(code)" in sql, f"index lost expression: {sql}"
+    assert "status != 'archived'" in sql, f"index lost partial WHERE: {sql}"
+    assert sql.startswith("CREATE UNIQUE INDEX"), f"index not unique: {sql}"
+
+
+def test_duplicate_active_code_rejected_after_upgrade(upgraded_db: Path) -> None:
+    """Case-insensitive duplicate ACTIVE codes cannot be inserted."""
+    from app.persistence.models import Character
+
+    engine = create_engine_for_path(upgraded_db)
+    with Session(engine) as session:
+        ws = Workspace(name="Dup Index Workspace")
+        session.add(ws)
+        session.flush()
+        ws_id = ws.id
+        session.add(Character(workspace_id=ws_id, name="First", code="MyHero"))
+        session.commit()
+
+    with Session(engine) as session:
+        dup = Character(workspace_id=ws_id, name="Second", code="myhero")
+        session.add(dup)
+        with pytest.raises(IntegrityError):
+            session.commit()
+
+
+def test_archived_code_reuse_still_allowed_after_upgrade(upgraded_db: Path) -> None:
+    """The partial index (status != 'archived') allows archived-code reuse."""
+    from app.persistence.models import Character
+
+    engine = create_engine_for_path(upgraded_db)
+    with Session(engine) as session:
+        ws = Workspace(name="Archive Index Workspace")
+        session.add(ws)
+        session.flush()
+        ws_id = ws.id
+        first = Character(workspace_id=ws_id, name="First", code="ReuseMe")
+        session.add(first)
+        session.commit()
+
+    with Session(engine) as session:
+        first = session.query(Character).filter(Character.code == "ReuseMe").one()
+        first.status = "archived"
+        session.commit()
+
+    with Session(engine) as session:
+        reused = Character(workspace_id=ws_id, name="Reused", code="reuseme")
+        session.add(reused)
+        session.commit()
+        assert reused.id is not None

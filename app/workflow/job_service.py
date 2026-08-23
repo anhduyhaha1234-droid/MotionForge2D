@@ -35,7 +35,12 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.persistence import JobNotFoundError, JobRepository, StepInput
+from app.persistence import (
+    InvalidStateTransition,
+    JobNotFoundError,
+    JobRepository,
+    StepInput,
+)
 from app.schemas import JobInfo, JobState
 from app.workflow.durable_worker import DurableWorker
 from app.workflow.job_handlers import (
@@ -58,6 +63,11 @@ __all__ = [
 #: The single default step code every API Job uses (one-step Jobs are the
 #: faithful mapping of the legacy single-closure jobs).
 _DEFAULT_STEP_CODE = "run"
+
+#: Bounded re-reads for the guarded cancel transition (S08-R01): a cancel
+#: racing the worker's claim/completion re-reads the live row instead of
+#: surfacing a spurious conflict (contract §6.3 first-writer-wins).
+_CANCEL_TRANSITION_RETRIES = 3
 
 
 def _step_plan() -> list[StepInput]:
@@ -152,6 +162,17 @@ class JobService:
         self._database_path: Path | None = None
         self._engine: Any = None
         self._worker = worker
+        # S08-R01 AC5: the DEFAULT managed artifact root resolves from the
+        # configured absolute project root (app.config / deps._config) —
+        # never from the process CWD (the T06 incident: a QA backend
+        # launched without cd wrote uploads/staging into the worktree root).
+        resolved_root = _default_managed_root() if managed_root is None else Path(managed_root)
+        # S08-R01 AC6 fail-closed: in QA/test mode the effective roots must
+        # be explicit, absolute and isolated from the protected MAIN tree.
+        # Only the managed root is guarded here (side-effect-free
+        # construction); the project root is guarded in ``_ensure_engine``
+        # exactly when the service resolves its default database path.
+        _validate_service_roots(None, resolved_root)
         if self._worker is None:
             from app.workflow.durable_worker import WorkerConfig  # noqa: PLC0415
 
@@ -163,11 +184,47 @@ class JobService:
 
             self._worker = DurableWorker(
                 session_factory or _placeholder,
-                config=WorkerConfig(staging_root=Path(str(managed_root or "artifacts"))),
+                config=WorkerConfig(staging_root=resolved_root),
             )
             register_api_handlers(self._worker)
+            # The ANALYZE_MEDIA dispatcher (S05-T04) routes the approved
+            # import step to the S05-T02 handler and the scene_detect step to
+            # the scene-detection handler — one registered handler per job
+            # class (the worker dispatches by job_type).
+            from app.services.scene_detector import register_scene_detection_handler
+
+            register_scene_detection_handler(self._worker)
+            from app.services.video_proxy import register_generate_proxy_handler
+
+            register_generate_proxy_handler(self._worker)
+            # The DISCOVER_OBJECTS handler (S08-T02): deterministic CI
+            # adapter + explicit production capability/provider path; the
+            # worker dispatches by job_type to this registered handler.
+            from app.services.object_extraction import (
+                register_discover_objects_handler,
+            )
+
+            register_discover_objects_handler(self._worker)
+            # The RECOMPUTE_OBJECTS handler (S08-T05): targeted correction
+            # recompute — regenerates ONLY the invalidated derived state of
+            # one correction (suggestions/artifacts); minimal registration,
+            # same pattern as the S05/S08 handlers.
+            from app.services.object_correction import (
+                register_recompute_objects_handler,
+            )
+
+            register_recompute_objects_handler(self._worker)
+            # The ATTACH_ORIGINAL_AUDIO handler (S11-T01C): durable wiring of
+            # the S11-T01B original-audio remux engine — thin adapter, one
+            # registered handler per job type (the worker dispatches by
+            # job_type), verified-publication completion gate included.
+            from app.workflow.original_audio_handler import (
+                register_attach_original_audio_handler,
+            )
+
+            register_attach_original_audio_handler(self._worker)
         self._worker_owned = worker is None
-        self._managed_root = Path(str(managed_root or "artifacts"))
+        self._managed_root = resolved_root
 
     # ── Lifecycle (AC1: explicit bootstrap + shutdown) ────────────────────
 
@@ -175,6 +232,28 @@ class JobService:
     def database_path(self) -> Path | None:
         """The SQLite file backing this service (None until initialized)."""
         return self._database_path
+
+    @property
+    def session_factory(self) -> Callable[[], Session] | None:
+        """The bound session factory (public, explicit binding contract).
+
+        ``None`` only before :meth:`initialize` (or an explicit
+        ``bind``); after initialization every caller — the worker, the
+        reconciler and the chain orchestrator — resolves the SAME factory
+        through this public property (S05-C04).  Never inspect
+        ``_session_factory`` directly from outside this class.
+        """
+        return self._session_factory
+
+    @property
+    def managed_root(self) -> Path:
+        """The managed artifact root bound to this service (public).
+
+        The durable worker and the ``AnalyzeChainOrchestrator`` resolve
+        the SAME root through this public property (S05-C04).  Never
+        inspect ``_managed_root`` directly from outside this class.
+        """
+        return self._managed_root
 
     @property
     def last_backup(self) -> BackupEvidence | None:
@@ -188,17 +267,39 @@ class JobService:
         here (explicit operation), the database file itself only by
         :meth:`initialize` (Alembic).  An explicitly pre-set
         ``_database_path`` (tests / embedding) is honoured.
+
+        **S05-C04 public lifecycle binding:** a default ``JobService()``
+        constructed its ``DurableWorker`` with a PLACEHOLDER session
+        factory (raises ``RuntimeError("job service not initialized")``).
+        The real factory created here REBINDS that worker through the
+        public :meth:`DurableWorker.bind_session_factory` so the
+        production path (``uvicorn app.main:app``) starts a worker bound
+        to the real database — no stale placeholder remains.
         """
         if self._session_factory is not None:
             return
         from app.persistence import create_engine_for_path, create_session_factory  # noqa: PLC0415
 
         if self._database_path is None:
+            # S08-R01 AC6: guard the configured project root exactly when
+            # the service resolves its default database path from it — a
+            # QA/test process can never bootstrap the protected MAIN
+            # database.  An explicitly pre-set ``_database_path`` (tests /
+            # embedding) is the caller's explicit isolated target.
+            _validate_service_roots(_project_root(), self._managed_root)
             self._database_path = _project_root() / "data" / "motionforge.db"
         db_path = self._database_path
         db_path.parent.mkdir(parents=True, exist_ok=True)
+        # S05-C04: the default managed root must exist — the import/proxy
+        # handlers stat it (disk-safety check) and publish into it.  The
+        # QA launcher used to pre-create it by hand; the default
+        # production path ensures it.  S08-R01: the root resolves from the
+        # configured absolute project root (never the process CWD).
+        self._managed_root.mkdir(parents=True, exist_ok=True)
         self._engine = create_engine_for_path(db_path)
         self._session_factory = create_session_factory(self._engine)
+        if self._worker_owned and self._worker is not None:
+            self._worker.bind_session_factory(self._session_factory)
 
     def initialize(self) -> None:
         """Run the approved bootstrap path with the S01 migration policy.
@@ -372,31 +473,52 @@ class JobService:
         idempotent second cancel, contract §6.3), False when the Job is
         unknown or already terminal (contract §6.2 / §11.2: 200
         cancel_requested, 400/404).
+
+        S08-R01: the guarded transition is retried over a bounded window —
+        a cancel racing the durable worker's claim (``queued -> running``)
+        re-reads the live row and cancels the now-running Job instead of
+        surfacing a spurious conflict (contract §6.3: cancel wins; the
+        first committed writer wins, the loser re-reads).
         """
         self._ensure_engine()
-        with self._session_factory() as session:  # type: ignore[misc]
+        assert self._session_factory is not None
+        with self._session_factory() as session:
             repo = JobRepository(session)
+            for _attempt in range(_CANCEL_TRANSITION_RETRIES):
+                try:
+                    job = repo.get_job(job_id)
+                except JobNotFoundError:
+                    return False
+                if job.state in ("cancelled", "completed", "failed"):
+                    return False
+                if job.state == "cancelling":
+                    # Second cancel while cancelling is an idempotent no-op
+                    # (contract §6.3: 200-style while cancelling).
+                    return True
+                if job.state not in ("queued", "running"):
+                    return False
+                try:
+                    repo.transition_job(
+                        job_id,
+                        "cancelling",
+                        actor="api",
+                        expected_revision=job.revision,
+                        reason_code="CANCEL_REQUESTED",
+                    )
+                    session.commit()
+                    return True
+                except InvalidStateTransition:
+                    # The job changed state under us (worker claim,
+                    # completion or another cancel): re-read and retry.
+                    session.rollback()
+                    continue
+            # Exhausted retries: report the final observed state honestly
+            # (the API maps False to a 400 with the live state).
             try:
-                job = repo.get_job(job_id)
+                final = repo.get_job(job_id)
             except JobNotFoundError:
                 return False
-            if job.state in ("cancelled", "completed", "failed"):
-                return False
-            if job.state == "cancelling":
-                # Second cancel while cancelling is an idempotent no-op
-                # (contract §6.3: 200-style while cancelling).
-                return True
-            if job.state not in ("queued", "running"):
-                return False
-            repo.transition_job(
-                job_id,
-                "cancelling",
-                actor="api",
-                expected_revision=job.revision,
-                reason_code="CANCEL_REQUESTED",
-            )
-            session.commit()
-            return True
+            return final.state == "cancelling"
 
     # ── Internal helpers ──────────────────────────────────────────────────
 
@@ -467,6 +589,38 @@ def _project_root() -> Path:
         from app.config import config as _cfg  # noqa: PLC0415
 
         return Path(_cfg.project_root)
+
+
+def _default_managed_root() -> Path:
+    """The default managed artifact root (S08-R01 AC5).
+
+    Resolves from the configured absolute project root — ``<project
+    root>/artifacts`` — NEVER from the process CWD.  The worker, the
+    reconciler, the chain orchestrator, the APIs and the manifests all
+    resolve this same public root through the owning :class:`JobService`.
+    """
+    return _project_root() / "artifacts"
+
+
+def _validate_service_roots(
+    project_root: Path | None, managed_root: Path
+) -> None:
+    """Fail-closed QA/test root guard for one JobService (S08-R01 AC6).
+
+    In QA/test mode the effective project root (when this service owns the
+    database) and the managed artifact root must be explicit, absolute and
+    isolated from the protected MAIN tree.  Explicit QA mode additionally
+    requires the project root to come from ``MOTIONFORGE_ROOT`` — QA
+    launchers may never rely on defaults or ``cd`` for storage
+    correctness.
+    """
+    from app.config import qa_mode_enabled, validate_runtime_roots
+
+    validate_runtime_roots(
+        project_root,
+        managed_root,
+        require_env_project_root=qa_mode_enabled(),
+    )
 
 
 def _max_revision(migrations: Path) -> str | None:

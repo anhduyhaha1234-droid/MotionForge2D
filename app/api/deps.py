@@ -11,10 +11,12 @@ database are created only by the explicit application lifecycle
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator, Iterator
+from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends
+from sqlalchemy.orm import Session
 
 from app.config import AppConfig, config
 from app.persistence.summaries import SummaryRepository
@@ -25,8 +27,6 @@ from app.workflow.replacement_service import ReplacementService
 from app.workflow.segmentation_service import SegmentationService
 
 if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
-
     from app.persistence.channels import ChannelService
     from app.persistence.projects import ProjectService
     from app.persistence.videos import VideoItemService
@@ -54,6 +54,32 @@ def get_config() -> AppConfig:
     return _config
 
 
+def get_managed_root() -> Path:
+    """Resolve the durable managed storage root for character artifacts.
+
+    The durable ``JobService`` owns the managed root and every caller
+    resolves it through this public accessor.  When no job service is
+    bound yet, the fallback resolves from the CONFIGURED absolute project
+    root (``<project root>/artifacts``) — never the process CWD (S08-R01
+    AC5: worker/reconciler/orchestrator/APIs/manifests share the same
+    public root).  In QA/test mode an unsafe fallback fails closed.
+    """
+    svc = _job_service
+    if svc is not None:
+        root = svc.managed_root
+        if root is not None:
+            return Path(root)
+    from app.config import qa_mode_enabled, validate_runtime_roots
+
+    root = Path(_config.project_root) / "artifacts"
+    validate_runtime_roots(
+        _config.project_root,
+        root,
+        require_env_project_root=qa_mode_enabled(),
+    )
+    return root
+
+
 def get_job_service() -> JobService:
     """Return the process-wide durable JobService (lazy, explicit init)."""
     global _job_service
@@ -69,7 +95,7 @@ def get_channel_service() -> ChannelService:
 
     The session factory resolves from the durable database the app
     lifecycle initializes (same path as :func:`get_job_service`); tests
-    inject ``deps._lifecycle_db`` / a patched ``deps._job_service`` so the
+    inject a patched ``deps._job_service`` so the
     channel service always targets the same isolated database.  Laziness
     means importing this module constructs nothing (S02-T05 AC1 pattern).
     """
@@ -79,7 +105,7 @@ def get_channel_service() -> ChannelService:
         from app.persistence.channels import ChannelService
 
         job_service = get_job_service()
-        session_factory = getattr(job_service, "_session_factory", None)
+        session_factory = job_service.session_factory
         if session_factory is not None:
             factory = session_factory
         else:
@@ -98,7 +124,7 @@ def get_project_service() -> ProjectService:
 
     The session factory resolves from the durable database the app
     lifecycle initializes (same path as :func:`get_channel_service`);
-    tests inject ``deps._lifecycle_db`` / a patched ``deps._job_service``
+    tests inject a patched ``deps._job_service``
     so the project service always targets the same isolated database.
     Laziness means importing this module constructs nothing.
     """
@@ -108,7 +134,7 @@ def get_project_service() -> ProjectService:
         from app.persistence.projects import ProjectService
 
         job_service = get_job_service()
-        session_factory = getattr(job_service, "_session_factory", None)
+        session_factory = job_service.session_factory
         if session_factory is not None:
             factory = session_factory
         else:
@@ -127,7 +153,7 @@ def get_video_service() -> VideoItemService:
 
     The session factory resolves from the durable database the app
     lifecycle initializes (same path as :func:`get_channel_service`);
-    tests inject ``deps._lifecycle_db`` / a patched ``deps._job_service``
+    tests inject a patched ``deps._job_service``
     so the video service always targets the same isolated database.
     Laziness means importing this module constructs nothing.
     """
@@ -137,7 +163,7 @@ def get_video_service() -> VideoItemService:
         from app.persistence.videos import VideoItemService
 
         job_service = get_job_service()
-        session_factory = getattr(job_service, "_session_factory", None)
+        session_factory = job_service.session_factory
         if session_factory is not None:
             factory = session_factory
         else:
@@ -158,7 +184,7 @@ def get_summary_repository() -> Iterator[SummaryRepository]:
     single read boundary the read-model contract requires (AC1/AC9) —
     and the session is closed when the request ends.  The factory
     resolves from the durable database the app lifecycle initializes
-    (tests inject ``deps._lifecycle_db`` / a patched ``deps._job_service``
+    (tests inject a patched ``deps._job_service``
     so it targets the same isolated database).  The repository never
     commits — reads only.
 
@@ -173,7 +199,7 @@ def get_summary_repository() -> Iterator[SummaryRepository]:
     constructs nothing (S02-T05 AC1 pattern).
     """
     job_service = get_job_service()
-    session_factory = getattr(job_service, "_session_factory", None)
+    session_factory = job_service.session_factory
     if session_factory is not None:
         factory: Callable[[], Session] = session_factory
     else:
@@ -232,3 +258,33 @@ def get_preview_render_service() -> PreviewRenderService:
 
 def get_final_render_service() -> FinalRenderService:
     return _final_render
+
+
+def get_db_session() -> Generator[Session, None, None]:
+    """Yield a database Session from the process-wide session factory.
+
+    The factory resolves from the durable database the app lifecycle
+    initializes (same path as :func:`get_channel_service`); tests inject
+    ``deps._job_service`` so the dependency always targets the same
+    isolated database.  Laziness means importing this module constructs
+    nothing (S02-T05 AC1 pattern).
+    """
+    job_service = get_job_service()
+    session_factory = job_service.session_factory
+    if session_factory is None:
+        from app.persistence import create_engine_for_path, create_session_factory
+
+        injected = getattr(_config, "project_root", None)
+        from app.lifecycle import default_database_path
+
+        session_factory = create_session_factory(
+            create_engine_for_path(default_database_path(injected))
+        )
+    session = session_factory()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
+SessionDep = Annotated[Session, Depends(get_db_session)]

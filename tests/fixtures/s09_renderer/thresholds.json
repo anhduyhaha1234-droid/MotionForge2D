@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "policy": "s09-t00-frozen-20260823",
+  "frozen_at": "2026-08-23T18:20:00+07:00",
+  "source_of_authority": [
+    "docs/pm/sessions/S09-T00-I03-benchmark-harness/TASK.md#thresholds-frozen",
+    "docs/pm/TARGET_PROFILE_2D_SOURCE_LOCKED.md#8-reference-benchmark-gate"
+  ],
+  "note": "Frozen BEFORE first measured run. Tightening allowed with evidence; loosening requires PM evidence and a versioned CompatibilityPolicy change (overlay section 8).",
+  "cut_action_error_frames_max": 1,
+  "trajectory_median_pct_max": 0.5,
+  "trajectory_p95_pct_max": 1.0,
+  "scale_p95_pct_max": 3.0,
+  "rotation_p95_deg_max": 3.0,
+  "contact_p95_pct_max": 1.0,
+  "z_order_inversions_max": 0,
+  "unexplained_visibility_events_max": 0,
+  "clipping_from_source_silhouette_allowed": false,
+  "determinism": {
+    "same_seed_byte_identical_required": true,
+    "excluded_fields": ["wall_runtime_ms_per_frame", "vram_peak_mib"]
+  }
+}

@@ -393,6 +393,20 @@ def test_no_worker_or_api_cutover_tables(upgraded_db: Path) -> None:
         "job_attempt",
         "job_event",
         "job_lease",
+        "character",
+        "character_pack_version",
+        "character_asset",
+        "object_role",
+        "object_occurrence",
+        "object_grouping_suggestion",
+        "object_role_operation",
+        "object_correction",
+        "object_role_artifact",
+        # S08-A02 structural-evidence bridge (R1) — four new tables.
+        "occurrence_segment",
+        "segment_motion",
+        "scene_graph_occlusion",
+        "scene_graph_contact",
     }
     assert not unexpected, f"unexpected tables: {sorted(unexpected)}"
 

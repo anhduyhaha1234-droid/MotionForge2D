@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import base64
+import json
+import re
 import shutil
+import time
 import uuid
-from pathlib import Path
+from pathlib import Path, PurePath
 
 from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import FileResponse
@@ -19,6 +22,10 @@ from app.api.deps import (
     get_segmentation_service,
 )
 from app.api.helpers import find_frame_path, job_response
+from app.api.security import (
+    InvalidPathIdentifierError,
+    validate_path_identifier,
+)
 from app.schemas import (
     BoundingBox,
     ObjectKind,
@@ -30,6 +37,14 @@ from app.schemas import (
     SelectionInput,
     TrackedObject,
 )
+from app.services.media_validation import (
+    MediaValidationError,
+    is_reserved_entry_name,
+    probe_image,
+    sniff_video_container,
+)
+from app.services.video_probe import probe_video
+from app.workflow import analyze_orchestrator
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -63,12 +78,113 @@ class ReplacementSettingsRequest(BaseModel):
     replacement_config: ReplacementConfig
 
 
+# ─── Upload security helpers (S08-H02) ──────────────────────────────────────
+
+def _safe_upload_filename(filename: str | None, fallback: str) -> str:
+    """Harden a client-supplied upload filename into a single safe segment.
+
+    Used ONLY for a display/metadata value; storage is always server-owned.
+    Rejects empty / dot / dot-dot / control-byte names and folds any path
+    separator into ``_`` so the value can never look like a path escape.
+    """
+    raw = (filename or "").strip().replace("\x00", "_")
+    if not raw:
+        return fallback
+    safe = re.sub(r"[^\w\.\-]", "_", raw)
+    if ".." in safe:
+        safe = safe.replace("..", "_")
+    safe = safe.strip("._")
+    if not safe:
+        return fallback
+    return safe
+
+
+def _reject_hostile_upload_filename(filename: str | None) -> None:
+    """Reject a hostile upload filename BEFORE any write (S08-H02-C1).
+
+    Reserved project entries (case-insensitive on Windows) and any
+    traversal/separator/absolute filename are refused with 422 so the client
+    filename can never collide with ``project.json``/reserved entries and the
+    project file stays byte-identical.  Accepted filenames are additionally
+    stored under a SERVER-OWNED name, so even an accepted name cannot be
+    written into a reserved location.
+    """
+    raw = (filename or "").strip()
+    if not raw:
+        return  # absent filename is fine; storage is server-owned
+    name = raw.replace("\x00", "")
+    if "/" in name or "\\" in name or ".." in name or name in (".", ".."):
+        raise HTTPException(
+            422, "upload filename must be a single safe segment"
+        )
+    if Path(name).is_absolute() or PurePath(name).name != name:
+        raise HTTPException(
+            422, "upload filename must be a single safe segment"
+        )
+    if is_reserved_entry_name(name):
+        raise HTTPException(
+            422, "upload filename collides with a reserved project entry"
+        )
+
+
+def _assert_contained(proj_dir: Path, projects_root: Path) -> None:
+    """Fail closed when *proj_dir* does not resolve under the projects root."""
+    root = Path(projects_root).resolve()
+    resolved = Path(proj_dir).resolve()
+    if resolved != root and not resolved.is_relative_to(root):
+        raise HTTPException(403, "project path escapes the managed projects root")
+
+
+def _stream_staged(file: UploadFile, staging: Path, limit: int) -> None:
+    """Stream *file* to *staging* in chunks, aborting over *limit* bytes.
+
+    The staging file is left in place for the caller's validation; the caller
+    owns its removal (``finally: staging.unlink(missing_ok=True)``).
+    """
+    written = 0
+    with staging.open("wb") as out:
+        while True:
+            chunk = file.file.read(64 * 1024)
+            if not chunk:
+                break
+            written += len(chunk)
+            if written > limit:
+                raise HTTPException(
+                    413,
+                    f"upload exceeds the {limit}-byte limit",
+                )
+            out.write(chunk)
+    if written == 0:
+        raise HTTPException(415, "empty upload")
+
+
+def _validate_replacement_paths(settings: ReplacementConfig) -> None:
+    """Reject absolute / ``..``-bearing media paths in replacement settings.
+
+    S08-H02-C1: a settings payload can carry ``asset_path`` /
+    ``frame_sequence_dir``; neither may point outside the project root (they
+    are resolved against ``proj_dir`` at serve time).  Absolute paths,
+    backslash separators and ``..`` segments are rejected with 422.
+    """
+    for field_name in ("asset_path", "frame_sequence_dir"):
+        value = getattr(settings, field_name, "") or ""
+        if not isinstance(value, str) or not value:
+            continue
+        if value.startswith("/") or "\\" in value or ".." in value:
+            raise HTTPException(
+                422, f"{field_name} must be a relative project-owned path"
+            )
+        if Path(value).is_absolute():
+            raise HTTPException(
+                422, f"{field_name} must be a relative project-owned path"
+            )
+
+
 # ─── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.get("")
 def list_all_projects() -> list[dict[str, object]]:
     """List all projects on disk with summary info."""
-    import json
 
     pwf = get_project_workflow()
     projects_dir = pwf.projects_dir  # projects root
@@ -213,27 +329,86 @@ def apply_character_preset_early(
 @router.post("/{project_id}/video")
 @router.post("/{project_id}/video/")
 async def upload_video(project_id: str, file: UploadFile) -> dict[str, object]:
-    """Upload a video file for the project."""
-    import re
+    """Upload a video file for the project.
+
+    S08-H02-C1 hardened:
+
+    - the project identifier is validated BEFORE any filesystem join;
+    - the body is streamed to a staging file with a hard byte ceiling;
+    - the staged bytes are content-probed (container magic prefilter), then
+      validated for REAL through the bounded ffprobe probe — a container
+      header with no decodable video stream (e.g. ftyp + zero bytes) is 415;
+    - the file is atomically published under a SERVER-OWNED name
+      (``source_<uuid>.mp4``) — the client filename is metadata/display only
+      and can never collide with ``project.json`` or reserved entries;
+    - on ANY failure no source file is created and project state is unchanged;
+      the staging file is always removed.
+    """
     pwf = get_project_workflow()
+    try:
+        validate_path_identifier(project_id, label="project_id")
+    except InvalidPathIdentifierError as err:
+        raise HTTPException(422, str(err)) from err
+    # Reject hostile filenames BEFORE any write -> project.json stays byte-identical.
+    _reject_hostile_upload_filename(file.filename)
     try:
         pwf.get_project(project_id)
     except FileNotFoundError as err:
         raise HTTPException(404, "Project not found") from err
 
-    # Sanitize filename to avoid invalid characters on Windows (?, :, *, <, >, |, ")
-    original_name = file.filename or "video.mp4"
-    safe_filename = re.sub(r'[^\w\.-]', '_', original_name)
-    if not safe_filename or safe_filename.startswith("."):
-        safe_filename = f"source_{safe_filename}"
-
     proj_dir = pwf._project_dir(project_id)
-    dest = proj_dir / safe_filename
-    with open(dest, "wb") as f:
-        shutil.copyfileobj(file.file, f)
+    _assert_contained(proj_dir, pwf.projects_dir)
 
-    pwf.set_video(project_id, safe_filename)
-    return {"status": "ok", "filename": safe_filename}
+    cfg = get_config()
+    staging = proj_dir / f".source-{uuid.uuid4().hex}.staging"
+    stored_name = f"source_{uuid.uuid4().hex}.mp4"
+    original_name = _safe_upload_filename(file.filename, "video.mp4")
+    try:
+        _stream_staged(file, staging, cfg.max_upload_bytes)
+        # 1) Container prefix prefilter (never sufficient on its own).
+        with staging.open("rb") as handle:
+            head = handle.read(4096)
+        if sniff_video_container(head) is None:
+            raise HTTPException(
+                415,
+                "uploaded file is not a recognized video container "
+                "(MP4/MOV, WebM, Ogg or AVI)",
+            )
+        # 2) REAL validation: bounded ffprobe requires a decodable video
+        #    stream and sane dimensions (probe_video enforces dimension caps).
+        try:
+            meta = probe_video(staging)
+        except (RuntimeError, ValueError) as err:
+            raise HTTPException(
+                415, f"uploaded file is not a valid decodable video: {err}"
+            ) from err
+        if (
+            meta.duration_seconds <= 0
+            or meta.duration_seconds > cfg.max_video_duration_seconds
+        ):
+            raise HTTPException(
+                415,
+                "uploaded video duration is out of the allowed range "
+                f"(0 < d <= {cfg.max_video_duration_seconds}s)",
+            )
+        # 3) Atomic publish under a server-owned name — only after validation.
+        staging.replace(proj_dir / stored_name)
+    finally:
+        staging.unlink(missing_ok=True)
+
+    # Record the new source in project metadata; on failure roll the just-
+    # published source file back (no orphan) and re-raise — the previous
+    # valid source stays present and SELECTED, project state is unchanged.
+    try:
+        pwf.set_video(project_id, stored_name)
+    except Exception:
+        (proj_dir / stored_name).unlink(missing_ok=True)
+        raise
+    return {
+        "status": "ok",
+        "filename": stored_name,
+        "original_filename": original_name,
+    }
 
 
 @router.post("/{project_id}/ingest")
@@ -268,16 +443,26 @@ def trigger_ingest(project_id: str) -> dict[str, object]:
 @router.delete("/{project_id}")
 @router.delete("/{project_id}/")
 def delete_project(project_id: str) -> dict[str, object]:
-    """Delete a project and purge all files from disk."""
+    """Delete a project and purge all files from disk.
+
+    S08-H02-C1: the identifier is validated and the resolved path containment
+    is re-checked BEFORE ``rmtree`` — a hostile/ traversal identifier can
+    never trigger a recursive delete outside the projects root.
+    """
     import shutil
 
     pwf = get_project_workflow()
+    try:
+        validate_path_identifier(project_id, label="project_id")
+    except InvalidPathIdentifierError as err:
+        raise HTTPException(422, str(err)) from err
     try:
         pwf.get_project(project_id)
     except FileNotFoundError as err:
         raise HTTPException(404, "Project not found") from err
 
     proj_dir = pwf._project_dir(project_id)
+    _assert_contained(proj_dir, pwf.projects_dir)
     if proj_dir.exists():
         shutil.rmtree(proj_dir)
 
@@ -512,8 +697,7 @@ def delete_single_object(project_id: str, object_id: str) -> dict[str, object]:
     pwf._save_project(project_id, proj)
 
     # Remove object dir on disk
-    proj_dir = pwf._project_dir(project_id)
-    obj_dir = proj_dir / "objects" / object_id
+    obj_dir = pwf.object_dir(project_id, object_id)
     if obj_dir.exists():
         shutil.rmtree(obj_dir, ignore_errors=True)
 
@@ -632,7 +816,9 @@ def _auto_crop_object(
 
         crop_img = frame[y : y + bh, x : x + bw]
 
-        obj_dir = proj_dir / "objects" / object_id
+        obj_dir = proj_dir / "objects" / validate_path_identifier(
+            object_id, label="object_id"
+        )
         obj_dir.mkdir(parents=True, exist_ok=True)
         crop_file = obj_dir / "crop.png"
         cv2.imwrite(str(crop_file), crop_img)
@@ -652,7 +838,7 @@ def get_object_crop(project_id: str, object_id: str) -> FileResponse:
         raise HTTPException(404, str(e)) from e
 
     proj_dir = pwf._project_dir(project_id)
-    crop_file = proj_dir / "objects" / object_id / "crop.png"
+    crop_file = pwf.object_dir(project_id, object_id) / "crop.png"
 
     # Auto-generate crop if missing
     if not crop_file.exists():
@@ -830,13 +1016,13 @@ def propagate_object(project_id: str, object_id: str) -> dict[str, object]:
     except (FileNotFoundError, KeyError) as e:
         raise HTTPException(404, str(e)) from e
 
-    mask_path = proj_dir / "objects" / object_id / "masks" / "initial_mask.png"
+    mask_path = pwf.object_dir(project_id, object_id) / "masks" / "initial_mask.png"
     if not mask_path.exists():
         debug_dir = proj_dir / "debug"
         f_idx = obj.selection.frame_index
         frame_mask = debug_dir / f"preview_mask_{f_idx}.png"
         if frame_mask.exists():
-            mask_dir = proj_dir / "objects" / object_id / "masks"
+            mask_dir = pwf.object_dir(project_id, object_id) / "masks"
             mask_dir.mkdir(parents=True, exist_ok=True)
             shutil.copy2(str(frame_mask), str(mask_path))
         else:
@@ -850,7 +1036,7 @@ def propagate_object(project_id: str, object_id: str) -> dict[str, object]:
                 else []
             )
             if preview_masks:
-                mask_dir = proj_dir / "objects" / object_id / "masks"
+                mask_dir = pwf.object_dir(project_id, object_id) / "masks"
                 mask_dir.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(str(preview_masks[0]), str(mask_path))
             else:
@@ -867,7 +1053,7 @@ def propagate_object(project_id: str, object_id: str) -> dict[str, object]:
                     if frame_path is not None:
                         seg_svc = get_segmentation_service()
                         mask = seg_svc.preview_mask(frame_path, obj.selection, "contour")
-                        mask_dir = proj_dir / "objects" / object_id / "masks"
+                        mask_dir = pwf.object_dir(project_id, object_id) / "masks"
                         mask_dir.mkdir(parents=True, exist_ok=True)
                         cv2.imwrite(str(mask_path), mask)
                 except Exception:
@@ -920,8 +1106,7 @@ def get_gallery(project_id: str, object_id: str) -> dict[str, object]:
     import json as json_mod
 
     pwf = get_project_workflow()
-    proj_dir = pwf._project_dir(project_id)
-    manifest_path = proj_dir / "objects" / object_id / "gallery_manifest.json"
+    manifest_path = pwf.object_dir(project_id, object_id) / "gallery_manifest.json"
 
     if not manifest_path.exists():
         raise HTTPException(404, "Gallery not found. Run propagation first.")
@@ -938,38 +1123,114 @@ def get_gallery(project_id: str, object_id: str) -> dict[str, object]:
 async def upload_replacement(
     project_id: str, object_id: str, file: UploadFile,
 ) -> dict[str, object]:
-    """Upload a replacement PNG for a tracked object."""
+    """Upload a replacement image (PNG/JPEG/WebP) for a tracked object.
+
+    S08-H02-C1 hardened:
+
+    - identifiers are validated before any filesystem join;
+    - the body streams to a staging file under the object dir with a hard byte
+      ceiling;
+    - the staged bytes are fully verified (magic prefilter + FULL Pillow
+      decode + dimension and total-pixel caps) — a truncated/corrupt payload
+      with valid magic is 415;
+    - the VERIFIED format decides the stored extension and Content-Type
+      (``replacement.<png|jpg|webp>``) so JPEG/WebP bytes are never stored as
+      ``replacement.png`` and served as ``image/png``;
+    - the file is atomically published only after validation; every staging /
+      publish temp is removed on ALL error paths; and if the project-metadata
+      update fails the file(s) are rolled back so an existing valid
+      replacement is never destroyed.
+    """
     pwf = get_project_workflow()
+    try:
+        validate_path_identifier(project_id, label="project_id")
+        validate_path_identifier(object_id, label="object_id")
+    except InvalidPathIdentifierError as err:
+        raise HTTPException(422, str(err)) from err
+    # Defense-in-depth: reject hostile filenames (storage is canonical anyway).
+    _reject_hostile_upload_filename(file.filename)
     try:
         pwf.get_tracked_object(project_id, object_id)
     except (FileNotFoundError, KeyError) as e:
         raise HTTPException(404, str(e)) from e
 
-    proj_dir = pwf._project_dir(project_id)
-    obj_dir = proj_dir / "objects" / object_id
+    cfg = get_config()
+    obj_dir = pwf.object_dir(project_id, object_id)
     obj_dir.mkdir(parents=True, exist_ok=True)
 
-    # Write to temp file first, then let service copy to final location
-    import tempfile
-    from pathlib import Path
-    suffix = Path(file.filename or "replacement.png").suffix or ".png"
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        shutil.copyfileobj(file.file, tmp)
-        tmp_path = Path(tmp.name)
-
+    staging = obj_dir / f".replacement-{uuid.uuid4().hex}.staging"
     try:
-        rep_svc = get_replacement_service()
-        rel_path = rep_svc.upload_replacement(project_id, object_id, tmp_path)
+        _stream_staged(file, staging, cfg.max_image_upload_bytes)
+        try:
+            probe = probe_image(
+                staging.read_bytes(),
+                max_dimension=cfg.max_image_dimension,
+                max_pixels=cfg.max_image_pixels,
+            )
+        except MediaValidationError as err:
+            raise HTTPException(415, f"invalid replacement image: {err}") from err
+
+        dest_name = f"replacement.{probe.canonical_extension()}"
+        dest = obj_dir / dest_name
+        rel_path = f"objects/{object_id}/{dest_name}"
+
+        # Preserve the previous replacement (any extension) for rollback.
+        previous: tuple[Path, bytes] | None = None
+        for older in obj_dir.glob("replacement.*"):
+            if older.is_file():
+                previous = (older, older.read_bytes())
+                break
+
+        # Atomic publish via a same-directory temp.
+        tmp_dest = obj_dir / f".replacement-publish-{uuid.uuid4().hex}"
+        try:
+            shutil.copy2(str(staging), str(tmp_dest))
+            tmp_dest.replace(dest)
+        finally:
+            tmp_dest.unlink(missing_ok=True)
+
+        # Project-metadata update; on failure roll the file(s) back.
+        try:
+            pwf.update_object(project_id, object_id, replacement_image=rel_path)
+        except Exception:
+            dest.unlink(missing_ok=True)
+            if previous is not None:
+                previous[0].write_bytes(previous[1])
+            raise
+
+        # Success: drop stale sibling-format files.
+        for older in obj_dir.glob("replacement.*"):
+            if older.is_file() and older.resolve() != dest.resolve():
+                older.unlink(missing_ok=True)
     finally:
-        tmp_path.unlink(missing_ok=True)
+        staging.unlink(missing_ok=True)
 
     return {"status": "ok", "asset_path": rel_path}
+
+
+_REPLACEMENT_MEDIA_TYPE: dict[str, str] = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+}
+
+
+def _replacement_media_type(path: Path) -> str | None:
+    return _REPLACEMENT_MEDIA_TYPE.get(path.suffix.lower())
 
 
 @router.get("/{project_id}/objects/{object_id}/replacement-image")
 @router.get("/{project_id}/objects/{object_id}/replacement-image/")
 def get_replacement_image(project_id: str, object_id: str) -> FileResponse:
-    """Serve the uploaded replacement image for a tracked object."""
+    """Serve the uploaded replacement image for a tracked object.
+
+    S08-H02-C1: only files that resolve UNDER the project dir are served —
+    neither the ``replacement.*`` glob nor the fallback ``asset_path`` can
+    ever return an arbitrary absolute client-controlled path — and the
+    Content-Type is derived from the verified file extension (never
+    octet-stream for a WebP).
+    """
     pwf = get_project_workflow()
     try:
         obj = pwf.get_tracked_object(project_id, object_id)
@@ -977,23 +1238,35 @@ def get_replacement_image(project_id: str, object_id: str) -> FileResponse:
         raise HTTPException(404, str(e)) from e
 
     proj_dir = pwf._project_dir(project_id)
+    root = proj_dir.resolve()
+    obj_dir = pwf.object_dir(project_id, object_id)
 
-    # Replacement file lives at objects/<object_id>/replacement.png (or .jpg/...)
-    obj_dir = proj_dir / "objects" / object_id
+    # Replacement file lives at objects/<object_id>/replacement.<ext>.
     for candidate in sorted(obj_dir.glob("replacement.*")):
         if candidate.is_file():
-            return FileResponse(candidate)
+            resolved = candidate.resolve()
+            if resolved == root or resolved.is_relative_to(root):
+                return FileResponse(
+                    str(candidate),
+                    media_type=_replacement_media_type(candidate),
+                )
 
-    # Fall back to the asset_path saved on the object
+    # Fall back to the asset_path saved on the object — only when contained.
     asset = getattr(obj, "replacement_config", None)
     asset_path = getattr(asset, "asset_path", "") if asset else ""
     if asset_path and asset_path != "/replacements/test.png":
         p = Path(asset_path)
         if not p.is_absolute():
             p = proj_dir / p
-        if p.is_file():
-            return FileResponse(p)
-
+        try:
+            resolved = p.resolve()
+        except OSError:
+            resolved = p.absolute()
+        if (resolved == root or resolved.is_relative_to(root)) and resolved.is_file():
+            return FileResponse(
+                str(resolved),
+                media_type=_replacement_media_type(resolved),
+            )
     raise HTTPException(404, "Replacement image not found")
 
 
@@ -1004,8 +1277,7 @@ def get_object_mask_image(
 ) -> FileResponse:
     """Serve a mask image for a tracked object at a given frame."""
     pwf = get_project_workflow()
-    proj_dir = pwf._project_dir(project_id)
-    mask_dir = proj_dir / "objects" / object_id / "masks"
+    mask_dir = pwf.object_dir(project_id, object_id) / "masks"
 
     candidates = [
         mask_dir / f"mask_{frame_index}.png",
@@ -1044,7 +1316,7 @@ def get_inpainted_frame(
     if frame_path is None:
         raise HTTPException(404, f"Frame {frame_index} not found")
 
-    mask_dir = proj_dir / "objects" / object_id / "masks"
+    mask_dir = pwf.object_dir(project_id, object_id) / "masks"
     mask_candidates = [
         mask_dir / f"mask_{frame_index}.png",
         mask_dir / f"mask_{frame_index:06d}.png",
@@ -1089,7 +1361,18 @@ def get_inpainted_frame(
 def update_replacement_settings(
     project_id: str, object_id: str, body: ReplacementSettingsRequest,
 ) -> dict[str, object]:
-    """Update replacement transform settings."""
+    """Update replacement transform settings.
+
+    S08-H02-C1: identifiers are validated before any join and the settings
+    payload may not carry an absolute/``..`` asset path or frame-sequence dir.
+    """
+    try:
+        validate_path_identifier(project_id, label="project_id")
+        validate_path_identifier(object_id, label="object_id")
+    except InvalidPathIdentifierError as err:
+        raise HTTPException(422, str(err)) from err
+    _validate_replacement_paths(body.replacement_config)
+
     rep_svc = get_replacement_service()
     try:
         obj = rep_svc.update_settings(
@@ -1626,18 +1909,41 @@ class SavePresetRequest(BaseModel):
 def save_project_preset(
     project_id: str, body: SavePresetRequest,
 ) -> dict[str, object]:
-    """Save current project configuration as a preset."""
+    """Save current project configuration as a preset.
+
+    S08-H02-C2: the client ``body.name`` is DISPLAY-ONLY metadata; the FILE
+    name is a strict server-validated slug.  A hostile name (slash, backslash,
+    ``..``, absolute/drive-qualified, control bytes, dot-only, reserved) is
+    rejected with 422 BEFORE any write and can never reach ``project.json`` or
+    escape ``<project>/presets``.
+    """
     from app.workflow.preset_service import (  # noqa: PLC0415
         CharacterMapping,
+        InvalidPresetNameError,
         PresetService,
         ProjectPreset,
+        unique_preset_output_path,
     )
 
     pwf = get_project_workflow()
     try:
+        validate_path_identifier(project_id, label="project_id")
+    except InvalidPathIdentifierError as err:
+        raise HTTPException(422, str(err)) from err
+    try:
         proj = pwf.get_project(project_id)
     except FileNotFoundError as err:
         raise HTTPException(404, "Project not found") from err
+
+    proj_dir = pwf._project_dir(project_id)
+    _assert_contained(proj_dir, pwf.projects_dir)
+    presets_dir = proj_dir / "presets"
+    try:
+        output_path = unique_preset_output_path(
+            presets_dir, proj_dir, display_name=body.name
+        )
+    except InvalidPresetNameError as err:
+        raise HTTPException(422, str(err)) from err
 
     # Build mappings from current objects
     mappings = []
@@ -1654,10 +1960,6 @@ def save_project_preset(
         description=body.description,
         mappings=mappings,
     )
-
-    proj_dir = pwf._project_dir(project_id)
-    presets_dir = proj_dir / "presets"
-    output_path = presets_dir / f"{body.name.lower().replace(' ', '_')}.json"
 
     svc = PresetService()
     svc.save_preset(preset, output_path)
@@ -1686,17 +1988,36 @@ def list_project_presets(project_id: str) -> list[dict[str, object]]:
 @router.post("/{project_id}/presets/{preset_filename}/apply")
 @router.post("/{project_id}/presets/{preset_filename}/apply/")
 def apply_preset(project_id: str, preset_filename: str) -> dict[str, object]:
-    """Apply a preset to the current project."""
-    from app.workflow.preset_service import PresetService  # noqa: PLC0415
+    """Apply a preset to the current project.
+
+    S08-H02-C2: ``preset_filename`` is validated as a single safe segment with a
+    ``.json`` suffix and contained under ``<project>/presets`` (symlink/junction
+    escape rejected) — it can never read `project.json` or any file outside the
+    presets dir.  Hostile input → 422, missing preset → 404, never 500.
+    """
+    from app.workflow.preset_service import (  # noqa: PLC0415
+        InvalidPresetNameError,
+        PresetService,
+        safe_preset_path,
+    )
 
     pwf = get_project_workflow()
+    try:
+        validate_path_identifier(project_id, label="project_id")
+    except InvalidPathIdentifierError as err:
+        raise HTTPException(422, str(err)) from err
     try:
         proj = pwf.get_project(project_id)
     except FileNotFoundError as err:
         raise HTTPException(404, "Project not found") from err
 
     proj_dir = pwf._project_dir(project_id)
-    preset_path = proj_dir / "presets" / preset_filename
+    _assert_contained(proj_dir, pwf.projects_dir)
+    presets_dir = proj_dir / "presets"
+    try:
+        preset_path = safe_preset_path(presets_dir, proj_dir, preset_filename)
+    except InvalidPresetNameError as err:
+        raise HTTPException(422, str(err)) from err
 
     svc = PresetService()
     try:
@@ -2018,3 +2339,262 @@ def auto_match_character(project_id: str, object_id: str) -> dict[str, object]:
         "pose": pose_choice,
         "warning": "Applied replacement config to all scenes",
     }
+
+
+# ── S05-C01: Approved-pipeline orchestration (T02→T03→T04) ──────────────────
+#
+# One UI-facing submission creates the REAL approved durable job chain:
+#   T02 ANALYZE_MEDIA import  →  T03 GENERATE_PROXY  →  T04 ANALYZE_MEDIA
+#   scene_detect
+# reusing the S05-T04 ANALYZE_MEDIA dispatcher and the S05-T03 GENERATE_PROXY
+# registration (both registered on the worker by the API JobService — never
+# rewritten here).  The proxy/scene-detect Jobs can only be created once
+# their predecessor's input artifact exists, so the chain is materialized
+# lazily: the chain-state endpoint advances the chain when the previous
+# step's durable Job is terminal-completed (each poll materializes the next
+# step at most once — creation is idempotent via the repository's
+# owner-scoped idempotency keys, DURABLE_JOB_CONTRACT §8.1).  Every
+# progress/state value in the response is read from the durable Job rows
+# (real checkpoints); nothing is mocked or synthesized.
+
+# S05-C02: chain progression is owned by the focused durable orchestration
+# service (app/workflow/analyze_orchestrator.py).  The routes below are thin:
+# they resolve the legacy project source (read-only), then delegate
+# submission/advancement/state/retry to the orchestrator's PUBLIC surface.
+# GET is STRICTLY read-only — it never creates Jobs, artifacts or scene rows
+# (Codex CHANGES_REQUESTED round 2).  No JobService private member is
+# accessed from this module; no job-state-machine semantics are changed.
+
+
+class AnalyzeChainRequest(BaseModel):
+    """One UI-facing submission payload for the approved T02→T03→T04 chain."""
+
+    generation: str = "1"
+    title: str | None = None
+
+
+def _resolve_project_source(proj: ProjectData) -> str | None:
+    """Resolve the uploaded source video path of a legacy project."""
+    vm = proj.video_metadata
+    if vm is not None and vm.file_path:
+        return vm.file_path
+    if proj.source_video:
+        return proj.source_video
+    return None
+
+
+def _chain_submit_error(exc: Exception) -> HTTPException:
+    """Map an approved-service submit failure to a stable HTTP error."""
+    from app.services.scene_detector import SceneDetectorError  # noqa: PLC0415
+    from app.services.video_import import VideoImportError  # noqa: PLC0415
+    from app.services.video_proxy import VideoProxyError  # noqa: PLC0415
+
+    if isinstance(exc, (VideoImportError, VideoProxyError, SceneDetectorError)):
+        return HTTPException(400, f"{exc.code}: {exc.message} — {exc.action()}")
+    if isinstance(exc, ValueError):
+        return HTTPException(400, str(exc))
+    return HTTPException(500, f"chain submission failed: {exc}")
+
+
+@router.post("/{project_id}/analyze")
+@router.post("/{project_id}/analyze/")
+def analyze_project(
+    project_id: str, body: AnalyzeChainRequest | None = None
+) -> dict[str, object]:
+    """ONE UI-facing submission drives the approved T02→T03→T04 chain.
+
+    Thin route: validates the legacy project + resolves its uploaded source
+    (read-only), then delegates to the durable orchestration service
+    (:func:`app.workflow.analyze_orchestrator.get_analyze_orchestrator`).
+    The orchestrator binds the chain identity to the source SHA-256 +
+    generation, creates the ``ANALYZE_MEDIA`` import Job (S05-T02) and owns
+    the T03/T04 materialization under its background loop — the request
+    itself never runs the pipeline and no browser polling is required.
+
+    Re-submission is idempotent: an existing chain for the same source
+    identity is returned (reuse), never a duplicate Job (contract §8.1).
+    """
+    pwf = get_project_workflow()
+    try:
+        proj = pwf.get_project(project_id)
+    except FileNotFoundError as err:
+        raise HTTPException(404, "Project not found") from err
+
+    source = _resolve_project_source(proj)
+    if source is None or not Path(source).exists():
+        raise HTTPException(
+            400, "Video file not found. Upload the source video first."
+        )
+
+    generation = body.generation if body is not None and body.generation else "1"
+    title = (
+        body.title
+        if body is not None and body.title
+        else (proj.name or Path(source).name)
+    )
+    try:
+        return analyze_orchestrator.get_analyze_orchestrator().submit_chain(
+            project_id,
+            source,
+            generation=generation,
+            title=title,
+        )
+    except Exception as exc:  # noqa: BLE001 - mapped to a stable HTTP error
+        raise _chain_submit_error(exc) from exc
+
+
+@router.get("/{project_id}/analyze")
+def get_analyze_chain(project_id: str, generation: str = "1") -> dict[str, object]:
+    """Backend-owned chain state for the UI — STRICTLY READ-ONLY.
+
+    Reads only: the chain response is derived entirely from durable rows
+    (Job/JobStep states, checkpoint progress, artifact links, scene rows).
+    This endpoint NEVER creates proxy/scene-detection Jobs and NEVER
+    mutates any row — chain progression is owned by the orchestration
+    service's background loop, not by polling.  Repeated/concurrent GETs
+    cause zero database mutations (verified by
+    ``tests/test_s05_chain_progression.py``).
+    """
+    pwf = get_project_workflow()
+    try:
+        pwf.get_project(project_id)
+    except FileNotFoundError as err:
+        raise HTTPException(404, "Project not found") from err
+    return analyze_orchestrator.get_analyze_orchestrator().chain_state(
+        project_id, generation
+    )
+
+
+@router.post("/{project_id}/analyze/retry")
+@router.post("/{project_id}/analyze/retry/")
+def retry_analyze_chain(project_id: str, generation: str = "1") -> dict[str, object]:
+    """Retry the newest failed/cancelled chain Job via a successor (§8.5).
+
+    Thin route: delegates to the orchestrator's successor path, which
+    validates ownership (only the project's own chain Jobs for the CURRENT
+    source identity) and is idempotent — a duplicate retry reuses the
+    already-created successor, never a 409/500 without a path.  The
+    predecessor row stays immutable.
+    """
+    pwf = get_project_workflow()
+    try:
+        pwf.get_project(project_id)
+    except FileNotFoundError as err:
+        raise HTTPException(404, "Project not found") from err
+    state = analyze_orchestrator.get_analyze_orchestrator().retry_chain(
+        project_id, generation
+    )
+    if state is None:
+        raise HTTPException(400, "No failed or cancelled job to retry")
+    return state
+
+
+#: Job states that count as an ACTIVE chain step for the atomic cancel
+#: endpoint (mirrors the durable API cancel contract §11.2).
+_ACTIVE_CHAIN_JOB_STATES = ("pending", "queued", "running", "cancelling")
+
+
+def _first_active_chain_job(state: dict[str, object]) -> dict[str, object] | None:
+    """The first chain step whose durable Job is still active (or None)."""
+    steps = state.get("steps")
+    if not isinstance(steps, dict):
+        return None
+    for name in ("import", "proxy", "scene_detect"):
+        step = steps.get(name)
+        if not isinstance(step, dict):
+            continue
+        if step.get("job_id") and step.get("status") in _ACTIVE_CHAIN_JOB_STATES:
+            return step
+    return None
+
+
+@router.post("/{project_id}/analyze/cancel")
+@router.post("/{project_id}/analyze/cancel/")
+def cancel_analyze_chain(project_id: str, generation: str = "1") -> dict[str, object]:
+    """Atomically cancel the chain's CURRENTLY ACTIVE durable step.
+
+    S05-C04-R3 (Codex finding 1, RED gate): the UI previously derived the
+    cancel target from a POLLED chain snapshot, so a click during an
+    import→proxy→scene transition could target a stale/terminal job or no
+    job at all (zero cancel requests reached the backend).  This endpoint
+    RESOLVES the active job on the backend AT CANCEL TIME — one atomic
+    request:
+
+    - the chain state is re-read here (never a client snapshot);
+    - when the chain is mid-transition (previous step durably completed,
+      the next Job not materialized yet), the orchestrator's own idempotent
+      advance pass materializes the next Job (normal progression) and it is
+      cancelled — the click therefore cancels the chain even across a step
+      boundary;
+    - a `queued`/`pending` Job is NOT transitioned straight to
+      ``cancelling`` (a lease-less ``cancelling`` Job is never drained by
+      the worker/reconciler — verified): the endpoint waits a bounded time
+      for the durable worker to claim it (``running``), then cancels it —
+      the worker's cooperative drain then terminates it as ``cancelled``;
+    - a Job already ``cancelling`` yields the idempotent 200 (contract
+      §6.3, exactly like ``POST /api/jobs/{id}/cancel``);
+    - when the chain has GENUINELY completed/failed/cancelled with no
+      active job, the endpoint fails honestly (400) and the UI refetches
+      the terminal state.
+
+    Semantics preserve the existing HTTP cancel contract: 200
+    ``{"status": "cancel_requested", "job_id": ...}``, 400 with a reason,
+    404 unknown project.  The endpoint NEVER creates a successor and never
+    touches the read-only ``GET /analyze`` surface.
+    """
+    pwf = get_project_workflow()
+    try:
+        pwf.get_project(project_id)
+    except FileNotFoundError as err:
+        raise HTTPException(404, "Project not found") from err
+
+    orchestrator = analyze_orchestrator.get_analyze_orchestrator()
+    job_svc = get_job_service()
+
+    # Bounded re-resolution loop (≤ ~3.5 s worst case; the common path
+    # — an already-running step — returns on the first iteration).  The
+    # loop only ever cancels a job the worker can drain: `running` jobs
+    # are cancelled directly, `queued`/`pending` jobs are waited on until
+    # the worker claims them (production worker poll interval is 1 s).
+    for _attempt in range(35):
+        state = orchestrator.chain_state(project_id, generation)  # read-only
+        chain_status = state.get("chain_status")
+        if chain_status in ("completed", "failed", "cancelled", "idle"):
+            raise HTTPException(
+                400, "Chain already terminal — no active job to cancel"
+            )
+        target = _first_active_chain_job(state)
+        if target is None:
+            # Step-transition gap: the next Job is not materialized yet.
+            # The orchestrator's idempotent advance pass creates it (the
+            # chain's normal progression) and the next iteration cancels
+            # it — the click never targets a stale snapshot.
+            orchestrator.advance_once(project_id)
+            time.sleep(0.1)
+            continue
+        job_id = str(target["job_id"])
+        if target["status"] == "cancelling":
+            # Second cancel while cancelling is idempotent (contract §6.3).
+            return {"status": "cancel_requested", "job_id": job_id}
+        if target["status"] == "running":
+            if job_svc.cancel_job(job_id):
+                return {"status": "cancel_requested", "job_id": job_id}
+            # The job raced to terminal between the read and the cancel —
+            # loop and re-resolve the (possibly next) active job.
+            time.sleep(0.1)
+            continue
+        # queued/pending: not claimed yet — wait for the durable worker to
+        # claim it, then cancel as `running` (never create the lease-less
+        # `cancelling` stuck state; the worker's cooperative drain then
+        # terminates the job as `cancelled`).
+        time.sleep(0.1)
+
+    state = orchestrator.chain_state(project_id, generation)
+    if state.get("chain_status") == "completed":
+        raise HTTPException(
+            400, "Chain already completed — no active job to cancel"
+        )
+    raise HTTPException(
+        409,
+        "No active job to cancel right now — the chain is transitioning; retry",
+    )

@@ -97,7 +97,9 @@ Sprint numbers express dependency order. They do not promise fixed duration. A s
 | S04-T02 | Home dashboard lists projects, next actions and active jobs | S04-T01 | APPROVED |
 | S04-T03 | Channel management UX with empty/loading/error states | S04-T02 | APPROVED |
 | S04-T04 | Project Detail manages Video Items, channels and outputs | S04-T02,S03-T04 | APPROVED |
-| S04-T05 | Guided Project Shell persists step readiness and resume location | S04-T04 | PLANNED |
+| S04-T05 | Guided Project Shell persists step readiness and resume location | S04-T04 | APPROVED |
+
+**Sprint status:** APPROVED — Codex PM review; UI quality-baseline `20260804-144203` (7/7 PASS).
 
 **Epic exit:** Scenario H passes; a user never needs filesystem navigation to find the next Video Item.
 
@@ -112,14 +114,18 @@ Sprint numbers express dependency order. They do not promise fixed duration. A s
 
 | Task ID | Session outcome | Depends on | Status |
 |---|---|---|---|
-| S05-T01 | Video preflight/probe contract and actionable incompatibility errors | E02 | PLANNED |
-| S05-T02 | Managed import copies/registers source safely with checksum | S05-T01 | PLANNED |
-| S05-T03 | Canonical timebase and proxy artifact generation | S05-T02 | PLANNED |
-| S05-T04 | Scene detection job uses stable Scene IDs and removes deprecated frame access | S05-T03 | PLANNED |
-| S05-T05 | Import/Analyze UI shows estimate, progress, cancel, retry and resume | S05-T04 | PLANNED |
-| S05-T06 | Golden import/analyze integration and restart-recovery evidence | S05-T05 | PLANNED |
+| S05-T01 | Video preflight/probe contract and actionable incompatibility errors | E02 | APPROVED |
+| S05-T02 | Managed import copies/registers source safely with checksum | S05-T01 | APPROVED |
+| S05-T03 | Canonical timebase and proxy artifact generation | S05-T02 | APPROVED |
+| S05-T04 | Scene detection job uses stable Scene IDs and removes deprecated frame access | S05-T03 | APPROVED |
+| S05-T05 | Import/Analyze UI shows estimate, progress, cancel, retry and resume | S05-T04 | APPROVED |
+| S05-T06 | Golden import/analyze integration and restart-recovery evidence | S05-T05 | APPROVED |
 
 **Epic exit:** one Video Item imports, analyzes and resumes from the new Project Shell with stable scene/time contracts.
+
+**Sprint status:** APPROVED — final correction S05-C04 closed by Codex PM
+review; independent 41/41 targeted tests and fresh quality baseline
+`20260805-214242` (7/7 PASS).
 
 ---
 
@@ -132,11 +138,13 @@ Sprint numbers express dependency order. They do not promise fixed duration. A s
 
 | Task ID | Session outcome | Depends on | Status |
 |---|---|---|---|
-| S06-T01 | Character, Pack Version, Asset and pose-slot domain/API | E01 | PLANNED |
-| S06-T02 | Import existing preset assets into draft packs without mutating originals | S06-T01 | PLANNED |
-| S06-T03 | Six required poses, transparency/resolution and completeness validation | S06-T02 | PLANNED |
-| S06-T04 | Character Library browse/search/filter/detail UI | S06-T03,S04-T01 | PLANNED |
-| S06-T05 | Pack review, publish and immutable version UX | S06-T04 | PLANNED |
+| S06-T01 | Character, Pack Version, Asset and pose-slot domain/API | E01 | APPROVED |
+| S06-T02 | Import existing preset assets into draft packs without mutating originals | S06-T01 | APPROVED |
+| S06-T03 | Six required poses, transparency/resolution and completeness validation | S06-T02 | APPROVED |
+| S06-T04 | Character Library browse/search/filter/detail UI | S06-T03,S04-T01 | APPROVED |
+| S06-T05 | Pack review, publish and immutable version UX | S06-T04 | APPROVED |
+
+**Sprint status:** APPROVED — S06-T01..T04 approved per sprint; S06-T05 correction approved by Codex PM review 2026-08-05T09:28:00+07:00 (quality baseline `20260805-091121` 7/7 PASS). Sprint S06 complete at the product gate; integrated into the S08-P00 base (2026-08-05).
 
 ### Sprint S07 - Project cast reuse
 
@@ -159,12 +167,21 @@ Sprint numbers express dependency order. They do not promise fixed duration. A s
 
 | Task ID | Session outcome | Depends on | Status |
 |---|---|---|---|
-| S08-T01 | ObjectOccurrence/ObjectRole schema with stable IDs and confidence | E03 | PLANNED |
-| S08-T02 | Candidate extraction job stores representative thumbnails/masks | S08-T01 | PLANNED |
-| S08-T03 | Cross-scene grouping suggestions with merge/split/confirm API | S08-T02 | PLANNED |
-| S08-T04 | Object Gallery selection and confidence UX | S08-T03 | PLANNED |
-| S08-T05 | Object correction actions rerun only affected dependencies | S08-T04 | PLANNED |
-| S08-T06 | Golden grouping/correction dataset and metrics report | S08-T05 | PLANNED |
+| S08-T01 | ObjectOccurrence/ObjectRole schema with stable IDs and confidence | E03 | SUBMITTED → MANAGER_VERIFIED_PENDING_SPRINT_REVIEW (C1+C2) |
+| S08-T02 | Candidate extraction job stores representative thumbnails/masks | S08-T01 | SUBMITTED → MANAGER_VERIFIED_PENDING_SPRINT_REVIEW (C1+C2) |
+| S08-T03 | Cross-scene grouping suggestions with merge/split/confirm API | S08-T02 | SUBMITTED → MANAGER_VERIFIED_PENDING_SPRINT_REVIEW (C1+C2) |
+| S08-T04 | Object Gallery selection and confidence UX | S08-T03 | SUBMITTED → MANAGER_VERIFIED_PENDING_SPRINT_REVIEW (C1+C2) |
+| S08-T05 | Object correction actions rerun only affected dependencies | S08-T04 | SUBMITTED → MANAGER_VERIFIED_PENDING_SPRINT_REVIEW (C1+C2) |
+| S08-T06 | Golden grouping/correction dataset and metrics report | S08-T05 | SUBMITTED → MANAGER_VERIFIED_PENDING_SPRINT_REVIEW (C1+C2: final golden vertical Run `20260818-s08t06-c2`, fresh 7/7 baseline Run `20260819-004409`) |
+| S08-R01 | Runtime lifecycle safety (queued cancel, absolute root, QA fail-closed) | — | SUBMITTED → MANAGER_VERIFIED_PENDING_SPRINT_REVIEW |
+| S08-H01 | Frontend production authority (no fabricated fallback) | — | SUBMITTED → MANAGER_VERIFIED_PENDING_SPRINT_REVIEW |
+| S08-H02 | Local API origin/upload/media safety (C1 recovered: server-owned storage, real probe, atomicity, containment) | — | SUBMITTED → MANAGER_VERIFIED_PENDING_SPRINT_REVIEW (C1 recovery 2026-08-19) |
+| S08-H02-C2 | Preset path containment + bounded video_probe (C2: client preset name/path traversal + unbounded ffprobe stdout) | — | SUBMITTED → MANAGER_VERIFIED_PENDING_SPRINT_REVIEW (2026-08-19, baseline Run `20260819-015528` 7/7 PASS) |
+| S08-H02-C3 | Probe deadline + preset root containment + preset collision (C3: concurrent probe drain <1s deadline, preset root symlink/junction 422 anchored, collision 409 no-overwrite) | — | SUBMITTED → MANAGER_VERIFIED_PENDING_SPRINT_REVIEW (2026-08-19, session `20260819_033728_0a3c30`, baseline Run `20260819-041116` 7/7 PASS) |
+| S08-H02-C4 | Atomic preset + exact probe bounds (C4: O_EXCL atomic preset no race, binary byte-cap before decode, max(0,deadline-monotonic) waits, deterministic concurrency test) | — | SUBMITTED → MANAGER_VERIFIED_PENDING_SPRINT_REVIEW (2026-08-19, session `20260819_105751_c6c6a1`, baseline Run `20260819-114525` 7/7 PASS) |
+| S08-H02-C4-C5 | Atomic combined pipe cap + cleanup deadline budgets (C5: atomic _CaptureState accept/reject overshoot ≤1 chunk, shared remaining_budget(deadline), no fixed 5s windows, no child leak) | — | SUBMITTED → MANAGER_VERIFIED_PENDING_SPRINT_REVIEW (2026-08-19, resume same session `20260819_105751_c6c6a1`, baseline Run `20260819-133623` 7/7 PASS) |
+
+**Sprint status (2026-08-19, after H02-C5 correction):** SPRINT_SUBMITTED — all correction rounds incl. H02-C4-C5 MANAGER_VERIFIED_PENDING_SPRINT_REVIEW; fresh 7/7 baseline Run `20260819-133623` PASS; golden metrics contract SHA `f008c027…`; all writers stopped; ports free; protected MAIN unchanged. Awaiting ONE Codex sprint-exit review — Hermes never writes APPROVED/CLOSED.
 
 **Epic exit:** Scenarios A-B pass through object selection with actionable low-confidence handling.
 
@@ -268,3 +285,33 @@ Sprint numbers express dependency order. They do not promise fixed duration. A s
 - Sprint/epic exit là task review riêng nếu evidence phân tán; không tự suy ra từ việc các PR đã merge.
 - Thứ tự E04 và E05 có thể overlap sau khi contract ObjectRole tối thiểu được approve; `S07-T01` vẫn chờ contract đó.
 - E09 có thể chạy sau E04 nhưng mặc định đặt sau beta reskin để không làm trễ core value.
+
+| S05-C01 | Approved-pipeline orchestration + successor retry (correction) | S05-T05 | SUBMITTED (Codex CHANGES_REQUESTED → S05-C02) |
+| S05-C02 | Durable chain progression correction (read-only GET, orchestrator-owned chain, source-SHA identity) | S05-C01 | SUBMITTED (sprint-exit review pending; baseline 7/7 `20260805-163430`) |
+
+_S05-C02 correction (2026-08-05, appended — do not rewrite history): chain
+progression moved from the projects route into_
+`app/workflow/analyze_orchestrator.py`_; GET /analyze strictly read-only;
+chain identity bound to source SHA-256 + generation; evidence in_
+`docs/pm/sessions/S05-C02-durable-chain-progression/REPORT.md`_.
+
+
+S05-C03 correction (2026-08-05, appended — do not rewrite history): Codex
+CHANGES_REQUESTED round 3 (S05-C02 review) — orchestrator start/stop wired
+into the real FastAPI lifespan with a startup scan-and-resume (no
+POST/GET/browser/manual advance); TRUE process-lifecycle test (restart
+after import, restart after proxy, zero analyze API calls); source
+replacement with a different SHA now performs an explicit VideoItem/version
+supersession (old VideoItem archived, jobs/artifacts/scenes byte-identical
+immutable, new VideoItem distinct identity + outputs, new chain COMPLETES,
+chain state exposes only the current source); GET read-only + all C02
+concurrency/retry guarantees preserved. Evidence:
+`docs/pm/sessions/S05-C03-final-lifecycle-correction/REPORT.md`_. Status:
+SUBMITTED (never APPROVED).
+
+S05-C04 final correction (2026-08-05, appended — do not rewrite history):
+production `JobService` wiring, authoritative lifecycle binding, atomic current-
+step chain cancellation, isolated default-binding coverage and corrected
+desktop/390px completion evidence. Codex decision: APPROVED and CLOSED. Evidence:
+`docs/pm/sessions/S05-C04-production-job-service-wiring/PM_REVIEW.md`; fresh
+quality baseline `20260805-214242` (7/7 PASS).

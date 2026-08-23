@@ -5,6 +5,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+from app.api.security import validate_path_identifier
 from app.schemas import ReplacementConfig, TrackedObject
 from app.workflow.project_workflow import ProjectWorkflowService
 
@@ -28,11 +29,12 @@ class ReplacementService:
             project_id: Target project ID.
             object_id: Target object ID.
             source_path: Path to the uploaded replacement PNG.
-            filename: Destination filename.
+            filename: Destination filename (single safe segment only).
 
         Returns:
             Relative path to the stored replacement image.
         """
+        validate_path_identifier(filename, label="filename")
         project = self._project_wf.get_project(project_id)
         obj = None
         for o in project.objects:
@@ -42,8 +44,7 @@ class ReplacementService:
         if obj is None:
             raise KeyError(f"Object not found: {object_id}")
 
-        proj_dir = self._project_wf._project_dir(project_id)
-        obj_dir = proj_dir / "objects" / object_id
+        obj_dir = self._project_wf.object_dir(project_id, object_id)
         obj_dir.mkdir(parents=True, exist_ok=True)
         dest = obj_dir / filename
         shutil.copy2(str(source_path), str(dest))

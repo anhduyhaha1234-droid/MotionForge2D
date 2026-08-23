@@ -7,6 +7,7 @@ the storage layer only — they are never exported as API schemas.
 
 from __future__ import annotations
 
+import re as _re
 import uuid
 from datetime import UTC, datetime
 
@@ -30,29 +31,76 @@ __all__ = [
     "ARTIFACT_KINDS",
     "ARTIFACT_STATES",
     "ARCHIVED_VIDEO_STATUS",
+    "CHARACTER_STATUSES",
+    "CHARACTER_SYMMETRIES",
+    "CHARACTER_TYPES",
     "CHANNEL_ROLES",
     "CHANNEL_STATUSES",
+    "CONTACT_KINDS",
+    "CONTACT_KIND_CHECK_SQL",
+    "CONTACT_KIND_PATTERN",
+    "CORE_POSE_SLOTS",
+    "GROUPING_SCOPES",
+    "GROUPING_SUGGESTION_STATUSES",
     "JOB_ACTORS",
     "JOB_STATES",
     "JOB_STEP_STATES",
     "LEGACY_IMPORT_STATUSES",
+    "OBJECT_KINDS",
+    "OBJECT_KIND_CHECK_SQL",
+    "OBJECT_KIND_PATTERN",
+    "RENDERER_ROUTES",
+    "RENDERER_ROUTE_CHECK_SQL",
+    "RENDERER_ROUTE_PATTERN",
+    "STRUCTURAL_LOCK_MANIFEST_STATUSES",
+    "OBJECT_ROLE_STATUSES",
+    "OCCURRENCE_CONFIDENCE_SOURCES",
+    "OCCURRENCE_REVIEW_STATES",
+    "OCCURRENCE_SEGMENT_VISIBILITY",
+    "OCCURRENCE_SEGMENT_VISIBILITY_CHECK_SQL",
+    "OCCURRENCE_SEGMENT_VISIBILITY_PATTERN",
+    "OBJECT_CORRECTION_STATUSES",
+    "OBJECT_CORRECTION_TYPES",
     "OWNER_TYPES",
+    "PACK_STATUSES",
     "PROJECT_STATUSES",
     "RESOURCE_CLASSES",
+    "REMOVAL_ONLY_KINDS",
     "SCENE_STATUSES",
+    "SOURCE_OVERLAY_KIND",
     "STEP_TYPES",
     "VIDEO_PIPELINE_STATES",
     "Artifact",
     "ArtifactOwner",
+    "Character",
+    "CharacterAsset",
+    "CharacterPackVersion",
     "Channel",
+    "ContactEdge",
     "Job",
     "JobAttempt",
     "JobEvent",
     "JobLease",
     "JobStep",
     "LegacyImport",
+    "ObjectCorrection",
+    "ObjectGroupingSuggestion",
+    "ObjectOccurrence",
+    "ObjectRole",
+    "ObjectRoleArtifact",
+    "OcclusionEdge",
     "Project",
+    "RoleOperation",
     "Scene",
+    "SceneGraphContact",
+    "ProjectCastMapping",
+    "ApplyCheckpoint",
+    "ReskinConfig",
+    "StructuralLockManifest",
+    "SegmentRenderRoute",
+    "SceneGraphOcclusion",
+    "SegmentMotion",
+    "OccurrenceSegment",
     "VideoItem",
     "Workspace",
     "utc_now",
@@ -87,11 +135,138 @@ VIDEO_PIPELINE_STATES = (
 )
 #: Convenience constant: the archive terminal state of a Video Item.
 ARCHIVED_VIDEO_STATUS = "archived"
+CHARACTER_STATUSES = ("draft", "generating", "needs_review", "ready", "archived")
+CHARACTER_TYPES = ("character", "prop", "other")
+CHARACTER_SYMMETRIES = ("symmetric", "asymmetric")
+PACK_STATUSES = ("draft", "validating", "ready", "published", "archived")
+CORE_POSE_SLOTS = ("front", "three_quarter", "side", "back", "sitting", "walking")
 SCENE_STATUSES = ("pending", "draft", "approved")
 ARTIFACT_KINDS = ("video", "image", "audio", "document", "other")
 ARTIFACT_STATES = ("staging", "ready", "trash", "missing", "failed")
 OWNER_TYPES = ("channel", "project", "video_item", "scene", "artifact")
 LEGACY_IMPORT_STATUSES = ("previewed", "importing", "completed", "failed", "rolled_back")
+OBJECT_ROLE_STATUSES = ("suggested", "confirmed", "superseded")
+#: Canonical ObjectRole source-locked 2D role/layer taxonomy (S08-A01).
+#: Exactly these seven kinds are authoritative across ORM, migration
+#: constraint, Pydantic schemas, repository and API.  ``source_overlay`` is
+#: the BACKEND-OWNED removal-only role (a source watermark/logo layer that
+#: must be removed, never reproduced as a replacement asset).
+OBJECT_KINDS = (
+    "character",
+    "prop",
+    "background",
+    "foreground",
+    "graphic",
+    "source_overlay",
+    "other",
+)
+#: Convenience constant for the backend-owned removal-only role kind.
+SOURCE_OVERLAY_KIND = "source_overlay"
+#: Kinds that are backend-owned removal-only: never a Character Pack /
+#: replacement candidate; grouping never pairs them; curation surfaces must
+#: not present them as replaceable output.  (Currently exactly
+#: ``source_overlay``.)
+REMOVAL_ONLY_KINDS = frozenset({SOURCE_OVERLAY_KIND})
+
+#: SQL literal for the ``object_role.kind`` CHECK, DERIVED from
+#: ``OBJECT_KINDS`` — the runtime/persistence ORM constraint can never drift
+#: from the canonical taxonomy (S08-A01-C1 F3 single authority).  The byte
+#: format (no space after each comma) deliberately matches the FROZEN
+#: migration snapshot in
+#: ``migrations/versions/f7a8b9c0d1e2_object_role_7_kind_taxonomy.py`` so the
+#: ``writable_schema`` CHECK-literal edit keeps finding its needle EXACTLY ONCE.
+OBJECT_KIND_CHECK_SQL = (
+    "kind IN (" + ",".join("'" + k + "'" for k in OBJECT_KINDS) + ")"
+)
+
+#: Pydantic ``pattern`` for every role-kind validation, DERIVED from
+#: ``OBJECT_KINDS`` (F3 single authority — no duplicated regex literals).
+OBJECT_KIND_PATTERN = (
+    "^(" + "|".join(_re.escape(k) for k in OBJECT_KINDS) + ")$"
+)
+
+OCCURRENCE_CONFIDENCE_SOURCES = ("model", "detector", "user", "manual", "derived")
+OCCURRENCE_REVIEW_STATES = ("unreviewed", "accepted", "rejected", "edited")
+#: Canonical visibility state of an occurrence/segment (S08-A02 scene graph).
+#: Exactly these four states are authoritative across ORM, migration
+#: constraint, Pydantic schemas and repository validation.
+OCCURRENCE_SEGMENT_VISIBILITY = ("visible", "occluded", "out_of_frame", "hidden")
+#: SQL literal for the ``occurrence_segment.visibility`` CHECK, DERIVED from
+#: ``OCCURRENCE_SEGMENT_VISIBILITY`` (single authority — never a second copy).
+OCCURRENCE_SEGMENT_VISIBILITY_CHECK_SQL = (
+    "visibility IN ("
+    + ",".join("'" + v + "'" for v in OCCURRENCE_SEGMENT_VISIBILITY)
+    + ")"
+)
+#: Pydantic ``pattern`` for segment visibility, DERIVED from the same enum.
+OCCURRENCE_SEGMENT_VISIBILITY_PATTERN = (
+    "^(" + "|".join(_re.escape(v) for v in OCCURRENCE_SEGMENT_VISIBILITY) + ")$"
+)
+#: Canonical renderer routes for the adaptive 2D renderer router (S09-T00-I01,
+#: TARGET_PROFILE §4 P0-7 + §8 priority).  EXACTLY these five values are
+#: authoritative across ORM, migration CHECK, Pydantic schemas and the
+#: repository — never a second copy of the taxonomy.  ``pose_swap`` covers the
+#: versioned pose/expression swap route; ``controlled_redraw`` is reserved for
+#: exceptional complex shots only.
+RENDERER_ROUTES = (
+    "pose_swap",
+    "sprite_affine",
+    "mesh_warp",
+    "part_rig",
+    "controlled_redraw",
+)
+#: SQL literal for the ``segment_render_route.route`` CHECK, DERIVED from
+#: ``RENDERER_ROUTES`` (single authority).
+RENDERER_ROUTE_CHECK_SQL = (
+    "route IN (" + ",".join("'" + r + "'" for r in RENDERER_ROUTES) + ")"
+)
+#: Pydantic ``pattern`` for renderer-route validation, DERIVED likewise.
+RENDERER_ROUTE_PATTERN = (
+    "^(" + "|".join(_re.escape(r) for r in RENDERER_ROUTES) + ")$"
+)
+#: Lifecycle statuses of a StructuralLockManifest (S09-T00-I01): ``active``
+#: is the manifest a reskin/apply pin resolves to; superseding a manifest
+#: archives it as ``superseded`` (history is kept, never overwritten) and a
+#: draft lock may be ``voided`` before any pin references it.
+STRUCTURAL_LOCK_MANIFEST_STATUSES = ("draft", "active", "superseded", "voided")
+#: Canonical contact kinds for scene-graph contact edges (S08-A02).
+#: ``hand_phone`` / ``character_phone`` are the two acceptance-scenario
+#: kinds; the remaining values keep the set closed for future events without
+#: a schema change.
+CONTACT_KINDS = (
+    "hand_phone",
+    "character_phone",
+    "hand_face",
+    "touch",
+    "grasp",
+    "other",
+)
+#: SQL literal for the ``scene_graph_contact.contact_kind`` CHECK, DERIVED
+#: from ``CONTACT_KINDS``.
+CONTACT_KIND_CHECK_SQL = (
+    "contact_kind IN (" + ",".join("'" + k + "'" for k in CONTACT_KINDS) + ")"
+)
+#: Pydantic ``pattern`` for contact kinds, DERIVED from the same enum.
+CONTACT_KIND_PATTERN = "^(" + "|".join(_re.escape(k) for k in CONTACT_KINDS) + ")$"
+#: Reviewable cross-scene grouping suggestions are NEVER auto-confirmed:
+#: they start ``pending`` and only explicit user actions move them to
+#: ``dismissed`` (reject), ``applied`` (a merge referenced the suggestion) or
+#: ``superseded`` (the underlying role set changed — traceable, not deleted).
+GROUPING_SUGGESTION_STATUSES = ("pending", "dismissed", "applied", "superseded")
+#: Suggestion scope: ``video`` (roles of one video item) — ``project`` is
+#: reserved for future cross-video grouping; the API currently supports
+#: ``video`` only.
+GROUPING_SCOPES = ("video", "project")
+#: Explicit durable curation mutations recorded in the operation audit.
+ROLE_OPERATION_TYPES = ("merge", "split", "confirm")
+#: Targeted correction kinds (S08-T05): the mutation the correction applies.
+OBJECT_CORRECTION_TYPES = ("reassign", "candidate_edit", "merge", "split")
+#: Correction workflow states: ``pending`` (impact computed, awaiting
+#: confirmation) -> ``applied`` (mutation + recompute job committed) or
+#: ``cancelled`` (never applied).  The recompute outcome is read from the
+#: linked durable Job (successor chain) — the correction row never fabricates
+#: a ``completed`` state.
+OBJECT_CORRECTION_STATUSES = ("pending", "applied", "cancelled")
 JOB_STATES = (
     "pending",
     "queued",
@@ -180,6 +355,7 @@ class Workspace(TimestampMixin, Base):
     projects: Mapped[list[Project]] = relationship(back_populates="workspace")
     artifacts: Mapped[list[Artifact]] = relationship(back_populates="workspace")
     jobs: Mapped[list[Job]] = relationship(back_populates="workspace")
+    characters: Mapped[list[Character]] = relationship(back_populates="workspace")
 
 
 class Channel(ArchivableMixin, Base):
@@ -397,6 +573,9 @@ class Artifact(TimestampMixin, Base):
     sha256: Mapped[str | None] = mapped_column(String(64))
     size_bytes: Mapped[int | None] = mapped_column(Integer)
     mime_type: Mapped[str | None] = mapped_column(String(128))
+    # Pixel dimensions of the artifact (S08-T02; NULL for non-image kinds).
+    width: Mapped[int | None] = mapped_column(Integer)
+    height: Mapped[int | None] = mapped_column(Integer)
     trashed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     workspace: Mapped[Workspace] = relationship(back_populates="artifacts")
@@ -720,3 +899,1671 @@ class JobLease(TimestampMixin, Base):
     ttl_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=60)
 
     job: Mapped[Job] = relationship(back_populates="lease")
+
+
+class Character(ArchivableMixin, Base):
+    """Reusable workspace character asset definition."""
+
+    __tablename__ = "character"
+    __table_args__ = (
+        CheckConstraint("length(name) > 0", name="ck_character_name_nonempty"),
+        CheckConstraint("length(name) <= 200", name="ck_character_name_len"),
+        CheckConstraint("length(code) > 0", name="ck_character_code_nonempty"),
+        CheckConstraint("length(code) <= 64", name="ck_character_code_len"),
+        CheckConstraint(
+            "character_type IN ('character','prop','other')",
+            name="ck_character_type",
+        ),
+        CheckConstraint(
+            "symmetry IN ('symmetric','asymmetric')",
+            name="ck_character_symmetry",
+        ),
+        CheckConstraint(
+            "status IN ('draft','generating','needs_review','ready','archived')",
+            name="ck_character_status",
+        ),
+        CheckConstraint("revision > 0", name="ck_character_revision_positive"),
+        Index(
+            "uq_character_active_workspace_code",
+            "workspace_id",
+            sa_text("lower(code)"),
+            unique=True,
+            postgresql_where=sa_text("status != 'archived'"),
+            sqlite_where=sa_text("status != 'archived'"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    code: Mapped[str] = mapped_column(String(64), nullable=False)
+    character_type: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="character"
+    )
+    symmetry: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="symmetric"
+    )
+    status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="draft"
+    )
+    default_version_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey(
+            "character_pack_version.id",
+            ondelete="RESTRICT",
+            use_alter=True,
+            name="fk_character_default_version",
+        ),
+    )
+    description: Mapped[str | None] = mapped_column(Text)
+    revision: Mapped[int] = mapped_column(
+        Integer, default=1, server_default=sa_text("1"), nullable=False
+    )
+
+    workspace: Mapped[Workspace] = relationship(back_populates="characters")
+    versions: Mapped[list[CharacterPackVersion]] = relationship(
+        back_populates="character",
+        foreign_keys="[CharacterPackVersion.character_id]",
+    )
+
+
+class CharacterPackVersion(ArchivableMixin, Base):
+    """Versioned pose pack for a Character."""
+
+    __tablename__ = "character_pack_version"
+    __table_args__ = (
+        UniqueConstraint(
+            "character_id", "version", name="uq_pack_version_character_version"
+        ),
+        CheckConstraint("version > 0", name="ck_pack_version_positive"),
+        CheckConstraint(
+            "status IN ('draft','validating','ready','published','archived')",
+            name="ck_pack_version_status",
+        ),
+        CheckConstraint("revision > 0", name="ck_pack_version_revision_positive"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    character_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("character.id", ondelete="RESTRICT"), nullable=False
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="draft"
+    )
+    validation_json: Mapped[str | None] = mapped_column(Text)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revision: Mapped[int] = mapped_column(
+        Integer, default=1, server_default=sa_text("1"), nullable=False
+    )
+
+    character: Mapped[Character] = relationship(
+        back_populates="versions",
+        foreign_keys=[character_id],
+    )
+    workspace: Mapped[Workspace] = relationship()
+    assets: Mapped[list[CharacterAsset]] = relationship(back_populates="pack_version")
+
+
+class CharacterAsset(TimestampMixin, Base):
+    """Pose asset slot attachment referencing an Artifact."""
+
+    __tablename__ = "character_asset"
+    __table_args__ = (
+        UniqueConstraint(
+            "pack_version_id", "pose_slot", name="uq_character_asset_version_pose_slot"
+        ),
+        CheckConstraint("length(pose_slot) > 0", name="ck_character_asset_pose_slot_nonempty"),
+        CheckConstraint("length(pose_slot) <= 64", name="ck_character_asset_pose_slot_len"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    pack_version_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("character_pack_version.id", ondelete="RESTRICT"), nullable=False
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    pose_slot: Mapped[str] = mapped_column(String(64), nullable=False)
+    artifact_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("artifact.id", ondelete="RESTRICT"), nullable=False
+    )
+
+    pack_version: Mapped[CharacterPackVersion] = relationship(back_populates="assets")
+    artifact: Mapped[Artifact] = relationship()
+    workspace: Mapped[Workspace] = relationship()
+
+
+class ObjectRole(TimestampMixin, Base):
+    """Video-global object identity with explicit review status."""
+
+    __tablename__ = "object_role"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('suggested','confirmed','superseded')",
+            name="ck_object_role_status",
+        ),
+        CheckConstraint(
+            OBJECT_KIND_CHECK_SQL,  # derived from OBJECT_KINDS (F3 single authority)
+            name="ck_object_role_kind",
+        ),
+        CheckConstraint(
+            "length(name) BETWEEN 1 AND 240", name="ck_object_role_name_len"
+        ),
+        CheckConstraint(
+            "length(source_generation) > 0",
+            name="ck_object_role_source_generation_nonempty",
+        ),
+        CheckConstraint(
+            "length(source_generation) <= 64",
+            name="ck_object_role_source_generation_len",
+        ),
+        CheckConstraint(
+            "length(idempotency_key) <= 255",
+            name="ck_object_role_idempotency_key_len",
+        ),
+        CheckConstraint("revision > 0", name="ck_object_role_revision_positive"),
+        Index(
+            "uq_object_role_workspace_idempotency",
+            "workspace_id",
+            "idempotency_key",
+            unique=True,
+            sqlite_where=sa_text("idempotency_key IS NOT NULL"),
+            postgresql_where=sa_text("idempotency_key IS NOT NULL"),
+        ),
+        Index("ix_object_role_video_status", "video_item_id", "status"),
+        Index("ix_object_role_legacy_object", "legacy_object_id"),
+        Index("ix_object_role_supersedes", "supersedes_role_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    project_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("project.id", ondelete="RESTRICT"), nullable=False
+    )
+    video_item_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("video_item.id", ondelete="RESTRICT"), nullable=False
+    )
+    source_generation: Mapped[str] = mapped_column(String(64), nullable=False)
+    name: Mapped[str] = mapped_column(String(240), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False, default="character")
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="suggested")
+    supersedes_role_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("object_role.id", ondelete="RESTRICT")
+    )
+    legacy_object_id: Mapped[str | None] = mapped_column(String(255))
+    legacy_scene_id: Mapped[int | None] = mapped_column(Integer)
+    description: Mapped[str | None] = mapped_column(Text)
+    # The durable DISCOVER_OBJECTS Job that produced (and owns) this role
+    # (S08-T02).  NULL for user-created / T01-era roles.
+    source_job_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("job.id", ondelete="RESTRICT")
+    )
+    idempotency_key: Mapped[str | None] = mapped_column(String(255))
+    revision: Mapped[int] = mapped_column(
+        Integer, default=1, server_default=sa_text("1"), nullable=False
+    )
+
+    occurrences: Mapped[list[ObjectOccurrence]] = relationship(
+        back_populates="role",
+        cascade="all, delete-orphan",
+        order_by="ObjectOccurrence.frame_index",
+    )
+
+
+class ObjectOccurrence(TimestampMixin, Base):
+    """Canonical scene/frame evidence for an ObjectRole."""
+
+    __tablename__ = "object_occurrence"
+    __table_args__ = (
+        UniqueConstraint(
+            "role_id", "scene_id", "frame_index", name="uq_object_occurrence_role_scene_frame"
+        ),
+        CheckConstraint("frame_index >= 0", name="ck_object_occurrence_frame_index_nonneg"),
+        CheckConstraint("time_ms >= 0", name="ck_object_occurrence_time_ms_nonneg"),
+        CheckConstraint("bbox_x >= 0", name="ck_object_occurrence_bbox_x_nonneg"),
+        CheckConstraint("bbox_y >= 0", name="ck_object_occurrence_bbox_y_nonneg"),
+        CheckConstraint("bbox_w >= 0", name="ck_object_occurrence_bbox_w_nonneg"),
+        CheckConstraint("bbox_h >= 0", name="ck_object_occurrence_bbox_h_nonneg"),
+        CheckConstraint(
+            "confidence >= 0 AND confidence <= 1",
+            name="ck_object_occurrence_confidence_range",
+        ),
+        CheckConstraint(
+            "confidence_source IN ('model','detector','user','manual','derived')",
+            name="ck_object_occurrence_confidence_source",
+        ),
+        CheckConstraint(
+            "review_state IN ('unreviewed','accepted','rejected','edited')",
+            name="ck_object_occurrence_review_state",
+        ),
+        CheckConstraint(
+            "length(algorithm) <= 64", name="ck_object_occurrence_algorithm_len"
+        ),
+        CheckConstraint(
+            "length(algorithm_version) <= 64",
+            name="ck_object_occurrence_algorithm_version_len",
+        ),
+        CheckConstraint("revision > 0", name="ck_object_occurrence_revision_positive"),
+        Index("ix_object_occurrence_role", "role_id"),
+        Index("ix_object_occurrence_scene", "scene_id"),
+        Index("ix_object_occurrence_video_frame", "video_item_id", "frame_index"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    project_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("project.id", ondelete="RESTRICT"), nullable=False
+    )
+    video_item_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("video_item.id", ondelete="RESTRICT"), nullable=False
+    )
+    role_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("object_role.id", ondelete="CASCADE"), nullable=False
+    )
+    scene_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("scene.id", ondelete="RESTRICT"), nullable=False
+    )
+    frame_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    time_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    bbox_x: Mapped[int] = mapped_column(Integer, nullable=False)
+    bbox_y: Mapped[int] = mapped_column(Integer, nullable=False)
+    bbox_w: Mapped[int] = mapped_column(Integer, nullable=False)
+    bbox_h: Mapped[int] = mapped_column(Integer, nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    confidence_source: Mapped[str] = mapped_column(String(32), nullable=False, default="model")
+    algorithm: Mapped[str | None] = mapped_column(String(64))
+    algorithm_version: Mapped[str | None] = mapped_column(String(64))
+    reasons_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    review_state: Mapped[str] = mapped_column(String(16), nullable=False, default="unreviewed")
+    revision: Mapped[int] = mapped_column(
+        Integer, default=1, server_default=sa_text("1"), nullable=False
+    )
+
+    role: Mapped[ObjectRole] = relationship(back_populates="occurrences")
+    scene: Mapped[Scene] = relationship()
+
+
+class ObjectRoleArtifact(TimestampMixin, Base):
+    """Durable id-based link between an ObjectRole and its published
+    candidate artifact (S08-T02 correction B6).
+
+    Keyed by stable ids + purpose + source generation + source job —
+    display names are never joins, so renames and duplicate display names
+    cannot re-map gallery/grouping references.  Written in the SAME
+    publication transaction as the artifacts/roles/occurrences; replay is
+    idempotent via the natural-key unique constraint.
+    """
+
+    __tablename__ = "object_role_artifact"
+    __table_args__ = (
+        UniqueConstraint(
+            "role_id",
+            "artifact_id",
+            "purpose",
+            "source_generation",
+            "source_job_id",
+            name="uq_object_role_artifact_natural_key",
+        ),
+        CheckConstraint(
+            "purpose IN ('thumbnail','mask')", name="ck_object_role_artifact_purpose"
+        ),
+        CheckConstraint(
+            "length(source_generation) > 0",
+            name="ck_object_role_artifact_generation_nonempty",
+        ),
+        CheckConstraint(
+            "length(source_generation) <= 64",
+            name="ck_object_role_artifact_generation_len",
+        ),
+        Index("ix_object_role_artifact_role", "role_id"),
+        Index("ix_object_role_artifact_artifact", "artifact_id"),
+        Index("ix_object_role_artifact_job", "source_job_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    role_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("object_role.id", ondelete="CASCADE"), nullable=False
+    )
+    artifact_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("artifact.id", ondelete="RESTRICT"), nullable=False
+    )
+    purpose: Mapped[str] = mapped_column(String(32), nullable=False)
+    source_generation: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_job_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("job.id", ondelete="RESTRICT"), nullable=False
+    )
+    # S08-T05-C1: when a correction recompute replaces this role's media the
+    # OLD active association is pointed at the replacement via this self-FK —
+    # the old row stays auditable, and "newest valid" resolution is simply
+    # ``superseded_by_id IS NULL``.
+    superseded_by_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("object_role_artifact.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+
+
+class ObjectGroupingSuggestion(TimestampMixin, Base):
+    """Reviewable cross-scene grouping suggestion (S08-T03).
+
+    A durable, NEVER-auto-confirmed suggestion that a set of ObjectRoles of
+    one video item (same source generation) represent the same object.
+    Statements carry confidence, review reasons and provenance
+    (algorithm/version).  Status starts ``pending``; only explicit user
+    actions move it to ``dismissed`` (reject), ``applied`` (a merge
+    referenced it) or ``superseded`` (the role set changed — traceable).
+    """
+
+    __tablename__ = "object_grouping_suggestion"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending','dismissed','applied','superseded')",
+            name="ck_object_grouping_suggestion_status",
+        ),
+        CheckConstraint(
+            "scope IN ('video','project')", name="ck_object_grouping_suggestion_scope"
+        ),
+        CheckConstraint(
+            "confidence >= 0 AND confidence <= 1",
+            name="ck_object_grouping_suggestion_confidence_range",
+        ),
+        CheckConstraint(
+            "length(source_generation) BETWEEN 1 AND 64",
+            name="ck_object_grouping_suggestion_generation_len",
+        ),
+        CheckConstraint(
+            "length(algorithm) BETWEEN 1 AND 64",
+            name="ck_object_grouping_suggestion_algorithm_len",
+        ),
+        CheckConstraint(
+            "length(algorithm_version) BETWEEN 1 AND 64",
+            name="ck_object_grouping_suggestion_algorithm_version_len",
+        ),
+        CheckConstraint(
+            "length(idempotency_key) <= 255",
+            name="ck_object_grouping_suggestion_idem_key_len",
+        ),
+        CheckConstraint(
+            "length(natural_key) <= 255",
+            name="ck_object_grouping_suggestion_natural_key_len",
+        ),
+        CheckConstraint(
+            "revision > 0", name="ck_object_grouping_suggestion_revision_positive"
+        ),
+        Index(
+            "uq_object_grouping_suggestion_natural",
+            "workspace_id",
+            "natural_key",
+            unique=True,
+            sqlite_where=sa_text("natural_key IS NOT NULL"),
+            postgresql_where=sa_text("natural_key IS NOT NULL"),
+        ),
+        Index(
+            "uq_object_grouping_suggestion_idempotency",
+            "workspace_id",
+            "idempotency_key",
+            unique=True,
+            sqlite_where=sa_text("idempotency_key IS NOT NULL"),
+            postgresql_where=sa_text("idempotency_key IS NOT NULL"),
+        ),
+        Index(
+            "ix_object_grouping_suggestion_video_status", "video_item_id", "status"
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    project_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("project.id", ondelete="RESTRICT"), nullable=False
+    )
+    video_item_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("video_item.id", ondelete="RESTRICT"), nullable=False
+    )
+    source_generation: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        default="pending",
+        server_default=sa_text("'pending'"),
+    )
+    role_ids_json: Mapped[str] = mapped_column(Text, nullable=False)
+    target_role_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("object_role.id", ondelete="RESTRICT")
+    )
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    reasons_json: Mapped[str] = mapped_column(Text, nullable=False)
+    algorithm: Mapped[str] = mapped_column(String(64), nullable=False)
+    algorithm_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    scope: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="video", server_default=sa_text("'video'")
+    )
+    idempotency_key: Mapped[str | None] = mapped_column(String(255))
+    natural_key: Mapped[str | None] = mapped_column(String(255))
+    revision: Mapped[int] = mapped_column(
+        Integer, default=1, server_default=sa_text("1"), nullable=False
+    )
+
+
+class RoleOperation(TimestampMixin, Base):
+    """Audit history of an explicit durable merge/split/confirm mutation.
+
+    One row per COMPLETED operation (S08-T03).  The row records the target
+    role, source role ids, created role ids, the exact transferred-occurrence
+    map (merge/split) and the target revision reached — so superseded roles
+    and moved evidence stay traceable and approved evidence is never
+    silently rewritten or deleted.  ``natural_key`` replay prevents
+    duplicate/concurrent requests and restart from creating a second
+    mutation.
+    """
+
+    __tablename__ = "object_role_operation"
+    __table_args__ = (
+        CheckConstraint(
+            "operation_type IN ('merge','split','confirm')",
+            name="ck_object_role_operation_type",
+        ),
+        CheckConstraint(
+            "length(idempotency_key) <= 255",
+            name="ck_object_role_operation_idem_key_len",
+        ),
+        CheckConstraint(
+            "length(natural_key) <= 255",
+            name="ck_object_role_operation_natural_key_len",
+        ),
+        CheckConstraint(
+            "revision_after > 0", name="ck_object_role_operation_revision_after_positive"
+        ),
+        Index(
+            "uq_object_role_operation_natural",
+            "workspace_id",
+            "natural_key",
+            unique=True,
+            sqlite_where=sa_text("natural_key IS NOT NULL"),
+            postgresql_where=sa_text("natural_key IS NOT NULL"),
+        ),
+        Index(
+            "uq_object_role_operation_idempotency",
+            "workspace_id",
+            "idempotency_key",
+            unique=True,
+            sqlite_where=sa_text("idempotency_key IS NOT NULL"),
+            postgresql_where=sa_text("idempotency_key IS NOT NULL"),
+        ),
+        Index(
+            "ix_object_role_operation_video_type", "video_item_id", "operation_type"
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    project_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("project.id", ondelete="RESTRICT"), nullable=False
+    )
+    video_item_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("video_item.id", ondelete="RESTRICT"), nullable=False
+    )
+    operation_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    target_role_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("object_role.id", ondelete="RESTRICT"), nullable=False
+    )
+    source_role_ids_json: Mapped[str] = mapped_column(
+        Text, nullable=False, default="[]", server_default=sa_text("'[]'")
+    )
+    created_role_ids_json: Mapped[str] = mapped_column(
+        Text, nullable=False, default="[]", server_default=sa_text("'[]'")
+    )
+    transferred_occurrence_ids_json: Mapped[str] = mapped_column(
+        Text, nullable=False, default="[]", server_default=sa_text("'[]'")
+    )
+    suggestion_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("object_grouping_suggestion.id", ondelete="RESTRICT")
+    )
+    idempotency_key: Mapped[str | None] = mapped_column(String(255))
+    natural_key: Mapped[str | None] = mapped_column(String(255))
+    revision_after: Mapped[int] = mapped_column(Integer, nullable=False)
+    note: Mapped[str | None] = mapped_column(Text)
+
+
+class ObjectCorrection(TimestampMixin, Base):
+    """Durable archive of ONE targeted object correction (S08-T05).
+
+    A correction is created ``pending`` with its computed impacted scope
+    (``impact_json`` — the pre-confirmation report), then explicitly
+    confirmed: the targeted mutation + supersession of the affected derived
+    state + the ``RECOMPUTE_OBJECTS`` job (only where recompute is needed)
+    are committed in ONE transaction, and the old affected mapping is
+    archived in ``result_json``.  ``natural_key`` replay makes duplicate /
+    concurrent requests return the SAME correction; ``recompute_job_id``
+    links the durable recompute work (successor chain owns retry).
+    """
+
+    __tablename__ = "object_correction"
+    __table_args__ = (
+        CheckConstraint(
+            "correction_type IN ('reassign','candidate_edit','merge','split')",
+            name="ck_object_correction_type",
+        ),
+        CheckConstraint(
+            "status IN ('pending','applied','cancelled')",
+            name="ck_object_correction_status",
+        ),
+        CheckConstraint(
+            "length(idempotency_key) <= 255",
+            name="ck_object_correction_idem_key_len",
+        ),
+        CheckConstraint(
+            "length(natural_key) <= 255",
+            name="ck_object_correction_natural_key_len",
+        ),
+        CheckConstraint(
+            "revision > 0", name="ck_object_correction_revision_positive"
+        ),
+        Index(
+            "uq_object_correction_natural",
+            "workspace_id",
+            "natural_key",
+            unique=True,
+            sqlite_where=sa_text("natural_key IS NOT NULL"),
+        ),
+        Index(
+            "uq_object_correction_idempotency",
+            "workspace_id",
+            "idempotency_key",
+            unique=True,
+            sqlite_where=sa_text("idempotency_key IS NOT NULL"),
+        ),
+        Index(
+            "ix_object_correction_video_status",
+            "video_item_id",
+            "status",
+        ),
+        Index("ix_object_correction_recompute_job", "recompute_job_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    project_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("project.id", ondelete="RESTRICT"), nullable=False
+    )
+    video_item_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("video_item.id", ondelete="RESTRICT"), nullable=False
+    )
+    correction_type: Mapped[str] = mapped_column(String(24), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        default="pending",
+        server_default=sa_text("'pending'"),
+    )
+    request_json: Mapped[str] = mapped_column(Text, nullable=False)
+    impact_json: Mapped[str] = mapped_column(Text, nullable=False)
+    result_json: Mapped[str | None] = mapped_column(Text)
+    recompute_job_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("job.id", ondelete="RESTRICT")
+    )
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    idempotency_key: Mapped[str | None] = mapped_column(String(255))
+    natural_key: Mapped[str | None] = mapped_column(String(255))
+    revision: Mapped[int] = mapped_column(
+        Integer, default=1, server_default=sa_text("1"), nullable=False
+    )
+
+
+# ── Structural evidence bridge (S08-A02) ────────────────────────────────────
+
+
+class OccurrenceSegment(TimestampMixin, Base):
+    """Durable occurrence/segment evidence record (S08-A02).
+
+    The structural-evidence bridge's canonical segment: a stable opaque id
+    (the durable join key — names are never joins), an explicit frame/time
+    range, generation ownership, prompt/segmentation JSON evidence, an
+    optional mask artifact reference and scene-graph geometry (visibility +
+    z-order).  The record is CAS-versioned and carries a self-FK
+    ``superseded_by_id`` so a correction archives the prior row and points it
+    at its successor instead of silently overwriting history.
+    """
+
+    __tablename__ = "occurrence_segment"
+    __table_args__ = (
+        CheckConstraint(
+            "start_frame >= 0", name="ck_occurrence_segment_start_frame_nonneg"
+        ),
+        CheckConstraint(
+            "end_frame >= start_frame", name="ck_occurrence_segment_end_frame_ge_start"
+        ),
+        CheckConstraint(
+            "start_time_ms >= 0", name="ck_occurrence_segment_start_time_ms_nonneg"
+        ),
+        CheckConstraint(
+            "end_time_ms >= start_time_ms",
+            name="ck_occurrence_segment_end_time_ms_ge_start",
+        ),
+        CheckConstraint(
+            "length(source_generation) BETWEEN 1 AND 64",
+            name="ck_occurrence_segment_source_generation_len",
+        ),
+        CheckConstraint(
+            "length(name) BETWEEN 1 AND 240", name="ck_occurrence_segment_name_len"
+        ),
+        CheckConstraint(
+            OBJECT_KIND_CHECK_SQL,  # derived from OBJECT_KINDS (F3 single authority)
+            name="ck_occurrence_segment_kind",
+        ),
+        CheckConstraint(
+            OCCURRENCE_SEGMENT_VISIBILITY_CHECK_SQL,
+            name="ck_occurrence_segment_visibility",
+        ),
+        CheckConstraint(
+            "z_order BETWEEN -1000000 AND 1000000",
+            name="ck_occurrence_segment_z_order_range",
+        ),
+        CheckConstraint(
+            "confidence >= 0 AND confidence <= 1",
+            name="ck_occurrence_segment_confidence_range",
+        ),
+        CheckConstraint(
+            "confidence_source IN ('model','detector','user','manual','derived')",
+            name="ck_occurrence_segment_confidence_source",
+        ),
+        CheckConstraint(
+            "length(algorithm) <= 64", name="ck_occurrence_segment_algorithm_len"
+        ),
+        CheckConstraint(
+            "length(algorithm_version) <= 64",
+            name="ck_occurrence_segment_algorithm_version_len",
+        ),
+        CheckConstraint(
+            "length(idempotency_key) <= 255",
+            name="ck_occurrence_segment_idempotency_key_len",
+        ),
+        CheckConstraint("revision > 0", name="ck_occurrence_segment_revision_positive"),
+        CheckConstraint(
+            "lineage_version >= 1",
+            name="ck_occurrence_segment_lineage_version_positive",
+        ),
+        Index("ix_occurrence_segment_role", "role_id"),
+        Index("ix_occurrence_segment_scene", "scene_id"),
+        Index("ix_occurrence_segment_video_generation", "video_item_id", "source_generation"),
+        Index("ix_occurrence_segment_mask_artifact", "mask_artifact_id"),
+        # Branch safety (C1-F2) is enforced by the repository revision CAS (one
+        # concurrent supersede wins, the loser CASes 0 rows and rolls back), by
+        # the UNIQUE(workspace_id, logical_id, lineage_version) index below (no
+        # duplicate lineage version) and by the ACTIVE partial unique identity
+        # index (no duplicate active slot).  The plain superseded_by index here
+        # supports the lineage walker; a branch/dangling state fabricated behind
+        # the repository's back is detected by the walker fail-closed.
+        CheckConstraint(
+            "superseded_by_id IS NULL OR superseded_by_id != id",
+            name="ck_occurrence_segment_no_self_link",
+        ),
+        Index(
+            "uq_occurrence_segment_successor",
+            "superseded_by_id",
+            unique=True,
+            sqlite_where=sa_text("superseded_by_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_occurrence_segment_active_lineage",
+            "workspace_id",
+            "logical_id",
+            unique=True,
+            sqlite_where=sa_text("superseded_by_id IS NULL"),
+        ),
+        Index("ix_occurrence_segment_superseded_by", "superseded_by_id"),
+        # C1-F2: explicit lineage versioning — UNIQUE(workspace_id, logical_id,
+        # lineage_version) makes the current version determinable, rejects any
+        # duplicate/branching lineage version and scopes each lineage to a
+        # workspace (a logical_id is never reused across workspaces).
+        Index(
+            "uq_occurrence_segment_lineage_version",
+            "workspace_id",
+            "logical_id",
+            "lineage_version",
+            unique=True,
+        ),
+        Index("ix_occurrence_segment_logical_id", "logical_id"),
+        # F3 (R1): NO full natural-key UniqueConstraint blocks versions — a
+        # successor of the same occurrence or a newer generation must coexist.
+        # Active/current rows are deduplicated by a PARTIAL unique index
+        # (WHERE superseded_by_id IS NULL) so superseded history is excluded
+        # and multiple versions/generations can live side by side.  SQLite
+        # 3.45 reflects and enforces partial unique indexes (verified by
+        # tests/test_s08_a02_structural_evidence_migration.py).
+        Index(
+            "uq_occurrence_segment_active_identity",
+            "role_id",
+            "scene_id",
+            "start_frame",
+            "end_frame",
+            "source_generation",
+            unique=True,
+            sqlite_where=sa_text("superseded_by_id IS NULL"),
+        ),
+        # F9 (R1): workspace-scoped idempotency uniqueness — the idempotency
+        # key is USED (not just stored); the natural key is never an
+        # idempotency key.
+        Index(
+            "uq_occurrence_segment_workspace_idempotency",
+            "workspace_id",
+            "idempotency_key",
+            unique=True,
+            sqlite_where=sa_text("idempotency_key IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    #: Stable logical lineage id (F2): the segment's durable identity across
+    #: corrections.  A correction creates a successor record that KEEPS the
+    #: same ``logical_id`` (same lineage); the immutable ``id`` is the
+    #: per-version evidence-record id.  Names are never the join key.
+    logical_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    #: Lineage version (C1-F2): starts at 1 for the root row; a successor's
+    #: version is ``predecessor.lineage_version + 1``.  UNIQUE(workspace_id,
+    #: logical_id, lineage_version) makes the current version determinable and
+    #: forbids duplicate/branching lineage versions.
+    lineage_version: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+        server_default=sa_text("1"),
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    project_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("project.id", ondelete="RESTRICT"), nullable=False
+    )
+    video_item_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("video_item.id", ondelete="RESTRICT"), nullable=False
+    )
+    role_id: Mapped[str] = mapped_column(
+        String(36),
+        # C1-F7: structural evidence is durable historical truth — deleting a
+        # role must NOT silently cascade-erase its occurrence-segment history.
+        # RESTRICT + fail-closed delete (was CASCADE in the R1 draft).
+        ForeignKey("object_role.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    scene_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("scene.id", ondelete="RESTRICT"), nullable=False
+    )
+    #: Stable display name of the segment (e.g. ``character``, ``phone``,
+    #: ``hand``, ``face``).  Names are never the join key — the opaque ``id``
+    #: is; ``name`` is a human label kept for deterministic ordering.
+    name: Mapped[str] = mapped_column(String(240), nullable=False)
+    #: Canonical seven-kind ObjectRole taxonomy (derived from OBJECT_KINDS).
+    kind: Mapped[str] = mapped_column(String(16), nullable=False, default="character")
+    start_frame: Mapped[int] = mapped_column(Integer, nullable=False)
+    end_frame: Mapped[int] = mapped_column(Integer, nullable=False)
+    start_time_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    end_time_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    #: Generation ownership: the producing source generation; combined with
+    #: ``source_job_id`` it is the durable production authority.  Only
+    #: user/manual corrections may leave ``source_job_id`` NULL.
+    source_generation: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_job_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("job.id", ondelete="RESTRICT")
+    )
+    #: Structured prompt evidence — deterministic JSON with an array of
+    #: points ``[{"x","y","label"}]`` and/or boxes ``[{"x","y","w","h"}]``
+    #: (see ``app.schemas.structural_evidence`` canonical shape).  The
+    #: historical flat ``bbox_*`` columns on ``object_occurrence`` remain;
+    #: this field carries the prompt-evidence parallel.
+    prompt_json: Mapped[str | None] = mapped_column(Text)
+    #: Structured segmentation output JSON (deterministic shape; points/boxes
+    #: or per-frame mask metadata).  Never a flattened single bounding box.
+    segmentation_json: Mapped[str | None] = mapped_column(Text)
+    #: Durable id-based link to the artifact row holding this segment's mask
+    #: bytes (never path-guessed).  At least one mask reference per
+    #: segmentation record is expected by the contract; indexed for lookup.
+    mask_artifact_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("artifact.id", ondelete="RESTRICT")
+    )
+    algorithm: Mapped[str | None] = mapped_column(String(64))
+    algorithm_version: Mapped[str | None] = mapped_column(String(64))
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    confidence_source: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="model"
+    )
+    reasons_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    provenance_json: Mapped[str | None] = mapped_column(Text)
+    #: Scene-graph geometry persisted (never inferred at read time).
+    visibility: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="visible"
+    )
+    z_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    #: Correction lineage: this row was superseded by ``superseded_by_id``
+    #: (the successor segment).  NULL = the current/active row.  A historical
+    #: row is never silently overwritten — a correction archives it and
+    #: points it at its successor (auditable chain).
+    superseded_by_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey(
+            "occurrence_segment.id", ondelete="RESTRICT", deferrable=True, initially="DEFERRED"
+        ),
+    )
+    idempotency_key: Mapped[str | None] = mapped_column(String(255))
+
+    role: Mapped[ObjectRole] = relationship(foreign_keys=[role_id])
+    scene: Mapped[Scene] = relationship(foreign_keys=[scene_id])
+
+
+class SegmentMotion(TimestampMixin, Base):
+    """Durable per-segment motion/transform evidence record (S08-A02).
+
+    Camera-relative or object-relative transform contract: a deterministic
+    JSON blob (affine/homography parameters) with provenance + confidence, a
+    temporal validity range and a durable reference to its point-correspondence
+    / track / sparse-flow evidence (ids or deterministic JSON pointers).  For
+    T01 this is CONTRACT-ONLY — no dense optical-flow engine runs here.
+    """
+
+    __tablename__ = "segment_motion"
+    __table_args__ = (
+        UniqueConstraint(
+            "occurrence_segment_id",
+            "transform_type",
+            "start_frame",
+            name="uq_segment_motion_segment_type_frame",
+        ),
+        CheckConstraint(
+            "transform_type IN ('camera_relative','object_relative')",
+            name="ck_segment_motion_transform_type",
+        ),
+        CheckConstraint(
+            "start_frame >= 0", name="ck_segment_motion_start_frame_nonneg"
+        ),
+        CheckConstraint(
+            "end_frame >= start_frame", name="ck_segment_motion_end_frame_ge_start"
+        ),
+        CheckConstraint(
+            "start_time_ms >= 0", name="ck_segment_motion_start_time_ms_nonneg"
+        ),
+        CheckConstraint(
+            "end_time_ms >= start_time_ms", name="ck_segment_motion_end_time_ms_ge_start"
+        ),
+        CheckConstraint(
+            "confidence >= 0 AND confidence <= 1", name="ck_segment_motion_confidence_range"
+        ),
+        CheckConstraint(
+            "confidence_source IN ('model','detector','user','manual','derived')",
+            name="ck_segment_motion_confidence_source",
+        ),
+        CheckConstraint(
+            "length(algorithm) <= 64", name="ck_segment_motion_algorithm_len"
+        ),
+        CheckConstraint(
+            "length(algorithm_version) <= 64",
+            name="ck_segment_motion_algorithm_version_len",
+        ),
+        CheckConstraint(
+            "length(idempotency_key) <= 255", name="ck_segment_motion_idem_key_len"
+        ),
+        CheckConstraint("revision > 0", name="ck_segment_motion_revision_positive"),
+        Index("ix_segment_motion_segment", "occurrence_segment_id"),
+        # F9 (R1): workspace-scoped idempotency uniqueness; no dead
+        # supersession column on motion (R1 F8 — real supersession lives on
+        # occurrence_segment only).
+        Index(
+            "uq_segment_motion_workspace_idempotency",
+            "workspace_id",
+            "idempotency_key",
+            unique=True,
+            sqlite_where=sa_text("idempotency_key IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    occurrence_segment_id: Mapped[str] = mapped_column(
+        String(36),
+        # C1-F7: deleting a segment must NOT silently erase its motion evidence
+        # history — RESTRICT + fail-closed delete (was CASCADE in R1 draft).
+        ForeignKey("occurrence_segment.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    #: ``camera_relative`` = 2D affine/homography parameters of the camera for
+    #: this segment; ``object_relative`` = object-relative motion
+    #: (translation/rotation/scale or affine).  One row per (segment, type,
+    #: start frame).
+    transform_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    #: Deterministic JSON blob of the transform parameters (canonical encoding).
+    transform_json: Mapped[str] = mapped_column(Text, nullable=False)
+    #: Durable reference (stable ids or deterministic JSON pointers) to the
+    #: point-correspondence / track / sparse-flow evidence for this transform.
+    point_track_flow_ref_json: Mapped[str | None] = mapped_column(Text)
+    start_frame: Mapped[int] = mapped_column(Integer, nullable=False)
+    end_frame: Mapped[int] = mapped_column(Integer, nullable=False)
+    start_time_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    end_time_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    algorithm: Mapped[str | None] = mapped_column(String(64))
+    algorithm_version: Mapped[str | None] = mapped_column(String(64))
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    confidence_source: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="model"
+    )
+    reasons_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    provenance_json: Mapped[str | None] = mapped_column(Text)
+    #: CAS/version token — bumped on every business mutation; stale => 409.
+    revision: Mapped[int] = mapped_column(
+        Integer, default=1, server_default=sa_text("1"), nullable=False
+    )
+    idempotency_key: Mapped[str | None] = mapped_column(String(255))
+
+    segment: Mapped[OccurrenceSegment] = relationship(foreign_keys=[occurrence_segment_id])
+
+
+class SceneGraphOcclusion(TimestampMixin, Base):
+    """Durable occlusion edge: occluder occurrence/segment -> occludee (S08-A02).
+
+    FK-enforced source/target references to ``occurrence_segment``, temporal
+    validity, provenance and confidence.  A correction archives the prior row
+    via the self-FK (never a silent overwrite).
+    """
+
+    __tablename__ = "scene_graph_occlusion"
+    __table_args__ = (
+        UniqueConstraint(
+            "occluder_segment_id",
+            "occludee_segment_id",
+            "start_frame",
+            name="uq_scene_graph_occlusion_natural_key",
+        ),
+        CheckConstraint(
+            "occluder_segment_id != occludee_segment_id",
+            name="ck_scene_graph_occlusion_not_self",
+        ),
+        CheckConstraint(
+            "start_frame >= 0", name="ck_scene_graph_occlusion_start_frame_nonneg"
+        ),
+        CheckConstraint(
+            "end_frame >= start_frame", name="ck_scene_graph_occlusion_end_frame_ge_start"
+        ),
+        CheckConstraint(
+            "start_time_ms >= 0", name="ck_scene_graph_occlusion_start_time_ms_nonneg"
+        ),
+        CheckConstraint(
+            "end_time_ms >= start_time_ms",
+            name="ck_scene_graph_occlusion_end_time_ms_ge_start",
+        ),
+        CheckConstraint(
+            "confidence >= 0 AND confidence <= 1",
+            name="ck_scene_graph_occlusion_confidence_range",
+        ),
+        CheckConstraint(
+            "confidence_source IN ('model','detector','user','manual','derived')",
+            name="ck_scene_graph_occlusion_confidence_source",
+        ),
+        CheckConstraint(
+            "length(algorithm) <= 64", name="ck_scene_graph_occlusion_algorithm_len"
+        ),
+        CheckConstraint(
+            "length(algorithm_version) <= 64",
+            name="ck_scene_graph_occlusion_algorithm_version_len",
+        ),
+        CheckConstraint(
+            "length(idempotency_key) <= 255",
+            name="ck_scene_graph_occlusion_idem_key_len",
+        ),
+        CheckConstraint("revision > 0", name="ck_scene_graph_occlusion_revision_positive"),
+        Index("ix_scene_graph_occlusion_occluder", "occluder_segment_id"),
+        Index("ix_scene_graph_occlusion_occludee", "occludee_segment_id"),
+        Index("ix_scene_graph_occlusion_video", "video_item_id"),
+        # F9 (R1): workspace-scoped idempotency uniqueness; no dead
+        # supersession column on occlusion (R1 F8 — real supersession lives on
+        # occurrence_segment only).
+        Index(
+            "uq_scene_graph_occlusion_workspace_idempotency",
+            "workspace_id",
+            "idempotency_key",
+            unique=True,
+            sqlite_where=sa_text("idempotency_key IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    project_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("project.id", ondelete="RESTRICT"), nullable=False
+    )
+    video_item_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("video_item.id", ondelete="RESTRICT"), nullable=False
+    )
+    occluder_segment_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("occurrence_segment.id", ondelete="RESTRICT"), nullable=False
+    )
+    occludee_segment_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("occurrence_segment.id", ondelete="RESTRICT"), nullable=False
+    )
+    start_frame: Mapped[int] = mapped_column(Integer, nullable=False)
+    end_frame: Mapped[int] = mapped_column(Integer, nullable=False)
+    start_time_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    end_time_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    algorithm: Mapped[str | None] = mapped_column(String(64))
+    algorithm_version: Mapped[str | None] = mapped_column(String(64))
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    confidence_source: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="model"
+    )
+    reasons_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    provenance_json: Mapped[str | None] = mapped_column(Text)
+    revision: Mapped[int] = mapped_column(
+        Integer, default=1, server_default=sa_text("1"), nullable=False
+    )
+    idempotency_key: Mapped[str | None] = mapped_column(String(255))
+
+    occluder: Mapped[OccurrenceSegment] = relationship(
+        foreign_keys=[occluder_segment_id]
+    )
+    occludee: Mapped[OccurrenceSegment] = relationship(
+        foreign_keys=[occludee_segment_id]
+    )
+
+
+#: Backwards-friendly alias (structural-evidence nouns use ``OcclusionEdge``).
+OcclusionEdge = SceneGraphOcclusion
+
+
+class SceneGraphContact(TimestampMixin, Base):
+    """Durable contact edge/event between two occurrence segments (S08-A02).
+
+    E.g. hand<->phone or character<->phone: both endpoints are real FKs to
+    ``occurrence_segment`` with RESTRICT delete, temporal validity,
+    provenance/confidence and a stable contact kind.
+    """
+
+    __tablename__ = "scene_graph_contact"
+    __table_args__ = (
+        UniqueConstraint(
+            "source_segment_id",
+            "target_segment_id",
+            "contact_kind",
+            "start_frame",
+            name="uq_scene_graph_contact_natural_key",
+        ),
+        CheckConstraint(
+            "source_segment_id != target_segment_id",
+            name="ck_scene_graph_contact_not_self",
+        ),
+        CheckConstraint(
+            CONTACT_KIND_CHECK_SQL, name="ck_scene_graph_contact_kind"
+        ),
+        CheckConstraint(
+            "start_frame >= 0", name="ck_scene_graph_contact_start_frame_nonneg"
+        ),
+        CheckConstraint(
+            "end_frame >= start_frame", name="ck_scene_graph_contact_end_frame_ge_start"
+        ),
+        CheckConstraint(
+            "start_time_ms >= 0", name="ck_scene_graph_contact_start_time_ms_nonneg"
+        ),
+        CheckConstraint(
+            "end_time_ms >= start_time_ms",
+            name="ck_scene_graph_contact_end_time_ms_ge_start",
+        ),
+        CheckConstraint(
+            "confidence >= 0 AND confidence <= 1",
+            name="ck_scene_graph_contact_confidence_range",
+        ),
+        CheckConstraint(
+            "confidence_source IN ('model','detector','user','manual','derived')",
+            name="ck_scene_graph_contact_confidence_source",
+        ),
+        CheckConstraint(
+            "length(algorithm) <= 64", name="ck_scene_graph_contact_algorithm_len"
+        ),
+        CheckConstraint(
+            "length(algorithm_version) <= 64",
+            name="ck_scene_graph_contact_algorithm_version_len",
+        ),
+        CheckConstraint(
+            "length(idempotency_key) <= 255", name="ck_scene_graph_contact_idem_key_len"
+        ),
+        CheckConstraint("revision > 0", name="ck_scene_graph_contact_revision_positive"),
+        Index("ix_scene_graph_contact_source", "source_segment_id"),
+        Index("ix_scene_graph_contact_target", "target_segment_id"),
+        Index("ix_scene_graph_contact_video", "video_item_id"),
+        # F9 (R1): workspace-scoped idempotency uniqueness; no dead
+        # supersession column on contact (R1 F8 — real supersession lives on
+        # occurrence_segment only).
+        Index(
+            "uq_scene_graph_contact_workspace_idempotency",
+            "workspace_id",
+            "idempotency_key",
+            unique=True,
+            sqlite_where=sa_text("idempotency_key IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    project_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("project.id", ondelete="RESTRICT"), nullable=False
+    )
+    video_item_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("video_item.id", ondelete="RESTRICT"), nullable=False
+    )
+    source_segment_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("occurrence_segment.id", ondelete="RESTRICT"), nullable=False
+    )
+    target_segment_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("occurrence_segment.id", ondelete="RESTRICT"), nullable=False
+    )
+    contact_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    start_frame: Mapped[int] = mapped_column(Integer, nullable=False)
+    end_frame: Mapped[int] = mapped_column(Integer, nullable=False)
+    start_time_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    end_time_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    algorithm: Mapped[str | None] = mapped_column(String(64))
+    algorithm_version: Mapped[str | None] = mapped_column(String(64))
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    confidence_source: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="model"
+    )
+    reasons_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    provenance_json: Mapped[str | None] = mapped_column(Text)
+    revision: Mapped[int] = mapped_column(
+        Integer, default=1, server_default=sa_text("1"), nullable=False
+    )
+    idempotency_key: Mapped[str | None] = mapped_column(String(255))
+
+    source: Mapped[OccurrenceSegment] = relationship(foreign_keys=[source_segment_id])
+    target: Mapped[OccurrenceSegment] = relationship(foreign_keys=[target_segment_id])
+
+
+#: Backwards-friendly alias (structural-evidence nouns use ``ContactEdge``).
+ContactEdge = SceneGraphContact
+
+
+class ProjectCastMapping(TimestampMixin, Base):
+    """Project Cast Mapping pins an Object Role to an immutable Pack Version (S07-T01).
+
+    - One mapping per (project, object_role) is expected; enforced via unique
+      constraint on (project_id, object_role_id) fail-closed.
+    - Immutable pin = pack_version_id FK to character_pack_version.id (immutable row identity);
+      new publish creates NEW pack_version row, old mapping FK still points old row.
+    - character_id is denormalized guard FK to character.id to enforce same-workspace
+      consistency (pack_version.character_id must equal character_id).
+    - Idempotency: UNIQUE(workspace_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
+      equivalent replay returns existing, materially different payload -> conflict.
+    - All FKs ondelete RESTRICT fail closed; revision >0 CAS.
+    """
+
+    __tablename__ = "project_cast_mapping"
+    __table_args__ = (
+        CheckConstraint("revision > 0", name="ck_project_cast_mapping_revision_positive"),
+        CheckConstraint(
+            "length(idempotency_key) <= 255",
+            name="ck_project_cast_mapping_idempotency_key_len",
+        ),
+        UniqueConstraint(
+            "project_id", "object_role_id", name="uq_project_cast_project_role"
+        ),
+        Index("ix_project_cast_mapping_workspace", "workspace_id"),
+        Index("ix_project_cast_mapping_project", "project_id"),
+        Index("ix_project_cast_mapping_role", "object_role_id"),
+        Index("ix_project_cast_mapping_pack_version", "pack_version_id"),
+        Index("ix_project_cast_mapping_character", "character_id"),
+        Index(
+            "uq_project_cast_mapping_workspace_idempotency",
+            "workspace_id",
+            "idempotency_key",
+            unique=True,
+            sqlite_where=sa_text("idempotency_key IS NOT NULL"),
+            postgresql_where=sa_text("idempotency_key IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    project_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("project.id", ondelete="RESTRICT"), nullable=False
+    )
+    object_role_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("object_role.id", ondelete="RESTRICT"), nullable=False
+    )
+    character_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("character.id", ondelete="RESTRICT"), nullable=False
+    )
+    pack_version_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("character_pack_version.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    idempotency_key: Mapped[str | None] = mapped_column(String(255))
+    revision: Mapped[int] = mapped_column(
+        Integer, default=1, server_default=sa_text("1"), nullable=False
+    )
+
+    workspace: Mapped[Workspace] = relationship()
+    project: Mapped[Project] = relationship()
+    object_role: Mapped[ObjectRole] = relationship()
+    character: Mapped[Character] = relationship()
+    pack_version: Mapped[CharacterPackVersion] = relationship()
+
+
+class ReskinConfig(TimestampMixin, Base):
+    """Durable Reskin parameter contract pinned to a Project Cast Mapping (S09-T01).
+
+    - One config per (project, object_role): unique constraint fail-closed.
+    - pack_version_id FK RESTRICT to character_pack_version.id — the immutable
+      pin identity is inherited from the referenced ProjectCastMapping; new
+      publishes create NEW pack_version rows and never mutate this FK (S07
+      version isolation preserved).
+    - params_json stores the transform contract validated fail-closed by
+      app.persistence.reskin_config BEFORE any write (anchor {x,y} in [0,1],
+      scale > 0, fit_mode in contain|cover|stretch, clip_mode in
+      asset_alpha|original_mask|intersection, offset, rotation_offset_deg,
+      opacity in [0,1]).
+    - Idempotency: UNIQUE(workspace_id, idempotency_key) WHERE NOT NULL —
+      equivalent replay returns existing row, materially different payload → 409.
+    - revision CAS > 0; all FKs ondelete RESTRICT fail closed.
+    """
+
+    __tablename__ = "reskin_config"
+    __table_args__ = (
+        CheckConstraint("revision > 0", name="ck_reskin_config_revision_positive"),
+        CheckConstraint(
+            "length(idempotency_key) <= 255",
+            name="ck_reskin_config_idempotency_key_len",
+        ),
+        UniqueConstraint(
+            "project_id", "object_role_id", name="uq_reskin_config_project_role"
+        ),
+        Index("ix_reskin_config_workspace", "workspace_id"),
+        Index("ix_reskin_config_project", "project_id"),
+        Index("ix_reskin_config_role", "object_role_id"),
+        Index("ix_reskin_config_pack_version", "pack_version_id"),
+        Index("ix_reskin_config_mapping", "cast_mapping_id"),
+        Index(
+            "uq_reskin_config_workspace_idempotency",
+            "workspace_id",
+            "idempotency_key",
+            unique=True,
+            sqlite_where=sa_text("idempotency_key IS NOT NULL"),
+            postgresql_where=sa_text("idempotency_key IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    project_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("project.id", ondelete="RESTRICT"), nullable=False
+    )
+    object_role_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("object_role.id", ondelete="RESTRICT"), nullable=False
+    )
+    cast_mapping_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("project_cast_mapping.id", ondelete="RESTRICT"),
+    )
+    character_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("character.id", ondelete="RESTRICT"), nullable=False
+    )
+    pack_version_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("character_pack_version.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    params_json: Mapped[str] = mapped_column(Text, nullable=False)
+    idempotency_key: Mapped[str | None] = mapped_column(String(255))
+    #: S09-T00-I01 additive pins: this reskin contract is bound to exactly one
+    #: versioned StructuralLockManifest (the structural authority it was
+    #: derived from).  Optional until a lock manifest exists for the video;
+    #: RESTRICT delete — a referenced lock can never be silently erased.
+    structural_lock_manifest_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("structural_lock_manifest.id", ondelete="RESTRICT"),
+    )
+    #: Frozen CompatibilityPolicy / threshold-policy version string (bounded,
+    #: backend-owned semantics; e.g. ``structural-thresholds-v1``).
+    lock_policy_version: Mapped[str | None] = mapped_column(String(64))
+
+    workspace: Mapped[Workspace] = relationship()
+    project: Mapped[Project] = relationship()
+    object_role: Mapped[ObjectRole] = relationship()
+    cast_mapping: Mapped[ProjectCastMapping] = relationship()
+    character: Mapped[Character] = relationship()
+    pack_version: Mapped[CharacterPackVersion] = relationship()
+    structural_lock_manifest: Mapped[StructuralLockManifest | None] = relationship()
+
+
+class ApplyCheckpoint(TimestampMixin, Base):
+    """Immutable append-only apply checkpoint (S09 schema-only for T06).
+
+    T06 writes rows via app.persistence.apply_checkpoint; this class owns the
+    storage shape ONLY. Rows are never UPDATEd or DELETEd: revision stays 1,
+    snapshot_json + checkpoint_hash freeze the approved state for S10 full-apply.
+    """
+
+    __tablename__ = "apply_checkpoint"
+    __table_args__ = (
+        CheckConstraint("revision = 1", name="ck_apply_checkpoint_immutable_revision"),
+        CheckConstraint(
+            "length(checkpoint_hash) = 64",
+            name="ck_apply_checkpoint_hash_len",
+        ),
+        Index("ix_apply_checkpoint_workspace", "workspace_id"),
+        Index("ix_apply_checkpoint_project", "project_id"),
+        Index("ix_apply_checkpoint_created", "created_at"),
+        Index(
+            "uq_apply_checkpoint_workspace_idempotency",
+            "workspace_id",
+            "idempotency_key",
+            unique=True,
+            sqlite_where=sa_text("idempotency_key IS NOT NULL"),
+            postgresql_where=sa_text("idempotency_key IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    project_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("project.id", ondelete="RESTRICT"), nullable=False
+    )
+    reskin_config_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("reskin_config.id", ondelete="RESTRICT"), nullable=False
+    )
+    reskin_config_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    pack_version_ids_json: Mapped[str] = mapped_column(Text, nullable=False)
+    loop_hashes_json: Mapped[str] = mapped_column(Text, nullable=False)
+    timebase_fingerprint: Mapped[str] = mapped_column(String(128), nullable=False)
+    snapshot_json: Mapped[str] = mapped_column(Text, nullable=False)
+    checkpoint_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    note: Mapped[str | None] = mapped_column(String(500))
+    idempotency_key: Mapped[str | None] = mapped_column(String(255))
+    #: S09-T00-I01 additive pins (immutable checkpoint): the approved apply
+    #: snapshot freezes the StructuralLockManifest version it was validated
+    #: against plus the policy/threshold version.  RESTRICT delete — an
+    #: approved checkpoint never loses its structural authority silently.
+    structural_lock_manifest_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("structural_lock_manifest.id", ondelete="RESTRICT"),
+    )
+    lock_policy_version: Mapped[str | None] = mapped_column(String(64))
+
+
+class StructuralLockManifest(TimestampMixin, Base):
+    """Versioned structural lock manifest per Video Item (S09-T00-I01).
+
+    TARGET_PROFILE §4 P0-1: persist a StructuralLockManifest per Video Item.
+    One manifest freezes the deterministic reconstruction contract for one
+    source generation of a video item: exact frame count / timebase, shot
+    order, z-order and contact topology fingerprints, the frozen threshold
+    policy version (§8) and a full ``manifest_json`` payload validated
+    fail-closed by ``app.persistence.structural_lock`` before any write.
+
+    - Versioning: ``version`` starts at 1; creating a new manifest for the
+      same (workspace, project, video_item, source_generation) supersedes the
+      previous version — the old row is archived with status ``superseded``
+      and ``superseded_by_id`` pointing at its successor. History is never
+      overwritten or erased.
+    - Natural key UNIQUE(workspace_id, project_id, video_item_id,
+      source_generation, version) makes the current version determinable.
+    - Idempotency: UNIQUE(workspace_id, idempotency_key) WHERE NOT NULL;
+      equivalent replay returns the existing row, materially different
+      payload → conflict.
+    - Status lifecycle: draft → active → superseded (or voided); CHECK-bound.
+    - All FKs ondelete RESTRICT fail closed; revision CAS > 0.
+    """
+
+    __tablename__ = "structural_lock_manifest"
+    __table_args__ = (
+        CheckConstraint(
+            "version >= 1", name="ck_structural_lock_manifest_version_positive"
+        ),
+        CheckConstraint(
+            "length(source_generation) BETWEEN 1 AND 64",
+            name="ck_structural_lock_manifest_source_generation_len",
+        ),
+        CheckConstraint(
+            "length(policy_version) BETWEEN 1 AND 64",
+            name="ck_structural_lock_manifest_policy_version_len",
+        ),
+        CheckConstraint(
+            "length(manifest_hash) = 64",
+            name="ck_structural_lock_manifest_hash_len",
+        ),
+        CheckConstraint(
+            "status IN ('draft','active','superseded','voided')",
+            name="ck_structural_lock_manifest_status",
+        ),
+        CheckConstraint(
+            "length(idempotency_key) <= 255",
+            name="ck_structural_lock_manifest_idem_key_len",
+        ),
+        CheckConstraint(
+            "superseded_by_id IS NULL OR superseded_by_id != id",
+            name="ck_structural_lock_manifest_no_self_link",
+        ),
+        CheckConstraint("revision > 0", name="ck_structural_lock_manifest_revision_positive"),
+        UniqueConstraint(
+            "workspace_id",
+            "project_id",
+            "video_item_id",
+            "source_generation",
+            "version",
+            name="uq_structural_lock_manifest_natural_key",
+        ),
+        Index("ix_structural_lock_manifest_workspace", "workspace_id"),
+        Index("ix_structural_lock_manifest_project", "project_id"),
+        Index("ix_structural_lock_manifest_video", "video_item_id"),
+        Index("ix_structural_lock_manifest_superseded_by", "superseded_by_id"),
+        Index(
+            "uq_structural_lock_manifest_active",
+            "workspace_id",
+            "project_id",
+            "video_item_id",
+            "source_generation",
+            unique=True,
+            sqlite_where=sa_text("status IN ('draft','active')"),
+        ),
+        Index(
+            "uq_structural_lock_manifest_workspace_idempotency",
+            "workspace_id",
+            "idempotency_key",
+            unique=True,
+            sqlite_where=sa_text("idempotency_key IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    project_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("project.id", ondelete="RESTRICT"), nullable=False
+    )
+    #: The locked video item (P0-1: one manifest per Video Item).
+    video_item_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("video_item.id", ondelete="RESTRICT"), nullable=False
+    )
+    #: Producing source generation this manifest locks (same canonical values
+    #: as occurrence_segment.source_generation).
+    source_generation: Mapped[str] = mapped_column(String(64), nullable=False)
+    version: Mapped[int] = mapped_column(
+        Integer, default=1, server_default=sa_text("1"), nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="active")
+    #: Frozen threshold/compatibility policy version (TARGET_PROFILE §8:
+    #: thresholds calibrated from evidence, then frozen in a versioned policy).
+    policy_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    #: Deterministic sha256 hex over canonical manifest_json — integrity pin
+    #: for the frozen contract.
+    manifest_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    #: Full fail-closed-validated manifest payload (frame count/timebase,
+    #: shot list, fingerprints, per-segment lock summary).
+    manifest_json: Mapped[str] = mapped_column(Text, nullable=False)
+    idempotency_key: Mapped[str | None] = mapped_column(String(255))
+    #: Correction lineage: the successor manifest that replaced this row.
+    superseded_by_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("structural_lock_manifest.id", ondelete="RESTRICT"),
+    )
+
+    workspace: Mapped[Workspace] = relationship()
+    project: Mapped[Project] = relationship()
+    video_item: Mapped[VideoItem] = relationship()
+    superseded_by: Mapped[StructuralLockManifest | None] = relationship(remote_side=[id])
+    render_routes: Mapped[list[SegmentRenderRoute]] = relationship(
+        back_populates="manifest",
+        cascade="save-update, merge, refresh-expire, expunge",
+    )
+
+
+class SegmentRenderRoute(TimestampMixin, Base):
+    """Persisted renderer route + contact anchors per occurrence segment.
+
+    TARGET_PROFILE §4 P0-7: renderer choice is PERSISTED PER OCCURRENCE
+    SEGMENT (never inferred at read time) from the EXACT enum {pose_swap,
+    sprite_affine, mesh_warp, part_rig, controlled_redraw} plus §4 P0-4
+    contact anchors in NORMALIZED x/y ∈ [0,1] coordinates (per occurrence
+    segment).  Each row carries its own provenance JSON evidence so Demo
+    review can audit WHY a route was chosen and override it later by writing
+    a NEW route row (history preserved via the natural key frame range).
+
+    - Route CHECK derives from RENDERER_ROUTES (single authority, exact five).
+    - Anchor coordinates are CHECK-bound into [0,1]; finiteness is enforced
+      at the repository layer (SQLite binds NaN as NULL, so range CHECKs are
+      authoritative only for real numbers — repository rejects non-finite).
+    - Natural key UNIQUE(occurrence_segment_id, route, start_frame) keeps one
+      decision per segment/frame-range/route triple.
+    - Workspace-scoped idempotency uniqueness like every sibling table.
+    """
+
+    __tablename__ = "segment_render_route"
+    __table_args__ = (
+        CheckConstraint(RENDERER_ROUTE_CHECK_SQL, name="ck_segment_render_route_route"),
+        CheckConstraint(
+            "anchor_x >= 0.0 AND anchor_x <= 1.0",
+            name="ck_segment_render_route_anchor_x_range",
+        ),
+        CheckConstraint(
+            "anchor_y >= 0.0 AND anchor_y <= 1.0",
+            name="ck_segment_render_route_anchor_y_range",
+        ),
+        CheckConstraint(
+            "start_frame >= 0", name="ck_segment_render_route_start_frame_nonneg"
+        ),
+        CheckConstraint(
+            "end_frame >= start_frame",
+            name="ck_segment_render_route_end_frame_ge_start",
+        ),
+        CheckConstraint(
+            "confidence >= 0 AND confidence <= 1",
+            name="ck_segment_render_route_confidence_range",
+        ),
+        CheckConstraint(
+            "confidence_source IN ('model','detector','user','manual','derived')",
+            name="ck_segment_render_route_confidence_source",
+        ),
+        CheckConstraint(
+            "length(algorithm) <= 64", name="ck_segment_render_route_algorithm_len"
+        ),
+        CheckConstraint(
+            "length(algorithm_version) <= 64",
+            name="ck_segment_render_route_algorithm_version_len",
+        ),
+        CheckConstraint(
+            "length(idempotency_key) <= 255",
+            name="ck_segment_render_route_idem_key_len",
+        ),
+        CheckConstraint("revision > 0", name="ck_segment_render_route_revision_positive"),
+        UniqueConstraint(
+            "occurrence_segment_id",
+            "route",
+            "start_frame",
+            name="uq_segment_render_route_natural_key",
+        ),
+        Index("ix_segment_render_route_segment", "occurrence_segment_id"),
+        Index("ix_segment_render_route_video", "video_item_id"),
+        Index("ix_segment_render_route_route", "route"),
+        Index("ix_segment_render_route_manifest", "structural_lock_manifest_id"),
+        Index(
+            "uq_segment_render_route_workspace_idempotency",
+            "workspace_id",
+            "idempotency_key",
+            unique=True,
+            sqlite_where=sa_text("idempotency_key IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    project_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("project.id", ondelete="RESTRICT"), nullable=False
+    )
+    video_item_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("video_item.id", ondelete="RESTRICT"), nullable=False
+    )
+    #: The locked occurrence segment (P0-4/P0-7: per occurrence segment).
+    occurrence_segment_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("occurrence_segment.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    #: Optional owning lock manifest (routes may exist pre-manifest; when a
+    #: manifest pins them they become part of its frozen contract).
+    structural_lock_manifest_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("structural_lock_manifest.id", ondelete="RESTRICT"),
+    )
+    #: Exact renderer-route enum value (CHECK-derived from RENDERER_ROUTES).
+    route: Mapped[str] = mapped_column(String(24), nullable=False)
+    #: Contact anchor in normalized [0,1] source-frame coordinates.
+    anchor_x: Mapped[float] = mapped_column(Float, nullable=False)
+    anchor_y: Mapped[float] = mapped_column(Float, nullable=False)
+    start_frame: Mapped[int] = mapped_column(Integer, nullable=False)
+    end_frame: Mapped[int] = mapped_column(Integer, nullable=False)
+    algorithm: Mapped[str | None] = mapped_column(String(64))
+    algorithm_version: Mapped[str | None] = mapped_column(String(64))
+    confidence: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    confidence_source: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="model"
+    )
+    #: Why this route was chosen (deterministic JSON: residual metrics,
+    #: escalation trigger, benchmark refs).  Fail-closed finite-only JSON at
+    #: the repository boundary.
+    provenance_json: Mapped[str | None] = mapped_column(Text)
+    reasons_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    idempotency_key: Mapped[str | None] = mapped_column(String(255))
+
+    occurrence_segment: Mapped[OccurrenceSegment] = relationship()
+    manifest: Mapped[StructuralLockManifest | None] = relationship(
+        foreign_keys=[structural_lock_manifest_id],
+        back_populates="render_routes",
+    )

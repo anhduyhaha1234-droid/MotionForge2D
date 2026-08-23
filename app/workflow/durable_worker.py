@@ -64,6 +64,7 @@ from app.persistence.jobs import (
     StepRecord,
 )
 from app.persistence.models import Job as _JobORM
+from app.persistence.models import JobLease as _JobLeaseORM
 
 __all__ = [
     "CANCELLED_ERROR_CODE",
@@ -138,6 +139,14 @@ TRANSIENT_ERROR_CODES: frozenset[str] = frozenset(
         "DISK_FULL",
         "GPU_OOM",
         "TRANSIENT",
+        # VIDEO_PREFLIGHT_CONTRACT §5.5/§7: the probe step's bounded
+        # ffprobe/checksum budget exhaustion is transient — the durable
+        # worker may auto-retry it (contract §6.1).
+        "PROBE_TIMEOUT",
+        # CANONICAL_TIMEBASE_PROXY_CONTRACT §4: the GENERATE_PROXY encode's
+        # bounded FFmpeg budget exhaustion is transient — the durable worker
+        # may auto-retry it (contract §6.1).
+        "PROXY_TIMEOUT",
     }
 )
 #: Purposes that count as a Job's final output (contract §9.2) — the only
@@ -284,6 +293,11 @@ class WorkerContext:
     write_checkpoint: Callable[[dict[str, Any]], None]
     is_cancelled: Callable[[], bool]
     staging_dir: Callable[[], Path]
+    #: Session factory bound to the Job's database, so a handler can open
+    #: its own short-lived sessions to persist durable step effects (the
+    #: worker's own session is never shared with handlers).  Optional for
+    #: backward compatibility; handlers that publish DB effects require it.
+    session_factory: Callable[[], Session] | None = None
 
 
 #: Registered step handler signature.
@@ -309,6 +323,20 @@ class _HandlerEntry:
     declared_outputs: dict[str, Any] | None
     output_validator: OutputValidator | None
     resource_class: str | None = None
+
+
+@dataclass
+class _Claim:
+    """One atomic queue claim: the Job and whether it is a cancel drain.
+
+    ``drain`` is True when the claim picked up an unleased ``cancelling``
+    Job (a cancel that arrived while it was still queued, S08-R01): the
+    execution path must drain it to terminal ``cancelled`` with ZERO
+    handler effects and release the claim's lease.
+    """
+
+    job: JobRecord
+    drain: bool
 
 
 class DurableWorker:
@@ -391,6 +419,26 @@ class DurableWorker:
         with self._lock:
             self._handlers.pop(job_type, None)
 
+    def bind_session_factory(self, session_factory: Callable[[], Session]) -> None:
+        """Publicly rebind this worker's session factory (S05-C04).
+
+        A ``DurableWorker`` created by the default ``JobService()`` is
+        constructed with a placeholder factory that raises
+        ``RuntimeError("job service not initialized")``; the service's
+        explicit :meth:`JobService.initialize` resolves the REAL factory
+        and rebinds this worker through this public API BEFORE
+        :meth:`start` — so the production entry point
+        (``uvicorn app.main:app``) never starts a stale placeholder-bound
+        worker.  Rebinding a running worker is refused: the poll loop and
+        the heartbeat thread already hold sessions from the old factory.
+        """
+        if not callable(session_factory):
+            raise TypeError("session_factory must be callable")
+        with self._lock:
+            if self._thread is not None and self._thread.is_alive():
+                raise RuntimeError("cannot rebind a running durable worker")
+            self._session_factory = session_factory
+
     # ── Lifecycle (AC1) ──────────────────────────────────────────────────────
 
     def start(self) -> None:
@@ -448,9 +496,14 @@ class DurableWorker:
         """
         with self._session_factory() as session:
             repo = JobRepository(session)
-            job = self._claim_next(session, repo)
-            if job is None:
+            claim = self._claim_next(session, repo)
+            if claim is None:
                 return 0
+            job = claim.job
+            # S08-R01: a drain claim (cancel arrived while queued) must
+            # never run the handler and its lease must never survive the
+            # terminal cancelled transition.
+            drain_claim = claim.drain
             try:
                 lease = repo.get_lease(job.id)
                 if lease is None:
@@ -458,13 +511,30 @@ class DurableWorker:
                     return 1
                 self._start_heartbeat(job.id, lease.fence_token)
                 try:
-                    self._execute_job(session, repo, job)
+                    self._execute_job(session, repo, job, drain=drain_claim)
                 finally:
                     self._stop_heartbeat()
                 # A failed heartbeat aborts before any subsequent write.
                 hb_error = self._heartbeat_error()
                 if hb_error is not None:
                     raise hb_error
+                if drain_claim:
+                    # S08-R01: the drain released its lease atomically with
+                    # the terminal transition, but an in-flight heartbeat
+                    # beat could have re-extended it just before the join.
+                    # With the heartbeat thread provably stopped, re-release
+                    # so a cancelled Job never keeps a live lease.
+                    live = repo.get_job(job.id)
+                    if live.state == "cancelled":
+                        current = repo.get_lease(job.id)
+                        if (
+                            current is not None
+                            and current.worker_id == self._config.worker_id
+                            and current.fence_token == lease.fence_token
+                        ):
+                            repo.release_lease(
+                                job.id, self._config.worker_id, lease.fence_token
+                            )
             except FencedWorkerError as exc:
                 # Fenced worker aborts silently at the worker/scheduler
                 # boundary (contract §5.3-3): structured log + resource
@@ -595,8 +665,22 @@ class DurableWorker:
 
     # ── Queue claim (AC1: atomic, ordered by priority/time) ─────────────────
 
-    def _claim_next(self, session: Session, repo: JobRepository) -> JobRecord | None:
-        """Atomically claim the highest-priority oldest queued Job, if any."""
+    def _claim_next(self, session: Session, repo: JobRepository) -> _Claim | None:
+        """Atomically claim the highest-priority oldest queued Job, if any.
+
+        S08-R01 queued-cancel drain: when no ``queued`` Job exists, the scan
+        falls back to an UNLEASED ``cancelling`` Job (a cancel that arrived
+        while the Job was still queued — no worker ever claimed it, so no
+        lease row exists).  The drain claim acquires a lease and marks the
+        Job ``running`` with a durable ``cancel_drain`` event marker (the
+        ``running`` transition is the only path that sets ``started_at``,
+        required by the schema CHECK before a terminal write);
+        :meth:`_execute_job` then drains it straight to terminal
+        ``cancelled`` with ZERO handler effects (contract §6.2
+        cancel-during-queued: no effects started).  A ``cancelling`` Job
+        WITH a lease row belongs to a draining worker (or the reconciler's
+        fence path) and is never touched here.
+        """
         from sqlalchemy import select
 
         candidate = session.scalar(
@@ -608,6 +692,24 @@ class DurableWorker:
             )
             .limit(1)
         )
+        drain = False
+        if candidate is None:
+            # Queued-cancel drain fallback (S08-R01): cancelling Jobs with
+            # NO lease row were cancelled before any claim — claim and
+            # drain them to terminal cancelled (zero effects).
+            candidate = session.scalar(
+                select(_JobORM)
+                .outerjoin(_JobLeaseORM, _JobLeaseORM.job_id == _JobORM.id)
+                .where(
+                    _JobORM.state == "cancelling",
+                    _JobLeaseORM.job_id.is_(None),
+                )
+                .order_by(
+                    _JobORM.priority.desc(),
+                    _JobORM.created_at.asc(),
+                )
+                .limit(1)
+            )
         if candidate is None:
             return None
         try:
@@ -617,17 +719,45 @@ class DurableWorker:
             # Contract §4.3: queued -> running guarded by the lease holder.
             # acquire_lease bumps the Job's revision, so re-read the current
             # row before the guarded transition (the pre-claim revision is
-            # stale by one).
+            # stale by one).  The drain flag is decided from the LIVE state
+            # at claim time: a cancel can commit between the scan and the
+            # claim, turning a queued candidate into a drain claim.
             claimed = repo.get_job(candidate.id)
-            repo.transition_job(
-                candidate.id,
-                "running",
-                actor="worker",
-                expected_revision=claimed.revision,
-                fence_token=lease.fence_token,
-            )
+            if claimed.state == "queued":
+                repo.transition_job(
+                    candidate.id,
+                    "running",
+                    actor="worker",
+                    expected_revision=claimed.revision,
+                    fence_token=lease.fence_token,
+                )
+            elif claimed.state == "cancelling":
+                # S08-R01 drain claim: mark running (sets started_at — the
+                # schema requires it before any terminal write) with a
+                # durable drain marker; _execute_job drains immediately
+                # without ever resolving or running the handler.  The
+                # marker lets the reconciler resolve a mid-drain crash to
+                # cancelled instead of requeueing (cancel wins, §6.3).
+                repo.transition_job(
+                    candidate.id,
+                    "running",
+                    actor="worker",
+                    expected_revision=claimed.revision,
+                    fence_token=lease.fence_token,
+                    reason_code="CANCEL_REQUESTED",
+                    details={"cancel_drain": True},
+                )
+            else:
+                # The Job left every claimable pre-execution state between
+                # the scan and the claim (e.g. the reconciler resolved it):
+                # abort the claim silently.
+                raise JobError(
+                    f"claim lost for Job {candidate.id} "
+                    f"(live state {claimed.state!r})"
+                )
+            drain = claimed.state == "cancelling"
             session.commit()
-            return repo.get_job(candidate.id)
+            return _Claim(job=repo.get_job(candidate.id), drain=drain)
         except (LeaseConflictError, FencedWorkerError, JobError):
             session.rollback()
             return None
@@ -635,17 +765,39 @@ class DurableWorker:
     # ── Execution (AC2..AC6) ─────────────────────────────────────────────────
 
     def _execute_job(
-        self, session: Session, repo: JobRepository, job: JobRecord
+        self,
+        session: Session,
+        repo: JobRepository,
+        job: JobRecord,
+        *,
+        drain: bool = False,
     ) -> None:
         """Execute a claimed Job to terminal (or fenced abort) inside *session*.
 
         The caller owns the transaction; every mutation inside this method is
         fenced with the current token and committed by the caller.
+
+        S08-R01 queued-cancel: when ``drain`` is true (the claim picked up
+        an unleased ``cancelling`` Job) the Job drains straight to
+        terminal ``cancelled`` with ZERO handler effects — the handler is
+        never even resolved (contract §6.2: no effects started; cancel
+        wins).  A cancel that lands after a NORMAL claim but before any
+        step ran drains the same way.
         """
         lease = repo.get_lease(job.id)
         if lease is None:
             return  # nothing to do; no lease means no claim
         token = lease.fence_token
+        if drain or job.state == "cancelling":
+            self._cancel_drain(
+                session,
+                repo,
+                job,
+                repo.list_steps(job.id),
+                token,
+                release_lease=True,
+            )
+            return
         entry = self._handlers.get(job.job_type)
         if entry is None:
             self._fail_job(
@@ -996,8 +1148,17 @@ class DurableWorker:
         job: JobRecord,
         steps: list[StepRecord] | None,
         token: str,
+        *,
+        release_lease: bool = False,
     ) -> None:
-        """Drain a cancelling Job: no new effects; terminal ``cancelled``."""
+        """Drain a cancelling Job: no new effects; terminal ``cancelled``.
+
+        S08-R01: when ``release_lease`` is true (the queued-cancel claim
+        path) the drain's own lease is released in the SAME transaction as
+        the terminal ``cancelled`` transition — a cancelled Job never
+        leaves an orphan live lease behind (contract §5.3-5 graceful
+        release).
+        """
         for step in repo.list_steps(job.id):
             current = repo.get_step(step.id)
             if current.state in TERMINAL_STATES:
@@ -1048,7 +1209,11 @@ class DurableWorker:
                 )
             session.commit()
         job_now = repo.get_job(job.id)
-        if job_now.state == "cancelling":
+        # S08-R01: the queued-cancel drain claim marks the Job running
+        # (cancel_drain marker — the running transition is the only path
+        # that sets started_at) before the drain; both the marked running
+        # state and the cooperative cancelling state drain to cancelled.
+        if job_now.state in ("cancelling", "running"):
             repo.transition_job(
                 job.id,
                 "cancelled",
@@ -1057,6 +1222,11 @@ class DurableWorker:
                 fence_token=token,
                 reason_code="CANCEL_DRAINED",
             )
+            if release_lease:
+                # S08-R01: the queued-cancel drain claim is released in the
+                # same transaction as the terminal transition — no orphan
+                # live lease survives a cancelled Job (contract §5.3-5).
+                repo.release_lease(job.id, self._config.worker_id, token)
             session.commit()
 
     # ── Fencing, attempts, classification ────────────────────────────────────
@@ -1086,13 +1256,23 @@ class DurableWorker:
     def _classify_error(
         self, exc: Exception, step: StepRecord, attempt: int
     ) -> dict[str, Any]:
-        """Classify a handler exception into a stable envelope (§6.1)."""
+        """Classify a handler exception into a stable envelope (§6.1).
+
+        Structured ``details`` carried by the exception (e.g.
+        :class:`app.services.video_import.VideoImportError`) are preserved
+        in the envelope so the error taxonomy's machine-readable context
+        survives classification; the error type is always included.
+        """
         code = getattr(exc, "code", None) or getattr(exc, "error_code", None) or type(
             exc
         ).__name__.upper()
         code = str(code)
         transient = code in TRANSIENT_ERROR_CODES
         retryable = transient and attempt < self._step_max_attempts(step)
+        details: dict[str, Any] = {"error_type": type(exc).__name__}
+        structured = getattr(exc, "details", None)
+        if isinstance(structured, dict) and structured:
+            details = {**structured, **details}
         return error_envelope(
             code,
             str(exc),
@@ -1102,7 +1282,7 @@ class DurableWorker:
             recoverable=transient,
             retryable=retryable,
             retry_after_s=self._backoff_delay(attempt) if transient else None,
-            details={"error_type": type(exc).__name__},
+            details=details,
         )
 
     def _step_max_attempts(self, step: StepRecord) -> int:
@@ -1170,6 +1350,7 @@ class DurableWorker:
             write_checkpoint=write_checkpoint,
             is_cancelled=is_cancelled,
             staging_dir=staging_dir,
+            session_factory=self._session_factory,
         )
 
     def _staging_dir(self, job: JobRecord, step: StepRecord) -> Path:
@@ -1207,6 +1388,7 @@ def build_worker_context(
     write_checkpoint: Callable[[dict[str, Any]], None],
     is_cancelled: Callable[[], bool],
     staging_dir: Callable[[], Path],
+    session_factory: Callable[[], Session] | None = None,
 ) -> WorkerContext:
     """Standalone constructor for :class:`WorkerContext` (test convenience)."""
     return WorkerContext(
@@ -1227,4 +1409,5 @@ def build_worker_context(
         write_checkpoint=write_checkpoint,
         is_cancelled=is_cancelled,
         staging_dir=staging_dir,
+        session_factory=session_factory,
     )

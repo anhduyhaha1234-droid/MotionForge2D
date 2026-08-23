@@ -15,20 +15,33 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.requests import Request
 
 from app.api import deps
 from app.api.routes import (
     channels,
+    durable_characters,
     durable_projects,
     durable_summaries,
     durable_videos,
     frames,
     jobs,
+    object_correction,
+    object_extraction,
+    object_grouping,
+    object_intelligence,
+    project_cast,
     projects,
+    reskin_config,
+    structural_evidence,
 )
-from app.lifecycle import Lifecycle, default_database_path
-from app.persistence import create_engine_for_path, create_session_factory
+from app.api.security import (
+    InvalidPathIdentifierError,
+    OriginGuardMiddleware,
+)
+from app.lifecycle import Lifecycle
+from app.workflow import analyze_orchestrator
 
 log = logging.getLogger("motionforge.lifecycle")
 
@@ -38,31 +51,41 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Explicit application lifecycle (AC1).
 
     Startup:
+      0. explicitly initialize the default ``JobService`` — this makes
+         it own its engine/database and REBINDS its ``DurableWorker``
+         from the placeholder factory to the real session factory
+         (S05-C04 public lifecycle binding: the SAME session factory
+         then serves the worker, the reconciler and the chain
+         orchestrator — one database, one managed root; no private
+         service attribute is inspected or patched here),
       1. bootstrap/upgrade the explicit database (approved path + S01
          pre-upgrade backup policy),
       2. reconcile stale in-flight Jobs (S02-T04) BEFORE worker polling,
-      3. start the durable worker poll loop.
-    Shutdown: stop/join the worker poll loop (the reconciler runs in the
-    same thread as its caller; there is no separate reconciler thread to
-    join — :meth:`Lifecycle.stop` stops the worker).
+      3. start the durable worker poll loop,
+      4. start the AnalyzeChainOrchestrator: its startup scan resumes every
+         incomplete T02→T03→T04 chain from durable rows (idempotent,
+         lease/fence-safe) WITHOUT any POST/GET/browser polling, then the
+         background loop owns progression until shutdown (S05-C03).
+    Shutdown: stop/join the chain orchestrator BEFORE the worker so no new
+    chain Jobs are created while the worker drains, then stop/join the
+    worker poll loop (the reconciler runs in the same thread as its caller;
+    there is no separate reconciler thread to join — :meth:`Lifecycle.stop`
+    stops the worker).
     """
     job_service = deps.get_job_service()
-    session_factory = getattr(job_service, "_session_factory", None)
+    job_service.initialize()
+    session_factory = job_service.session_factory
     if session_factory is None:
-        session_factory = create_session_factory(
-            create_engine_for_path(default_database_path())
-        )
-    # Tests inject a patched database path on deps (never the production DB).
-    injected = getattr(deps, "_lifecycle_db", None)
-    if injected is not None:
-        session_factory = create_session_factory(create_engine_for_path(injected))
+        raise RuntimeError("job service has no session factory after initialize")
     lifecycle = Lifecycle(job_service, session_factory)
     lifecycle.initialize()
     lifecycle.start()
+    analyze_orchestrator.get_analyze_orchestrator().ensure_started()
     app.state.lifecycle = lifecycle
     try:
         yield
     finally:
+        analyze_orchestrator.get_analyze_orchestrator().stop(timeout=5.0)
         lifecycle.stop()
 
 
@@ -74,13 +97,17 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS for frontend dev server
+# Cross-origin security boundary (S08-H02): a *configurable allowlist* of the
+# real frontend origins — never "*".  Credentials stay off (local JWT-free
+# app; no cookie auth).  An untrusted Origin (or "null") on any
+# state-changing request is rejected with 403 BEFORE its route runs, preflight
+# OPTIONS from an untrusted origin receive no ACAO, and native/CLI clients
+# with no Origin header follow the local-app contract.  The allowlist is read
+# live from config so launchers/tests can set MOTIONFORGE_CORS_ORIGINS.
 app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    OriginGuardMiddleware,
+    origins_provider=lambda: deps.get_config().cors_origins,
+    allow_credentials=bool(deps.get_config().cors_allow_credentials),
 )
 
 # Register route modules
@@ -98,6 +125,24 @@ app.include_router(durable_videos.router)
 # Durable Project summary read model (S03-T04) — read-only collection and
 # item routes under the isolated /api/v2/projects namespace.
 app.include_router(durable_summaries.router)
+# Durable Character Library API (S06-T01) — /api/v2/characters namespace,
+# disjoint from every legacy route (AC1/AC9 namespace isolation).
+app.include_router(durable_characters.router)
+# Durable Object Intelligence API (S08-T01) — /api/v2/object-intelligence namespace, disjoint from every legacy route.  # noqa: E501
+app.include_router(object_intelligence.router)
+# Durable Object Candidate Extraction API (S08-T02) — /api/v2/object-intelligence/extraction namespace, disjoint from every legacy route.  # noqa: E501
+app.include_router(object_extraction.router)
+app.include_router(object_grouping.router)
+app.include_router(object_correction.router)
+# Durable Structural Evidence API (S08-A02-T01-R2) — isolated under
+# /api/v2/structural-evidence, disjoint from every legacy route and from
+# /api/v2/object-intelligence (R2 §4).
+app.include_router(structural_evidence.router)
+# Durable Project Cast Mapping API (S07-T01) — /api/v2/project-cast, disjoint legacy.
+app.include_router(project_cast.router)
+# Durable ReskinConfig API (S09-T01) — /api/v2/reskin-configs, disjoint from
+# every legacy route and from /api/v2/project-cast.
+app.include_router(reskin_config.router)
 
 
 @app.get("/health")
@@ -107,3 +152,17 @@ app.include_router(durable_summaries.router)
 def health_check() -> dict[str, str]:
     """Health check endpoint."""
     return {"status": "ok", "service": "motionforge-2d"}
+
+
+@app.exception_handler(InvalidPathIdentifierError)
+async def invalid_identifier_handler(
+    _request: Request, exc: InvalidPathIdentifierError,
+) -> JSONResponse:
+    """Stable 422 for any uncaught unsafe identifier (S08-H02-C1).
+
+    The centralized resolver (:class:`app.workflow.project_workflow.
+    ProjectWorkflowService`) raises this for a hostile project/object
+    identifier before any filesystem join; routes that do not translate it
+    explicitly must still answer a stable 4xx, never a 500.
+    """
+    return JSONResponse({"detail": str(exc)}, status_code=422)

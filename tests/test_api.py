@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import shutil
+import subprocess
 import time
 from pathlib import Path
 
@@ -135,16 +137,37 @@ class TestUploadVideo:
     def test_upload_video(
         self, client: TestClient, project_id: str, tmp_path: Path,
     ) -> None:
-        fake_video = tmp_path / "test.mp4"
-        fake_video.write_bytes(b"\x00" * 100)
+        # S08-H02-C1: the upload endpoint runs a REAL ffprobe probe, so the
+        # fixture must be a decodable MP4 (generated here), not fake bytes.
+        ffmpeg = shutil.which("ffmpeg")
+        if not ffmpeg:
+            pytest.skip("ffmpeg not available")
+        video = tmp_path / "test.mp4"
+        subprocess.run(
+            [
+                ffmpeg, "-y",
+                "-f", "lavfi",
+                "-i", "color=c=black:duration=0.3:size=64x64:rate=10",
+                "-c:v", "libx264",
+                "-preset", "ultrafast",
+                "-crf", "30",
+                "-pix_fmt", "yuv420p",
+                str(video),
+            ],
+            check=True,
+            capture_output=True,
+            timeout=60,
+        )
 
-        with open(fake_video, "rb") as f:
+        with open(video, "rb") as f:
             resp = client.post(
                 f"/api/projects/{project_id}/video",
                 files={"file": ("test.mp4", f, "video/mp4")},
             )
         assert resp.status_code == 200
         assert resp.json()["status"] == "ok"
+        # Server-owned storage name, not the client filename.
+        assert resp.json()["filename"].startswith("source_")
 
     def test_upload_video_missing_project(
         self, client: TestClient, tmp_path: Path,

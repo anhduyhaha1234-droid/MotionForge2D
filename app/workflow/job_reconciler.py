@@ -248,23 +248,52 @@ class JobReconciler:
     def reconcile_once(self) -> ReconcileReport:
         """Perform one bounded reconciliation pass; return a structured report.
 
-        Deterministic entry point: scans at most ``batch_size`` expired active
-        leases (oldest expiry first), fences each candidate atomically, then
-        resolves every fenced Job to ``queued`` / ``failed`` / ``cancelled``
-        in fresh sessions (simulating an actual restart between the fence and
-        the decision — the committed state is the only state that matters,
-        never in-memory state).  Never raises: per-Job failures are recorded
-        on the report and the pass continues with the remaining candidates.
+        Deterministic entry point.  Two disjoint candidate classes, both
+        bounded by ``batch_size``:
+
+        1. **Unleased cancelling Jobs (S08-R01 queued-cancel):** a cancel
+           that arrived while the Job was still ``queued`` left it
+           ``cancelling`` with NO lease row (no worker ever claimed it).
+           The pass resolves each straight to terminal ``cancelled`` with
+           zero handler effects — no drain may depend on a worker being
+           alive.
+        2. **Expired active leases:** scans at most ``batch_size`` expired
+           active leases (``running`` / ``cancelling`` Jobs whose lease
+           ``expires_at`` has passed beyond the fence grace) ordered
+           oldest-first, fences each candidate atomically, then resolves
+           every fenced Job to ``queued`` / ``failed`` / ``cancelled`` in
+           fresh sessions (simulating an actual restart between the fence
+           and the decision — the committed state is the only state that
+           matters, never in-memory state).
+
+        Never raises: per-Job failures are recorded on the report and the
+        pass continues with the remaining candidates.
         """
         report = ReconcileReport()
         report.started_at = self._clock()
+        # S08-R01: unleased cancelling Jobs resolve first (deterministic
+        # terminal cancelled; no lease, no fence, no handler effects).
+        try:
+            unleased = self._unleased_cancelling_candidates()
+        except Exception as exc:  # noqa: BLE001 - report, never raise
+            report.errors.append({"stage": "scan-unleased-cancelling", "error": str(exc)})
+            unleased = []
+        report.scanned += len(unleased)
+        for job_id in unleased:
+            try:
+                self._resolve_unleased_cancelling(job_id, report)
+            except Exception as exc:  # noqa: BLE001 - per-Job isolation
+                report.errors.append({"job_id": job_id, "error": str(exc)})
+                self._log.warning(
+                    "unleased-cancelling resolve failed for Job %s: %s", job_id, exc
+                )
         try:
             candidates = self._expired_candidates()
         except Exception as exc:  # noqa: BLE001 - report, never raise
             report.errors.append({"stage": "scan", "error": str(exc)})
             report.finished_at = self._clock()
             return report
-        report.scanned = len(candidates)
+        report.scanned += len(candidates)
         for job_id in candidates:
             try:
                 self._reconcile_one(job_id, report)
@@ -273,6 +302,84 @@ class JobReconciler:
                 self._log.warning("reconcile failed for Job %s: %s", job_id, exc)
         report.finished_at = self._clock()
         return report
+
+    def _unleased_cancelling_candidates(self) -> list[str]:
+        """Return the oldest ``batch_size`` cancelling Jobs with NO lease row.
+
+        S08-R01 queued-cancel: ``cancelling`` + no lease row means the
+        cancel arrived while the Job was still ``queued`` — no worker ever
+        claimed it and no effect was ever started.  These Jobs self-drain
+        here instead of waiting forever for a claim that will never come.
+        A cancelling Job WITH a lease row (live or expired) is excluded:
+        it belongs to a draining worker or to the expired-lease fence path.
+        """
+        with self._session_factory() as session:
+            rows = session.scalars(
+                select(_JobORM.id)
+                .outerjoin(_JobLeaseORM, _JobLeaseORM.job_id == _JobORM.id)
+                .where(
+                    _JobORM.state == "cancelling",
+                    _JobLeaseORM.job_id.is_(None),
+                )
+                .order_by(_JobORM.created_at.asc())
+                .limit(self._config.batch_size)
+            ).all()
+        return list(rows)
+
+    def _resolve_unleased_cancelling(self, job_id: str, report: ReconcileReport) -> None:
+        """Resolve one unleased cancelling Job to terminal ``cancelled``.
+
+        Fresh session, guarded transitions: if the Job left ``cancelling``
+        (a worker claimed and drained it, or another actor resolved it)
+        between the scan and the write, the resolution is skipped — the
+        terminal outcome is the same.  The Job passes through ``running``
+        with the durable ``cancel_drain`` marker in the SAME transaction
+        (never committed/visible separately): the ``running`` transition
+        is the only path that sets ``started_at``, which the schema CHECK
+        requires before any terminal write.  No lease is created, so a
+        cancelled Job never carries an orphan lease.
+        """
+        with self._session_factory() as session:
+            repo = JobRepository(session)
+            try:
+                job = repo.get_job(job_id)
+            except Exception:  # noqa: BLE001 - deleted mid-flight
+                report.skipped += 1
+                return
+            if job.state != "cancelling":
+                report.skipped += 1
+                return
+            lease = repo.get_lease(job_id)
+            if lease is not None:
+                # A worker just claimed the drain; it will terminate the
+                # Job itself.  Never fence a live drain.
+                report.skipped += 1
+                return
+            try:
+                # S08-R01: marked running (sets started_at) then terminal
+                # cancelled — one atomic unit, no handler effects.
+                repo.transition_job(
+                    job_id,
+                    "running",
+                    actor="reconciler",
+                    expected_revision=job.revision,
+                    reason_code="CANCEL_REQUESTED",
+                    details={"cancel_drain": True},
+                )
+                marked = repo.get_job(job_id)
+                repo.transition_job(
+                    job_id,
+                    "cancelled",
+                    actor="reconciler",
+                    expected_revision=marked.revision,
+                    reason_code="CANCEL_DRAINED",
+                )
+            except Exception:  # noqa: BLE001 - lost a benign race
+                session.rollback()
+                report.skipped += 1
+                return
+            session.commit()
+            report.cancelled += 1
 
     def _expired_candidates(self) -> list[str]:
         """Return the oldest ``batch_size`` Jobs with an expired lease.
@@ -355,11 +462,16 @@ class JobReconciler:
                 report.skipped += 1
                 return
 
-            if self._fence_reason(job_id) == "CANCEL_REQUESTED":
+            if self._fence_reason(job_id) == "CANCEL_REQUESTED" or self._was_drain_claim(
+                job_id
+            ):
                 # Contract §6.3: cancel wins.  A Job that was cancelling when
                 # fenced resolves straight to terminal cancelled — the drain
                 # semantics of a worker are preserved without running any new
-                # effects.
+                # effects.  S08-R01: a queued-cancel drain claim that died
+                # mid-drain (its claim transition carries the durable
+                # ``cancel_drain`` marker) also resolves to cancelled — a
+                # requeue would RUN the handler, which cancel-wins forbids.
                 repo.transition_job(
                     job_id,
                     "cancelled",
@@ -480,6 +592,29 @@ class JobReconciler:
                 if event.to_state == "fenced" and event.reason_code:
                     return event.reason_code
         return None
+
+    def _was_drain_claim(self, job_id: str) -> bool:
+        """True when the Job's history carries the S08-R01 drain marker.
+
+        The worker's queued-cancel drain claim transitions the Job to
+        ``running`` with ``details.cancel_drain = True`` before draining
+        (the marker is durable on the transition event).  If such a Job
+        dies mid-drain and is fenced, the reconciler must resolve it to
+        ``cancelled`` — requeueing it would RUN the handler, violating
+        cancel-wins (contract §6.3).  The marker is only ever written by
+        the drain claim, so its presence means the current claim epoch
+        never started any effect.
+        """
+        with self._session_factory() as session:
+            repo = JobRepository(session)
+            for event in repo.list_events(job_id):
+                if (
+                    event.to_state == "running"
+                    and event.details
+                    and bool(event.details.get("cancel_drain"))
+                ):
+                    return True
+        return False
 
     def _fence_worker(self, job_id: str) -> str | None:
         """The worker id recorded on the Job's most recent fenced event."""

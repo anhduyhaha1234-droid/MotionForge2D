@@ -7,6 +7,37 @@
 const rawApiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8888";
 const API_BASE = rawApiUrl.replace(/\/+$/, "");
 
+/**
+ * API error carrying the HTTP status and the FastAPI error payload.
+ *
+ * FastAPI wraps every error body in `{"detail": <payload>}`; this class
+ * unwraps the envelope so callers render the real backend message (e.g.
+ * the durable job 400 "Cannot cancel job in state: X" or the preflight
+ * taxonomy codes), never a generic "failed".
+ */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly detail: unknown;
+
+  constructor(status: number, detail: unknown, message?: string) {
+    super(message ?? `API ${status}`);
+    this.name = "ApiError";
+    this.status = status;
+    this.detail = detail;
+  }
+
+  /** Human-readable backend detail (string payload or JSON text). */
+  detailText(): string {
+    if (typeof this.detail === "string" && this.detail) return this.detail;
+    if (this.detail === null || this.detail === undefined) return "";
+    try {
+      return JSON.stringify(this.detail);
+    } catch {
+      return String(this.detail);
+    }
+  }
+}
+
 async function apiFetch<T>(
   path: string,
   options?: RequestInit,
@@ -20,10 +51,35 @@ async function apiFetch<T>(
     },
   });
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`API ${res.status}: ${body}`);
+    const text = await res.text().catch(() => "");
+    let detail: unknown = text;
+    if (text) {
+      try {
+        const body: unknown = JSON.parse(text);
+        detail =
+          typeof body === "object" &&
+          body !== null &&
+          "detail" in body &&
+          (body as { detail: unknown }).detail !== undefined
+            ? (body as { detail: unknown }).detail
+            : body;
+      } catch {
+        detail = text;
+      }
+    }
+    throw new ApiError(res.status, detail, `API ${res.status}: ${detailTextOf(detail)}`);
   }
   return res.json() as Promise<T>;
+}
+
+function detailTextOf(detail: unknown): string {
+  if (typeof detail === "string" && detail) return detail;
+  if (detail === null || detail === undefined) return "";
+  try {
+    return JSON.stringify(detail);
+  } catch {
+    return String(detail);
+  }
 }
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -136,18 +192,94 @@ export interface ProjectData {
   scenes: SceneInfo[];
   scene_details: SceneDetail[];
   objects: TrackedObject[];
+  channel_id: string;
+  task_status: string;
+  created_at: string;
+  updated_at: string;
 }
 
+/**
+ * Durable job status as returned by GET /api/jobs/{id} (S02-T05 cutover).
+ *
+ * Real backend shape (verified against app/api/routes/jobs.py +
+ * app/api/helpers.py job_response): `job_id`, `status` (renamed from
+ * `state`), `progress` (0..100 from the durable state machine), `message`
+ * (state-derived), `result_path`, `error` (envelope message string),
+ * `job_type`. `status` may include `pending` (additive durable state,
+ * contract §11.2). The UI MUST NOT invent progress — only these fields.
+ */
 export interface JobInfo {
   job_id: string;
-  status: "queued" | "running" | "cancelling" | "cancelled" | "completed" | "failed";
+  status: "queued" | "running" | "cancelling" | "cancelled" | "completed" | "failed" | "pending";
   progress: number;
   message: string;
-  current_step: string;
-  started_at: string | null;
-  completed_at: string | null;
+  result_path: string | null;
+  error: string | null;
+  job_type: string;
+  /** Legacy optional fields (not present in the durable response). */
+  current_step?: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+  error_code?: string | null;
+  result?: Record<string, unknown> | null;
+}
+
+/**
+ * One step of the approved T02→T03→T04 chain (S05-C01). Every value is
+ * read from the durable Job row by the backend chain-state endpoint —
+ * `status` is the real Job state machine value (`not_created` when the
+ * step's job does not exist yet), `progress` is the real checkpoint
+ * progress, `error`/`error_code` come from the persisted error envelope.
+ */
+export type ChainStepName = "import" | "proxy" | "scene_detect";
+export type ChainStepStatus =
+  | "not_created"
+  | "pending"
+  | "queued"
+  | "running"
+  | "cancelling"
+  | "cancelled"
+  | "completed"
+  | "failed";
+
+export interface ChainStepInfo {
+  step: ChainStepName;
+  job_id: string | null;
+  status: ChainStepStatus;
+  progress: number;
+  message: string;
+  error: string | null;
   error_code: string | null;
-  result: Record<string, unknown> | null;
+  predecessor_job_id: string | null;
+}
+
+export type ChainStatus = "idle" | "running" | "completed" | "failed" | "cancelled";
+
+/**
+ * Backend-owned chain state returned by POST/GET /api/projects/{id}/analyze
+ * and POST /api/projects/{id}/analyze/retry. `chain_status` and
+ * `active_step` are derived from the real durable rows; `progress` is the
+ * mean of the real per-step checkpoint progresses; `source_sha256` is the
+ * immutable chain identity (source content SHA-256, S05-C02). No value is
+ * mocked.
+ */
+export interface AnalyzeChainState {
+  project_id: string;
+  video_item_id: string | null;
+  generation: string;
+  source_name: string | null;
+  source_sha256: string | null;
+  chain_status: ChainStatus;
+  active_step: ChainStepName | null;
+  progress: number;
+  steps: {
+    import: ChainStepInfo;
+    proxy: ChainStepInfo;
+    scene_detect: ChainStepInfo;
+  };
+  source_artifact_id: string | null;
+  proxy_artifact_id: string | null;
+  scenes_count: number | null;
 }
 
 export interface GalleryFrame {
@@ -255,6 +387,603 @@ export interface ChannelProject {
   object_count: number;
 }
 
+// ─── Durable Character Library (S06-T01 + S06-R02) ────────────────────────
+
+export type CharacterStatus = "draft" | "generating" | "needs_review" | "ready" | "archived";
+export type CharacterType = "character" | "prop" | "other";
+export type PackStatus = "draft" | "validating" | "ready" | "published" | "archived";
+
+export interface CharacterData {
+  id: string;
+  workspace_id: string;
+  name: string;
+  code: string;
+  character_type: CharacterType;
+  symmetry: "symmetric" | "asymmetric";
+  status: CharacterStatus;
+  default_version_id: string | null;
+  description: string | null;
+  revision: number;
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
+}
+
+export interface CharacterAssetData {
+  id: string;
+  pack_version_id: string;
+  workspace_id: string;
+  pose_slot: string;
+  artifact_id: string;
+  created_at: string;
+  updated_at: string;
+  /** Read-only artifact snapshot (S06-R02). Null when the linked Artifact is missing. */
+  artifact_state: string | null;
+  mime_type: string | null;
+  sha256: string | null;
+  size_bytes: number | null;
+  /** Server-produced typed link to the pose image bytes (S06-R02). */
+  content_url: string | null;
+}
+
+export interface PackVersionData {
+  id: string;
+  character_id: string;
+  workspace_id: string;
+  version: number;
+  status: PackStatus;
+  validation_json: string | null;
+  published_at: string | null;
+  revision: number;
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
+  assets: CharacterAssetData[];
+}
+
+export interface PackVersionValidationData {
+  version_id: string;
+  character_id: string;
+  workspace_id: string;
+  status: "valid" | "invalid";
+  complete: boolean;
+  missing_slots: string[];
+  errors: string[];
+}
+
+export interface CharacterListResponse {
+  workspace_id: string;
+  limit: number;
+  offset: number;
+  total: number;
+  characters: CharacterData[];
+}
+
+// ─── S07 Project Cast (T01 mapping + T02 picker/compat) ─────────────────────
+
+export interface ProjectCastData {
+  id: string;
+  workspace_id: string;
+  project_id: string;
+  object_role_id: string;
+  character_id: string;
+  pack_version_id: string;
+  idempotency_key: string | null;
+  revision: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectCastListResponse {
+  workspace_id: string;
+  project_id: string | null;
+  limit: number;
+  offset: number;
+  total: number;
+  mappings: ProjectCastData[];
+}
+
+export type CompatibilityReason =
+  | "workspace_mismatch"
+  | "source_overlay_refusal"
+  | "object_kind_mismatch"
+  | "incomplete_pack"
+  | "unpublished_pack"
+  | "missing_required_pose"
+  | "missing_required_capability"
+  | "generation_mismatch"
+  | "stale_revision";
+
+export interface PickerPackItem {
+  id: string;
+  character_id: string;
+  workspace_id: string;
+  version: number;
+  status: string;
+  character_name: string;
+  character_code: string;
+  character_type: string;
+  symmetry: string;
+  published_at: string | null;
+  revision: number;
+  created_at: string;
+  updated_at: string;
+  asset_count: number;
+  pose_slots: string[];
+}
+
+export interface PickerPacksResponse {
+  workspace_id: string;
+  limit: number;
+  offset: number;
+  total: number;
+  packs: PickerPackItem[];
+  query: string | null;
+}
+
+export interface CompatibilityEvaluateResponse {
+  compatible: boolean;
+  reasons: CompatibilityReason[];
+  fallback_allowed: boolean;
+  fallback_description: string | null;
+  blocked: boolean;
+  pinned_version_id: string | null;
+  current_revision: number | null;
+  workspace_id: string;
+}
+
+// ─── S08 Object Intelligence (T01 roles/occurrences) ─────────────────────
+
+export interface ObjectOccurrence {
+  id: string;
+  workspace_id: string;
+  project_id: string;
+  video_item_id: string;
+  role_id: string;
+  scene_id: string;
+  frame_index: number;
+  time_ms: number;
+  bbox: BoundingBox;
+  confidence: number;
+  confidence_source: string;
+  algorithm: string | null;
+  algorithm_version: string | null;
+  reasons: string[];
+  review_state: string;
+  revision: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ObjectRoleStatus = "suggested" | "confirmed" | "superseded";
+
+/**
+ * Canonical seven-kind ObjectRole taxonomy (S08-A01 — backend authoritative
+ * via GET /api/v2/object-intelligence/kinds).  The gallery filter, badges
+ * and edit dialog derive their options from the kinds endpoint so no second
+ * production authority is created in the frontend.
+ */
+export type ObjectRoleKind =
+  | "character"
+  | "prop"
+  | "background"
+  | "foreground"
+  | "graphic"
+  | "source_overlay"
+  | "other";
+
+/** One canonical kind with its backend-owned policy flag (S08-A01). */
+export interface RoleKindData {
+  name: ObjectRoleKind;
+  /** True = removal-only (source_overlay): never a replacement/Character
+   *  Pack candidate, never a grouping participant. */
+  removal_only: boolean;
+}
+
+export interface RoleKindsResponse {
+  kinds: RoleKindData[];
+  /** The backend-owned removal-only kind name (source_overlay). */
+  source_overlay: string;
+}
+
+/**
+ * The NEWEST VALID media association of a role (S08-T05-C1, finding D):
+ * resolved by the backend from the durable object_role_artifact
+ * associations (superseded_by_id IS NULL). Content is servable through the
+ * contained image endpoint — never a client filesystem path or name join.
+ */
+export interface RoleMedia {
+  association_id: string;
+  artifact_id: string;
+  purpose: string;
+  relative_path: string;
+  sha256: string;
+  size_bytes: number;
+  width: number | null;
+  height: number | null;
+  mime_type: string | null;
+  source_generation: string;
+  source_job_id: string;
+}
+
+/** Content URL of a role media artifact (contained endpoint, ETag/nosniff).
+ *  ABSOLUTE — the Next dev proxy rewrites relative /api to a hardcoded port,
+ *  so real byte URLs must go straight to the configured API base. */
+export function roleMediaContentUrl(media: RoleMedia): string {
+  return `${API_BASE}/api/v2/object-intelligence/extraction/${encodeURIComponent(media.source_job_id)}/artifacts/${encodeURIComponent(media.artifact_id)}/content`;
+}
+
+export interface ObjectRole {
+  id: string;
+  workspace_id: string;
+  project_id: string;
+  video_item_id: string;
+  source_generation: string;
+  name: string;
+  /** Canonical seven-kind taxonomy (S08-A01). */
+  kind: ObjectRoleKind;
+  status: ObjectRoleStatus;
+  supersedes_role_id: string | null;
+  legacy_object_id: string | null;
+  legacy_scene_id: number | null;
+  description: string | null;
+  revision: number;
+  created_at: string;
+  updated_at: string;
+  occurrences: ObjectOccurrence[];
+  media: RoleMedia[];
+  /** True when the role's media is association-managed (never name-fallback). */
+  has_media_associations: boolean;
+}
+
+export interface ObjectRoleListResponse {
+  workspace_id: string;
+  limit: number;
+  offset: number;
+  total: number;
+  roles: ObjectRole[];
+  /** "current" | "historical" — never mixed (T01-C2 generation isolation). */
+  scope: string;
+  /** Backend-authoritative current source generation (T01-C2/T02-C2). */
+  current_generation: string | null;
+}
+
+// ─── S08 Object Extraction (T02 durable job) ─────────────────────────────
+
+export interface ExtractionOutput {
+  artifact_id: string;
+  name: string;
+  purpose: string;
+  relative_path: string;
+  sha256: string;
+  size_bytes: number;
+  width: number | null;
+  height: number | null;
+  mime_type: string | null;
+}
+
+export interface ExtractionCandidate {
+  index: number;
+  /** STABLE role id (deterministic per job + candidate index) — never a name. */
+  role_id: string;
+  name: string;
+  kind: string;
+  confidence: number;
+  reasons: string[];
+  occurrences: Record<string, unknown>[];
+  artifacts: ExtractionOutput[];
+}
+
+export type ExtractionJobStatus =
+  | "queued"
+  | "running"
+  | "cancelling"
+  | "cancelled"
+  | "completed"
+  | "failed";
+
+export interface ExtractionJob {
+  job_id: string;
+  job_type: string;
+  status: ExtractionJobStatus;
+  progress: number;
+  message: string;
+  error: string | null;
+  provider: string | null;
+  extractor_version: string | null;
+  generation: string | null;
+  source_sha256: string | null;
+  video_item_id: string | null;
+  created_at: string | null;
+  finished_at: string | null;
+  outputs: ExtractionOutput[];
+  candidates: ExtractionCandidate[];
+}
+
+export interface ExtractionSubmitResult {
+  job_id: string;
+  reused: boolean;
+  job_type: string;
+  status: string;
+}
+
+export interface ExtractionOutputsResult {
+  job_id: string;
+  job_type: string;
+  status: string;
+  outputs: ExtractionOutput[];
+  candidates: ExtractionCandidate[];
+}
+
+// ─── S08 Grouping (T03 suggestions + curation) ───────────────────────────
+
+export type SuggestionStatus = "pending" | "dismissed" | "superseded";
+
+export interface GroupingSuggestion {
+  id: string;
+  workspace_id: string;
+  project_id: string;
+  video_item_id: string;
+  source_generation: string;
+  status: SuggestionStatus;
+  role_ids: string[];
+  target_role_id: string | null;
+  confidence: number;
+  reasons: string[];
+  algorithm: string;
+  algorithm_version: string;
+  scope: string;
+  revision: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SuggestionListResponse {
+  workspace_id: string;
+  limit: number;
+  offset: number;
+  total: number;
+  suggestions: GroupingSuggestion[];
+  /** "current" | "historical" — current-generation default (T03-C2). */
+  scope: string;
+  /** Backend-authoritative current source generation (T03-C2). */
+  current_generation: string | null;
+}
+
+export interface GenerateSuggestionsResult {
+  video_item_id: string;
+  source_generation: string;
+  algorithm: string;
+  algorithm_version: string;
+  scope: string;
+  created_count: number;
+  replayed_count: number;
+  superseded_count: number;
+  total: number;
+  suggestions: GroupingSuggestion[];
+}
+
+export interface GroupingOperation {
+  id: string;
+  workspace_id: string;
+  project_id: string;
+  video_item_id: string;
+  operation_type: string;
+  target_role_id: string;
+  source_role_ids: string[];
+  created_role_ids: string[];
+  transfer_map: Array<{ role_id: string; occurrence_ids: string[] }>;
+  suggestion_id: string | null;
+  idempotency_key: string | null;
+  revision_after: number;
+  note: string | null;
+  created_at: string;
+}
+
+export interface OperationListResponse {
+  workspace_id: string;
+  limit: number;
+  offset: number;
+  total: number;
+  operations: GroupingOperation[];
+}
+
+export interface MergeResult {
+  operation: GroupingOperation;
+  target_role: ObjectRole;
+}
+
+export interface SplitResult {
+  operation: GroupingOperation;
+  created_role: ObjectRole;
+}
+
+export interface ConfirmResult {
+  operation: GroupingOperation;
+  role: ObjectRole;
+}
+
+// ─── S08 Targeted Correction (T05 impacted scope + recompute) ──────────────
+
+export type CorrectionKind = "reassign" | "candidate_edit" | "merge" | "split";
+
+export interface CorrectionImpactData {
+  correction_type: string;
+  affected_role_ids: string[];
+  affected_occurrence_ids: string[];
+  invalidated_suggestion_ids: string[];
+  artifact_role_ids: string[];
+  regenerate_suggestions: boolean;
+  recompute_needed: boolean;
+  counts: Record<string, number>;
+}
+
+export interface RecomputeState {
+  recompute_needed: boolean;
+  job_id: string | null;
+  status: string | null;
+  progress: number | null;
+  error: string | null;
+}
+
+export interface ObjectCorrection {
+  id: string;
+  workspace_id: string;
+  project_id: string;
+  video_item_id: string;
+  correction_type: CorrectionKind;
+  status: "pending" | "applied" | "cancelled";
+  request: Record<string, unknown>;
+  impact: CorrectionImpactData;
+  result: Record<string, unknown> | null;
+  recompute_job_id: string | null;
+  applied_at: string | null;
+  idempotency_key: string | null;
+  natural_key: string | null;
+  revision: number;
+  created_at: string;
+  updated_at: string;
+  recompute: RecomputeState | null;
+}
+
+export interface CorrectionCreateResult {
+  correction: ObjectCorrection;
+  created: boolean;
+  status: string;
+}
+
+export interface CorrectionListResponse {
+  workspace_id: string;
+  limit: number;
+  offset: number;
+  total: number;
+  corrections: ObjectCorrection[];
+}
+
+/** Canonical correction request payload (kind selects the field set). */
+export interface CorrectionRequestPayload {
+  kind: CorrectionKind;
+  project_id: string;
+  video_item_id: string;
+  generation: string;  // reassign
+  occurrence_id?: string;
+  occurrence_revision?: number;
+  source_role_id?: string;
+  target_role_id?: string;
+  // candidate_edit
+  target?: "role" | "occurrence";
+  role_id?: string;
+  role_revision?: number;
+  name?: string;
+  role_kind?: string;
+  description?: string;
+  bbox?: BoundingBox;
+  confidence?: number;
+  review_state?: string;
+  reasons?: string[];
+  // merge / split
+  target_revision?: number;
+  source_role_ids?: string[];
+  suggestion_id?: string | null;
+  original_role_id?: string;
+  note?: string;
+  idempotency_key?: string;
+}
+
+// ─── S08 Grouping policy (T03-C1 backend-authoritative metadata) ──────────
+
+export interface GroupingPolicyData {
+  algorithm: string;
+  algorithm_version: string;
+  calibration_version: string;
+  review_threshold: number;
+  advisory: boolean;
+  confidence_semantics: string[];
+  note: string;
+}
+
+// ─── Durable Video Items (S03 — project video selector) ───────────────────
+
+export interface ProjectVideoItem {
+  video_item_id: string;
+  project_id: string;
+  workspace_id: string;
+  title: string;
+  position: number;
+  status: string;
+  source_artifact_id: string | null;
+  duration_ms: number | null;
+  width: number | null;
+  height: number | null;
+  fps_num: number | null;
+  fps_den: number | null;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+  revision: number;
+}
+
+export interface VideoListResponse {
+  project_id: string;
+  workspace_id: string;
+  active_only: boolean;
+  videos: ProjectVideoItem[];
+}
+
+// ─── Durable v2 Project (S03 — production authority for project identity) ─
+
+/** Durable SQLite Project DTO (S03-T02 GET /api/v2/projects). */
+export interface DurableProjectData {
+  project_id: string;
+  workspace_id: string;
+  name: string;
+  description: string;
+  status: string;
+  source_channel_id: string | null;
+  production_channel_id: string | null;
+  default_output_profile: string | null;
+  resume_step: string | null;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+  revision: number;
+}
+
+export interface DurableProjectListResponse {
+  workspace_id: string;
+  active_only: boolean;
+  projects: DurableProjectData[];
+}
+
+/** The six required core pose slots (S06-T03 contract). */
+export const CORE_POSE_SLOTS = ["front", "three_quarter", "side", "back", "sitting", "walking"] as const;
+export type CorePoseSlot = (typeof CORE_POSE_SLOTS)[number];
+
+export const POSE_SLOT_LABELS: Record<CorePoseSlot, string> = {
+  front: "Mặt trước",
+  three_quarter: "Ba phần tư",
+  side: "Nghiêng bên",
+  back: "Sau lưng",
+  sitting: "Ngồi",
+  walking: "Đi bộ",
+};
+
+export const CHARACTER_STATUS_LABELS: Record<CharacterStatus, string> = {
+  draft: "Nháp",
+  generating: "Đang tạo",
+  needs_review: "Cần duyệt",
+  ready: "Sẵn sàng",
+  archived: "Đã lưu trữ",
+};
+
+export const PACK_STATUS_LABELS: Record<PackStatus, string> = {
+  draft: "Nháp",
+  validating: "Đang kiểm tra",
+  ready: "Sẵn sàng",
+  published: "Đã xuất bản",
+  archived: "Đã lưu trữ",
+};
+
 // ─── API Functions ──────────────────────────────────────────────────────────
 
 export const api = {
@@ -283,13 +1012,19 @@ export const api = {
     return res.json() as Promise<{ video_path: string }>;
   },
 
-  triggerIngest: (projectId: string) =>
-    apiFetch<{ job_id: string }>(`/api/projects/${projectId}/ingest`, {
-      method: "POST",
-    }),
-
   getScenes: (projectId: string) =>
     apiFetch<SceneInfo[]>(`/api/projects/${projectId}/scenes`),
+
+  /**
+   * LEGACY path only — used exclusively by the pre-S05 ScreenA workflow
+   * (create project → upload → legacy ingest → chunk). The S05-C01
+   * Import/Analyze UI does NOT use this; it drives the approved chain via
+   * analyzeProject/getAnalyzeChain/retryAnalyzeChain.
+   */
+  triggerIngest: (projectId: string) =>
+    apiFetch<JobInfo>(`/api/projects/${projectId}/ingest`, {
+      method: "POST",
+    }),
 
   getFrameUrl: (projectId: string, frameIndex: number) =>
     `${API_BASE}/api/projects/${projectId}/frames/${frameIndex}`,
@@ -367,9 +1102,70 @@ export const api = {
   getJob: (jobId: string) => apiFetch<JobInfo>(`/api/jobs/${jobId}`),
 
   cancelJob: (jobId: string) =>
-    apiFetch<{ ok: boolean }>(`/api/jobs/${jobId}/cancel`, {
+    apiFetch<{ status: string; job_id: string }>(`/api/jobs/${jobId}/cancel`, {
       method: "POST",
     }),
+
+  /**
+   * ONE UI-facing submission drives the approved durable chain
+   * T02 ANALYZE_MEDIA import → T03 GENERATE_PROXY → T04 ANALYZE_MEDIA
+   * scene_detect (S05-C02). The request is submission-only; chain
+   * progression is owned by the backend orchestration service (its
+   * background loop materializes the proxy/scene_detect jobs as each
+   * predecessor durably completes — no polling required, survives API
+   * restarts). The chain identity is the source SHA-256 + generation;
+   * re-submitting the same source reuses the chain, a different source
+   * starts a fresh chain.
+   */
+  analyzeProject: (projectId: string, title?: string) =>
+    apiFetch<AnalyzeChainState>(
+      `/api/projects/${projectId}/analyze`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ generation: "1", title: title ?? null }),
+      },
+    ),
+
+  /**
+   * Backend-owned chain state (active step, real checkpoint progress,
+   * terminal states). Polled by the UI — STRICTLY READ-ONLY: this GET
+   * never creates jobs or mutates rows; the orchestration service owns
+   * chain progression.
+   */
+  getAnalyzeChain: (projectId: string, generation = "1") =>
+    apiFetch<AnalyzeChainState>(
+      `/api/projects/${projectId}/analyze?generation=${generation}`,
+    ),
+
+  /**
+   * Retry the newest failed/cancelled chain job via a successor Job
+   * (DURABLE_JOB_CONTRACT §8.5): owner validation + idempotency — a
+   * duplicate retry reuses the already-created successor (never a
+   * 500 IdempotencyKeyInUse without a path).
+   */
+  retryAnalyzeChain: (projectId: string, generation = "1") =>
+    apiFetch<AnalyzeChainState>(
+      `/api/projects/${projectId}/analyze/retry?generation=${generation}`,
+      { method: "POST" },
+    ),
+
+  /**
+   * Atomically cancel the chain's CURRENTLY ACTIVE durable step
+   * (S05-C04-R3). The backend re-resolves the active job AT CANCEL TIME
+   * (never a polled client snapshot), so a click during an
+   * import→proxy→scene transition still cancels the active step: 200
+   * `{status: "cancel_requested", job_id}` when a job was cancelled
+   * (idempotent while `cancelling`, same semantics as POST
+   * /api/jobs/{id}/cancel); 400 when the chain has genuinely
+   * completed/terminated — the UI then refetches and shows the terminal
+   * state. Never creates a successor.
+   */
+  cancelAnalyzeChain: (projectId: string, generation = "1") =>
+    apiFetch<{ status: string; job_id: string }>(
+      `/api/projects/${projectId}/analyze/cancel?generation=${generation}`,
+      { method: "POST" },
+    ),
 
   // Image URLs (direct links, no fetch)
   getMaskImageUrl: (projectId: string, objectId: string, frameIndex: number) =>
@@ -681,4 +1477,348 @@ export const api = {
       `/api/projects/${projectId}/auto-segment-objects?scene_id=${sceneId}`,
       { method: "POST" },
     ),
+  // ─── Durable Character Library (S06-T01 + S06-R02) ─────────────────────
+
+  listCharacters: (includeArchived = false, limit = 200) =>
+    apiFetch<CharacterListResponse>(
+      `/api/v2/characters?include_archived=${includeArchived}&limit=${limit}`,
+    ),
+
+  getCharacter: (characterId: string) =>
+    apiFetch<CharacterData>(`/api/v2/characters/${characterId}`),
+
+  listCharacterVersions: (characterId: string) =>
+    apiFetch<PackVersionData[]>(`/api/v2/characters/${characterId}/versions`),
+
+  getPackVersionValidation: (versionId: string) =>
+    apiFetch<PackVersionValidationData>(
+      `/api/v2/characters/versions/${versionId}/validation`,
+    ),
+
+  /** Publish a draft pack version (S06-T05). Uses the approved FLAT endpoint
+   *  ``POST /api/v2/characters/versions/{version_id}/publish`` with the
+   *  caller's current revision for CAS safety. 422 (invalid pack) and 409
+   *  (stale revision) throw ApiError with the server detail. */
+  publishCharacterVersion: (versionId: string, revision: number) =>
+    apiFetch<PackVersionData>(
+      `/api/v2/characters/versions/${versionId}/publish`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ revision }),
+      },
+    ),
+
+  /** Absolute URL for a pose asset's image bytes (R02 content endpoint). */
+  getCharacterAssetContentUrl: (asset: Pick<CharacterAssetData, "content_url">) =>
+    asset.content_url ? `${API_BASE}${asset.content_url}` : null,
+
+  // ─── S08 Object Intelligence (T01 roles/occurrences) ───────────────────
+
+  /** Paged Object Role summaries of one video item (infinite-load).
+   *  ``kind`` (S08-A01) is an optional canonical-kind filter — one of the
+   *  seven ObjectRole kinds; an unknown kind is a stable 422 from the
+   *  backend (never a silent empty). */
+  listObjectRoles: (
+    videoItemId: string,
+    opts?: { status?: string; kind?: ObjectRoleKind; limit?: number; offset?: number },
+  ) =>
+    apiFetch<ObjectRoleListResponse>(
+      `/api/v2/object-intelligence/roles?video_item_id=${encodeURIComponent(videoItemId)}${opts?.status ? `&status=${encodeURIComponent(opts.status)}` : ""}${opts?.kind ? `&kind=${encodeURIComponent(opts.kind)}` : ""}&limit=${opts?.limit ?? 20}&offset=${opts?.offset ?? 0}`,
+    ),
+
+  /** Canonical seven-kind ObjectRole taxonomy (S08-A01). */
+  getObjectRoleKinds: () =>
+    apiFetch<RoleKindsResponse>("/api/v2/object-intelligence/kinds"),
+
+  getObjectRole: (roleId: string) =>
+    apiFetch<ObjectRole>(`/api/v2/object-intelligence/roles/${roleId}`),
+
+  // ─── S08 Object Extraction (T02 durable job) ───────────────────────────
+
+  /** Submit one durable DISCOVER_OBJECTS job (provider resolved by the
+   *  backend: production default fails closed, QA env may select the
+   *  deterministic adapter explicitly). */
+  submitObjectExtraction: (req: {
+    projectId: string;
+    videoItemId: string;
+    generation?: string;
+    sourceSha256?: string | null;
+  }) =>
+    apiFetch<ExtractionSubmitResult>("/api/v2/object-intelligence/extraction", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        project_id: req.projectId,
+        video_item_id: req.videoItemId,
+        generation: req.generation ?? "1",
+        source_sha256: req.sourceSha256 ?? null,
+      }),
+    }),
+
+  /** Read-only job status + published outputs (empty until completed). */
+  getExtractionJob: (jobId: string) =>
+    apiFetch<ExtractionJob>(`/api/v2/object-intelligence/extraction/${jobId}`),
+
+  /** Committed output set of a terminal extraction job (409 while active). */
+  getExtractionOutputs: (jobId: string) =>
+    apiFetch<ExtractionOutputsResult>(
+      `/api/v2/object-intelligence/extraction/${jobId}/outputs`,
+    ),
+
+  /**
+   * Backend-authoritative lookup of the CURRENT completed extraction for a
+   * video item (404 when none). source_generation filters so a source
+   * replacement NEVER surfaces previous-generation media. Browser storage is
+   * never required — the backend is the authority.
+   */
+  getCurrentExtraction: (videoItemId: string, sourceGeneration?: string) =>
+    apiFetch<ExtractionJob>(
+      `/api/v2/object-intelligence/extraction/current?video_item_id=${encodeURIComponent(videoItemId)}${sourceGeneration ? `&source_generation=${encodeURIComponent(sourceGeneration)}` : ""}`,
+    ),
+
+  /** Backend-authoritative grouping policy (thresholds/semantics metadata). */
+  getGroupingPolicy: () =>
+    apiFetch<GroupingPolicyData>("/api/v2/object-intelligence/grouping/policy"),
+
+  /** Video Items of a project (S03) — powers the multi-video selector. */
+  listProjectVideos: (projectId: string) =>
+    apiFetch<VideoListResponse>(`/api/v2/projects/${encodeURIComponent(projectId)}/videos`),
+
+  /** Durable v2 project (backend-authoritative identity; 404 if unknown). */
+  getDurableProject: (projectId: string) =>
+    apiFetch<DurableProjectData>(`/api/v2/projects/${encodeURIComponent(projectId)}`),
+
+  /** Durable v2 project list (SQLite only — never the legacy project dirs). */
+  listDurableProjects: (activeOnly = true) =>
+    apiFetch<DurableProjectListResponse>(`/api/v2/projects?active_only=${activeOnly}`),
+
+  // ─── S08 Grouping (T03 suggestions + curation) ─────────────────────────
+
+  /** Deterministic grouping run — always creates pending suggestions. */
+  generateGroupingSuggestions: (
+    videoItemId: string,
+    sourceGeneration: string,
+    idempotencyKey?: string,
+  ) =>
+    apiFetch<GenerateSuggestionsResult>(
+      "/api/v2/object-intelligence/grouping/suggestions/generate",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          video_item_id: videoItemId,
+          source_generation: sourceGeneration,
+          scope: "video",
+          algorithm_version: "1",
+          idempotency_key: idempotencyKey ?? null,
+        }),
+      },
+    ),
+
+  listGroupingSuggestions: (videoItemId: string, status = "pending", limit = 200) =>
+    apiFetch<SuggestionListResponse>(
+      `/api/v2/object-intelligence/grouping/suggestions?video_item_id=${encodeURIComponent(videoItemId)}&status=${encodeURIComponent(status)}&limit=${limit}`,
+    ),
+
+  /** Explicit rejection of one pending suggestion (CAS). */
+  dismissSuggestion: (suggestionId: string, revision: number) =>
+    apiFetch<GroupingSuggestion>(
+      `/api/v2/object-intelligence/grouping/suggestions/${suggestionId}/dismiss`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ revision }),
+      },
+    ),
+
+  /** Explicit durable confirm of one role (CAS + audit + idempotent replay). */
+  confirmObjectRole: (
+    roleId: string,
+    videoItemId: string,
+    revision: number,
+    idempotencyKey?: string,
+    note?: string,
+  ) =>
+    apiFetch<ConfirmResult>(
+      `/api/v2/object-intelligence/grouping/roles/${roleId}/confirm`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          revision,
+          video_item_id: videoItemId,
+          idempotency_key: idempotencyKey ?? null,
+          note: note ?? null,
+        }),
+      },
+    ),
+
+  /** Explicit durable merge of source roles into the target (CAS + audit). */
+  mergeObjectRoles: (
+    targetRoleId: string,
+    videoItemId: string,
+    revision: number,
+    sourceRoleIds: string[],
+    opts?: { suggestionId?: string | null; idempotencyKey?: string; note?: string },
+  ) =>
+    apiFetch<MergeResult>(
+      `/api/v2/object-intelligence/grouping/roles/${targetRoleId}/merge`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          revision,
+          video_item_id: videoItemId,
+          source_role_ids: sourceRoleIds,
+          suggestion_id: opts?.suggestionId ?? null,
+          idempotency_key: opts?.idempotencyKey ?? null,
+          note: opts?.note ?? null,
+        }),
+      },
+    ),
+
+  /** Explicit durable split of one merged original role out of the target. */
+  splitObjectRole: (
+    targetRoleId: string,
+    videoItemId: string,
+    revision: number,
+    originalRoleId: string,
+    opts?: { idempotencyKey?: string; note?: string },
+  ) =>
+    apiFetch<SplitResult>(
+      `/api/v2/object-intelligence/grouping/roles/${targetRoleId}/split`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          revision,
+          video_item_id: videoItemId,
+          original_role_id: originalRoleId,
+          idempotency_key: opts?.idempotencyKey ?? null,
+          note: opts?.note ?? null,
+        }),
+      },
+    ),
+
+  /** Read-only curation audit history. */
+  listGroupingOperations: (videoItemId: string, limit = 100) =>
+    apiFetch<OperationListResponse>(
+      `/api/v2/object-intelligence/grouping/operations?video_item_id=${encodeURIComponent(videoItemId)}&limit=${limit}`,
+    ),
+
+  // ─── S08 Targeted Correction (T05 impacted scope + recompute) ───────────
+
+  /** Pre-confirmation impacted-scope report — ZERO durable writes. */
+  previewCorrection: (req: CorrectionRequestPayload) =>
+    apiFetch<CorrectionImpactData>("/api/v2/object-intelligence/corrections/preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req),
+    }),
+
+  /** Create the durable pending correction (natural-key replay -> 200). */
+  createCorrection: (req: CorrectionRequestPayload) =>
+    apiFetch<CorrectionCreateResult>("/api/v2/object-intelligence/corrections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req),
+    }),
+
+  /** Apply the pending correction exactly once (atomic CAS). */
+  confirmCorrection: (correctionId: string, revision: number) =>
+    apiFetch<ObjectCorrection>(
+      `/api/v2/object-intelligence/corrections/${correctionId}/confirm`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ revision }),
+      },
+    ),
+
+  /** Read-only correction status (recompute outcome follows the successor chain). */
+  getCorrection: (correctionId: string) =>
+    apiFetch<ObjectCorrection>(`/api/v2/object-intelligence/corrections/${correctionId}`),
+
+  /** Read-only correction history of one video item. */
+  listCorrections: (videoItemId: string, limit = 50) =>
+    apiFetch<CorrectionListResponse>(
+      `/api/v2/object-intelligence/corrections?video_item_id=${encodeURIComponent(videoItemId)}&limit=${limit}`,
+    ),
+
+  /** Cancel: pending correction -> durable CAS cancel; applied -> durable job cancel. */
+  cancelCorrection: (correctionId: string, revision: number) =>
+    apiFetch<ObjectCorrection>(
+      `/api/v2/object-intelligence/corrections/${correctionId}/cancel`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ revision }),
+      },
+    ),
+
+  /** Retry the recompute work: successor Job (contract §6.4), idempotent. */
+  retryCorrectionRecompute: (correctionId: string) =>
+    apiFetch<ObjectCorrection>(
+      `/api/v2/object-intelligence/corrections/${correctionId}/recompute/retry`,
+      { method: "POST" },
+    ),
+
+  // ─── S07 Project Cast (T02 picker + compatibility) ───────────────────────
+
+  /** Picker browse: only published/usable Pack Versions, search/filter, deterministic. */
+  listPickerPacks: (opts?: { q?: string; limit?: number; offset?: number }) =>
+    apiFetch<PickerPacksResponse>(
+      `/api/v2/project-cast/picker/packs?limit=${opts?.limit ?? 50}&offset=${opts?.offset ?? 0}${opts?.q ? `&q=${encodeURIComponent(opts.q)}` : ""}`,
+    ),
+
+  /** Deterministic compatibility evaluate (pure, no mutation). */
+  evaluateCastCompatibility: (req: {
+    project_id: string;
+    object_role_id: string;
+    pack_version_id: string;
+    expected_revision?: number | null;
+    mapping_id?: string | null;
+  }) =>
+    apiFetch<CompatibilityEvaluateResponse>(`/api/v2/project-cast/compatibility/evaluate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        project_id: req.project_id,
+        object_role_id: req.object_role_id,
+        pack_version_id: req.pack_version_id,
+        expected_revision: req.expected_revision ?? null,
+        mapping_id: req.mapping_id ?? null,
+      }),
+    }),
+
+  /** Project Cast Mapping CRUD (S07-T01). */
+  listProjectCastMappings: (projectId: string, limit = 50, offset = 0) =>
+    apiFetch<ProjectCastListResponse>(
+      `/api/v2/project-cast?project_id=${encodeURIComponent(projectId)}&limit=${limit}&offset=${offset}`,
+    ),
+
+  getProjectCastMapping: (mappingId: string) =>
+    apiFetch<ProjectCastData>(`/api/v2/project-cast/${mappingId}`),
+
+  createProjectCastMapping: (req: {
+    project_id: string;
+    object_role_id: string;
+    character_id: string;
+    pack_version_id: string;
+    idempotency_key?: string | null;
+    fallback_acknowledged?: boolean;
+  }) =>
+    apiFetch<ProjectCastData>(`/api/v2/project-cast`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req),
+    }),
+
+  updateProjectCastMapping: (mappingId: string, req: { revision: number; character_id?: string | null; pack_version_id?: string | null; fallback_acknowledged?: boolean }) =>
+    apiFetch<ProjectCastData>(`/api/v2/project-cast/${mappingId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req),
+    }),
 };

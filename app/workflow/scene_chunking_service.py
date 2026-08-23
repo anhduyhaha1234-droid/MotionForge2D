@@ -17,6 +17,13 @@ class SceneChunkingService:
     def __init__(self, config: AppConfig) -> None:
         self._config = config
 
+    @staticmethod
+    def _decode_timeout() -> float:
+        """Bounded decode timeout (S08-H02): fail closed on a hung ffmpeg."""
+        from app.config import config as app_config  # noqa: PLC0415
+
+        return max(1, int(app_config.decode_timeout_seconds))
+
     def chunk_video(
         self,
         video_path: Path,
@@ -100,7 +107,10 @@ class SceneChunkingService:
                 "-avoid_negative_ts", "make_zero",
                 str(clip_path),
             ]
-            subprocess.run(cmd, capture_output=True, check=True)
+            subprocess.run(
+                cmd, capture_output=True, check=True,
+                timeout=SceneChunkingService._decode_timeout(),
+            )
             results.append(clip_path)
 
         return results
@@ -165,7 +175,10 @@ class SceneChunkingService:
             "-avoid_negative_ts", "make_zero",
             str(output_path),
         ]
-        subprocess.run(cmd, capture_output=True, check=True)
+        subprocess.run(
+            cmd, capture_output=True, check=True,
+            timeout=SceneChunkingService._decode_timeout(),
+        )
 
     def _check_audio(self, video_path: Path) -> bool:
         """Check if video has audio stream."""

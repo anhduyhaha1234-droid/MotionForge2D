@@ -45,6 +45,17 @@
 |-------|------|---------|--------|
 | **sam2.1_hiera_large.pt** | ~890MB | Apache-2.0 | [Meta AI SAM2](https://github.com/facebookresearch/sam2) |
 
+## Renderer Router Wired Backends (S09-T00-I02)
+
+The renderer router wires ONLY backends verified present on the build machine.
+License entries below are limited to what is ACTUALLY wired — nothing
+pre-registered for future/unwired components.
+
+| Backend | Routes served | Detected build / runtime | License (as detected) |
+|---------|---------------|--------------------------|------------------------|
+| **FFmpeg encode path** (`ffmpeg_binary.probe_ffmpeg`) | pose_swap, sprite_affine | FFmpeg 8.1.2-full_build-www.gyan.dev; `configuration:` header contains `--enable-gpl --enable-version3` (no `--enable-nonfree` detected) | GPL-2.0-or-later family build (registry id `ffmpeg-gpl-build`). Local use approved; REDISTRIBUTION of this binary requires full GPL compliance — or ship an LGPL-only FFmpeg build instead |
+| **NVIDIA NVENC runtime** (`h264_nvenc` via `nvenc.probe_nvenc`) | pose_swap, sprite_affine (GPU encode) | NVENC SDK 13.1 loaded from installed GeForce driver; NVIDIA GeForce RTX 5070, SM 12.0 | Bundled with the installed NVIDIA display driver; MotionForge does not redistribute any NVIDIA binary |
+
 ## License Notes
 
 - **SAM 2.1** is released under Apache 2.0 by Meta AI, permitting commercial use.
@@ -60,5 +71,6 @@
 - [x] All dependencies checked for compatible licenses
 - [x] SAM 2.1 checkpoint license verified (Apache 2.0)
 - [x] FFmpeg GPL flags noted for distribution awareness
+- [x] Renderer-router wired backends license-gated at runtime (`validate_license_for_product_use`); no-permission licenses (CC-BY-NC family) hard-refused
 - [x] No commercial API keys required
 - [x] Fully offline-capable after model download
