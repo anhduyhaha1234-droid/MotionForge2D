@@ -40,7 +40,10 @@ from app.persistence import create_engine_for_path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ALEMBIC_INI = PROJECT_ROOT / "alembic.ini"
 PRE = "f7a8b9c0d1e2"
-HEAD = "b2c3d4e5f6a7b"
+# Revision under test (S08-A02-T01-R1 structural evidence bridge) — an
+# IDENTITY constant, not the Alembic head; newer revisions may stack above
+# it (the single head itself is discovered live via _live_head()).
+HEAD_REVISION = "a0b1c2d3e4f5"
 NEW_TABLES = (
     "occurrence_segment",
     "segment_motion",
@@ -96,9 +99,20 @@ def _fk_violations(db: Path) -> list[tuple]:
         return [tuple(r) for r in conn.execute(text("PRAGMA foreign_key_check")).fetchall()]
 
 
+def _live_head() -> str:
+    """Discover the CURRENT single Alembic head live from the script
+    directory — never hard-coded, so new migrations on top of this one do
+    not stale the assertion."""
+    from alembic.script import ScriptDirectory
+
+    heads = ScriptDirectory(str(PROJECT_ROOT / "migrations")).get_heads()
+    assert len(heads) == 1, f"expected exactly one head, got {heads}"
+    return heads[0]
+
+
 def _seed_parent_rows(db: Path) -> None:
     """Insert minimal FK-resolvable parent rows (all pre-A02 tables exist at
-    HEAD because Alembic runs the full history)."""
+    the current head because Alembic runs the full history)."""
     with create_engine_for_path(db).begin() as conn:
         conn.execute(
             text("INSERT INTO workspace(id,name) VALUES (:w,:w)"), {"w": WS}
@@ -187,7 +201,7 @@ def test_upgrade_downgrade_upgrade_empty_graph_byte_identical(
     cfg = _config(db)
 
     command.upgrade(cfg, "head")
-    assert _revision(db) == HEAD
+    assert _revision(db) == _live_head()
     assert _integrity(db) == "ok"
     assert _fk_violations(db) == []
     up_once = _schema_signature(db)
@@ -203,7 +217,7 @@ def test_upgrade_downgrade_upgrade_empty_graph_byte_identical(
     downgraded = _schema_signature(db)
 
     command.upgrade(cfg, "head")
-    assert _revision(db) == HEAD
+    assert _revision(db) == _live_head()
     assert _integrity(db) == "ok"
     assert _fk_violations(db) == []
     assert _schema_signature(db) == up_once, "re-upgrade DDL differs (not byte-identical)"
@@ -233,9 +247,10 @@ def test_downgrade_refused_atomically_with_any_row(
     with pytest.raises(RuntimeError, match="refusing to downgrade"):
         command.downgrade(cfg, PRE)
 
-    # ATOMIC refusal: with new head b2c, b2->a0 succeeds, a0->f7 refuses  # noqa: E501
-    # leaving revision at a0b1c2d3e4f5.  # noqa: E501
-    assert _revision(db) == "a0b1c2d3e4f5"
+    # ATOMIC refusal: with a newer head stacked above, the b2c->a0b1 leg
+    # succeeds first, then a0b1c2d3e4f5->f7 refuses — leaving revision at
+    # a0b1c2d3e4f5 (the S08-A02 revision under test).  # noqa: E501
+    assert _revision(db) == HEAD_REVISION
     assert _schema_signature(db) != before  # b2c table gone, but 4 tables remain
     for t in NEW_TABLES:
         with create_engine_for_path(db).connect() as conn:
@@ -243,9 +258,9 @@ def test_downgrade_refused_atomically_with_any_row(
         assert cnt == before_rows[t], f"{t} row count changed on refused downgrade"
     assert _integrity(db) == "ok"
     assert _fk_violations(db) == []
-    # Re-upgrade restores b2 head
+    # Re-upgrade restores the live head discovered from the script directory.
     command.upgrade(cfg, "head")
-    assert _revision(db) == HEAD
+    assert _revision(db) == _live_head()
     assert _schema_signature(db) == before
 
 
@@ -394,8 +409,11 @@ def test_revision_chain_and_single_head() -> None:
 
     script = ScriptDirectory(str(PROJECT_ROOT / "migrations"))
     heads = script.get_heads()
-    assert heads == ["b2c3d4e5f6a7b"], f"unexpected Alembic head(s): {heads}"
-    # Chain still contains a0b1c2d3e4f5 as intermediate (S08-A02 → S07-T01)
+    # Single-head, discovered LIVE (not a hard-coded snapshot).
+    assert heads == [_live_head()], f"unexpected Alembic head(s): {heads}"
+    # Chain still contains a0b1c2d3e4f5 as intermediate (S08-A02 → S07-T01),
+    # reachable from the LIVE head.
     assert "a0b1c2d3e4f5" in {  # noqa: E501
-        r.revision for r in script.walk_revisions(base="f7a8b9c0d1e2", head="b2c3d4e5f6a7b")
+        r.revision
+        for r in script.walk_revisions(base="f7a8b9c0d1e2", head=_live_head())
     }

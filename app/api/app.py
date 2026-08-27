@@ -34,6 +34,10 @@ from app.api.routes import (
     project_cast,
     projects,
     reskin_config,
+    s09_approval,
+    s09_correction,
+    s09_demo_compare,
+    s09_demo_loops,
     structural_evidence,
 )
 from app.api.security import (
@@ -143,6 +147,31 @@ app.include_router(project_cast.router)
 # Durable ReskinConfig API (S09-T01) — /api/v2/reskin-configs, disjoint from
 # every legacy route and from /api/v2/project-cast.
 app.include_router(reskin_config.router)
+
+
+# Durable S09 demo-loop API (S09-T03) — /api/v2/s09-demo-loops, disjoint
+# from every legacy route and from /api/v2/reskin-configs.
+app.include_router(s09_demo_loops.router)
+
+
+# Durable S09 demo comparison API (S09-T04) — /api/v2/s09-demo-compare,
+# disjoint from every legacy route, from /api/v2/reskin-configs and from
+# the T03 /api/v2/s09-demo-loops namespace.
+app.include_router(s09_demo_compare.router)
+
+
+# Durable targeted-correction API (S09-T05A) — /api/v2/s09-corrections.
+# Production wiring per S09 FULL_SPRINT review F4 / fast-track §8 T56:
+# the frontend calls this namespace; isolated-app test mounts alone do not
+# satisfy production registration.
+app.include_router(s09_correction.router)
+
+
+# Immutable approval/checkpoint API (S09-T06A) — /api/v2/s09-approvals.
+# Same F4/T56 production wiring: routes commit explicitly under real
+# get_db_session semantics (close-only dependency), so checkpoints survive
+# process restart/reload without any test-only auto-commit.
+app.include_router(s09_approval.router)
 
 
 @app.get("/health")

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import subprocess
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -18,9 +19,9 @@ from app.adapters.renderer.nvenc import NvencProbe, probe_nvenc, vram_bytes_via_
 from app.services.renderer_contract import (
     BackendBinaryMissingError,
     CapabilityDescriptor,
+    RendererContractCode,
     RenderRequest,
     RenderResult,
-    RendererContractCode,
     utc_now_iso,
 )
 
@@ -28,7 +29,7 @@ __all__ = ["FfmpegEncodeAdapterBase", "measure_peak_vram_bytes_during"]
 
 
 def measure_peak_vram_bytes_during(
-    proc_builder: "callable[[], subprocess.Popen[str]]",
+    proc_builder: Callable[[], subprocess.Popen[str]],
 ) -> tuple[float, int | None]:
     """Run ``proc_builder().wait()`` while sampling nvidia-smi used-memory.
 
@@ -113,10 +114,7 @@ class FfmpegEncodeAdapterBase:
         return self._gates
 
     def capability(self) -> CapabilityDescriptor:
-        license_id: str | None
         details: dict[str, object] = {}
-        available = True
-        error: str | None = None
         try:
             gates = self._ensure_gates()
         except BackendBinaryMissingError as err:
@@ -142,7 +140,7 @@ class FfmpegEncodeAdapterBase:
         return CapabilityDescriptor(
             backend_id=self.backend_id,
             route=self.route,
-            available=available,
+            available=True,
             license_id=license_id or "ffmpeg-lgpl",
             evidence_source="measured_live",
             measured_at_utc=utc_now_iso(),
@@ -180,9 +178,10 @@ def _frames_in_range(request: RenderRequest) -> int:
     return request.end_frame - request.start_frame + 1
 
 
-def _validate_media(request: RenderRequest, *, need_input: bool) -> tuple[
-    Path | None, RenderResult | None]:
-    """Shared media validation returning (paths, error_result)."""
+def _validate_media(
+    request: RenderRequest, *, need_input: bool
+) -> tuple[tuple[Path, Path] | None, RenderResult | None]:
+    """Shared media validation returning ((input, output) paths, error)."""
     from app.services.renderer_contract import RendererContractCode
 
     if request.output_media is None:
@@ -207,4 +206,6 @@ def _validate_media(request: RenderRequest, *, need_input: bool) -> tuple[
             error_code=RendererContractCode.INVALID_REQUEST,
             error_detail="input_media is required for encode adapters",
         )
+    assert request.input_media is not None  # narrowed by the guards above
+    assert request.output_media is not None
     return (request.input_media, request.output_media), None

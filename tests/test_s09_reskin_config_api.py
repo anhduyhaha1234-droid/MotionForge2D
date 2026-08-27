@@ -370,3 +370,103 @@ def test_patch_stale_zero_mutation_on_pack_pin(client: TestClient) -> None:
     after = client.get(f"/api/v2/reskin-configs/{cid}").json()
     assert after["revision"] == 1
     assert after["pack_version_id"] == pv_old
+
+
+# ── Source-Locked: manifest pin + renderer-route evidence via HTTP ───────────
+
+
+def test_create_with_structural_lock_pin_and_evidence(client: TestClient) -> None:
+    from app.persistence.structural_lock import StructuralLockRepository
+
+    proj, role, char, pv = _seed_one()
+    ws = DEFAULT_WORKSPACE_ID
+    with _sf() as s:
+        from sqlalchemy import text as sqltext
+
+        scene_row = s.execute(
+            sqltext("SELECT id FROM scene LIMIT 1")
+        ).first()
+        assert scene_row is not None
+        video_id = s.execute(
+            sqltext(
+                "SELECT v.id FROM video_item v JOIN project p ON p.id=v.project_id "
+                "WHERE p.id=:pid LIMIT 1"
+            ),
+            {"pid": proj},
+        ).scalar_one()
+
+        # Real occurrence segment backing the manifest's segment decision.
+        s.execute(
+            sqltext(
+                "INSERT INTO occurrence_segment(id,workspace_id,project_id,video_item_id,"
+                "role_id,scene_id,logical_id,lineage_version,name,kind,start_frame,end_frame,"
+                "start_time_ms,end_time_ms,source_generation,confidence,confidence_source,"
+                "reasons_json,visibility,z_order,revision) VALUES ('sg-api-1',:w,:p,:v,:rl,:sc,"
+                "'lg-api-1',1,'Hero','character',0,100,0,3000,'1',0.95,'model','[]','visible',0,1)"
+            ),
+            {
+                "w": ws,
+                "p": proj,
+                "v": video_id,
+                "rl": role,
+                "sc": scene_row[0],
+            },
+        )
+        repo = StructuralLockRepository(s)
+        payload = {
+            "frame_count": 100,
+            "timebase": {"fps": 30.0, "time_base": "1/30000", "start_time_ms": 0},
+            "shot_order": ["shot-001"],
+            "fingerprints": {"z_order": "a" * 64, "contacts": "b" * 64},
+            "segments": [
+                {
+                    "occurrence_segment_id": "sg-api-1",
+                    "route": "pose_swap",
+                    "anchor": {"x": 0.5, "y": 0.5},
+                    "start_frame": 0,
+                    "end_frame": 100,
+                    "provenance": {"residual": 0.2},
+                }
+            ],
+            "policy_version": "structural-thresholds-v1",
+        }
+        manifest, _created = repo.create_manifest(ws, proj, video_id, "1", payload)
+        repo.record_render_route(
+            ws, proj, video_id, "sg-api-1", "pose_swap", 0.5, 0.5, 0, 100,
+            provenance={"residual": 0.2}, reasons=["auto-route"],
+            structural_lock_manifest_id=manifest.id,
+        )
+        s.commit()
+        mid = manifest.id
+
+    # POST create WITH the pin → policy derived server-side.
+    r = client.post(
+        "/api/v2/reskin-configs",
+        json={
+            "project_id": proj,
+            "object_role_id": role,
+            "character_id": char,
+            "pack_version_id": pv,
+            "params": VALID_PARAMS,
+            "structural_lock_manifest_id": mid,
+        },
+    )
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["structural_lock_manifest_id"] == mid
+    assert body["lock_policy_version"] == "structural-thresholds-v1"
+
+    # Evidence endpoint returns per-segment persisted decisions.
+    ev = client.get(f"/api/v2/reskin-configs/{body['id']}/renderer-route-evidence")
+    assert ev.status_code == 200, ev.text
+    rows = ev.json()
+    assert len(rows) == 1
+    assert rows[0]["occurrence_segment_id"] == "sg-api-1"
+    assert rows[0]["route"] == "pose_swap"
+    assert rows[0]["anchor"] == {"x": 0.5, "y": 0.5}
+
+    # Unknown config id → 404 (no cross-workspace leak).
+    miss = client.get(
+        f"/api/v2/reskin-configs/{uuid.uuid4()}/renderer-route-evidence"
+    )
+    assert miss.status_code == 404

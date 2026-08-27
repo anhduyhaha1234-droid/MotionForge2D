@@ -1,102 +1,153 @@
-"""sprite_affine route adapter — FFmpeg encode path (S09-T00-I02).
+"""sprite_affine route adapter — REAL anchored replacement-layer reskin
+(S09-T02-C1).
 
-Rigid translation/scale/rotation of the segment through a real FFmpeg
-re-encode on THIS machine's stack (FFmpeg 8.1.2 + h264_nvenc, RTX 5070).
-The affine transform is applied per-frame via rotate filter (which also
-performs translation+scale in one pass) driven by the request's frame range;
-runtime and peak VRAM are measured; binaries missing → fail closed.
+F1 correction: this adapter no longer applies a fixed 1°/1.02 transform to
+the WHOLE source frame.  It composites the request's REPLACEMENT LAYER,
+transformed by the anchor + affine keyframes of the REQUEST (translation/
+scale/rotation sampled per frame), into the affected region via the
+deterministic CPU compositor, then encodes.  NVENC is only an encode
+acceleration with provenance; the CPU path is the deterministic reference.
 """
 
 from __future__ import annotations
 
-import subprocess
-from pathlib import Path
-
-from app.adapters.renderer.encode_base import (
-    FfmpegEncodeAdapterBase,
-    _frames_in_range,
-    _validate_media,
-    measure_peak_vram_bytes_during,
+from app.adapters.renderer.encode_base import FfmpegEncodeAdapterBase
+from app.services.renderer_contract import (
+    CapabilityDescriptor,
+    CapabilityMismatchError,
+    RenderRequest,
+    RenderResult,
 )
-from app.services.renderer_contract import RenderResult
+from app.services.renderer_routes.composite import (
+    canonical_frame_sha256,
+    composite_sprite_affine_frames,
+    decode_rgb_frames,
+    write_frames_mp4,
+)
 
 __all__ = ["SpriteAffineAdapter"]
-
-_CANONICAL_FPS = 30.0
 
 
 class SpriteAffineAdapter(FfmpegEncodeAdapterBase):
     route_name = "sprite_affine"
     backend_id_value = "ffmpeg-nvenc-sprite-affine"
 
+    #: Canonical decoded-frame hash of the last successful render (evidence).
+    _last_output_sha256: str | None = None
+
     def _render_impl(self, request: RenderRequest) -> RenderResult:
-        paths, error = _validate_media(request, need_input=True)
-        if error is not None or paths is None:
-            return error  # type: ignore[return-value]
-        input_media, output_media = paths
+        # FAIL BEFORE SUCCESS: binary gates first (stable taxonomy for a
+        # vanished encoder), then the FULL typed contract validation —
+        # all before any composite/encode work.
         gates = self._ensure_gates()
+        request.validate_for_render()
 
-        frames = _frames_in_range(request)
-        start_s = request.start_frame / _CANONICAL_FPS
-        duration_s = frames / _CANONICAL_FPS
-        # Deterministic rigid transform derived from the segment itself —
-        # identity-centered rotation over the range (no external model).
-        angle_deg = 1.0
-        scale = 1.02
+        import time
 
-        encoder: list[str]
-        if gates.nvenc.available:
-            encoder = ["-c:v", "h264_nvenc", "-preset", "p4", "-cq", "23"]
-        else:
-            encoder = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23"]
-
-        vf = (
-            f"rotate={angle_deg}*PI/180:ow=iw*{scale}:oh=ih*{scale}:c=black,"
-            f"scale=iw/{scale:.4f}:ih/{scale:.4f}"
-        )
-
-        cmd = [
-            str(gates.ffmpeg.ffmpeg_path),
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-ss",
-            f"{start_s:.6f}",
-            "-i",
-            str(Path(input_media)),
-            "-t",
-            f"{duration_s:.6f}",
-            "-vf",
-            vf,
-            "-r",
-            f"{_CANONICAL_FPS:.6f}",
-            "-y",
-            *encoder,
-            "-pix_fmt",
-            "yuv420p",
-            "-an",
-            str(Path(output_media)),
+        started = time.perf_counter()
+        assert request.input_media is not None
+        source_frames = decode_rgb_frames(request.input_media)
+        if len(source_frames) < request.end_frame + 1:
+            raise CapabilityMismatchError(
+                f"source has {len(source_frames)} frames; render range needs "
+                f"{request.end_frame + 1} (0-based inclusive)"
+            )
+        window = source_frames[
+            request.start_frame : request.end_frame + 1
         ]
 
-        out_parent = Path(output_media).parent
-        out_parent.mkdir(parents=True, exist_ok=True)
-
-        proc = subprocess.Popen(  # noqa: S603 — fixed argv, no shell
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
+        progress: dict[str, object] = {}
+        composed = composite_sprite_affine_frames(
+            window, request, progress=progress
         )
-        wall_s, peak_vram = measure_peak_vram_bytes_during(lambda: proc)
+        expected = request.end_frame - request.start_frame + 1
+        if len(composed) != expected:
+            raise CapabilityMismatchError(
+                f"compositor produced {len(composed)} frames; the inclusive "
+                f"range {request.start_frame}..{request.end_frame} requires "
+                f"{expected}"
+            )
 
-        _, err_out = proc.communicate() if proc.stderr else ("", "")
-        ok = proc.returncode == 0 and Path(output_media).is_file()
+        # C2 (F5): encode at the SOURCE rational fps/timebase — never a
+        # canonical retime.
+        assert request.source_timebase is not None
+        fps = request.timebase().fps_float
+        encode_backend = "cv2-mp4v-deterministic"
+        accelerated = False
+        assert request.output_media is not None
+        if gates.nvenc.available:
+            encode_backend = "h264_nvenc"
+            accelerated = True
+            nvenc_out = [
+                "-c:v",
+                "h264_nvenc",
+                "-preset",
+                "p4",
+                "-rc",
+                "vbr",
+                "-cq",
+                "23",
+                "-pix_fmt",
+                "yuv420p",
+                "-an",
+            ]
+            write_frames_mp4(
+                composed,
+                request.output_media,
+                fps=fps,
+                extra_output_opts=nvenc_out,
+            )
+        else:
+            write_frames_mp4(
+                composed,
+                request.output_media,
+                fps=fps,
+            )
+        wall_s = time.perf_counter() - started
 
-        from app.adapters.renderer.pose_swap_adapter import PoseSwapAdapter  # noqa: F401
-        from app.services.renderer_contract import RendererContractCode
+        exit_ok = request.output_media.is_file()
+        # C2 (F5): output_frame_sha256 hashes the CANONICAL DECODED FRAMES
+        # of the written artifact (post-encode), not pre-encode buffers.
+        output_hash: str | None = None
+        if exit_ok:
+            encoded_frames = decode_rgb_frames(request.output_media)
+            if len(encoded_frames) != expected:
+                raise CapabilityMismatchError(
+                    f"encoded output decodes to {len(encoded_frames)} "
+                    f"frames; expected exactly {expected} (inclusive range "
+                    f"{request.start_frame}..{request.end_frame})"
+                )
+            output_hash = canonical_frame_sha256(encoded_frames)
+        return self._finalize(
+            request,
+            exit_ok=exit_ok,
+            wall_s=wall_s,
+            frames=expected,
+            compose_backend=encode_backend,
+            output_sha256=output_hash,
+            keyframe_progress=progress,
+            accelerated=accelerated,
+        )
 
-        if not ok:
-            tail = (err_out or "").strip().splitlines()
+    def _finalize(
+        self,
+        request: RenderRequest,
+        *,
+        exit_ok: bool,
+        wall_s: float,
+        frames: int,
+        compose_backend: str,
+        output_sha256: str | None,
+        keyframe_progress: dict[str, object],
+        accelerated: bool,
+    ) -> RenderResult:
+        from app.adapters.renderer.nvenc import vram_bytes_via_nvidia_smi
+        from app.services.renderer_contract import (
+            RendererContractCode,
+            utc_now_iso,
+        )
+
+        if not exit_ok:
             return RenderResult(
                 request_id=request.request_id,
                 route=self.route,
@@ -104,13 +155,9 @@ class SpriteAffineAdapter(FfmpegEncodeAdapterBase):
                 ok=False,
                 frames_rendered=0,
                 wall_time_ms=wall_s * 1000.0,
-                error_code=RendererContractCode.INVALID_REQUEST
-                if proc.returncode != 0
-                else RendererContractCode.BACKEND_BINARY_MISSING,
-                error_detail=tail[-1] if tail else f"exit {proc.returncode}",
+                error_code=RendererContractCode.BACKEND_BINARY_MISSING,
+                error_detail="encode failed (see adapter log)",
             )
-        from app.services.renderer_contract import CapabilityDescriptor, utc_now_iso
-
         cap = CapabilityDescriptor(
             backend_id=self.backend_id,
             route=self.route,
@@ -119,10 +166,21 @@ class SpriteAffineAdapter(FfmpegEncodeAdapterBase):
             evidence_source="measured_live",
             measured_at_utc=utc_now_iso(),
             runtime_ms_per_frame=(wall_s * 1000.0) / max(frames, 1),
-            vram_bytes=peak_vram,
-            details={"encode": "h264_nvenc" if peak_vram is not None else "libx264"},
+            vram_bytes=vram_bytes_via_nvidia_smi(),
+            details={
+                "encode": compose_backend,
+                "composite": "replacement_layer_anchor_keyframes_cpu_deterministic",
+                "output_frame_sha256": output_sha256,
+                "keyframes_sampled": len(keyframe_progress or {}),
+                "nvenc_provenance": (
+                    "acceleration-only; compositor is CPU deterministic"
+                    if accelerated
+                    else "cpu_reference"
+                ),
+            },
         )
-        self._last_capability = cap  # type: ignore[attr-defined]
+        self._last_capability = cap
+        self._last_output_sha256 = output_sha256
         return RenderResult(
             request_id=request.request_id,
             route=self.route,
@@ -130,5 +188,5 @@ class SpriteAffineAdapter(FfmpegEncodeAdapterBase):
             ok=True,
             frames_rendered=frames,
             wall_time_ms=wall_s * 1000.0,
-            output_media=Path(request.output_media),
+            output_media=request.output_media,
         )

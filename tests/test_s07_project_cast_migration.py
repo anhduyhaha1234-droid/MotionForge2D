@@ -28,7 +28,10 @@ from app.persistence import create_engine_for_path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ALEMBIC_INI = PROJECT_ROOT / "alembic.ini"
 PRE = "a0b1c2d3e4f5"
-HEAD = "b2c3d4e5f6a7b"
+# Revision under test (S07-T01 project_cast_mapping) — an IDENTITY constant,
+# not the Alembic head; newer revisions may stack above it (the single head
+# itself is discovered live via _live_head()).
+HEAD_REVISION = "b2c3d4e5f6a7b"
 NEW_TABLES = ("project_cast_mapping",)
 WS = "ws-test-s07mig"
 
@@ -76,6 +79,17 @@ def _integrity(db: Path) -> str:
 def _fk_violations(db: Path) -> list[tuple]:
     with create_engine_for_path(db).connect() as conn:
         return [tuple(r) for r in conn.execute(text("PRAGMA foreign_key_check")).fetchall()]
+
+
+def _live_head() -> str:
+    """Discover the CURRENT single Alembic head live from the script
+    directory — never hard-coded, so new migrations on top of this one do
+    not stale the assertion."""
+    from alembic.script import ScriptDirectory
+
+    heads = ScriptDirectory(str(PROJECT_ROOT / "migrations")).get_heads()
+    assert len(heads) == 1, f"expected exactly one head, got {heads}"
+    return heads[0]
 
 
 def _seed_parents(db: Path) -> None:
@@ -135,7 +149,8 @@ def _insert_mapping(db: Path, mid: str, key: str | None = None) -> None:
 def test_revision_chain_and_single_head() -> None:
     import migrations.versions.b2c3d4e5f6a7b_s07_project_cast_mapping as mig
 
-    assert mig.revision == HEAD
+    # Revision identity of the migration under test (unchanged semantics).
+    assert mig.revision == "b2c3d4e5f6a7b"
     assert mig.down_revision == PRE
     assert mig.branch_labels is None
     assert mig.depends_on is None
@@ -144,7 +159,13 @@ def test_revision_chain_and_single_head() -> None:
 
     script = ScriptDirectory(str(PROJECT_ROOT / "migrations"))
     heads = script.get_heads()
-    assert heads == [HEAD], f"unexpected Alembic head(s): {heads}"
+    # Single-head, discovered LIVE (not a hard-coded snapshot).
+    assert heads == [_live_head()], f"unexpected Alembic head(s): {heads}"
+    # The S07 revision must remain on the live chain (still an ancestor of
+    # the current head) — the original chain-position guarantee.
+    assert mig.revision in {
+        r.revision for r in script.walk_revisions()
+    }, f"{mig.revision} no longer reachable from live head(s)"
 
 
 def test_upgrade_downgrade_upgrade_empty_graph_byte_identical(tmp_path: Path) -> None:
@@ -152,7 +173,7 @@ def test_upgrade_downgrade_upgrade_empty_graph_byte_identical(tmp_path: Path) ->
     cfg = _config(db)
 
     command.upgrade(cfg, "head")
-    assert _revision(db) == HEAD
+    assert _revision(db) == _live_head()
     assert _integrity(db) == "ok"
     assert _fk_violations(db) == []
     up_once = _schema_signature(db)
@@ -168,7 +189,7 @@ def test_upgrade_downgrade_upgrade_empty_graph_byte_identical(tmp_path: Path) ->
     downgraded = _schema_signature(db)
 
     command.upgrade(cfg, "head")
-    assert _revision(db) == HEAD
+    assert _revision(db) == _live_head()
     assert _integrity(db) == "ok"
     assert _fk_violations(db) == []
     assert _schema_signature(db) == up_once, "re-upgrade DDL differs"
@@ -179,7 +200,11 @@ def test_downgrade_refused_atomically_with_any_row(tmp_path: Path) -> None:
     db = tmp_path / "refuse.db"
     cfg = _config(db)
 
-    command.upgrade(cfg, "head")
+    # Park the fixture exactly at the S07 revision under test so the
+    # downgrade below is the S07 leg itself (later revisions may exist on
+    # top of it — the single head itself is discovered live, never
+    # hard-coded).
+    command.upgrade(cfg, HEAD_REVISION)
     _seed_parents(db)
     _insert_mapping(db, "m1", key="k1")
 
@@ -190,7 +215,7 @@ def test_downgrade_refused_atomically_with_any_row(tmp_path: Path) -> None:
     with pytest.raises(RuntimeError, match="refusing to downgrade"):
         command.downgrade(cfg, PRE)
 
-    assert _revision(db) == HEAD
+    assert _revision(db) == HEAD_REVISION
     assert _schema_signature(db) == before
     with create_engine_for_path(db).connect() as conn:
         cnt = conn.execute(text("SELECT COUNT(*) FROM project_cast_mapping")).scalar()
@@ -198,8 +223,8 @@ def test_downgrade_refused_atomically_with_any_row(tmp_path: Path) -> None:
     assert _integrity(db) == "ok"
     assert _fk_violations(db) == []
 
-    command.upgrade(cfg, "head")
-    assert _revision(db) == HEAD
+    command.upgrade(cfg, HEAD_REVISION)
+    assert _revision(db) == HEAD_REVISION
     assert _schema_signature(db) == before
 
 

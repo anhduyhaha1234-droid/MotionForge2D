@@ -1,0 +1,86 @@
+{
+  "annotations": {
+    "graphic": {
+      "kind": "semantic_graphic",
+      "required_content": "text_bars_story_equivalent",
+      "source_center_px": [
+        430,
+        110
+      ]
+    },
+    "watermark": {
+      "kind": "source_only_overlay",
+      "present_frames": [
+        0,
+        44
+      ],
+      "rect_px": [
+        536,
+        308,
+        634,
+        356
+      ]
+    }
+  },
+  "cuts": [
+    {
+      "cut_frame": 45,
+      "tolerance_frames": 1
+    }
+  ],
+  "fps": 30,
+  "frame_count": 90,
+  "generation": {
+    "seed": 20260823,
+    "tool": "PIL plates + ffmpeg libx264 bitexact"
+  },
+  "loop_id": "d1_cut_graphic",
+  "replacement_program": [
+    {
+      "center_px": [
+        430,
+        110
+      ],
+      "end_frame": 89,
+      "layer_id": "d1_sign_graphic",
+      "op": "graphic_replace",
+      "replacement_png": "sprites/d1_cut_graphic/sign_replacement.png",
+      "start_frame": 50
+    },
+    {
+      "end_frame": 44,
+      "layer_id": "d1_watermark",
+      "op": "watermark_remove",
+      "rect_px": [
+        536,
+        308,
+        634,
+        356
+      ],
+      "sample_margin_px": 8,
+      "start_frame": 0
+    }
+  ],
+  "resolution": {
+    "height": 360,
+    "width": 640
+  },
+  "risk_classes": [
+    "hard_cut",
+    "semantic_graphic_replacement"
+  ],
+  "segments": [
+    {
+      "end_frame": 44,
+      "shot_id": "shot_a",
+      "start_frame": 0
+    },
+    {
+      "end_frame": 89,
+      "shot_id": "shot_b",
+      "start_frame": 45
+    }
+  ],
+  "start_time_ms": 0,
+  "time_base": "1/30"
+}

@@ -19,6 +19,8 @@ from app.adapters.renderer.nvenc import probe_nvenc, vram_bytes_via_nvidia_smi
 from app.adapters.renderer.pose_swap_adapter import PoseSwapAdapter
 from app.adapters.renderer.sprite_affine_adapter import SpriteAffineAdapter
 from app.services.renderer_contract import (
+    AffectedRegion,
+    AffineKeyframe,
     BackendBinaryMissingError,
     CapabilityDescriptor,
     RenderRequest,
@@ -59,6 +61,44 @@ def test_vram_query_returns_bytes_or_none() -> None:
 
 
 def _render_request(tmp_path: Path, route: str, clip: Path, name: str) -> RenderRequest:
+    # S09-T02-C1: renders go through the FULL typed contract — every
+    # benchmark/IT request carries a real replacement layer (or pose
+    # schedule) so the composite pipeline is what's exercised.
+    import cv2
+    import numpy as np
+
+    from app.services.renderer_contract import (
+        PoseSwapEntry,
+        ReplacementAsset,
+    )
+    from app.services.renderer_routes.composite import probe_source_timebase
+
+    asset_path = tmp_path / f"repl_{name}.png"
+    if not asset_path.is_file():
+        layer = np.zeros((48, 48, 4), dtype=np.uint8)
+        layer[:, :, 1] = 220
+        layer[:, :, 3] = 255
+        cv2.imwrite(str(asset_path), layer)
+    kwargs: dict[str, object] = {
+        "workspace_root": tmp_path,
+        "affected_region": None,
+    }
+    if route == "pose_swap":
+        pose_asset = ReplacementAsset(path=asset_path, kind="pose_state")
+        kwargs["pose_state_assets"] = {"open": pose_asset}
+        kwargs["pose_schedule"] = (
+            PoseSwapEntry(frame=4, state_id="open", asset=pose_asset),
+        )
+        kwargs["affected_region"] = AffectedRegion((0.25, 0.25, 0.5, 0.5))
+    else:
+        kwargs["replacement_asset"] = ReplacementAsset(
+            path=asset_path, kind="sprite"
+        )
+        kwargs["anchor_xy_norm"] = (0.5, 0.5)
+        kwargs["affine_keyframes"] = (
+            AffineKeyframe(frame=4),
+            AffineKeyframe(frame=15, scale=1.05, rotation_deg=2.0),
+        )
     return RenderRequest(
         request_id=f"it-{name}",
         workspace_id="ws-it",
@@ -70,6 +110,8 @@ def _render_request(tmp_path: Path, route: str, clip: Path, name: str) -> Render
         end_frame=15,
         input_media=clip,
         output_media=tmp_path / f"out_{name}.mp4",
+        source_timebase=probe_source_timebase(clip),
+        **kwargs,  # type: ignore[arg-type]
     )
 
 
@@ -141,6 +183,20 @@ def test_adapter_fails_closed_when_binary_missing(
 
     def _missing(timeout_s: float = 20.0) -> FfmpegProbe:
         return FfmpegProbe(available=False, error="simulated missing binary")
+
+    # A real tiny input media so the typed-contract helper can probe its
+    # timebase; cv2 writer keeps this independent of any ffmpeg presence.
+    import cv2
+    import numpy as np
+
+    clip = tmp_path / "clip.mp4"
+    writer = cv2.VideoWriter(
+        str(clip), cv2.VideoWriter_fourcc(*"mp4v"), 30.0, (32, 32)
+    )
+    assert writer.isOpened()
+    for i in range(20):
+        writer.write(np.full((32, 32, 3), i * 10, dtype=np.uint8))
+    writer.release()
 
     monkeypatch.setattr(eb, "probe_ffmpeg", _missing)
     adapter = PoseSwapAdapter()

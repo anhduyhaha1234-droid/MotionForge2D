@@ -1,0 +1,13 @@
+app/adapters/renderer/__init__.py text eol=lf
+app/adapters/renderer/benchmark_harness.py text eol=lf
+app/adapters/renderer/encode_base.py text eol=lf
+app/adapters/renderer/ffmpeg_binary.py text eol=lf
+app/adapters/renderer/nvenc.py text eol=lf
+app/adapters/renderer/pose_swap_adapter.py text eol=lf
+app/adapters/renderer/sprite_affine_adapter.py text eol=lf
+app/services/renderer_contract.py text eol=lf
+app/services/renderer_router.py text eol=lf
+app/services/renderer_routes/__init__.py text eol=lf
+app/services/renderer_routes/adaptive_pose_swap.py text eol=lf
+app/services/renderer_routes/benchmark_results.py text eol=lf
+app/services/renderer_routes/composite.py text eol=crlf

@@ -70,6 +70,12 @@ class ReskinConfigCreateRequest(_StrictBase):
 
     The pack_version_id is the immutable pin identity; compatibility is
     re-validated server-side against the authoritative S07 policy.
+
+    Source-Locked (TASK-SL): ``structural_lock_manifest_id`` optionally pins
+    the StructuralLockManifest; existence, hash integrity, route enum and
+    policy version are all validated server-side fail-closed. The effective
+    lock_policy_version is ALWAYS derived from the manifest — never accepted
+    from the client.
     """
 
     project_id: str = Field(..., min_length=1, max_length=36)
@@ -79,6 +85,7 @@ class ReskinConfigCreateRequest(_StrictBase):
     params: ReskinParams
     idempotency_key: str | None = Field(None, min_length=1, max_length=255)
     cast_mapping_id: str | None = Field(None, min_length=1, max_length=36)
+    structural_lock_manifest_id: str | None = Field(None, min_length=1, max_length=36)
 
 
 class ReskinParamsPatch(ReskinParams):
@@ -86,12 +93,39 @@ class ReskinParamsPatch(ReskinParams):
 
 
 class ReskinConfigUpdateRequest(_StrictBase):
-    """CAS update payload: revision is the required optimistic token."""
+    """CAS update payload: revision is the required optimistic token.
+
+    Source-Locked (TASK-SL): ``structural_lock_manifest_id`` semantics —
+    omitted/None keeps the current pin; an explicit id re-pins (fail-closed
+    server-side validation); the empty string unpins.
+    """
 
     revision: int = Field(..., ge=1)
     params: ReskinParamsPatch | None = None
     pack_version_id: str | None = Field(None, min_length=1, max_length=36)
     character_id: str | None = Field(None, min_length=1, max_length=36)
+    structural_lock_manifest_id: str | None = Field(None, max_length=36)
+
+
+class RendererRouteEvidence(BaseModel):
+    """One persisted per-segment renderer-route decision (read model).
+
+    TARGET_PROFILE §4 P0-7: route is the EXACT enum value persisted per
+    occurrence segment; anchors are normalized x/y ∈ [0,1] source-frame
+    coordinates from SegmentRenderRoute. Evidence per segment — never an
+    opaque global score.
+    """
+
+    occurrence_segment_id: str
+    route: str
+    anchor: dict[str, float]
+    start_frame: int
+    end_frame: int
+    confidence: float
+    confidence_source: str
+    reasons: list[str] = []
+    provenance: dict[str, Any] | None = None
+    structural_lock_manifest_id: str | None = None
 
 
 class ReskinConfigData(BaseModel):
@@ -106,6 +140,8 @@ class ReskinConfigData(BaseModel):
     pack_version_id: str
     params: dict[str, Any]
     idempotency_key: str | None
+    structural_lock_manifest_id: str | None
+    lock_policy_version: str | None
     revision: int
     created_at: datetime
     updated_at: datetime
@@ -124,6 +160,8 @@ class ReskinConfigData(BaseModel):
             pack_version_id=record.pack_version_id,
             params=record.params,
             idempotency_key=record.idempotency_key,
+            structural_lock_manifest_id=record.structural_lock_manifest_id,
+            lock_policy_version=record.lock_policy_version,
             revision=record.revision,
             created_at=record.created_at,
             updated_at=record.updated_at,

@@ -1,0 +1,79 @@
+{
+  "generator_sha256": "59db6875e9056079fb0bd4fdd134b344a8423633fcef6daaf163ae79fdd2de75",
+  "loops": [
+    {
+      "frame_count": 90,
+      "layer_ids": [
+        "d1_sign_graphic",
+        "d1_watermark"
+      ],
+      "loop_id": "d1_cut_graphic",
+      "manifest_path": "manifests/d1_cut_graphic.json",
+      "manifest_sha256": "fa5e1a92ab177c631744b3ad8c686ac4049ce1fff808c2da7a83ddf1d8ca056c",
+      "media_path": "media/d1_cut_graphic.mp4",
+      "media_sha256": "6208281fb6111694e510a2d7d4ff2ac6860a5131cc6e800343e39d0cd0408608",
+      "risk_classes": [
+        "hard_cut",
+        "semantic_graphic_replacement"
+      ]
+    },
+    {
+      "frame_count": 60,
+      "layer_ids": [
+        "d2_mouth_head",
+        "d2_phone"
+      ],
+      "loop_id": "d2_mouth_phone",
+      "manifest_path": "manifests/d2_mouth_phone.json",
+      "manifest_sha256": "52bb28344ee493babaa6bd374196aa721119813fbe5eea991ed6413c1a0e04b6",
+      "media_path": "media/d2_mouth_phone.mp4",
+      "media_sha256": "26d58a61e4141c84da25ed1b71792b1ad47c5bd0621cce6f7234c9e04dcd92ad",
+      "risk_classes": [
+        "mouth_expression_swap",
+        "phone_contact"
+      ]
+    },
+    {
+      "frame_count": 72,
+      "layer_ids": [
+        "d3_hero"
+      ],
+      "loop_id": "d3_rotation_bed",
+      "manifest_path": "manifests/d3_rotation_bed.json",
+      "manifest_sha256": "8f453a4364bbb0a8002ffdb8b8a59d9c0bc2a2b38077240986aad09fa0df2bfb",
+      "media_path": "media/d3_rotation_bed.mp4",
+      "media_sha256": "682191f60da960f7308a2ec565112af0b697744ec0176bf802c323826ff14219",
+      "risk_classes": [
+        "whole_body_rotation"
+      ]
+    },
+    {
+      "frame_count": 96,
+      "layer_ids": [
+        "d4_walker",
+        "d4_group_0",
+        "d4_group_1",
+        "d4_group_2"
+      ],
+      "loop_id": "d4_group_occlusion",
+      "manifest_path": "manifests/d4_group_occlusion.json",
+      "manifest_sha256": "aa5c9d143b7c7ec8ff0a9d7678320939f24f412723c1eb04c571722074a16f40",
+      "media_path": "media/d4_group_occlusion.mp4",
+      "media_sha256": "b0a707b26eeb304f97f8a54aa43c7582959869116f0fd3cc3378a95ffc3d39b6",
+      "risk_classes": [
+        "group_occlusion",
+        "hard_cut"
+      ]
+    }
+  ],
+  "risk_classes_canonical": [
+    "hard_cut",
+    "mouth_expression_swap",
+    "phone_contact",
+    "whole_body_rotation",
+    "group_occlusion",
+    "semantic_graphic_replacement"
+  ],
+  "schema_version": 1,
+  "seed": 20260823
+}

@@ -1,0 +1,138 @@
+{
+  "fixture_id": "f2_mouth_swap",
+  "fps": 30,
+  "frame_count": 60,
+  "generation": {
+    "seed": 20260823,
+    "sources": [
+      "gradients=size=640x360:rate=30:speed=0:c0=0x2a3f2c:c1=0x87a86f:seed=20260824"
+    ],
+    "tool": "ffmpeg lavfi (gradients speed=0) + Pillow sprites + libx264 bitexact"
+  },
+  "layers": [
+    {
+      "color_hint_rgb": [
+        66,
+        133,
+        244
+      ],
+      "layer_id": "torso",
+      "role": "character",
+      "z": 0
+    },
+    {
+      "layer_id": "head",
+      "role": "character_pose_state",
+      "states": [
+        "closed",
+        "open"
+      ],
+      "z": 1
+    }
+  ],
+  "metrics_applicable": [
+    "swap_error_frames",
+    "timebase_error_frames",
+    "frame_error",
+    "trajectory_median_pct",
+    "trajectory_p95_pct"
+  ],
+  "pose_layer": {
+    "center_xy": [
+      320,
+      100
+    ],
+    "layer_id": "head",
+    "sprite_size_wh": [
+      100,
+      100
+    ],
+    "templates": {
+      "closed": "head_closed_rep",
+      "open": "head_open_rep"
+    }
+  },
+  "pose_region_bbox_xywh_norm": [
+    0.484375,
+    0.311111,
+    0.03125,
+    0.055556
+  ],
+  "render_contract": {
+    "replacements": [
+      {
+        "assets_by_state": {
+          "closed": {
+            "file": "sprites/f2_mouth_swap/head_closed_rep.png",
+            "sha256": "497375315a0987067cf6a964ee10e412b6b24169d9adae31a80b399afa2bc55f"
+          },
+          "open": {
+            "file": "sprites/f2_mouth_swap/head_open_rep.png",
+            "sha256": "ceb65e7a3cf6b5bf93018ec394a0de901cd578d7642d1d4327848aee19fe532a"
+          }
+        },
+        "kind": "pose_state_sequence",
+        "layer_id": "head",
+        "placement_center_xy": [
+          320,
+          100
+        ],
+        "state_schedule": [
+          {
+            "from_frame": 0,
+            "state": "closed",
+            "to_frame": 14
+          },
+          {
+            "from_frame": 15,
+            "state": "open",
+            "to_frame": 29
+          },
+          {
+            "from_frame": 30,
+            "state": "closed",
+            "to_frame": 44
+          },
+          {
+            "from_frame": 45,
+            "state": "open",
+            "to_frame": 59
+          }
+        ]
+      }
+    ],
+    "source_plate": {
+      "frame_count": 60,
+      "path": "render_plates/f2_mouth_swap/source_plate.mp4",
+      "sha256": "23c5bd3f857b9a44f7c7ba5767ff3bd02e523fc4523a18f87a8f6f8dc02f8774"
+    }
+  },
+  "resolution": {
+    "height": 360,
+    "width": 640
+  },
+  "risk_class": "mouth_expression_swap",
+  "sprites": {
+    "head_closed_rep": "497375315a0987067cf6a964ee10e412b6b24169d9adae31a80b399afa2bc55f",
+    "head_closed_src": "899b492f8690553d5c3ebb5c8dc4073f499fce7f9e661f37c407bbe3b8608370",
+    "head_open_rep": "ceb65e7a3cf6b5bf93018ec394a0de901cd578d7642d1d4327848aee19fe532a",
+    "head_open_src": "bbb7e2568e20bfe0e15f51158b71015ec8712d9e572b67e9c566b3415946e20f"
+  },
+  "start_time_ms": 0,
+  "swaps": [
+    {
+      "expected_state": "open",
+      "swap_frame": 15
+    },
+    {
+      "expected_state": "closed",
+      "swap_frame": 30
+    },
+    {
+      "expected_state": "open",
+      "swap_frame": 45
+    }
+  ],
+  "t03_loop": "REF-R02",
+  "time_base": "1/30"
+}

@@ -177,6 +177,9 @@ S08_HEAD_TABLES = S06_HEAD_TABLES | {
     "apply_checkpoint",
     "structural_lock_manifest",
     "segment_render_route",
+    # S09-T05A correction persistence (migration b3c4d5e6f7a9): durable
+    # ``s09_correction`` archive of targeted demo-review corrections.
+    "s09_correction",
 }
 
 

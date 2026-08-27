@@ -1,12 +1,19 @@
 {
-  "schema_version": 1,
-  "policy": "s09-t00-frozen-20260823",
-  "frozen_at": "2026-08-23T18:20:00+07:00",
+  "schema_version": 3,
+  "policy": "s09-t00-i03-c1-frozen-20260824",
+  "supersedes": {
+    "policy": "s09-t00-i03-c1-frozen-20260824",
+    "schema_version": 2,
+    "v2_evidence_preserved_at": "output/s09/20260823_sprint_full/t00-i03-c1/"
+  },
+  "frozen_at": "2026-08-24T22:30:00+07:00",
+  "frozen_before": "first v3 measured run (Wave B, post J1-C2 handshake)",
   "source_of_authority": [
-    "docs/pm/sessions/S09-T00-I03-benchmark-harness/TASK.md#thresholds-frozen",
+    "docs/pm/prompts/S09_C1_FAST_TRACK_MANAGER_2026-08-24.md#5-s09-t00-i03-c1",
+    "docs/pm/reviews/S09_FULL_SPRINT_PM_REVIEW_2026-08-24.md#f2--p0",
     "docs/pm/TARGET_PROFILE_2D_SOURCE_LOCKED.md#8-reference-benchmark-gate"
   ],
-  "note": "Frozen BEFORE first measured run. Tightening allowed with evidence; loosening requires PM evidence and a versioned CompatibilityPolicy change (overlay section 8).",
+  "note": "v3 freeze BEFORE any measured run. Threshold VALUES unchanged from v1/v2 (no tuning); what changed is the harness schema: v3 measures through the PUBLIC production surface (RendererRouter.execute) and pins full provenance (route/backend/license, request contract SHA, J1 manifest SHA, encoded artifact SHA, canonical decoded frame SHA, frame count, rational fps/timebase, runtime, VRAM, sample count). Contract reject / empty sample is NOT a pass. No loosening after measurement.",
   "cut_action_error_frames_max": 1,
   "trajectory_median_pct_max": 0.5,
   "trajectory_p95_pct_max": 1.0,
@@ -16,6 +23,11 @@
   "z_order_inversions_max": 0,
   "unexplained_visibility_events_max": 0,
   "clipping_from_source_silhouette_allowed": false,
+  "required_layer_min_samples": 1,
+  "replacement_presence_ratio_min": 0.5,
+  "adversarial_source_reencode_must_fail_replacement_gate": true,
+  "reference_media_verification_status_only": "MEDIA_VERIFIED",
+  "reference_benchmark_requires": "authoritative REF-R01..R05 annotation/replacement contract",
   "determinism": {
     "same_seed_byte_identical_required": true,
     "excluded_fields": ["wall_runtime_ms_per_frame", "vram_peak_mib"]

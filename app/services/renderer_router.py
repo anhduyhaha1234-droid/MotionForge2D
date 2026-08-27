@@ -23,16 +23,16 @@ from typing import Any
 
 from app.persistence.models import RENDERER_ROUTES
 from app.services.renderer_contract import (
+    ROUTE_PRIORITY,
     BackendAdapter,
     BackendBinaryMissingError,
     BenchmarkBelowThresholdError,
     CapabilityMismatchError,
     LicenseMissingError,
-    RenderRequest,
-    RenderResult,
     RendererContractCode,
     RendererRoute,
-    ROUTE_PRIORITY,
+    RenderRequest,
+    RenderResult,
     UnknownBackendError,
     UnknownCapabilityError,
     validate_license_for_product_use,
@@ -211,6 +211,10 @@ class RendererRouter:
     # ── Execution (never crosses routes/backends silently) ───────────────
 
     def execute(self, request: RenderRequest) -> RenderResult:
+        # Exact-route dispatch (no silent fallback): routing/gate taxonomy
+        # errors surface from select_backend; the SELECTED adapter then
+        # enforces the FULL typed render contract (S09-T02-C1) inside
+        # render() BEFORE any composite/encode work — fail before success.
         adapter = self.select_backend(request)
         return adapter.render(request)
 
@@ -314,3 +318,55 @@ class RendererRouter:
         path.write_text(
             json.dumps(payload, sort_keys=True, indent=2), encoding="utf-8"
         )
+
+
+# ── S09-T02 ownership-transfer wiring (ADDITIVE ONLY — zero lines removed) ───
+#
+# TASK.md S09-T02 grants exactly ONE wiring point into this module: exposing
+# the adaptive implementation package through a deterministic factory.  The
+# factory below only ASSEMBLES the default registry; selection/override/
+# escalation semantics above are untouched and remain the single authority.
+#
+# Default composition (fail-closed, evidence-driven):
+# - pose_swap is served by the S09-T02 adaptive backend (real NVENC pipeline
+#   inherited from the verified I02 adapter + measured pose-state evidence);
+# - sprite_affine keeps the I02 backend first (unchanged behavior) with the
+#   measured-optimized variant as the second candidate on the same route;
+# - mesh_warp / part_rig / controlled_redraw stay UNREGISTERED → they raise
+#   UnknownCapabilityError (overlay: no silent fallback, no invented backends).
+
+
+def build_adaptive_default_router(
+    *,
+    evidence_dir: Path | None = None,
+    benchmark_results: Any | None = None,
+) -> RendererRouter:
+    """Assemble the S09-T02 adaptive default router.
+
+    Deterministic adapter order (route rank, then insertion): pose_swap ←
+    ``ffmpeg-nvenc-pose-swap-adaptive``; sprite_affine ← ``ffmpeg-nvenc-
+    sprite-affine`` (I02, unchanged) then ``ffmpeg-nvenc-sprite-affine-
+    optimized``.  Passing ``benchmark_results`` (a
+    ``BenchmarkResultsDocument``) records its frozen SHA inside each
+    adaptive capability descriptor for provenance; it NEVER changes route
+    semantics.
+    """
+    from app.adapters.renderer.sprite_affine_adapter import SpriteAffineAdapter
+    from app.services.renderer_routes.adaptive_pose_swap import (
+        OptimizedSpriteAffineAdapter,
+        PoseSwapAdaptiveAdapter,
+    )
+    from app.services.renderer_routes.benchmark_results import (
+        BenchmarkResultsDocument,
+    )
+
+    adaptive = PoseSwapAdaptiveAdapter()
+    optimized = OptimizedSpriteAffineAdapter()
+    if isinstance(benchmark_results, BenchmarkResultsDocument):
+        sha = benchmark_results.frozen_content_sha256
+        adaptive._benchmark_results_sha256 = sha  # provenance-only annotation
+        optimized._benchmark_results_sha256 = sha
+
+    adapters: list[BackendAdapter] = [adaptive, SpriteAffineAdapter(), optimized]
+    router = RendererRouter(adapters, evidence_dir=evidence_dir)
+    return router

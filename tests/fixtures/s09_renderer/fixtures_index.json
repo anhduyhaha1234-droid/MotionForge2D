@@ -1,0 +1,61 @@
+{
+  "fixtures": [
+    {
+      "fixture_id": "f1_hard_cut",
+      "frame_count": 90,
+      "manifest_path": "manifests/f1_hard_cut.json",
+      "manifest_sha256": "53a99c4da7e961260135b347ee79391c98c598fdbd5ef94fd9399112e4561fb7",
+      "media_path": "media/f1_hard_cut.mp4",
+      "media_sha256": "b4261e1dba2f0ee058678f9e0bd45601b569d6f209b7751448f3e66ab6ecc5f2",
+      "risk_class": "hard_cut"
+    },
+    {
+      "fixture_id": "f2_mouth_swap",
+      "frame_count": 60,
+      "manifest_path": "manifests/f2_mouth_swap.json",
+      "manifest_sha256": "ebd4e45b15cca751df1cbcf809623d92928ae8ba4716d55e9bd8fdb7e634fa68",
+      "media_path": "media/f2_mouth_swap.mp4",
+      "media_sha256": "e73660c8f050df2c18c4d64327941910719453c6d0c5c0ca1a04a4276e7850a9",
+      "risk_class": "mouth_expression_swap"
+    },
+    {
+      "fixture_id": "f3_phone_contact",
+      "frame_count": 90,
+      "manifest_path": "manifests/f3_phone_contact.json",
+      "manifest_sha256": "05640c1e9c336a2d07a3532ec8886b1c8ed8181cf388da36d2379c2aca5ed435",
+      "media_path": "media/f3_phone_contact.mp4",
+      "media_sha256": "8cecdf93fd0d4601abd980530f377ff6d7b2a6af4488bdaabb2246496a35642e",
+      "risk_class": "phone_contact"
+    },
+    {
+      "fixture_id": "f4_body_rotation",
+      "frame_count": 90,
+      "manifest_path": "manifests/f4_body_rotation.json",
+      "manifest_sha256": "68b67e4201ed63e2ec9854a9c2d68a7d7721b985c0ab8eaf82e687f4a8b904dc",
+      "media_path": "media/f4_body_rotation.mp4",
+      "media_sha256": "d1b09fff3712da05fda463ab737abef668166378d50892935de115872e552d82",
+      "risk_class": "whole_body_rotation"
+    },
+    {
+      "fixture_id": "f5_group_occlusion",
+      "frame_count": 120,
+      "manifest_path": "manifests/f5_group_occlusion.json",
+      "manifest_sha256": "106e60588c86bbbadd6f8f1e8aaf6dd3b1d2d10ad2324f545de521294b35984b",
+      "media_path": "media/f5_group_occlusion.mp4",
+      "media_sha256": "c7301c627e451b18db63358427d1738abaa3b4dff5e0d88072318b5232e25325",
+      "risk_class": "group_occlusion"
+    },
+    {
+      "fixture_id": "f6_graphic_replacement",
+      "frame_count": 60,
+      "manifest_path": "manifests/f6_graphic_replacement.json",
+      "manifest_sha256": "c42af67c8a97d5932a1bdd803a34be6381154269e0453190d3cf12546bfc561d",
+      "media_path": "media/f6_graphic_replacement.mp4",
+      "media_sha256": "93747e4642bf96526521de776ab0058b1b0238f243a5515f8304fef1e2c2d5de",
+      "risk_class": "semantic_graphic_replacement"
+    }
+  ],
+  "generator_sha256": "abd57ef1a5e1975eac83c885b43ec64be476533ed1d4c9ea68b54847948bdc2b",
+  "schema_version": 1,
+  "seed": 20260823
+}

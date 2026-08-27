@@ -19,11 +19,18 @@ from app.adapters.renderer.pose_swap_adapter import PoseSwapAdapter
 from app.adapters.renderer.sprite_affine_adapter import SpriteAffineAdapter
 from app.services.renderer_contract import (
     CapabilityDescriptor,
+    PoseSwapEntry,
     RenderRequest,
+    SourceTimebase,
     utc_now_iso,
 )
 
 __all__ = ["benchmark_wired_routes", "default_route_mapping"]
+
+#: The synthetic benchmark clip is generated at exactly 30/1 fps; the
+#: request declares that rational timebase and the render preserves it.
+_CANONICAL_FPS_BENCH_NUM = 30
+_CANONICAL_FPS_BENCH = float(_CANONICAL_FPS_BENCH_NUM)
 
 
 def _make_synthetic_clip(ffmpeg_exe: str, out_path: Path, frames: int = 24) -> None:
@@ -51,9 +58,6 @@ def _make_synthetic_clip(ffmpeg_exe: str, out_path: Path, frames: int = 24) -> N
     subprocess.run(cmd, check=True, capture_output=True, timeout=120)
 
 
-_CANONICAL_FPS_BENCH = 30.0
-
-
 def benchmark_wired_routes(
     work_dir: Path,
     *,
@@ -73,6 +77,20 @@ def benchmark_wired_routes(
     clip = work_dir / "bench_input.mp4"
     _make_synthetic_clip(ffmpeg.ffmpeg_path, clip, frames=frames)
 
+    # S09-T02-C1: the harness renders through the FULL typed contract —
+    # every request carries a real replacement asset (a green RGBA square)
+    # so the composite pipeline (not a bare re-encode) is what's measured.
+    import cv2
+    import numpy as np
+
+    from app.services.renderer_contract import ReplacementAsset
+
+    replacement = work_dir / "bench_replacement.png"
+    layer = np.zeros((64, 64, 4), dtype=np.uint8)
+    layer[:, :, 1] = 220  # green (BGR)
+    layer[:, :, 3] = 255  # opaque
+    cv2.imwrite(str(replacement), layer)
+
     results: dict[str, Any] = {
         "generated_at_utc": utc_now_iso(),
         "clip": str(clip),
@@ -86,6 +104,23 @@ def benchmark_wired_routes(
     for name, adapter in adapters:
         cap_before: CapabilityDescriptor = adapter.capability()
         out = work_dir / f"bench_{name}.mp4"
+        kwargs: dict[str, Any] = {}
+        if name == "pose_swap":
+            pose_asset = ReplacementAsset(
+                path=replacement, kind="pose_state"
+            )
+            kwargs["pose_state_assets"] = {"open": pose_asset}
+            kwargs["pose_schedule"] = (
+                PoseSwapEntry(
+                    frame=max(1, frames // 2),
+                    state_id="open",
+                    asset=pose_asset,
+                ),
+            )
+        else:
+            kwargs["replacement_asset"] = ReplacementAsset(
+                path=replacement, kind="sprite"
+            )
         request = RenderRequest(
             request_id=f"bench-{name}-{frames}f",
             workspace_id="benchmark",
@@ -97,6 +132,12 @@ def benchmark_wired_routes(
             end_frame=frames - 1,
             input_media=clip,
             output_media=out,
+            workspace_root=work_dir,
+            source_timebase=SourceTimebase(
+                fps_num=_CANONICAL_FPS_BENCH_NUM,
+                fps_den=1,
+            ),
+            **kwargs,
         )
         result = adapter.render(request)
         entry: dict[str, Any] = {
@@ -131,5 +172,6 @@ def default_route_mapping(benchmark: dict[str, Any]) -> dict[str, str]:
     for name in ("pose_swap", "sprite_affine"):
         entry = benchmark.get("routes", {}).get(name)
         if isinstance(entry, dict) and entry.get("ok") is True:
-            mapping[name] = "ffmpeg-nvenc" + ("-pose-swap" if name == "pose_swap" else "-sprite-affine")
+            suffix = "-pose-swap" if name == "pose_swap" else "-sprite-affine"
+            mapping[name] = "ffmpeg-nvenc" + suffix
     return mapping

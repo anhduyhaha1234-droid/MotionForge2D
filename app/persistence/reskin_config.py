@@ -42,6 +42,7 @@ from sqlalchemy.exc import IntegrityError, NoResultFound
 from sqlalchemy.orm import Session
 
 from app.persistence.models import (
+    RENDERER_ROUTES,
     Character,
     CharacterPackVersion,
     ObjectRole,
@@ -52,10 +53,18 @@ from app.persistence.models import (
     utc_now,
 )
 from app.persistence.project_cast import evaluate_compatibility
+from app.persistence.structural_lock import (
+    StructuralLockNotFoundError,
+    StructuralLockParamsError,
+    StructuralLockRepository,
+    canonical_manifest_json,
+)
+from app.persistence.structural_lock import manifest_hash as structural_manifest_hash
 
 __all__ = [
     "CLIP_MODES",
     "FIT_MODES",
+    "RENDERER_ROUTES",
     "ReskinConfigConflictError",
     "ReskinConfigNotFoundError",
     "ReskinConfigOwnershipError",
@@ -89,22 +98,6 @@ class ReskinConfigOwnershipError(ReskinConfigError):
 
 class ReskinConfigParamsError(ValueError):
     """params payload outside its closed domain (fail-closed validation)."""
-
-
-@dataclass(frozen=True)
-class ReskinConfigRecord:
-    id: str
-    workspace_id: str
-    project_id: str
-    object_role_id: str
-    cast_mapping_id: str | None
-    character_id: str
-    pack_version_id: str
-    params: dict[str, Any]
-    idempotency_key: str | None
-    revision: int
-    created_at: datetime
-    updated_at: datetime
 
 
 def _require_number(params: dict[str, Any], key: str) -> float:
@@ -218,6 +211,35 @@ def canonical_params_json(params: dict[str, Any]) -> str:
     return json.dumps(validate_params(params), sort_keys=True, separators=(",", ":"))
 
 
+def _as_comparable_dt(value: datetime) -> datetime:
+    """Normalize a datetime for ordering comparisons.
+
+    SQLite storage strips tzinfo, while ORM defaults may hand back aware
+    datetimes; comparing mixed naive/aware values raises TypeError. Both
+    conventions are UTC in this codebase, so dropping tzinfo is lossless for
+    ordering.
+    """
+    return value.replace(tzinfo=None) if value.tzinfo is not None else value
+
+
+@dataclass(frozen=True)
+class ReskinConfigRecord:
+    id: str
+    workspace_id: str
+    project_id: str
+    object_role_id: str
+    cast_mapping_id: str | None
+    character_id: str
+    pack_version_id: str
+    params: dict[str, Any]
+    idempotency_key: str | None
+    structural_lock_manifest_id: str | None
+    lock_policy_version: str | None
+    revision: int
+    created_at: datetime
+    updated_at: datetime
+
+
 def _map_row(row: ReskinConfig) -> ReskinConfigRecord:
     return ReskinConfigRecord(
         id=row.id,
@@ -229,6 +251,8 @@ def _map_row(row: ReskinConfig) -> ReskinConfigRecord:
         pack_version_id=row.pack_version_id,
         params=parse_params(row.params_json),
         idempotency_key=row.idempotency_key,
+        structural_lock_manifest_id=row.structural_lock_manifest_id,
+        lock_policy_version=row.lock_policy_version,
         revision=row.revision,
         created_at=row.created_at,
         updated_at=row.updated_at,
@@ -248,6 +272,8 @@ class ReskinConfigRepository:
         character_id: str,
         pack_version_id: str,
         params_json: str,
+        structural_lock_manifest_id: str | None = None,
+        lock_policy_version: str | None = None,
     ) -> None:
         if (
             existing.project_id != project_id
@@ -255,11 +281,80 @@ class ReskinConfigRepository:
             or existing.character_id != character_id
             or existing.pack_version_id != pack_version_id
             or existing.params_json != params_json
+            or existing.structural_lock_manifest_id != structural_lock_manifest_id
+            or existing.lock_policy_version != lock_policy_version
         ):
             raise ReskinConfigConflictError(
                 f"idempotency key {existing.idempotency_key!r} is already bound to "
                 "a different reskin config payload"
             )
+
+    def _resolve_lock_pin(
+        self,
+        workspace_id: str,
+        structural_lock_manifest_id: str,
+        lock_policy_version: str | None,
+    ) -> tuple[str, str]:
+        """Resolve + fail-closed validate a structural-lock pin pair.
+
+        Source-Locked contract (TASK-SL outcome 1):
+        - Manifest MUST exist in THIS workspace (cross-workspace refused,
+          404-semantics ownership error, zero mutation).
+        - Stored manifest payload MUST re-validate through the single
+          authority ``canonical_manifest_json`` and its recomputed sha256
+          MUST equal the stored ``manifest_hash`` — a tampered/corrupt
+          manifest is refused (hash-mismatch fail-closed).
+        - EVERY persisted per-segment route MUST be one of the exact five
+          ``RENDERER_ROUTES`` (single enum authority); anything else is a
+          conflict, zero mutation.
+        - A ``voided`` manifest cannot back a live contract.
+        - ``lock_policy_version``, when supplied, MUST equal the manifest's
+          own frozen ``policy_version``; when omitted it DERIVES from the
+          manifest (never invented client-side).
+        """
+        lock_repo = StructuralLockRepository(self._session)
+        try:
+            manifest = lock_repo.get_manifest(structural_lock_manifest_id, workspace_id)
+        except StructuralLockNotFoundError as err:
+            raise ReskinConfigOwnershipError(
+                f"structural lock manifest {structural_lock_manifest_id!r} not "
+                "found in this workspace"
+            ) from err
+        except StructuralLockParamsError as err:
+            # Corrupted/hand-edited manifest_json fails re-validation inside
+            # get_manifest — refuse the pin fail-closed (zero mutation).
+            raise ReskinConfigConflictError(
+                f"pinned manifest payload invalid: {err}"
+            ) from err
+        if manifest.status == "voided":
+            raise ReskinConfigConflictError(
+                f"structural lock manifest {manifest.id!r} is voided and cannot "
+                "pin a reskin config"
+            )
+        try:
+            canonical = canonical_manifest_json(manifest.manifest)
+        except StructuralLockParamsError as err:
+            raise ReskinConfigConflictError(
+                f"pinned manifest payload invalid: {err}"
+            ) from err
+        if structural_manifest_hash(canonical) != manifest.manifest_hash_hex:
+            raise ReskinConfigConflictError(
+                "pinned manifest hash mismatch: manifest_hash does not match "
+                "the stored manifest_json payload"
+            )
+        for seg in manifest.manifest.get("segments", []):
+            if seg["route"] not in RENDERER_ROUTES:
+                raise ReskinConfigConflictError(
+                    f"pinned manifest segment {seg['occurrence_segment_id']!r} "
+                    f"has route {seg['route']!r} outside {RENDERER_ROUTES}"
+                )
+        policy = manifest.policy_version
+        if lock_policy_version is not None and lock_policy_version != policy:
+            raise ReskinConfigConflictError(
+                f"lock_policy_version {lock_policy_version!r} does not match the "
+                f"pinned manifest policy_version {policy!r}"
+            )
+        return manifest.id, policy
 
     def get_config(self, config_id: str, workspace_id: str) -> ReskinConfigRecord:
         row = self._session.scalar(
@@ -309,6 +404,7 @@ class ReskinConfigRepository:
         params: dict[str, Any],
         idempotency_key: str | None = None,
         cast_mapping_id: str | None = None,
+        structural_lock_manifest_id: str | None = None,
     ) -> tuple[ReskinConfigRecord, bool]:
         if not project_id.strip():
             raise ValueError("project_id must not be empty")
@@ -325,6 +421,15 @@ class ReskinConfigRepository:
 
         # Fail-closed param validation BEFORE any DB work (zero mutation on error).
         canonical_json = canonical_params_json(params)
+
+        # Source-Locked pin resolution BEFORE any DB work: manifest existence,
+        # hash integrity, route-enum and policy-version checks all fail closed
+        # here so a bad pin can never reach the write path.
+        resolved_policy_version: str | None = None
+        if structural_lock_manifest_id is not None:
+            _, resolved_policy_version = self._resolve_lock_pin(
+                workspace_id, structural_lock_manifest_id, None
+            )
 
         self._ensure_workspace(workspace_id)
 
@@ -344,6 +449,8 @@ class ReskinConfigRepository:
                     character_id=character_id,
                     pack_version_id=pack_version_id,
                     params_json=canonical_json,
+                    structural_lock_manifest_id=structural_lock_manifest_id,
+                    lock_policy_version=resolved_policy_version,
                 )
                 return _map_row(existing), False
 
@@ -364,6 +471,8 @@ class ReskinConfigRepository:
                     character_id=character_id,
                     pack_version_id=pack_version_id,
                     params_json=canonical_json,
+                    structural_lock_manifest_id=structural_lock_manifest_id,
+                    lock_policy_version=resolved_policy_version,
                 )
                 return _map_row(natural_existing), False
             raise ReskinConfigConflictError(
@@ -415,6 +524,8 @@ class ReskinConfigRepository:
             pack_version_id=pack_version_id,
             params_json=canonical_json,
             idempotency_key=idempotency_key,
+            structural_lock_manifest_id=structural_lock_manifest_id,
+            lock_policy_version=resolved_policy_version,
         )
         try:
             with self._session.begin_nested():
@@ -436,6 +547,8 @@ class ReskinConfigRepository:
                         character_id=character_id,
                         pack_version_id=pack_version_id,
                         params_json=canonical_json,
+                        structural_lock_manifest_id=structural_lock_manifest_id,
+                        lock_policy_version=resolved_policy_version,
                     )
                     return _map_row(existing), False
             natural = self._session.scalar(
@@ -461,7 +574,18 @@ class ReskinConfigRepository:
         params: dict[str, Any] | None = None,
         pack_version_id: str | None = None,
         character_id: str | None = None,
+        structural_lock_manifest_id: str | None = None,
     ) -> ReskinConfigRecord:
+        """CAS update.
+
+        ``structural_lock_manifest_id`` semantics (Source-Locked):
+        - ``None`` → pin UNCHANGED (params/repin-only updates keep the pin).
+        - explicit id → resolve + fail-closed validate, then re-pin.
+        - the sentinel string ``""`` (empty) → UNPIN (both columns cleared).
+
+        The lock_policy_version is ALWAYS derived from the manifest on a
+        re-pin; it is never client-authoritative.
+        """
         if expected_revision < 1:
             raise ValueError("revision must be >= 1")
         current = self._session.scalar(
@@ -476,6 +600,22 @@ class ReskinConfigRepository:
             raise ReskinConfigConflictError(
                 f"stale revision {expected_revision}; current revision is {current.revision}"  # noqa: E501
             )
+
+        # Pin resolution BEFORE any DB work (fail-closed, zero mutation).
+        new_manifest_id = current.structural_lock_manifest_id
+        new_policy_version = current.lock_policy_version
+        if structural_lock_manifest_id == "":
+            new_manifest_id = None
+            new_policy_version = None
+        elif (
+            structural_lock_manifest_id is not None
+            and structural_lock_manifest_id != current.structural_lock_manifest_id
+        ):
+            _, new_policy_version = self._resolve_lock_pin(
+                workspace_id, structural_lock_manifest_id, None
+            )
+            new_manifest_id = structural_lock_manifest_id
+
         new_character_id = character_id if character_id is not None else current.character_id
         new_pack_version_id = (
             pack_version_id if pack_version_id is not None else current.pack_version_id
@@ -487,6 +627,8 @@ class ReskinConfigRepository:
             new_character_id == current.character_id
             and new_pack_version_id == current.pack_version_id
             and new_params_json == current.params_json
+            and new_manifest_id == current.structural_lock_manifest_id
+            and new_policy_version == current.lock_policy_version
         ):
             return _map_row(current)
 
@@ -515,6 +657,8 @@ class ReskinConfigRepository:
             "character_id": new_character_id,
             "pack_version_id": new_pack_version_id,
             "params_json": new_params_json,
+            "structural_lock_manifest_id": new_manifest_id,
+            "lock_policy_version": new_policy_version,
         }
         stmt = (
             update(ReskinConfig)
@@ -540,6 +684,67 @@ class ReskinConfigRepository:
                 f"stale revision {expected_revision}; current revision is {cur_rev}"
             ) from None
         return _map_row(row)
+
+    # ── Source-Locked evidence surface ───────────────────────────────────
+
+    def list_renderer_route_evidence(
+        self,
+        workspace_id: str,
+        config_id: str,
+    ) -> list[dict[str, Any]]:
+        """CompatibilityPolicy evidence per occurrence segment (NOT an opaque
+        global score).
+
+        For the manifest pinned by ``config_id`` (fail-closed ownership via
+        get_config) this returns ONLY the persisted SegmentRenderRoute
+        decisions bound to that exact pinned manifest (F6 isolation):
+
+        - rows with ``structural_lock_manifest_id IS NULL`` (legacy /
+          unattributed history) are EXCLUDED;
+        - rows bound to a DIFFERENT manifest are excluded;
+        - rows created AFTER the pin moment (config.created_at) are excluded,
+          so later route re-decisions on the same video cannot leak into the
+          frozen evidence surface.
+
+        Each entry: occurrence_segment_id, route (exact enum), normalized
+        anchor x/y ∈ [0,1], frame range, confidence + source, reasons and
+        provenance. Read-only; no mutation.
+        """
+        current = self.get_config(config_id, workspace_id)
+        if current.structural_lock_manifest_id is None:
+            return []
+        lock_repo = StructuralLockRepository(self._session)
+        manifest = lock_repo.get_manifest(
+            current.structural_lock_manifest_id, workspace_id
+        )
+        routes = lock_repo.list_routes_for_video(
+            workspace_id, current.project_id, manifest.video_item_id
+        )
+        # Normalize away tzinfo before comparing: ORM defaults persist through
+        # SQLite which strips offsets, so mixed aware/naive values must be
+        # coerced to a comparable naive form (both are UTC by convention).
+        pinned_at = _as_comparable_dt(current.created_at)
+        pinned = [
+            r
+            for r in routes
+            if r.structural_lock_manifest_id == manifest.id
+            and _as_comparable_dt(r.created_at) <= pinned_at
+        ]
+        return [
+            {
+                "occurrence_segment_id": r.occurrence_segment_id,
+                "route": r.route,
+                "anchor": {"x": r.anchor_x, "y": r.anchor_y},
+                "start_frame": r.start_frame,
+                "end_frame": r.end_frame,
+                "confidence": r.confidence,
+                "confidence_source": r.confidence_source,
+                "reasons": list(r.reasons),
+                "provenance": r.provenance,
+                "structural_lock_manifest_id": r.structural_lock_manifest_id,
+            }
+            for r in pinned
+        ]
 
     # ── internals ────────────────────────────────────────────────────────
 

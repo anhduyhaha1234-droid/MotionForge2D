@@ -82,6 +82,10 @@ export interface ReskinConfigData {
   pack_version_id: string;
   params: ReskinParams;
   idempotency_key: string | null;
+  /** Pinned StructuralLockManifest (Source-Locked), null when unpinned. */
+  structural_lock_manifest_id: string | null;
+  /** Derived server-side from the pinned manifest's policy_version. */
+  lock_policy_version: string | null;
   revision: number;
   created_at: string;
   updated_at: string;
@@ -104,6 +108,8 @@ export interface ReskinConfigCreateRequest {
   params: ReskinParams;
   idempotency_key?: string | null;
   cast_mapping_id?: string | null;
+  /** Pin a StructuralLockManifest; validated fail-closed server-side. */
+  structural_lock_manifest_id?: string | null;
 }
 
 export interface ReskinConfigUpdateRequest {
@@ -111,6 +117,23 @@ export interface ReskinConfigUpdateRequest {
   params?: ReskinParams;
   pack_version_id?: string | null;
   character_id?: string | null;
+  /** Omitted → keep pin; explicit id → re-pin; "" → unpin. */
+  structural_lock_manifest_id?: string | null;
+}
+
+/** One persisted per-segment renderer-route decision (read model). */
+export interface RendererRouteEvidence {
+  occurrence_segment_id: string;
+  /** Exact RENDERER_ROUTES enum value persisted for this segment. */
+  route: string;
+  anchor: ReskinAnchor;
+  start_frame: number;
+  end_frame: number;
+  confidence: number;
+  confidence_source: string;
+  reasons: string[];
+  provenance: Record<string, unknown> | null;
+  structural_lock_manifest_id: string | null;
 }
 
 /** Create a durable ReskinConfig pin (idempotent replay → 200 with existing row). */
@@ -155,4 +178,14 @@ export function updateReskinConfig(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(req),
   });
+}
+
+/** CompatibilityPolicy evidence per occurrence segment (read-only).
+ *  Empty list when the config has no pinned StructuralLockManifest. */
+export function getRendererRouteEvidence(
+  configId: string,
+): Promise<RendererRouteEvidence[]> {
+  return reskinFetch<RendererRouteEvidence[]>(
+    `/api/v2/reskin-configs/${configId}/renderer-route-evidence`,
+  );
 }

@@ -50,6 +50,13 @@ def _live_heads() -> list[str]:
     return list(script.get_heads())
 
 
+def _live_head() -> str:
+    """The single LIVE head — fails if the tree ever forks multi-head."""
+    heads = _live_heads()
+    assert len(heads) == 1, f"expected exactly one head, got {heads}"
+    return heads[0]
+
+
 def _revision(db: Path) -> str | None:
     with create_engine_for_path(db).connect() as conn:
         return conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
@@ -92,14 +99,22 @@ def test_single_head_and_live_down_revision() -> None:
     # The migration's declared parent MUST be discovered live, not assumed.
     assert mig.down_revision == "c9d0e1f2a3b4"
     heads = _live_heads()
-    assert heads == ["d8e9f0a1b2c3"], f"expected exactly one head, got {heads}"
+    # Single head discovered LIVE — never a hard-coded revision snapshot
+    # (a stale literal would fail the moment a newer migration stacks on top).
+    # Multi-head forks must still fail here (len check), and the discovery
+    # itself must be deterministic across two live reads.
+    assert len(heads) == 1, f"expected exactly one head, got {heads}"
+    assert heads == _live_heads(), f"inconsistent head discovery: {heads}"
 
 
 def test_upgrade_downgrade_upgrade_empty_graph_byte_identical(tmp_path: Path) -> None:
     db = tmp_path / "roundtrip.db"
     cfg = _config(db)
     command.upgrade(cfg, "head")
-    assert _revision(db) == "d8e9f0a1b2c3"
+    # Roundtrip runs THROUGH the live head (newer revisions may stack above
+    # the one under test) — both schema snapshots are taken AT the live head
+    # so the byte-identical comparison stays like-for-like.
+    assert _revision(db) == _live_head()
     sig_first = _schema_signature(db)
     assert "structural_lock_manifest" in sig_first["tables"]  # type: ignore[operator]
     assert "segment_render_route" in sig_first["tables"]  # type: ignore[operator]
@@ -123,7 +138,7 @@ def test_upgrade_downgrade_upgrade_empty_graph_byte_identical(tmp_path: Path) ->
     command.upgrade(cfg, "head")
     sig_again = _schema_signature(db)
     assert sig_again == sig_first, "re-upgraded schema differs from first upgrade"
-    assert _revision(db) == "d8e9f0a1b2c3"
+    assert _revision(db) == _live_head()
     assert _integrity(db) == "ok"
     assert _fk_violations(db) == []
 
@@ -267,7 +282,7 @@ def test_downgrade_allows_unused_empty_pins_then_roundtrip(tmp_path: Path) -> No
         row = conn.execute(text("SELECT id FROM reskin_config WHERE id='rc1'")).first()
         assert row is not None, "downgrade must not touch pre-existing data rows"
     command.upgrade(cfg, "head")
-    assert _revision(db) == "d8e9f0a1b2c3"
+    assert _revision(db) == _live_head()
     assert _fk_violations(db) == []
 
 

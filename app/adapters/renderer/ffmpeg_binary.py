@@ -26,7 +26,7 @@ def _candidate_dirs() -> tuple[Path, ...]:
     if from_shutil:
         parent = Path(from_shutil).parent
         return (parent, *dirs)
-    return tuple(dirs)  # type: ignore[arg-type]
+    return tuple(dirs)
 
 
 @dataclass(frozen=True)

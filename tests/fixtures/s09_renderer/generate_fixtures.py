@@ -34,6 +34,7 @@ import hashlib
 import json
 import math
 import random
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -96,9 +97,7 @@ def read_lavfi(spec: str, frames: int) -> np.ndarray:
     expected = frames * H * W * 3
     buf = proc.stdout
     if len(buf) < expected:
-        raise RuntimeError(
-            f"lavfi source {spec!r} produced {len(buf)} bytes, need {expected}"
-        )
+        raise RuntimeError(f"lavfi source {spec!r} produced {len(buf)} bytes, need {expected}")
     arr = np.frombuffer(buf[:expected], dtype=np.uint8).reshape(frames, H, W, 3)
     return arr.copy()
 
@@ -172,18 +171,28 @@ def draw_character(palette: dict[str, str], seed: int, variant: str = "base") ->
 def draw_phone(palette: dict[str, str]) -> Image.Image:
     img = Image.new("RGBA", (56, 96), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    d.rounded_rectangle((2, 2, 54, 94), radius=10, fill=palette["shell"], outline=palette["ink"], width=4)
+    d.rounded_rectangle(
+        (2, 2, 54, 94), radius=10, fill=palette["shell"], outline=palette["ink"], width=4
+    )
     d.rectangle((10, 14, 46, 78), fill=palette["screen"])
     return img
 
 
 def draw_pillar(palette: dict[str, str]) -> Image.Image:
-    """Full-height foreground occluder: hides a crossing character entirely."""
-    img = Image.new("RGBA", (130, 360), (0, 0, 0, 0))
+    """Full-height foreground occluder: hides a crossing character entirely.
+
+    J1-C2-v2 geometry: char_a's rep sprite is 164 wide and its walk crosses
+    x 222..522 during the hidden window [28,45]; a 130px pillar can never
+    fully cover that (the old window only passed because the legacy
+    compositor stretched the occluder full-frame).  The pillar is now 310px
+    wide with an opaque core x 4..306 (abs 221..523 when centered at 372),
+    so the hide window is geometrically true under per-region placement.
+    """
+    img = Image.new("RGBA", (310, 360), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    d.rectangle((10, 0, 120, 360), fill=palette["stone"], outline=palette["ink"], width=4)
+    d.rectangle((4, 0, 306, 360), fill=palette["stone"], outline=palette["ink"], width=4)
     for y in range(30, 360, 60):
-        d.line((16, y, 114, y), fill=palette["ink"], width=2)
+        d.line((16, y, 294, y), fill=palette["ink"], width=2)
     return img
 
 
@@ -191,7 +200,9 @@ def draw_sign(palette: dict[str, str]) -> Image.Image:
     """Semantic graphic: card with abstract text bars (story-equivalent)."""
     img = Image.new("RGBA", (180, 110), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    d.rounded_rectangle((2, 2, 178, 108), radius=8, fill=palette["card"], outline=palette["ink"], width=4)
+    d.rounded_rectangle(
+        (2, 2, 178, 108), radius=8, fill=palette["card"], outline=palette["ink"], width=4
+    )
     y = 20
     for wdt in (140, 120, 132, 90):
         d.rounded_rectangle((16, y, 16 + wdt, y + 10), radius=4, fill=palette["bars"])
@@ -202,8 +213,12 @@ def draw_sign(palette: dict[str, str]) -> Image.Image:
 def draw_bed(palette: dict[str, str]) -> Image.Image:
     img = Image.new("RGBA", (300, 120), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    d.rounded_rectangle((4, 30, 296, 96), radius=14, fill=palette["mattress"], outline=palette["ink"], width=4)
-    d.rounded_rectangle((4, 8, 84, 60), radius=12, fill=palette["pillow"], outline=palette["ink"], width=4)
+    d.rounded_rectangle(
+        (4, 30, 296, 96), radius=14, fill=palette["mattress"], outline=palette["ink"], width=4
+    )
+    d.rounded_rectangle(
+        (4, 8, 84, 60), radius=12, fill=palette["pillow"], outline=palette["ink"], width=4
+    )
     return img
 
 
@@ -217,7 +232,9 @@ def draw_watermark(palette: dict[str, str]) -> Image.Image:
     return img
 
 
-def make_replacement(sprite: Image.Image, hue_shift: tuple[int, int, int], seed: int) -> Image.Image:
+def make_replacement(
+    sprite: Image.Image, hue_shift: tuple[int, int, int], seed: int
+) -> Image.Image:
     """Recolor + slightly larger silhouette replacement asset (pose_swap route).
 
     The alpha grows by 2px on every side (MaxFilter) so a route that clips the
@@ -232,7 +249,9 @@ def make_replacement(sprite: Image.Image, hue_shift: tuple[int, int, int], seed:
         channel = rgb[:, :, c]
         channel[mask] = np.clip(channel[mask].astype(np.int16) + hue_shift[c], 0, 255)
     grown_alpha = sprite.split()[3].filter(ImageFilter.MaxFilter(5))
-    out = Image.merge("RGBA", (*[Image.fromarray(rgb[:, :, c].astype(np.uint8)) for c in range(3)], grown_alpha))
+    out = Image.merge(
+        "RGBA", (*[Image.fromarray(rgb[:, :, c].astype(np.uint8)) for c in range(3)], grown_alpha)
+    )
     rng = random.Random(seed)
     _speckle(out, rng, (255, 255, 255), 24)
     return out
@@ -269,7 +288,11 @@ PHONE_PAL = {
 }
 PILLAR_PAL = {"stone": (150, 152, 160, 255), "ink": (28, 30, 36, 255)}
 SIGN_PAL = {"card": (245, 240, 225, 255), "bars": (52, 78, 121, 255), "ink": (30, 30, 30, 255)}
-BED_PAL = {"mattress": (222, 226, 235, 255), "pillow": (250, 250, 250, 255), "ink": (40, 44, 52, 255)}
+BED_PAL = {
+    "mattress": (222, 226, 235, 255),
+    "pillow": (250, 250, 250, 255),
+    "ink": (40, 44, 52, 255),
+}
 WM_PAL = {"mark": (128, 128, 128, 165)}
 REPLACEMENT_SHIFT = (70, -35, 95)
 
@@ -277,7 +300,9 @@ REPLACEMENT_SHIFT = (70, -35, 95)
 # ── composition helpers ──────────────────────────────────────────────────────
 
 
-def compose(bg: Image.Image, sprite: Image.Image, center: tuple[int, int], angle: float = 0.0) -> Image.Image:
+def compose(
+    bg: Image.Image, sprite: Image.Image, center: tuple[int, int], angle: float = 0.0
+) -> Image.Image:
     """Alpha-composite sprite rotated by `angle` deg with center at `center`."""
     layer = sprite
     if angle % 360 != 0.0:
@@ -289,7 +314,9 @@ def compose(bg: Image.Image, sprite: Image.Image, center: tuple[int, int], angle
     return out
 
 
-def lin(start: tuple[int, int], end: tuple[int, int], frames: list[int], f0: int, f1: int) -> dict[int, tuple[int, int]]:
+def lin(
+    start: tuple[int, int], end: tuple[int, int], frames: list[int], f0: int, f1: int
+) -> dict[int, tuple[int, int]]:
     """Linear interpolation table over inclusive frame range [f0, f1]."""
     span = max(1, f1 - f0)
     return {
@@ -306,21 +333,66 @@ def const(pos: tuple[int, int], frames: list[int]) -> dict[int, tuple[int, int]]
     return {f: pos for f in frames}
 
 
+def emit_source_plate(out: Path, fid: str, frames_rgb: np.ndarray) -> dict[str, Any]:
+    """Encode the replacement-free SOURCE plate consumed by the v2 renderer.
+
+    The plate is the renderer's input scene (background + non-replaced
+    elements), encoded with the same bitexact settings as the fixture media so
+    hashes stay stable across regenerations. The v2 benchmark measures the
+    renderer's OUTPUT against ground truth; this plate is what the renderer
+    actually receives as source input (F2 remediation).
+    """
+    pdir = out / "render_plates" / fid
+    pdir.mkdir(parents=True, exist_ok=True)
+    ppath = pdir / "source_plate.mp4"
+    encode_mp4(frames_rgb, ppath)
+    return {
+        "path": f"render_plates/{fid}/source_plate.mp4",
+        "sha256": sha256_file(ppath),
+        "frame_count": int(frames_rgb.shape[0]),
+    }
+
+
+def static_plate_frames(bg_frame: np.ndarray, n: int) -> np.ndarray:
+    """Repeat a static background frame n times for plate encoding."""
+    return np.repeat(bg_frame[0:1], n, axis=0)
+
+
 # ── fixture builders ─────────────────────────────────────────────────────────
 
 
 def build_f1(out: Path, seed: int) -> tuple[dict[str, Any], dict[str, str]]:
-    """Hard cut: static gradient segment A -> moving testsrc2 segment B at 45."""
+    """Hard cut + a typed replacement that must survive the cut.
+
+    Segment A (0..44): static gradient with a static sign graphic; segment B
+    (45..89): moving testsrc2 with the SAME sign at its second position. The
+    sign is the typed ``prop_trajectory`` replacement the renderer composites;
+    the hard cut at 45 is preserved by the plate itself so the route must keep
+    cut semantics while placing both sign instances.
+    """
     n, cut = 90, 45
     # gradients has seed=-1 (random) by default -> pin it for determinism
     spec_a = f"gradients=size={W}x{H}:rate={FPS}:speed=0:c0=0x20304a:c1=0x5878a0:seed={seed}"
     seg_a = read_lavfi(spec_a, cut)
     seg_b = read_lavfi(f"testsrc2=size={W}x{H}:rate={FPS}", n - cut)
     frames = np.concatenate([seg_a, seg_b], axis=0)
+    sign = draw_sign(SIGN_PAL)
+    rep_sign = make_replacement(sign, REPLACEMENT_SHIFT, seed + 30)
+    all_f = list(range(n))
+    sign_pos: dict[int, tuple[int, int]] = {}
+    sign_pos.update(const((140, 90), [f for f in all_f if f < cut]))
+    sign_pos.update(const((480, 250), [f for f in all_f if f >= cut]))
     media = out / "media"
     media.mkdir(parents=True, exist_ok=True)
     path = media / "f1_hard_cut.mp4"
     encode_mp4(frames, path)
+    spr_dir = out / "sprites" / "f1_hard_cut"
+    spr_dir.mkdir(parents=True, exist_ok=True)
+    hashes: dict[str, str] = {}
+    for name, im in (("sign_src", sign), ("sign_rep", rep_sign)):
+        p = spr_dir / f"{name}.png"
+        im.save(p)
+        hashes[name] = sha256_file(p)
     manifest = {
         "fixture_id": "f1_hard_cut",
         "risk_class": "hard_cut",
@@ -340,9 +412,37 @@ def build_f1(out: Path, seed: int) -> tuple[dict[str, Any], dict[str, str]]:
             {"shot_id": "shot_a", "start_frame": 0, "end_frame": cut - 1},
             {"shot_id": "shot_b", "start_frame": cut, "end_frame": n - 1},
         ],
+        # v2 render contract: renderer receives source_plate.mp4 + this
+        # replacement spec and must produce rendered_output.mp4.  C2-PREP:
+        # f1 carries a TYPED replacement (sign graphic) whose position jumps
+        # at the cut -- the route must place both instances while the plate
+        # preserves the hard-cut segment structure.
+        "render_contract": {
+            "source_plate": emit_source_plate(out, "f1_hard_cut", frames),
+            "replacements": [
+                {
+                    "layer_id": "sign",
+                    "kind": "prop_trajectory",
+                    "assets_by_state": {
+                        "default": {
+                            "file": "sprites/f1_hard_cut/sign_rep.png",
+                            "sha256": hashes["sign_rep"],
+                        }
+                    },
+                    "positions_by_frame": {
+                        str(k): list(v) for k, v in sign_pos.items()
+                    },
+                }
+            ],
+            "note": (
+                "cut/segmentation fixture: the typed sign replacement must "
+                "land on both sides of the cut; cut semantics live in the "
+                "plate itself"
+            ),
+        },
         "metrics_applicable": ["cut_error_frames", "timebase_error_frames", "frame_error"],
     }
-    hashes = {"media": sha256_file(path)}
+    hashes["media"] = sha256_file(path)
     return manifest, hashes
 
 
@@ -361,7 +461,13 @@ def build_f2(out: Path, seed: int) -> tuple[dict[str, Any], dict[str, str]]:
     for f in range(n):
         open_state = (f // 15) % 2 == 1
         if f > 0 and (f % 15) == 0:
-            swap_plan.append({"swap_frame": f, "from_state": "closed", "to_state": "open" if open_state else "closed"})
+            swap_plan.append(
+                {
+                    "swap_frame": f,
+                    "from_state": "closed",
+                    "to_state": "open" if open_state else "closed",
+                }
+            )
         base = Image.fromarray(bg_frames[0]).convert("RGBA")
         # torso stays; head swaps between closed/open variants (pose_swap)
         torso = draw_character(PALETTE_A, seed, variant="closed").crop((0, 90, 160, 260))
@@ -384,6 +490,8 @@ def build_f2(out: Path, seed: int) -> tuple[dict[str, Any], dict[str, str]]:
         p = spr_dir / f"{name}.png"
         im.save(p)
         heads[name] = sha256_file(p)
+    # v2 source plate: background + torso WITHOUT the swappable head
+    plate = emit_source_plate(out, "f2_mouth_swap", static_plate_frames(bg_frames, n))
     manifest = {
         "fixture_id": "f2_mouth_swap",
         "risk_class": "mouth_expression_swap",
@@ -399,8 +507,18 @@ def build_f2(out: Path, seed: int) -> tuple[dict[str, Any], dict[str, str]]:
             "seed": seed,
         },
         "layers": [
-            {"layer_id": "torso", "role": "character", "z": 0, "color_hint_rgb": list(PALETTE_A["body"][:3])},
-            {"layer_id": "head", "role": "character_pose_state", "z": 1, "states": ["closed", "open"]},
+            {
+                "layer_id": "torso",
+                "role": "character",
+                "z": 0,
+                "color_hint_rgb": list(PALETTE_A["body"][:3]),
+            },
+            {
+                "layer_id": "head",
+                "role": "character_pose_state",
+                "z": 1,
+                "states": ["closed", "open"],
+            },
         ],
         "swaps": [
             {"swap_frame": 15, "expected_state": "open"},
@@ -413,6 +531,38 @@ def build_f2(out: Path, seed: int) -> tuple[dict[str, Any], dict[str, str]]:
             0.03125,
             0.055556,
         ],
+        "pose_layer": {
+            "layer_id": "head",
+            "center_xy": [center[0], center[1] - 50],
+            "sprite_size_wh": [head_closed.width, head_closed.height],
+            "templates": {"open": "head_open_rep", "closed": "head_closed_rep"},
+        },
+        "render_contract": {
+            "source_plate": plate,
+            "replacements": [
+                {
+                    "layer_id": "head",
+                    "kind": "pose_state_sequence",
+                    "assets_by_state": {
+                        "closed": {
+                            "file": "sprites/f2_mouth_swap/head_closed_rep.png",
+                            "sha256": heads["head_closed_rep"],
+                        },
+                        "open": {
+                            "file": "sprites/f2_mouth_swap/head_open_rep.png",
+                            "sha256": heads["head_open_rep"],
+                        },
+                    },
+                    "state_schedule": [
+                        {"from_frame": 0, "to_frame": 14, "state": "closed"},
+                        {"from_frame": 15, "to_frame": 29, "state": "open"},
+                        {"from_frame": 30, "to_frame": 44, "state": "closed"},
+                        {"from_frame": 45, "to_frame": 59, "state": "open"},
+                    ],
+                    "placement_center_xy": [center[0], center[1] - 50],
+                }
+            ],
+        },
         "sprites": heads,
         "metrics_applicable": [
             "swap_error_frames",
@@ -470,7 +620,9 @@ def build_f3(out: Path, seed: int) -> tuple[dict[str, Any], dict[str, str]]:
         "time_base": "1/30",
         "start_time_ms": 0,
         "generation": {
-            "tool": "ffmpeg lavfi (gradients speed=0, seed-pinned) + Pillow sprites + libx264 bitexact",
+            "tool": (
+                "ffmpeg lavfi (gradients speed=0, seed-pinned) + Pillow sprites + libx264 bitexact"
+            ),
             "sources": [spec],
             "seed": seed,
         },
@@ -479,8 +631,14 @@ def build_f3(out: Path, seed: int) -> tuple[dict[str, Any], dict[str, str]]:
             {"layer_id": "phone", "role": "prop", "z": 1},
         ],
         "trajectories": [
-            {"layer_id": "phone", "positions_by_frame": {str(k): list(v) for k, v in phone_traj.items()}},
-            {"layer_id": "character", "positions_by_frame": {str(k): list(v) for k, v in char_pos.items()}},
+            {
+                "layer_id": "phone",
+                "positions_by_frame": {str(k): list(v) for k, v in phone_traj.items()},
+            },
+            {
+                "layer_id": "character",
+                "positions_by_frame": {str(k): list(v) for k, v in char_pos.items()},
+            },
         ],
         "contacts": [
             {
@@ -491,6 +649,34 @@ def build_f3(out: Path, seed: int) -> tuple[dict[str, Any], dict[str, str]]:
                 "expected_error_pct_of_diagonal_max": round(6.0 / diag * 100, 6),
             }
         ],
+        "render_contract": {
+            "source_plate": emit_source_plate(
+                out, "f3_phone_contact", static_plate_frames(bg_frames, n)
+            ),
+            # plate = background ONLY; the renderer composites BOTH the
+            # character (static trajectory) and the phone replacement
+            "plate_layers": [
+                {
+                    "layer_id": "character",
+                    "file": "sprites/f3_phone_contact/char_rep.png",
+                    "sha256": hashes["char_rep"],
+                    "positions_by_frame": {str(k): list(v) for k, v in char_pos.items()},
+                }
+            ],
+            "replacements": [
+                {
+                    "layer_id": "phone",
+                    "kind": "prop_trajectory",
+                    "assets_by_state": {
+                        "default": {
+                            "file": "sprites/f3_phone_contact/phone.png",
+                            "sha256": hashes["phone"],
+                        }
+                    },
+                    "positions_by_frame": {str(k): list(v) for k, v in phone_traj.items()},
+                }
+            ],
+        },
         "sprites": hashes,
         "metrics_applicable": [
             "trajectory_median_pct",
@@ -528,7 +714,9 @@ def build_f4(out: Path, seed: int) -> tuple[dict[str, Any], dict[str, str]]:
             ang, sc = 90.0, 1.12
         gt_rot[f] = ang
         gt_scale[f] = sc
-        spr = rep_char.resize((max(1, round(rep_char.width * sc)), max(1, round(rep_char.height * sc))))
+        spr = rep_char.resize(
+            (max(1, round(rep_char.width * sc)), max(1, round(rep_char.height * sc)))
+        )
         base = compose(base, spr, (220, 190), angle=ang)
         frames.append(np.asarray(base.convert("RGB"), dtype=np.uint8))
     media = out / "media"
@@ -565,21 +753,63 @@ def build_f4(out: Path, seed: int) -> tuple[dict[str, Any], dict[str, str]]:
             "pivot_xy": [220, 190],
             "rotation_deg_by_frame": {str(k): v for k, v in gt_rot.items()},
             "scale_by_frame": {str(k): v for k, v in gt_scale.items()},
+            # declared segment-entry transform (route input contract, same as
+            # SegmentRenderRoute anchors): motion starts from identity
+            "start_rotation_deg": 0.0,
+            "start_scale": 1.0,
             "source_basis_scale": 1.0,
             "max_scale": 1.12,
         },
         "contacts": [
             {
-                "name": "body_to_bed_final",
+                "name": "body_rest_center_final",
                 "layer_id": "body",
                 "active_frames": [85, 86, 87, 88, 89],
-                "anchor_xy_norm": [round(340 / W, 6), round(262 / H, 6)],
-                "expected_error_pct_of_diagonal_max": round(8.0 / math.hypot(W, H) * 100, 6),
+                "anchor_xy_norm": [round(220 / W, 6), round(190 / H, 6)],
+                "expected_error_pct_of_diagonal_max": round(6.0 / math.hypot(W, H) * 100, 6),
             }
         ],
         "clipping_probe": {
-            "purpose": "detect reuse-of-source-silhouette clipping (scale 1.12 > basis 1.0)",
+            "purpose": (
+                "asset-level audit: would a route that reuses the SOURCE "
+                "silhouette lose replacement content at max declared scale? "
+                "Detector ships in the harness and is unit-validated; it "
+                "fails only routes declared to perform silhouette reuse."
+            ),
             "min_clipped_pixels_for_fail": 25,
+            "applies_to_routes": [],
+        },
+        "render_contract": {
+            "source_plate": emit_source_plate(
+                out, "f4_body_rotation", static_plate_frames(bg_frames, n)
+            ),
+            # plate = background + bed; the renderer composites the rotating
+            # body replacement from the motion contract below
+            "plate_layers": [
+                {
+                    "layer_id": "bed",
+                    "file": "sprites/f4_body_rotation/bed.png",
+                    "sha256": hashes["bed"],
+                    "center_xy": [430, 260],
+                }
+            ],
+            "replacements": [
+                {
+                    "layer_id": "body",
+                    "kind": "affine_keyframes",
+                    "assets_by_state": {
+                        "default": {
+                            "file": "sprites/f4_body_rotation/char_rep.png",
+                            "sha256": hashes["char_rep"],
+                        }
+                    },
+                    "placement_center_xy": [220, 190],
+                    "rotation_deg_by_frame": {str(k): v for k, v in gt_rot.items()},
+                    "scale_by_frame": {str(k): v for k, v in gt_scale.items()},
+                    "start_rotation_deg": 0.0,
+                    "start_scale": 1.0,
+                }
+            ],
         },
         "sprites": hashes,
         "metrics_applicable": [
@@ -594,6 +824,29 @@ def build_f4(out: Path, seed: int) -> tuple[dict[str, Any], dict[str, str]]:
         ],
     }
     return manifest, {"media": sha256_file(path)}
+
+
+def emit_f5_plate(out: Path, seed: int) -> dict[str, Any]:
+    """Build + encode the f5 source plate: background + pillar + charB.
+
+    charA is the replacement layer the renderer must composite BEHIND the
+    pillar (z_order), so it is deliberately absent from the plate.
+    """
+    n = 120
+    bg_frames = read_lavfi(f"smptebars=size={W}x{H}:rate={FPS}", 1)
+    pal_b = dict(PALETTE_A)
+    pal_b["body"] = (214, 93, 46, 255)
+    pal_b["legs"] = (170, 70, 30, 255)
+    char_b = draw_character(pal_b, seed + 12)
+    rep_b = make_replacement(char_b, (40, -60, 70), seed + 14)
+    pillar = draw_pillar(PILLAR_PAL)
+    frames: list[np.ndarray] = []
+    for _ in range(n):
+        base = Image.fromarray(bg_frames[0]).convert("RGBA")
+        base = compose(base, pillar, (372, 180))
+        base = compose(base, rep_b, (100, 205))
+        frames.append(np.asarray(base.convert("RGB"), dtype=np.uint8))
+    return emit_source_plate(out, "f5_group_occlusion", np.stack(frames))
 
 
 def build_f5(out: Path, seed: int) -> tuple[dict[str, Any], dict[str, str]]:
@@ -616,7 +869,11 @@ def build_f5(out: Path, seed: int) -> tuple[dict[str, Any], dict[str, str]]:
     a_traj: dict[int, tuple[int, int]] = {}
     a_traj.update(lin((80, 200), (560, 200), all_f, 0, 79))
     a_traj.update(const((560, 200), [f for f in all_f if f >= 80]))
-    b_traj = const((480, 205), all_f)
+    # charB stands LEFT of the pillar (span [18,182]) so the pillar rect
+    # [221,523] never covers it: with the v2 sandwich order the occluder
+    # draws above ALL plate content inside the window, so any overlap would
+    # wrongly hide char_b.  char_b must stay visible per its GT intervals.
+    b_traj = const((100, 205), all_f)
     hide_lo, hide_hi = 28, 45
     overlap_lo, overlap_hi = 24, 49
     frames: list[np.ndarray] = []
@@ -625,7 +882,7 @@ def build_f5(out: Path, seed: int) -> tuple[dict[str, Any], dict[str, str]]:
         ax, ay = a_traj[f]
         if not (hide_lo <= f <= hide_hi):
             base = compose(base, rep_a, (ax, ay))
-        base = compose(base, pillar, (320, 180))
+        base = compose(base, pillar, (372, 180))
         base = compose(base, rep_b, b_traj[f])
         frames.append(np.asarray(base.convert("RGB"), dtype=np.uint8))
     media = out / "media"
@@ -664,9 +921,19 @@ def build_f5(out: Path, seed: int) -> tuple[dict[str, Any], dict[str, str]]:
             {"layer_id": "pillar", "role": "foreground_occluder", "z": 1},
             {"layer_id": "char_b", "role": "character", "z": 2},
         ],
+        # v2 REQUIRED coverage: every layer below must have measured samples
+        # for its applicable metrics -- an empty/unmapped template is
+        # UNKNOWN/FAIL, never an implicit pass (F2 remediation)
+        "required_layers": ["char_a", "char_b", "pillar"],
         "trajectories": [
-            {"layer_id": "char_a", "positions_by_frame": {str(k): list(v) for k, v in a_traj.items()}},
-            {"layer_id": "char_b", "positions_by_frame": {str(k): list(v) for k, v in b_traj.items()}},
+            {
+                "layer_id": "char_a",
+                "positions_by_frame": {str(k): list(v) for k, v in a_traj.items()},
+            },
+            {
+                "layer_id": "char_b",
+                "positions_by_frame": {str(k): list(v) for k, v in b_traj.items()},
+            },
         ],
         "visibility": [
             {"layer_id": "char_a", "intervals": [[0, hide_lo - 1], [hide_hi + 1, n - 1]]},
@@ -679,13 +946,67 @@ def build_f5(out: Path, seed: int) -> tuple[dict[str, Any], dict[str, str]]:
                 "below": "char_a",
                 "frames": [overlap_lo, overlap_hi],
                 "ambiguous_frames": [
-                    f
-                    for f in range(overlap_lo, overlap_hi + 1)
-                    if not (hide_lo <= f <= hide_hi)
+                    f for f in range(overlap_lo, overlap_hi + 1) if not (hide_lo <= f <= hide_hi)
                 ],
             },
             {"above": "char_b", "below": "pillar", "frames": [0, n - 1]},
         ],
+        "render_contract": {
+            # plate = background + charB (charA is the replacement; the pillar
+            # travels with the request as a typed OCCLUDER so the renderer
+            # must honor the per-frame z-order below -- C2-PREP)
+            "source_plate_source_frames": emit_f5_plate(out, seed),
+            "replacements": [
+                {
+                    "layer_id": "char_a",
+                    "kind": "prop_trajectory",
+                    "assets_by_state": {
+                        "default": {
+                            "file": "sprites/f5_group_occlusion/char_a_rep.png",
+                            "sha256": hashes["char_a_rep"],
+                        }
+                    },
+                    "positions_by_frame": {str(k): list(v) for k, v in a_traj.items()},
+                    "z": 0,
+                }
+            ],
+            # C2-PREP (F1): typed occluders + EXPECTED per-frame layer order.
+            # The renderer receives the pillar as an occluder asset and the
+            # z directive ``replacement BELOW pillar`` exactly over the
+            # hidden window 28..45; outside that window no layer_order entry
+            # is active, so the pillar drawn by the request only appears in
+            # that window (the plate itself never carries the pillar -- the
+            # GT media does, matching the original scene).
+            "occluders": [
+                {
+                    "layer_id": "pillar",
+                    "file": "sprites/f5_group_occlusion/pillar.png",
+                    "sha256": hashes["pillar"],
+                    "kind": "sprite",
+                }
+            ],
+            # J1-C2-v2 per-region occluder placement: pillar sprite is
+            # 310x360 centered at (372,180) -> opaque core abs x 221..523,
+            # full height (normalized 0.3390625, 0.0, 0.484375, 1.0).
+            # Without a region the legacy compositor stretches the occluder
+            # over the WHOLE frame, which would also cover char_b inside
+            # the hidden window.
+            "occluder_regions": {
+                "pillar": [217 / W, 0.0, 310 / W, 1.0]
+            },
+            "expected_layer_order": [
+                {
+                    "frame_from": hide_lo,
+                    "frame_to": hide_hi,
+                    "below": "char_a",
+                    "above": "pillar",
+                    "note": (
+                        "char_a replacement must render BEHIND the pillar "
+                        "occluder inside the hidden window"
+                    ),
+                }
+            ],
+        },
         "sprites": hashes,
         "metrics_applicable": [
             "z_order_inversions",
@@ -747,12 +1068,54 @@ def build_f6(out: Path, seed: int) -> tuple[dict[str, Any], dict[str, str]]:
             {"layer_id": "watermark", "role": "source_only_overlay", "z": 9},
         ],
         "graphics": [
-            {"layer_id": "sign", "bbox_xywh_norm": [round(110 / W, 6), round(65 / H, 6), round(180 / W, 6), round(110 / H, 6)]},
-            {"layer_id": "watermark", "source_only": True, "must_be_absent": True, "bbox_xywh_norm": [round(536 / W, 6), round(306 / H, 6), round(90 / W, 6), round(40 / H, 6)]},
+            {
+                "layer_id": "sign",
+                "bbox_xywh_norm": [
+                    round(110 / W, 6),
+                    round(65 / H, 6),
+                    round(180 / W, 6),
+                    round(110 / H, 6),
+                ],
+            },
+            {
+                "layer_id": "watermark",
+                "source_only": True,
+                "must_be_absent": True,
+                "bbox_xywh_norm": [
+                    round(536 / W, 6),
+                    round(306 / H, 6),
+                    round(90 / W, 6),
+                    round(40 / H, 6),
+                ],
+            },
         ],
         "trajectories": [
-            {"layer_id": "sign", "positions_by_frame": {str(k): list(v) for k, v in sign_pos.items()}}
+            {
+                "layer_id": "sign",
+                "positions_by_frame": {str(k): list(v) for k, v in sign_pos.items()},
+            }
         ],
+        "render_contract": {
+            # plate = background only; renderer composites the sign
+            # replacement. The source-only watermark must NOT appear in any
+            # rendered output (must_be_absent).
+            "source_plate": emit_source_plate(
+                out, "f6_graphic_replacement", static_plate_frames(bg_frames, n)
+            ),
+            "replacements": [
+                {
+                    "layer_id": "sign",
+                    "kind": "prop_trajectory",
+                    "assets_by_state": {
+                        "default": {
+                            "file": "sprites/f6_graphic_replacement/sign_rep.png",
+                            "sha256": hashes["sign_rep"],
+                        }
+                    },
+                    "positions_by_frame": {str(k): list(v) for k, v in sign_pos.items()},
+                }
+            ],
+        },
         "sprites": hashes,
         "metrics_applicable": [
             "graphic_present_frames_ratio",
@@ -796,6 +1159,10 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     out = args.out.resolve()
     (out / "manifests").mkdir(parents=True, exist_ok=True)
+    # frozen thresholds travel WITH the fixture set so a harness pointed at
+    # this directory freezes against the exact same bytes
+    thr_src = Path(__file__).resolve().parent / "thresholds.json"
+    shutil.copyfile(thr_src, out / "thresholds.json")
     index: dict[str, Any] = {"schema_version": 1, "seed": args.seed, "fixtures": []}
     gen_src = Path(__file__).read_bytes()
     index["generator_sha256"] = hashlib.sha256(gen_src).hexdigest()

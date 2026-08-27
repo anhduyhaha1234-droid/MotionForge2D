@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Boxes, FolderOpen, Home, Radio, UploadCloud, Users } from "lucide-react";
+import { Boxes, FolderOpen, Home, Radio, Sparkles, UploadCloud, Users } from "lucide-react";
 import { api } from "@/lib/api";
 
 const items = [
@@ -13,6 +13,7 @@ const items = [
   { href: "/projects", label: "Dự án", icon: FolderOpen },
   { href: "/object-gallery", label: "Thư viện đối tượng", icon: Boxes },
   { href: "/characters", label: "Thư viện nhân vật", icon: Users },
+  { href: "/demo-compare", label: "So sánh demo", icon: Sparkles },
 ];
 
 export function AppNav() {

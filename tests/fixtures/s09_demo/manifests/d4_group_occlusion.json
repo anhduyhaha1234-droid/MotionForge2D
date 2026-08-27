@@ -1,0 +1,114 @@
+{
+  "annotations": {
+    "occlusion": {
+      "hidden_window_frames": [
+        24,
+        40
+      ],
+      "occluder": "pillar",
+      "occluder_rect_px": [
+        270,
+        0,
+        400,
+        360
+      ],
+      "z_order": "walker_behind_pillar"
+    }
+  },
+  "cuts": [
+    {
+      "cut_frame": 48,
+      "tolerance_frames": 1
+    }
+  ],
+  "fps": 30,
+  "frame_count": 96,
+  "generation": {
+    "seed": 20260823,
+    "tool": "PIL plates + ffmpeg libx264 bitexact"
+  },
+  "loop_id": "d4_group_occlusion",
+  "replacement_program": [
+    {
+      "keyframes": [
+        {
+          "angle_end_deg": 0.0,
+          "angle_start_deg": 0.0,
+          "center_end_px": [
+            560,
+            200
+          ],
+          "center_start_px": [
+            80,
+            200
+          ],
+          "end_frame": 47,
+          "start_frame": 0
+        }
+      ],
+      "layer_id": "d4_walker",
+      "op": "affine_keyframes",
+      "replacement_png": "sprites/d4_group_occlusion/walker_replacement.png"
+    },
+    {
+      "op": "group_place",
+      "placements": [
+        {
+          "center_px": [
+            140,
+            214
+          ],
+          "end_frame": 95,
+          "layer_id": "d4_group_0",
+          "replacement_png": "sprites/d4_group_occlusion/group_0_replacement.png",
+          "start_frame": 48,
+          "z_order": 0
+        },
+        {
+          "center_px": [
+            320,
+            213
+          ],
+          "end_frame": 95,
+          "layer_id": "d4_group_1",
+          "replacement_png": "sprites/d4_group_occlusion/group_1_replacement.png",
+          "start_frame": 48,
+          "z_order": 1
+        },
+        {
+          "center_px": [
+            500,
+            212
+          ],
+          "end_frame": 95,
+          "layer_id": "d4_group_2",
+          "replacement_png": "sprites/d4_group_occlusion/group_2_replacement.png",
+          "start_frame": 48,
+          "z_order": 2
+        }
+      ]
+    }
+  ],
+  "resolution": {
+    "height": 360,
+    "width": 640
+  },
+  "risk_classes": [
+    "group_occlusion",
+    "hard_cut"
+  ],
+  "segments": [
+    {
+      "end_frame": 47,
+      "shot_id": "cross_shot",
+      "start_frame": 0
+    },
+    {
+      "end_frame": 95,
+      "shot_id": "group_shot",
+      "start_frame": 48
+    }
+  ],
+  "start_time_ms": 0,
+  "time_base": "1/30"
+}

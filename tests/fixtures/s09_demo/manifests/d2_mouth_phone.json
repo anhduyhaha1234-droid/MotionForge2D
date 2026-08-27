@@ -1,0 +1,86 @@
+{
+  "annotations": {
+    "phone_contact": {
+      "contact_start_frame": 30,
+      "hand_anchor_norm": [
+        0.5312,
+        0.6528
+      ],
+      "z_order": "phone_above_torso"
+    }
+  },
+  "cuts": [],
+  "fps": 30,
+  "frame_count": 60,
+  "generation": {
+    "seed": 20260823,
+    "tool": "PIL plates + ffmpeg libx264 bitexact"
+  },
+  "loop_id": "d2_mouth_phone",
+  "replacement_program": [
+    {
+      "center_px": [
+        320,
+        96
+      ],
+      "initial_state": "closed",
+      "layer_id": "d2_mouth_head",
+      "op": "pose_swap",
+      "region_xywh_norm": [
+        0.4375,
+        0.0833,
+        0.225,
+        0.2389
+      ],
+      "swap_plan": [
+        {
+          "from_state": "closed",
+          "swap_frame": 15,
+          "to_state": "open"
+        },
+        {
+          "from_state": "closed",
+          "swap_frame": 30,
+          "to_state": "closed"
+        },
+        {
+          "from_state": "closed",
+          "swap_frame": 45,
+          "to_state": "open"
+        }
+      ],
+      "templates": {
+        "closed": "sprites/d2_mouth_phone/head_closed_rep.png",
+        "open": "sprites/d2_mouth_phone/head_open_rep.png"
+      }
+    },
+    {
+      "center_px": [
+        338,
+        238
+      ],
+      "end_frame": 59,
+      "layer_id": "d2_phone",
+      "op": "graphic_replace",
+      "replacement_png": "sprites/d2_mouth_phone/phone_replacement.png",
+      "start_frame": 30
+    }
+  ],
+  "resolution": {
+    "height": 360,
+    "width": 640
+  },
+  "risk_classes": [
+    "mouth_expression_swap",
+    "phone_contact"
+  ],
+  "segments": [
+    {
+      "end_frame": 59,
+      "shot_id": "shot_a",
+      "start_frame": 0
+    }
+  ],
+  "start_time_ms": 0,
+  "time_base": "1/30"
+}

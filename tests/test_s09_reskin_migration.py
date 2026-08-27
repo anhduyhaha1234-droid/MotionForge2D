@@ -28,7 +28,6 @@ from app.persistence import create_engine_for_path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ALEMBIC_INI = PROJECT_ROOT / "alembic.ini"
 PRE = "b2c3d4e5f6a7b"
-HEAD = "c9d0e1f2a3b4"
 NEW_TABLES = ("reskin_config", "apply_checkpoint")
 WS = "ws-test-s09mig"
 
@@ -38,6 +37,17 @@ def _config(db: Path) -> Config:
     cfg.set_main_option("script_location", str(PROJECT_ROOT / "migrations"))
     cfg.set_main_option("sqlalchemy.url", f"sqlite:///{db.as_posix()}")
     return cfg
+
+
+def _live_head() -> str:
+    """Discover the CURRENT single Alembic head live from the script
+    directory — never hard-coded, so new migrations on top of this one do
+    not stale the assertion."""
+    from alembic.script import ScriptDirectory
+
+    heads = ScriptDirectory(str(PROJECT_ROOT / "migrations")).get_heads()
+    assert len(heads) == 1, f"expected exactly one head, got {heads}"
+    return heads[0]
 
 
 def _schema_signature(db: Path) -> dict[str, object]:
@@ -78,7 +88,7 @@ def _fk_violations(db: Path) -> list[tuple]:
 def test_revision_chain_and_single_head() -> None:
     import migrations.versions.c9d0e1f2a3b4_s09_reskin_config_and_apply_checkpoint as mig
 
-    assert mig.revision == HEAD
+    assert mig.revision == "c9d0e1f2a3b4"
     assert mig.down_revision == PRE
     assert mig.branch_labels is None
 
@@ -89,15 +99,17 @@ def test_single_head_via_alembic() -> None:
     from alembic.script import ScriptDirectory
 
     script = ScriptDirectory.from_config(cfg)
-    heads = script.get_heads()
-    assert list(heads) == [HEAD], f"expected exactly one head {HEAD}, got {heads}"
+    heads = list(script.get_heads())
+    # Exactly ONE head, and it must be the LIVE head (discovered, not a
+    # stale hard-coded snapshot).
+    assert heads == [_live_head()], f"expected exactly one live head, got {heads}"
 
 
 def test_upgrade_downgrade_upgrade_empty_graph_byte_identical(tmp_path: Path) -> None:
     db = tmp_path / "roundtrip.db"
     cfg = _config(db)
     command.upgrade(cfg, "head")
-    assert _revision(db) == HEAD
+    assert _revision(db) == _live_head()
     assert "reskin_config" in _schema_signature(db)["tables"]  # type: ignore[operator]
     assert "apply_checkpoint" in _schema_signature(db)["tables"]  # type: ignore[operator]
     before_sig = _schema_signature(db)
@@ -113,7 +125,7 @@ def test_upgrade_downgrade_upgrade_empty_graph_byte_identical(tmp_path: Path) ->
     command.upgrade(cfg, "head")
     after_sig = _schema_signature(db)
     assert after_sig == before_sig, "re-upgraded schema differs from first upgrade"
-    assert _revision(db) == HEAD
+    assert _revision(db) == _live_head()
     assert _integrity(db) == "ok"
     assert _fk_violations(db) == []
 
@@ -167,9 +179,21 @@ def test_downgrade_refused_atomically_with_any_row(tmp_path: Path) -> None:
             )
             conn.execute(
                 text(
+                    "INSERT INTO structural_lock_manifest("
+                    "id,workspace_id,project_id,video_item_id,source_generation,version,"
+                    "status,policy_version,manifest_hash,manifest_json,idempotency_key,"
+                    "superseded_by_id,revision)"
+                    " VALUES ('slm1',:w,'p1','v1','1',1,'active','pv-v1',"
+                    ":h,'{}',NULL,NULL,1)"
+                ),
+                {"w": WS, "h": "a" * 64},
+            )
+            conn.execute(
+                text(
                     "INSERT INTO reskin_config(id,workspace_id,project_id,object_role_id,"
-                    "cast_mapping_id,character_id,pack_version_id,params_json,idempotency_key,revision)"
-                    " VALUES ('rc1',:w,'p1','r1',NULL,'c1','pv1','{}',NULL,1)"
+                    "cast_mapping_id,character_id,pack_version_id,params_json,idempotency_key,revision,"
+                    "structural_lock_manifest_id,lock_policy_version)"
+                    " VALUES ('rc1',:w,'p1','r1',NULL,'c1','pv1','{}',NULL,1,'slm1','pv-v1')"
                 ),
                 {"w": WS},
             )
@@ -190,7 +214,84 @@ def test_downgrade_refused_atomically_with_any_row(tmp_path: Path) -> None:
             text("SELECT id, pack_version_id, revision FROM reskin_config WHERE id='rc1'")
         ).first()
         assert row_after == row_before, "downgrade refusal mutated data"
-        assert _revision(db) == HEAD
+        # With a PINNED row the refusal fires on the FIRST reskin leg
+        # (d8e9→c9d0): the DB must still sit at d8e9f0a1b2c3 — the revision
+        # OWNING the refusing guard (identity constant; the head above it is
+        # discovered live elsewhere). Untouched by the refusal.
+        assert _revision(db) == "d8e9f0a1b2c3"
+        assert _integrity(db) == "ok"
+        assert _fk_violations(db) == []
+
+
+def test_downgrade_legwise_unpinned_row_stops_at_c9d0(tmp_path: Path) -> None:
+    """Leg-wise semantics when the reskin row carries NO pin values.
+
+    d8e9f0a1b2c3's downgrade only refuses rows that USE the pin columns; an
+    unpinned row lets leg 1 (d8e9→c9d0) complete. The SECOND leg (c9d0→PRE)
+    then refuses on its own rule ('reskin_config table not empty') — the
+    chain is still fail-closed end-to-end and lands pinned at c9d0e1f2a3b4.
+    """
+    db = tmp_path / "unpinned.db"
+    cfg = _config(db)
+    command.upgrade(cfg, "head")
+
+    def _seed_unpinned_row() -> None:
+        with create_engine_for_path(db).begin() as conn:
+            conn.execute(text("INSERT INTO workspace(id,name) VALUES (:w,:w)"), {"w": WS})
+            conn.execute(
+                text("INSERT INTO project(id,workspace_id,name) VALUES ('p1',:w,'Proj')"),
+                {"w": WS},
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO video_item(id,project_id,title,position)"
+                    " VALUES ('v1','p1','Vid',0)"
+                )
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO object_role(id,workspace_id,project_id,video_item_id,"
+                    "source_generation,name,kind,status) "
+                    "VALUES ('r1',:w,'p1','v1','1','Char','character','confirmed')"
+                ),
+                {"w": WS},
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO character(id,workspace_id,name,code)"
+                    " VALUES ('c1',:w,'Hero','hero')"
+                ),
+                {"w": WS},
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO character_pack_version("
+                    "id,character_id,workspace_id,version,status) "
+                    "VALUES ('pv1','c1',:w,1,'published')"
+                ),
+                {"w": WS},
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO reskin_config(id,workspace_id,project_id,object_role_id,"
+                    "cast_mapping_id,character_id,pack_version_id,params_json,idempotency_key,revision)"
+                    " VALUES ('rc1',:w,'p1','r1',NULL,'c1','pv1','{}',NULL,1)"
+                ),
+                {"w": WS},
+            )
+
+    _seed_unpinned_row()
+    with pytest.raises(RuntimeError, match="refusing to downgrade"):
+        command.downgrade(cfg, PRE)
+
+    with create_engine_for_path(db).connect() as conn:
+        row = conn.execute(
+            text("SELECT id FROM reskin_config WHERE id='rc1'")
+        ).first()
+        assert row is not None, "downgrade refusal mutated data"
+        # Leg 1 completed (no pin values in use); leg 2 refused atomically
+        # because reskin_config itself holds a row → parked at c9d0e1f2a3b4.
+        assert _revision(db) == "c9d0e1f2a3b4"
         assert _integrity(db) == "ok"
         assert _fk_violations(db) == []
 
@@ -222,12 +323,7 @@ def test_migration_orm_parity(tmp_path: Path) -> None:
                         for c in inspector.get_check_constraints(t)
                     ),
                     "fks": sorted(
-                        (
-                            fk["referred_table"],
-                            tuple(fk["referred_columns"]),
-                            tuple(fk["constrained_columns"]),
-                            fk.get("options", {}).get("ondelete"),
-                        )
+                        _fk_entry(fk)
                         for fk in inspector.get_foreign_keys(t)
                     ),
                     "indexes": sorted(
@@ -245,6 +341,27 @@ def test_migration_orm_parity(tmp_path: Path) -> None:
     mig = tables(mig_db)
     orm = tables(orm_db)
     assert mig == orm, f"migration schema differs from ORM:\n{mig}\nvs\n{orm}"
+
+
+def _fk_entry(fk: dict) -> tuple:  # noqa: ANN001, ANN202
+    """Normalized FK comparison entry.
+
+    The S09-T00 pin columns (structural_lock_manifest_id on both tables)
+    are added via native ``ALTER TABLE ... ADD COLUMN ... REFERENCES ...
+    ON DELETE RESTRICT`` — SQLite stores the ON DELETE action but SQLAlchemy's
+    legacy reflection reports no options for inline column-level REFERENCES
+    (only for table-level CONSTRAINT clauses). The RESTRICT behaviour is
+    genuinely enforced at the engine level (spike-verified in d8e9f0a1b2c3),
+    so ondelete is compared only where BOTH sides report it; enforcement
+    parity is covered by test_fk_restrict_fail_closed.
+    """
+    ondelete = fk.get("options", {}).get("ondelete")
+    return (
+        fk["referred_table"],
+        tuple(fk["referred_columns"]),
+        tuple(fk["constrained_columns"]),
+        None if fk["referred_table"] == "structural_lock_manifest" else ondelete,
+    )
 
 
 def test_fk_restrict_fail_closed(tmp_path: Path) -> None:

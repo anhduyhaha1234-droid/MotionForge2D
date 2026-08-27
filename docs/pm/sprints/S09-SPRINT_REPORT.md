@@ -42,6 +42,22 @@ SERIAL T01→T02→T03→T04→T05→T06 → final integration gate → SPRINT_S
 
 ## 2026-08-23T05:10+07 — S09-T00 TERMINAL: TASK_MANAGER_VERIFIED_PENDING_CODEX_SCOPE_REVIEW
 
+### 2026-08-24T20:45+07 — FINAL SPRINT GATE COMPLETE → SPRINT_SUBMITTED / MANAGER_VERIFIED_PENDING_CODEX_REVIEW
+
+Final gate evidence (tất cả chạy tay bởi Manager, log trong output/s09/20260823_sprint_full/final-gate/):
+- Full backend regression RUN 3: **1760 passed / 0 failed / 19 skipped, EXIT=0** (27:59) — regression-run3.log. (Run 1 -x dừng sớm phát hiện FG1; Run 2 FULL lộ FG2+FG3; cả 3 corrections đã fix + verify ×2)
+- Corrections: FG1 durable-tables normalize (47×2 PASS + adversarial planted-table FAIL-closed) · FG2 single-head live-discovery ×4 files (18×2 PASS) · FG3 bootstrap s09_correction + S08A01 head (61×2 PASS)
+- Static: ruff app+tests All-passed · mypy app Success 124 source files
+- Alembic: single head b3c4d5e6f7a9; T05A revision round-trip verified; downgrade-to-base chặn bởi S06 contract (by design)
+- Frontend: tsc --noEmit EXIT=0; eslint write-set EXIT=0; Playwright S09 specs xanh ×2 runs idempotent
+- OpenAPI: additive xuyên suốt 215→229 paths, removed=0 mọi task
+- MAIN protected tree: dirty chỉ docs/pm prompts/handoffs của lanes Codex/S11/S13 khác — KHÔNG có bất kỳ production file S09 nào
+- Cleanup: toàn bộ pytest basetemp dirs đã xóa (còn lại 0); không còn proc pytest/uvicorn/playwright sống; MOTIONFORGE_DATABASE_URL UNSET xuyên suốt
+
+Task registry cuối (tất cả TASK_MANAGER_VERIFIED_PENDING_CODEX_REVIEW): T00-I01/I02/I03/I04/I05 · T01 (resume owner b4b2ad) · T02 · T03 · T04 · T05A · T05B · T06A · T06B (+FG1/FG2/FG3 gate corrections)
+
+**TRẠNG THÁI: SPRINT_SUBMITTED / MANAGER_VERIFIED_PENDING_CODEX_REVIEW — dừng toàn bộ workers, chờ Codex review. Không APPROVED/CLOSED, không mở S10.**
+
 ### Session/model/provider map
 | Task | Session ID (chuẩn hóa) | Proc wrapper | Model route | State |
 |---|---|---|---|---|

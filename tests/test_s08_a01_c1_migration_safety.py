@@ -32,13 +32,24 @@ from app.persistence import create_engine_for_path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ALEMBIC_INI = PROJECT_ROOT / "alembic.ini"
 PRE_A01 = "f6a7b8c9d0e1"
+#: Revision identity of the migration under test — a frozen literal on
+#: purpose; only the single head itself is discovered live via
+#: :func:`_live_head` so newer revisions stacked on top never stale the
+#: ``upgrade head -> alembic_version`` assertions.
 A01 = "f7a8b9c0d1e2"
-#: Current single Alembic head — the S08-A02 structural-evidence revision
-#: (R1).  Suites that assert ``upgrade head -> alembic_version`` must use
-#: this revision, which is now the head instead of the A01 ``f7a8b9c0d1e2``.
-HEAD = "b2c3d4e5f6a7b"
 LEGACY = ("character", "prop", "other")
 NEW = ("background", "foreground", "graphic", "source_overlay")
+
+
+def _live_head() -> str:
+    """Discover the CURRENT single Alembic head live from the script
+    directory — never hard-coded, so new migrations on top of this one do
+    not stale the assertion."""
+    from alembic.script import ScriptDirectory
+
+    heads = ScriptDirectory(str(PROJECT_ROOT / "migrations")).get_heads()
+    assert len(heads) == 1, f"expected exactly one head, got {heads}"
+    return heads[0]
 
 
 def _alembic_config(db: Path) -> Config:
@@ -167,7 +178,7 @@ def test_legacy_3_kind_roundtrip_byte_identical(tmp_path: Path) -> None:
     # upgrade A01 -> 7-kind
     command.upgrade(cfg, "head")
     assert _role_rows(engine) == baseline
-    assert _revision(engine) == HEAD
+    assert _revision(engine) == _live_head()
     _assert_7_kind(_ddl(engine))
     assert _integrity(engine)[0][0] == "ok"
 
@@ -181,7 +192,7 @@ def test_legacy_3_kind_roundtrip_byte_identical(tmp_path: Path) -> None:
     # re-upgrade -> 7-kind again, rows still byte-identical
     command.upgrade(cfg, "head")
     assert _role_rows(engine) == baseline
-    assert _revision(engine) == HEAD
+    assert _revision(engine) == _live_head()
     _assert_7_kind(_ddl(engine))
     assert _integrity(engine)[0][0] == "ok"
 
@@ -201,7 +212,7 @@ def test_new_kind_rows_refuse_downgrade_atomic(tmp_path: Path) -> None:
     before_ddl = _ddl(engine)
     assert len(before_rows) == 7  # 3 legacy + 4 new
     _assert_7_kind(before_ddl)
-    assert _revision(engine) == HEAD
+    assert _revision(engine) == _live_head()
 
     # downgrade MUST fail closed BEFORE any mutation: it raises, the exit is
     # non-zero (pytest.raises proves the failure surfaced), and the DB is
@@ -221,7 +232,7 @@ def test_new_kind_rows_refuse_downgrade_atomic(tmp_path: Path) -> None:
     command.upgrade(cfg, "head")
     assert _ddl(engine) == before_ddl
     assert _role_rows(engine) == before_rows
-    assert _revision(engine) == HEAD
+    assert _revision(engine) == _live_head()
     assert _integrity(engine)[0][0] == "ok"
 
 

@@ -1,0 +1,59 @@
+{
+  "annotations": {
+    "bed_contact": {
+      "contact_anchor_norm": [
+        0.5156,
+        0.6944
+      ],
+      "contact_frame": 71,
+      "z_order": "body_above_mattress"
+    }
+  },
+  "cuts": [],
+  "fps": 30,
+  "frame_count": 72,
+  "generation": {
+    "seed": 20260823,
+    "tool": "PIL plates + ffmpeg libx264 bitexact"
+  },
+  "loop_id": "d3_rotation_bed",
+  "replacement_program": [
+    {
+      "keyframes": [
+        {
+          "angle_end_deg": 180.0,
+          "angle_start_deg": 0.0,
+          "center_end_px": [
+            330,
+            250
+          ],
+          "center_start_px": [
+            140,
+            150
+          ],
+          "end_frame": 71,
+          "start_frame": 0
+        }
+      ],
+      "layer_id": "d3_hero",
+      "op": "affine_keyframes",
+      "replacement_png": "sprites/d3_rotation_bed/hero_replacement.png"
+    }
+  ],
+  "resolution": {
+    "height": 360,
+    "width": 640
+  },
+  "risk_classes": [
+    "whole_body_rotation"
+  ],
+  "segments": [
+    {
+      "end_frame": 71,
+      "shot_id": "shot_a",
+      "start_frame": 0
+    }
+  ],
+  "start_time_ms": 0,
+  "time_base": "1/30"
+}

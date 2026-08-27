@@ -38,12 +38,11 @@ from app.persistence.structural_lock import (
 )
 from app.services.renderer_contract import (
     BACKEND_LICENSE_REGISTRY,
-    BackendBinaryMissingError,
+    PROVENANCE_REQUIRED_FIELDS,
     BenchmarkBelowThresholdError,
     CapabilityDescriptor,
     CapabilityMismatchError,
     LicenseMissingError,
-    PROVENANCE_REQUIRED_FIELDS,
     RenderRequest,
     RouteProvenance,
     UnknownBackendError,

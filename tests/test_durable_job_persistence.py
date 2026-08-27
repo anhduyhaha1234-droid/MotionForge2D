@@ -68,6 +68,58 @@ JOB_HEAD_REVISION = "23b308b1fd0b"
 # JOB_HEAD_REVISION is an ancestor of it, so future migrations cannot
 # break these tests.
 
+#: Expected-tables contract at the current Alembic head, built ADDITIVELY per
+#: sprint (S09-FG1 normalization, same shape as tests/test_persistence_
+#: bootstrap.py).  New migrations must EXTEND these sets with a source
+#: comment; the unexpected-tables assertions stay fail-closed so unknown
+#: table drift is still caught.
+S02_HEAD_TABLES = {
+    "workspace",
+    "channel",
+    "project",
+    "video_item",
+    "scene",
+    "artifact",
+    "artifact_owner",
+    "legacy_import",
+    "job",
+    "job_step",
+    "job_attempt",
+    "job_event",
+    "job_lease",
+    "alembic_version",
+}
+S06_HEAD_TABLES = S02_HEAD_TABLES | {
+    "character",
+    "character_pack_version",
+    "character_asset",
+}
+S08_HEAD_TABLES = S06_HEAD_TABLES | {
+    "object_role",
+    "object_occurrence",
+    "object_grouping_suggestion",
+    "object_role_operation",
+    "object_correction",
+    "object_role_artifact",
+    # S08-A02 structural-evidence bridge (R1) — four new tables.
+    "occurrence_segment",
+    "segment_motion",
+    "scene_graph_occlusion",
+    "scene_graph_contact",
+    # S07-T01 project cast mapping (b2c3d4e5f6a7b).
+    "project_cast_mapping",
+    # S09-T00 additive tables (c9d0e1f2a3b4 / d8e9f0a1b2c3): reskin config +
+    # apply checkpoint, structural-lock manifest, per-segment render route.
+    "reskin_config",
+    "apply_checkpoint",
+    "structural_lock_manifest",
+    "segment_render_route",
+}
+S09_HEAD_TABLES = S08_HEAD_TABLES | {
+    # S09-T05A targeted-correction log (b3c4d5e6f7a9).
+    "s09_correction",
+}
+
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -375,39 +427,18 @@ def test_downgrade_is_refused(db_path: Path) -> None:
 
 
 def test_no_worker_or_api_cutover_tables(upgraded_db: Path) -> None:
-    """AC6: no worker/API cutover tables or dual-write artifacts."""
+    """AC6: no worker/API cutover tables or dual-write artifacts.
+
+    S09-FG1 normalization: the expected-tables contract is now the additive
+    per-sprint constant ``S09_HEAD_TABLES`` (mirroring
+    tests/test_persistence_bootstrap.py) instead of a frozen S02/S08-era
+    inline set, so later additive migrations no longer trip this assertion.
+    The check itself stays fail-closed: any table outside the contract —
+    including future unknown ones — still fails.
+    """
     engine = create_engine_for_path(upgraded_db)
     tables = set(inspect(engine).get_table_names())
-    unexpected = tables - {
-        "workspace",
-        "channel",
-        "project",
-        "video_item",
-        "scene",
-        "artifact",
-        "artifact_owner",
-        "legacy_import",
-        "alembic_version",
-        "job",
-        "job_step",
-        "job_attempt",
-        "job_event",
-        "job_lease",
-        "character",
-        "character_pack_version",
-        "character_asset",
-        "object_role",
-        "object_occurrence",
-        "object_grouping_suggestion",
-        "object_role_operation",
-        "object_correction",
-        "object_role_artifact",
-        # S08-A02 structural-evidence bridge (R1) — four new tables.
-        "occurrence_segment",
-        "segment_motion",
-        "scene_graph_occlusion",
-        "scene_graph_contact",
-    }
+    unexpected = tables - S09_HEAD_TABLES
     assert not unexpected, f"unexpected tables: {sorted(unexpected)}"
 
 

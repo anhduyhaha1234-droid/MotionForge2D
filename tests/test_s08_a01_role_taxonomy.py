@@ -58,6 +58,20 @@ API = "/api/v2/object-intelligence"
 ALL_SEVEN = list(OBJECT_KINDS)
 
 
+def _live_head() -> str:
+    """Discover the CURRENT single Alembic head live from the script
+    directory — never hard-coded, so new migrations on top of this one do
+    not stale the ``upgrade head`` assertion."""
+    from pathlib import Path
+
+    from alembic.script import ScriptDirectory
+
+    migrations_dir = Path(__file__).resolve().parent.parent / "migrations"
+    heads = ScriptDirectory(str(migrations_dir)).get_heads()
+    assert len(heads) == 1, f"expected exactly one head, got {heads}"
+    return heads[0]
+
+
 # ── local test helpers (isolated, no cross-test coupling) ────────────────
 
 
@@ -221,7 +235,7 @@ def test_migration_widens_kind_preserving_rows(tmp_path: Any) -> None:
         version = conn.execute(
             text("SELECT version_num FROM alembic_version")
         ).scalar()
-        assert version == "b2c3d4e5f6a7b"  # S08-A02 head (post-A01)
+        assert version == _live_head()
         ddl = "".join(
             conn.execute(
                 text(

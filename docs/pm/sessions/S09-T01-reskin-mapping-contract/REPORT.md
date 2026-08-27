@@ -1,67 +1,104 @@
-# REPORT — S09-T01 Reskin Mapping Contract
+# REPORT — S09-T01 Source-Locked Reskin Mapping completion
 
-- **Session**: S09-T01-reskin-mapping-contract (worker: alpha @ custom, reasoning max)
-- **Run id**: 20260822_worker_r1
-- **Date**: 2026-08-23 (+07)
-- **Worktree**: C:\Users\Admin\MotionForge2D-worktrees\s08-integration (branch codex/s08-integration)
-- **Status**: **TASK_SUBMITTED** (chờ Manager/Codex review — KHÔNG tự APPROVED)
+- **Session**: S09-T01-reskin-mapping-contract — RESUME owner `20260822_232748_b4b2ad` (SL-2, 2026-08-24)
+- **Worktree**: C:/Users/Admin/MotionForge2D-worktrees/s08-integration @ codex/s08-integration `ee10e55a809c`
+- **RULES**: HERMES_AUTOPILOT_RULES.md đọc trọn (RULES_LOADED); overlay TARGET_PROFILE_2D_SOURCE_LOCKED.md đọc trọn; MOTIONFORGE_DATABASE_URL UNSET mọi lệnh; MAIN READ-ONLY.
+- **STATUS: TASK_SUBMITTED** (không self-APPROVED)
 
-## Deliverables (đúng allowlist TASK.md "Exclusive write ownership")
+## Outcome 1 — Durable pin, fail-closed (app/persistence/reskin_config.py)
+`_resolve_lock_pin` + wiring vào create/update:
+- Manifest phải tồn tại CÙNG workspace (cross-workspace → ownership refusal, zero mutation).
+- Stored manifest_json re-validate qua authority `canonical_manifest_json`; corrupt → conflict refusal.
+- Recomputed sha256 phải khớp `manifest_hash` (tamper → hash-mismatch refusal).
+- MỌI segment route trong manifest phải thuộc enum authority `RENDERER_ROUTES` (5 giá trị) → route ngoài enum bị refuse.
+- Manifest `voided` không pin được; `lock_policy_version` LUÔN derive từ manifest (client hint chỉ được phép khớp, không tự chế).
+- Update CAS 3-trạng-thái: omitted = giữ pin; explicit id = re-pin full-validate; "" = unpin cả hai cột. Idempotent replay so sánh cả pin pair.
 
-| File | Loại | Nội dung |
-|---|---|---|
-| app/persistence/models.py | ADDITIVE ONLY | +2 ORM class `ReskinConfig`, `ApplyCheckpoint` + 2 dòng `__all__`. Đã chứng minh additive: diff vs HEAD = 0 removed lines; mọi class HEAD còn nguyên vẹn |
-| migrations/versions/c9d0e1f2a3b4_s09_reskin_config_and_apply_checkpoint.py | NEW | DUY NHẤT 1 revision S09, down_revision=b2c3d4e5f6a7b, tạo HAI bảng reskin_config + apply_checkpoint (schema-only đầy đủ cho T06). Fail-closed downgrade: từ chối nếu có bất kỳ row nào |
-| app/persistence/reskin_config.py | NEW | Repository + validate_params fail-closed; tái sử dụng evaluate_compatibility của S07 (không re-implement), strict hơn S07: không cho fallback qua |
-| app/schemas/reskin_config.py | NEW | Pydantic strict extra=forbid DTOs |
-| app/api/routes/reskin_config.py | NEW | Router /api/v2/reskin-configs + trailing-slash variants; 201 create / 200 replay / 409 conflict+CAS / 404 / 422 |
-| app/api/app.py | ADDITIVE include_router only | +import, +comment, +include_router(reskin_config.router) — 4 dòng |
-| frontend/src/features/reskin/index.ts | NEW thin client | Typed API client + types mirror backend contract. tsc --noEmit PASS, eslint --max-warnings 0 PASS |
-| tests/test_s09_reskin_config_domain.py | NEW | 26 test: published/compatible/complete gate, CAS zero-mutation, idempotent replay, version isolation pin, params fail-closed ×15 case |
-| tests/test_s09_reskin_config_api.py | NEW | 14 test API binary gates |
-| tests/test_s09_reskin_migration.py | NEW | 8 test migration: single head, round-trip byte-identical, refusal atomic, ORM parity, FK RESTRICT, CHECK immutability |
+## Outcome 2 — Evidence per segment, không global score
+- Repository `list_renderer_route_evidence`: trả về từng SegmentRenderRoute của manifest đang pin — occurrence_segment_id / route (enum exact) / anchor x,y ∈ [0,1] / frame range / confidence + source / reasons / provenance. Read-only.
+- API `GET /api/v2/reskin-configs/{id}/renderer-route-evidence` (+ trailing-slash variant). Response DTO expose thêm `structural_lock_manifest_id`, `lock_policy_version`.
+- **Bug thật đã sửa**: route truyền nhầm thứ tự (config_id ↔ workspace_id) gây 404 "default" — bắt được bởi test mới, đã fix + regression.
 
-## Required tests (binary) — bằng chứng chạy thật
+## Outcome 3 — Router registration
+Router reskin-configs đã đăng ký sẵn từ foundation (được Codex duyệt giữ) — KHÔNG đụng app/api/app.py trong phiên này (additive-only nếu thiếu; thực tế không cần).
 
-1. **Published/compatible/complete gate** — PASS (domain tests 1a/1b/1c: draft/validating/ready/archived + incomplete đều reject zero mutation)
-2. **Revision CAS stale → conflict + zero mutation** — PASS (domain + api + S07 regression stale_repin_zero_mutation)
-3. **Idempotent replay equivalent → existing; conflicting → 409** — PASS
-4. **Publish version mới không mutate pin** — PASS (test_s09 domain + 6 test isolation S07 ×2 liên tiếp)
-5. **Migration round-trip byte-identical + PRAGMA foreign_key_check=0 + single head** — PASS (migration-roundtrip.log STEP3 True, fk=0, alembic-heads.log chỉ c9d0e1f2a3b4)
-6. **OpenAPI additive thuần** — PASS: paths 215→219 (+4 path mới /api/v2/reskin-configs*), removed=0, op-added trên path cũ=0, schemas +8/-0
-7. **Domain validation fail-closed mọi param** — PASS (15 parametrize case + schema 422 ×7 mutator + extra-field)
+## Outcome 4 — Frontend additive (frontend/src/features/reskin/index.ts)
+Mirror schema mới: 2 field pin trong ReskinConfigData/Create/Update + interface `RendererRouteEvidence` + `getRendererRouteEvidence()`. tsc --noEmit EXIT=0; eslint --max-warnings 0 EXIT=0.
 
-## Gates tổng
+## Outcome 5 — Tests (adversarial, zero mutation trên mọi refusal)
+- NEW `tests/test_s09_reskin_source_locked_domain.py`: 9 test — pin derive policy; cross-workspace refuse; tampered-hash refuse zero-mutation; voided refuse; route-enum enforce; CAS repin/unpin/keep ×2 runs; evidence per-segment; unpinned→empty; idempotent replay pin-conflict.
+- `tests/test_s09_reskin_config_api.py` +1: POST có pin → 201 derive policy; evidence endpoint per-segment; unknown id 404.
+- `tests/test_s09_reskin_migration.py` repair theo head mới d8e9f0a1b2c3 + leg-wise downgrade semantics (pinned row chặn chân 1 atomic ở head; unpinned row đi chân 1, chân 2 refuse → đậu c9d0e1f2a3b4) + FK parity chuẩn hóa cho pin columns do native ALTER TABLE ADD COLUMN REFERENCES (reflection không báo ondelete inline; RESTRICT enforce thật ở engine level).
 
-- Focused/full S09 suite ×2: **48 passed** mỗi lần (pytest-final-run1.log, run2.log)
-- ruff check app tests: **All checks passed!** (ruff.log)
-- mypy app: **Success: no issues found in 99 source files** (mypy.log)
-- git diff --check: **EXIT=0**
-- alembic heads: **c9d0e1f2a3b4 (head)** — đúng 1 head, down_revision=b2c3d4e5f6a7b
-- Worktree delta vs baseline (259→266): đúng 7 path allowlist, không đụng file khác
+## Acceptance gate — bằng chứng chạy thật
+| Gate | Kết quả |
+|---|---|
+| Focused SL domain ×2 | 9 passed / 9 passed |
+| API reskin ×2 | 15 passed / 15 passed |
+| Domain gốc ×2 | 26 passed / 26 passed |
+| Migration ×2 | 9 passed / 9 passed |
+| FULL S09 4 file ×2 (basetemp khác nhau) | **59 passed** (38.00s) / **59 passed** (37.46s) — sl-pytest-final-run1.log |
+| Regression T00 (domain+migration) | 20 passed |
+| Regression S07 nguyên file | 10 passed (live-head discovery, không deselect) |
+| OpenAPI | 219 → 221 paths, removed=0, chỉ ADD evidence path ×2 — openapi-after-sl.json |
+| ruff app+tests | All checks passed! |
+| mypy app | Success: no issues in 110 source files |
+| git diff --check | EXIT=0 |
+| alembic heads | `d8e9f0a1b2c3 (head)` duy nhất — không tạo revision mới |
+| Frontend | tsc EXIT=0, eslint EXIT=0 |
 
-## ⚠️ Vấn đề cross-sprint cần quyết định của Manager (ngoài allowlist worker)
+Mọi pytest chạy: `env -u MOTIONFORGE_DATABASE_URL -p no:cacheprovider --basetemp=%TEMP%/s09t01-*`.
 
-Thêm migration mới làm các assertion hard-code revision cũ trong test sprint trước đỏ.
-Worker KHÔNG được sửa (TASK.md Forbidden: "S07/S08 tests+code — chỉ đọc regression"):
+## Write-set self-audit (allowlist TASK-SL)
+Sửa: app/persistence/reskin_config.py · app/schemas/reskin_config.py · app/api/routes/reskin_config.py · frontend/src/features/reskin/index.ts · tests/test_s09_reskin_config_api.py · tests/test_s09_reskin_migration.py.
+Tạo: tests/test_s09_reskin_source_locked_domain.py.
+KHÔNG đụng: migrations/**, structural_lock.py, models.py (chỉ import), tests S07/T00 (read-only), MAIN. Git status phiên: 17 → 25 entries (delta = đúng các file allowlist + TASK-SL.md untracked). Không commit/push/stash/merge.
 
-1. tests/test_s07_version_isolation.py::test_migration_round_trip_preserves_invariant —
-   hard-code head="b2c3d4e5f6a7b" (dòng ~584) → assert version==head FAIL vì head thật giờ là c9d0e1f2a3b4.
-   Round-trip thực tế vẫn byte-identical với head mới — chỉ constant cũ sai.
-2. tests/test_persistence_bootstrap.py — S08_HEAD_TABLES chưa gồm reskin_config/apply_checkpoint →
-   test_no_api_cutover_tables ("unexpected tables") + schema-drift assert sẽ FAIL;
-   các assert version == "b2c3d4e5f6a7b" (dòng 705/734/994) tương tự.
-3. tests/test_object_correction.py:527, test_object_extraction.py:380, test_object_grouping.py:315,
-   test_object_intelligence_domain.py:132 — assert version == "b2c3d4e5f6a7b".
+## Ghi chú minh bạch
+- Foundation cũ giữ nguyên 100% (không revert): models/migration c9d0e1f2a3b4/routes/client/48 tests — chỉ mở rộng additive.
+- Migration test repair là điều CHỈNH test theo contract mới (head dịch + leg-wise chain), không phải bypass: hành vi fail-closed vẫn được assert đầy đủ và có test mới riêng cho leg-wise.
+- Không có secret nào xuất hiện trong artifact/evidence.
 
-Đề xuất: Manager cấp hotfix-scope riêng (update constants → ScriptDirectory.get_heads() hoặc thêm
-2 bảng vào S08_HEAD_TABLES) hoặc gán cho task kế trong sprint. Đây là hệ quả tất yếu của MIGRATION
-DECISION A (T01 sole migration owner) — không phải defect của implementation.
+---
 
-## Evidence
+# ADDENDUM — S09-T01-C1 correction (2026-08-24): pinned route evidence isolation
 
-output/s09/s09-t01/20260822_worker_r1/: openapi-before.json, openapi-after.json,
-pytest-final-run1.log, pytest-final-run2.log, pytest-s07-isolation-run1.log, run2.log,
-ruff.log, mypy.log, git-diff-check.log, alembic-heads.log, migration-roundtrip.log.
+- **Session**: RESUME owner `20260822_232748_b4b2ad` (C1) — review `S09_FULL_SPRINT_PM_REVIEW_2026-08-24.md` finding **F6 (P1)** + fast-track prompt §6.
+- **STATUS: TASK_SUBMITTED** (không self-APPROVED)
 
-LOG.md đầy đủ (append-only): docs/pm/sessions/S09-T01-reskin-mapping-contract/LOG.md
+## Root cause (F6 xác nhận)
+`list_renderer_route_evidence` lọc theo `structural_lock_manifest_id == pin OR IS NULL` — nhánh OR NULL cho phép row legacy/unattributed của cùng video lọt vào pinned evidence. Test T01 cũ chỉ seed NULL-row nên leak được codify thành hành vi "đúng".
+
+## Fix — strict isolation (app/persistence/reskin_config.py, duy nhất)
+1. Bỏ hoàn toàn nhánh `OR IS NULL`: chỉ row có `structural_lock_manifest_id == pinned manifest.id` được trả.
+2. Frozen-surface guard: thêm điều kiện `created_at(route) <= created_at(config)` (pin moment, bền vững qua reload vì là cột DB có sẵn — không cần migration). Row tạo sau pin bị loại kể cả khi đúng manifest.
+3. `_as_comparable_dt` normalize naive↔aware trước so sánh (SQLite strip tzinfo vs ORM aware-UTC).
+4. Projection thứ hai (`s09_demo_compare._route_evidence_from_manifest`) đi qua cùng repo method → tự hưởng isolation, không sửa file đó.
+
+## Acceptance tests (tests/test_s09_reskin_source_locked_domain.py, +4)
+| Case | Kết quả |
+|---|---|
+| Đúng manifest (ghi trước pin) → CÓ | ✅ test_f6_evidence_excludes_null_manifest_rows (kèm NULL-row bị loại) |
+| NULL-manifest row → LOẠI | ✅ cùng test trên |
+| Manifest khác (m2 cùng video) → LOẠI | ✅ test_f6_evidence_excludes_other_manifest_rows |
+| Row tạo SAU pin → LOẠI | ✅ test_f6_evidence_excludes_rows_created_after_pin |
+| Reload DB mới → cùng kết quả | ✅ test_f6_evidence_stable_across_fresh_db_reload |
+
+Test cũ `test_renderer_route_evidence_per_segment` cập nhật: route row giờ PHẢI bind manifest id khi ghi (chính là contract F6).
+
+## Gates
+- Focused ×2 basetemp riêng: **13 passed / 13 passed** — output/s09/20260823_sprint_full/t01-c1/f6-focused-run{1,2}.log
+- Regression ×2 (T01 domain 26 + SL domain 13 + API 15 + migration 9 + T04 demo-compare 9): **72 passed / 72 passed** — f6-regression-run1.log
+- ruff write-set: All checks passed! · mypy reskin_config.py: Success · git diff --check EXIT=0
+- Không đụng: models/migrations/API/frontend/MAIN/data/** (forbidden tôn trọng); alembic head b3c4d5e6f7a9 do worker khác quản lý.
+
+## Findings ngoài write-set (attribution minh bạch — KHÔNG tự sửa)
+1. **T02 evidence fixture đỏ đúng spec mới**: `test_route_evidence_api_read_model_matches_persisted_row` INSERT config với `created_at='2026-08-24T00:00:00'` hard-code nhưng route row dùng utc_now() thật → post-pin theo định nghĩa F6 → bị loại ĐÚNG. Owner T02 cần backdate route-row timestamp hoặc forward-date config trong fixture.
+2. 3 test NVENC khác của T02 đỏ "output_media escapes workspace_root" — do validate_for_render mới trong renderer_contract.py (+306 dòng uncommitted của T02-C1). Thuộc T02 owner.
+3. mypy app: `app/workflow/s09_demo_jobs.py:203 "object" not callable` — select_route lazy re-export qua PEP 562 __getattr__ khiến mypy suy `object`. File untracked thuộc worker khác; khuyến nghị eager import hoặc TYPE_CHECKING guard.
+
+## Write-set audit (độc quyền §6)
+Sửa: app/persistence/reskin_config.py · tests/test_s09_reskin_source_locked_domain.py.
+Tạo: output/s09/20260823_sprint_full/t01-c1/** (focused/regression/ruff/mypy/diff-check logs).
+Append-only: LOG.md, REPORT.md này. reskin_config.py sha256-prefix sau fix: `3a4eabbc16711e8e`.
+Không commit/push/stash/merge; MAIN và data/** không đụng.

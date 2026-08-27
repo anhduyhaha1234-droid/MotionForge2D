@@ -52,6 +52,8 @@ __all__ = [
     "RENDERER_ROUTES",
     "RENDERER_ROUTE_CHECK_SQL",
     "RENDERER_ROUTE_PATTERN",
+    "S09_CORRECTION_KINDS",
+    "S09_CORRECTION_STATUSES",
     "STRUCTURAL_LOCK_MANIFEST_STATUSES",
     "OBJECT_ROLE_STATUSES",
     "OCCURRENCE_CONFIDENCE_SOURCES",
@@ -98,6 +100,7 @@ __all__ = [
     "ReskinConfig",
     "StructuralLockManifest",
     "SegmentRenderRoute",
+    "S09Correction",
     "SceneGraphOcclusion",
     "SegmentMotion",
     "OccurrenceSegment",
@@ -229,6 +232,23 @@ RENDERER_ROUTE_PATTERN = (
 #: archives it as ``superseded`` (history is kept, never overwritten) and a
 #: draft lock may be ``voided`` before any pin references it.
 STRUCTURAL_LOCK_MANIFEST_STATUSES = ("draft", "active", "superseded", "voided")
+#: Targeted S09 correction kinds (S09-T05A): the demo-review mutation the
+#: correction applies.  Masks/z-order corrections supersede the locked
+#: OccurrenceSegment lineage; contact corrections CAS the SceneGraphContact
+#: edge; mesh/parts corrections CAS the SegmentMotion transform; route
+#: override writes a NEW SegmentRenderRoute history row (never mutates the
+#: old decision).
+S09_CORRECTION_KINDS = (
+    "mask",
+    "z_order",
+    "contact",
+    "mesh_parts",
+    "route_override",
+)
+#: Correction workflow states (mirrors OBJECT_CORRECTION_STATUSES): a
+#: correction is created ``pending`` with its computed affected scope, then
+#: atomically confirmed ``applied`` (CAS) or ``cancelled`` — never both.
+S09_CORRECTION_STATUSES = ("pending", "applied", "cancelled")
 #: Canonical contact kinds for scene-graph contact edges (S08-A02).
 #: ``hand_phone`` / ``character_phone`` are the two acceptance-scenario
 #: kinds; the remaining values keep the set closed for future events without
@@ -2567,3 +2587,100 @@ class SegmentRenderRoute(TimestampMixin, Base):
         foreign_keys=[structural_lock_manifest_id],
         back_populates="render_routes",
     )
+
+
+class S09Correction(TimestampMixin, Base):
+    """Durable archive of ONE targeted demo-review correction (S09-T05A).
+
+    A correction is created ``pending`` with its computed affected scope
+    (``impact_json`` — the exact loop/layer/segment regeneration scope),
+    then explicitly CONFIRMED: the targeted mutation through the verified
+    durable core (mask/z_order → OccurrenceSegment supersede lineage,
+    contact → SceneGraphContact CAS, mesh_parts → SegmentMotion CAS,
+    route_override → a NEW SegmentRenderRoute history row) plus the result
+    archive are committed in ONE transaction.  The natural key replays the
+    SAME correction for duplicate/concurrent/restart submissions; the
+    revision CAS makes confirm/cancel exactly-once and fail-closed.
+
+    - ``correction_kind`` CHECK derives from S09_CORRECTION_KINDS (single
+      authority); ``status`` CHECK from S09_CORRECTION_STATUSES.
+    - ``request_json`` / ``impact_json`` / ``result_json`` are canonical
+      finite-only JSON validated fail-closed by the repository BEFORE any
+      write.
+    - Idempotency: UNIQUE(workspace_id, idempotency_key) WHERE NOT NULL —
+      workspace-scoped like every sibling table; equivalent replay returns
+      the existing row, materially different payload → conflict.
+    - Natural key UNIQUE(workspace_id, natural_key) WHERE NOT NULL — the
+      content-derived identity (kind + target ids + payload hash).
+    - All FKs ondelete RESTRICT fail closed; revision CAS > 0.
+    """
+
+    __tablename__ = "s09_correction"
+    __table_args__ = (
+        CheckConstraint(
+            "correction_kind IN ('mask','z_order','contact','mesh_parts',"
+            "'route_override')",
+            name="ck_s09_correction_kind",
+        ),
+        CheckConstraint(
+            "status IN ('pending','applied','cancelled')",
+            name="ck_s09_correction_status",
+        ),
+        CheckConstraint(
+            "length(idempotency_key) <= 255", name="ck_s09_correction_idem_key_len"
+        ),
+        CheckConstraint(
+            "length(natural_key) <= 255", name="ck_s09_correction_natural_key_len"
+        ),
+        CheckConstraint("revision > 0", name="ck_s09_correction_revision_positive"),
+        Index(
+            "uq_s09_correction_natural",
+            "workspace_id",
+            "natural_key",
+            unique=True,
+            sqlite_where=sa_text("natural_key IS NOT NULL"),
+        ),
+        Index(
+            "uq_s09_correction_workspace_idempotency",
+            "workspace_id",
+            "idempotency_key",
+            unique=True,
+            sqlite_where=sa_text("idempotency_key IS NOT NULL"),
+        ),
+        Index("ix_s09_correction_video_status", "video_item_id", "status"),
+        Index("ix_s09_correction_segment", "occurrence_segment_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    project_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("project.id", ondelete="RESTRICT"), nullable=False
+    )
+    video_item_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("video_item.id", ondelete="RESTRICT"), nullable=False
+    )
+    #: The locked occurrence segment this correction targets (NULL only for
+    #: video-scope kinds that carry their own segment references inside
+    #: request_json).
+    occurrence_segment_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("occurrence_segment.id", ondelete="RESTRICT"),
+    )
+    correction_kind: Mapped[str] = mapped_column(String(24), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        default="pending",
+        server_default=sa_text("'pending'"),
+    )
+    request_json: Mapped[str] = mapped_column(Text, nullable=False)
+    impact_json: Mapped[str] = mapped_column(Text, nullable=False)
+    result_json: Mapped[str | None] = mapped_column(Text)
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    idempotency_key: Mapped[str | None] = mapped_column(String(255))
+    natural_key: Mapped[str | None] = mapped_column(String(255))
+
+    segment: Mapped[OccurrenceSegment | None] = relationship()

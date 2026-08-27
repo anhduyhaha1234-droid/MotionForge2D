@@ -34,6 +34,7 @@ from app.persistence.reskin_config import (
     ReskinConfigRepository,
 )
 from app.schemas.reskin_config import (
+    RendererRouteEvidence,
     ReskinConfigCreateRequest,
     ReskinConfigData,
     ReskinConfigListResponse,
@@ -62,6 +63,7 @@ def create_reskin_config(
             params=body.params.to_domain(),
             idempotency_key=body.idempotency_key,
             cast_mapping_id=body.cast_mapping_id,
+            structural_lock_manifest_id=body.structural_lock_manifest_id,
         )
         session.commit()
     except ReskinConfigOwnershipError as err:
@@ -123,6 +125,25 @@ def get_reskin_config(config_id: uuid.UUID, session: SessionDep) -> ReskinConfig
     return ReskinConfigData.from_record(record)
 
 
+@router.get("/{config_id:uuid}/renderer-route-evidence", status_code=200)
+@router.get("/{config_id:uuid}/renderer-route-evidence/", status_code=200)
+def get_renderer_route_evidence(
+    config_id: uuid.UUID, session: SessionDep
+) -> list[RendererRouteEvidence]:
+    """CompatibilityPolicy evidence per occurrence segment/shot.
+
+    Returns every persisted SegmentRenderRoute decision tied to the config's
+    pinned StructuralLockManifest (empty list when no manifest is pinned).
+    Read-only; per-segment evidence, never an opaque global score.
+    """
+    repo = ReskinConfigRepository(session)
+    try:
+        rows = repo.list_renderer_route_evidence(WORKSPACE_ID, str(config_id))
+    except ReskinConfigNotFoundError as err:
+        raise HTTPException(404, str(err)) from err
+    return [RendererRouteEvidence(**row) for row in rows]
+
+
 @router.patch("/{config_id:uuid}", status_code=200)
 @router.patch("/{config_id:uuid}/", status_code=200)
 def update_reskin_config(
@@ -139,6 +160,11 @@ def update_reskin_config(
             params=body.params.to_domain() if body.params is not None else None,
             pack_version_id=body.pack_version_id,
             character_id=body.character_id,
+            structural_lock_manifest_id=(
+                body.structural_lock_manifest_id
+                if "structural_lock_manifest_id" in body.model_fields_set
+                else None
+            ),
         )
         session.commit()
     except ReskinConfigNotFoundError as err:
