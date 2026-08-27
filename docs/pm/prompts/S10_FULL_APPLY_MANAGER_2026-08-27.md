@@ -31,7 +31,7 @@ Integration authority:
 
 - expected worktree: `C:\Users\Admin\MotionForge2D-worktrees\s08-integration`
 - expected branch: `codex/s08-integration`
-- review baseline observed: HEAD `ee10e55a809c84d5cb5d4a3046a1ee78828528d0` plus attributed S09 dirty tree; a later Codex Git backup commit may legitimately advance HEAD.
+- expected current HEAD after the approved S09 GitHub backup: `d3f6f79` (`feat(s09): complete demo-first reskin sprint`); the independent review itself started from HEAD `ee10e55a809c84d5cb5d4a3046a1ee78828528d0` plus the attributed S09 tree. Discover and report the actual full HEAD rather than assuming either snapshot.
 - protected MAIN/reference: `C:\Users\Admin\MotionForge2D`
 
 Trước dispatch:
@@ -320,4 +320,3 @@ Thực thi ngay, không chỉ trả kế hoạch:
 4. Dispatch **S10-T01A và S10-T01B** thành hai session mới model `meta`, reasoning max, fallback OFF.
 5. Monitor bằng bounded checks/heartbeat; audit sau worker exit; tiếp tục đúng DAG cho tới sprint exit.
 6. Nếu gặp blocker ngoài scope, dừng `BLOCKED_WITH_FINDINGS` và nêu exact Task ID/owner/evidence; không tự mở rộng scope.
-

@@ -29,6 +29,11 @@ không được dùng để ghi đè rules.
 - S10 Full Apply là production lane kế tiếp và đã được Codex chia thành tám
   owner packets. Prompt:
   `docs/pm/prompts/S10_FULL_APPLY_MANAGER_2026-08-27.md`.
+- GitHub backup sau S09: code/test/session evidence đã push commit `d3f6f79` lên
+  `origin/codex/s08-integration`; Codex/Hermes settings, roadmap, prompts và
+  reviews đã push commit `3e61640` lên `origin/master`. Remote default `main`
+  vẫn ở `ee10e55`; chưa fast-forward trực tiếp vì thao tác nhánh mặc định cần
+  user phê duyệt rõ hoặc PR.
 - S11-T02..T06 vẫn blocked trên E06 cho tới S10 exit; production S13 vẫn không
   mở song song vì overlap `models.py`, migrations, `app/api/app.py` và
   integration state với S10.

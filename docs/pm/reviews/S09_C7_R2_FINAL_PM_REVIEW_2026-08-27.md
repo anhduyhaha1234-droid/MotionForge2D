@@ -63,7 +63,7 @@ Codex ran a third browser acceptance with previously nonexistent explicit roots 
 - Exact four-file T06 backend suite: **43 passed**, 83 known warnings, isolated Windows basetemp and `MOTIONFORGE_DATABASE_URL` unset.
 - Frontend TypeScript: exit 0.
 - Scoped C7 ESLint: exit 0.
-- `git diff --check`: exit 0; only Git's LF-to-CRLF warning for `next.config.ts` remains.
+- Tracked working-tree `git diff --check`: exit 0; only Git's LF-to-CRLF warning for `next.config.ts` remains. The later full Git staging pass surfaced whitespace-only P2s in previously untracked reports/tests; these do not alter the reviewed product/runtime verdict.
 
 ## Non-blocking findings carried forward
 
@@ -89,4 +89,3 @@ These three findings are PM/evidence hardening items for the S10 manager discipl
 - S11-T02..T06 remain production-blocked on E06 until S10 Full Apply closes; S11-P02 docs-only correction remains a separate readiness matter.
 - S13-P00 remains approved planning only. Production S13 is not opened in parallel with S10 because both early lanes require shared `models.py`, migrations, `app/api/app.py` and integration state.
 - Next authorized packet: `docs/pm/prompts/S10_FULL_APPLY_MANAGER_2026-08-27.md`.
-
