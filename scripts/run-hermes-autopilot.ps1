@@ -8,6 +8,8 @@ param(
     [string]$HermesModel = "ocg/deepseek-v4-flash"
 )
 
+throw "Legacy roadmap autopilot is disabled because it mixes PM approval and Hermes implementation in one long-lived session. Use automation/orchestrator.ps1 so each Task ID has one Hermes session and an explicit PM gate."
+
 $ErrorActionPreference = "Stop"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $statePath = Join-Path $repoRoot "docs\pm\AUTOPILOT_STATE.json"

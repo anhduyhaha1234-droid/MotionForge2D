@@ -60,6 +60,22 @@ Trước khi submit, Hermes phải:
 
 ## 6. PM review
 
+### Single-writer handshake (mandatory)
+
+- Chỉ một writer được phép hoạt động trên worktree tại mọi thời điểm.
+- Khi Hermes đang chạy, PM/Antigravity chỉ được đọc; không được sửa file, tạo packet kế tiếp, chạy quality gate làm thay đổi artifact, hoặc commit.
+- Hermes phải kết thúc tiến trình sau khi ghi `REPORT.md = SUBMITTED`.
+- PM chỉ được bắt đầu review sau khi Hermes đã thoát và working tree đã ổn định.
+- PM review phải ghi đúng commit/tree được review, Quality Run ID, và thời điểm review. Review không được có timestamp sớm hơn lần cập nhật cuối của REPORT/LOG.
+- PM không được sửa implementation trong lúc review. Nếu cần sửa, ghi `CHANGES_REQUESTED` và resume đúng Hermes session.
+- Ở chế độ review từng task, chỉ `APPROVED` hợp lệ mới cho phép commit/close
+  task và tạo packet task kế tiếp.
+- Ở chế độ full-sprint đã được PM ghi rõ trong sprint contract, Hermes manager
+  được mở dependency nội bộ kế tiếp sau khi writer thoát và manager ghi
+  `MANAGER_VERIFIED_PENDING_SPRINT_REVIEW`. Trạng thái này không phải PM
+  approval, không cho phép commit/merge/push và chỉ có hiệu lực bên trong đúng
+  sprint/worktree đã được PM mở.
+
 PM kiểm tra theo thứ tự:
 
 1. Scope compliance.
@@ -74,4 +90,58 @@ Nếu chưa đạt, PM không sửa lẫn vào task hiện tại. PM ghi `CHANGE
 
 ## 7. Session handoff
 
-Task kế tiếp chỉ được dùng các output đã được PM approve. Dependency chưa approve được coi là chưa tồn tại. Mỗi `TASK.md` mới phải trỏ chính xác đến report/contract được phép kế thừa.
+Mặc định, task kế tiếp chỉ được dùng các output đã được PM approve. Dependency
+chưa approve được coi là chưa tồn tại. Mỗi `TASK.md` mới phải trỏ chính xác đến
+report/contract được phép kế thừa.
+
+Ngoại lệ full-sprint chỉ áp dụng khi PM đã phát hành trước toàn bộ sprint
+contract và task packets. Trong phạm vi đó, task phụ thuộc nội bộ được dùng
+output `MANAGER_VERIFIED_PENDING_SPRINT_REVIEW` của task trước. Hermes manager
+không được tự tạo/thay đổi acceptance contract, mở task ngoài sprint, hoặc dùng
+manager gate để thỏa dependency của sprint/epic khác.
+
+Luồng trạng thái bắt buộc:
+
+`READY -> HERMES_RUNNING -> SUBMITTED_PENDING_PM -> CHANGES_REQUESTED -> HERMES_RUNNING`
+
+hoặc:
+
+`READY -> HERMES_RUNNING -> SUBMITTED_PENDING_PM -> APPROVED -> CLOSED`
+
+Hoặc, trong chế độ full-sprint do PM phát hành:
+
+`READY -> HERMES_RUNNING -> SUBMITTED_PENDING_MANAGER -> CHANGES_REQUESTED -> HERMES_RUNNING`
+
+hoặc:
+
+`READY -> HERMES_RUNNING -> SUBMITTED_PENDING_MANAGER -> MANAGER_VERIFIED_PENDING_SPRINT_REVIEW`
+
+Sau task cuối:
+
+`MANAGER_VERIFIED_PENDING_SPRINT_REVIEW -> SPRINT_SUBMITTED -> PM_SPRINT_REVIEW -> APPROVED -> CLOSED`
+
+Nếu Codex trả correction ở sprint exit:
+
+`SPRINT_SUBMITTED -> CHANGES_REQUESTED ->` resume đúng session của Task ID liên
+quan `-> SPRINT_SUBMITTED`.
+
+Không được nhảy trực tiếp từ `HERMES_RUNNING` sang `APPROVED`, và không được có hai Task ID ở trạng thái ghi đồng thời.
+
+### Full-sprint manager gate
+
+- PM phải chuẩn bị sprint contract, dependency graph, mọi task packet, allowed
+  write scope và protected-data baseline trước khi manager chạy task đầu tiên.
+- Mỗi Task ID vẫn dùng một Hermes coding session riêng. Correction của cùng Task
+  ID phải resume đúng stored session ID.
+- Manager chỉ review sau khi writer thoát và tree ổn định; phải audit scope/diff,
+  chạy validation và ghi exact session/evidence.
+- `MANAGER_VERIFIED_PENDING_SPRINT_REVIEW` chỉ mở dependency nội bộ tuyến tính;
+  không phải `APPROVED` và Hermes không được sửa `PM_REVIEW.md`.
+- Manager chạy fresh sprint-exit integration, Playwright/visual (nếu liên quan),
+  quality baseline và protected-data comparison, rồi dừng mọi writer ở
+  `SPRINT_SUBMITTED`.
+- Codex chỉ review khi người dùng yêu cầu ở sprint exit. Không tự poll tiến trình
+  Hermes trong lúc sprint đang chạy.
+- Parallel writers chỉ được phép khi sprint contract cho phép rõ ràng, worktree,
+  session, write scope và mutable runtime/evidence hoàn toàn tách biệt. Task có
+  dependency trực tiếp phải chạy tuần tự.

@@ -21,6 +21,12 @@ The durable latest notification is mirrored at
 `output/HERMES_AUTOPILOT_NOTIFICATION.md`. A missing notification means work is
 continuing normally; it is not a failure.
 
+During an active long-running manager session, "quiet" is limited by the
+liveness policy: the manager must post a concise progress heartbeat at least
+every 30 minutes. If no progress is confirmed for 20 minutes while runnable
+work remains, it must recover or emit `AUTOPILOT_BLOCKED`; it must never wait
+for a user message to wake it.
+
 For `DECISION_NEEDED`, `AUTOPILOT_BLOCKED`, and final readiness, Autopilot also
 opens a persistent Windows popup that stays visible until acknowledged. Popup
 implementation: `scripts/show-hermes-autopilot-popup.ps1`.

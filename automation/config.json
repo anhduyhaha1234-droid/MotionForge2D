@@ -2,7 +2,7 @@
   "schema_version": 1,
   "hermes_command": "hermes",
   "provider": "custom",
-  "model": "hermes",
+  "model": "ocg/deepseek-v4-flash",
   "reasoning_effort": "max",
   "max_turns": 300,
   "timeout_minutes": 90,

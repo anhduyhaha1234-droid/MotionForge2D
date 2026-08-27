@@ -249,12 +249,25 @@ try {
             Write-Host 'DRY RUN: add -Execute to launch a new Hermes session.'
             exit 0
         }
+        $runningState = [ordered]@{
+            schema_version = 1; task_id = $packet.task_id; session_path = $packet.relative_path
+            hermes_session_id = ''; status = 'HERMES_RUNNING'; correction_attempts = 0
+            report_status = $initialReportStatus; started_at = (Get-Date).ToString('o')
+            updated_at = (Get-Date).ToString('o')
+        }
+        Write-JsonFile $statePath $runningState
         $result = Invoke-Hermes -Prompt $prompt -ExistingSessionId '' -RunLabel "$($packet.task_id)-start"
+        $finalReportStatus = Get-ReportStatus $packet.report_path
+        $handoffStatus = if ($result.exit_code -eq 0 -and $finalReportStatus -eq 'SUBMITTED') {
+            'SUBMITTED_PENDING_PM'
+        } else {
+            'HERMES_FAILED'
+        }
         $newState = [ordered]@{
             schema_version = 1; task_id = $packet.task_id; session_path = $packet.relative_path
-            hermes_session_id = $result.session_id; status = 'SUBMITTED_PENDING_PM'
+            hermes_session_id = $result.session_id; status = $handoffStatus
             correction_attempts = 0; hermes_exit_code = $result.exit_code
-            report_status = Get-ReportStatus $packet.report_path
+            report_status = $finalReportStatus
             started_at = (Get-Date).ToString('o'); updated_at = (Get-Date).ToString('o')
             stdout_path = $result.stdout_path; stderr_path = $result.stderr_path
         }
@@ -282,10 +295,19 @@ try {
             exit 0
         }
         $prompt = Get-Content -LiteralPath $correctionAbsolute -Raw
+        $state.status = 'HERMES_RUNNING'
+        $state.updated_at = (Get-Date).ToString('o')
+        Write-JsonFile $statePath $state
         $result = Invoke-Hermes -Prompt $prompt -ExistingSessionId $state.hermes_session_id -RunLabel "$($state.task_id)-correction"
         $state.correction_attempts = [int]$state.correction_attempts + 1
         $state.hermes_exit_code = $result.exit_code
-        $state.status = 'SUBMITTED_PENDING_PM'
+        $resumeReportPath = Join-Path (Join-Path $repoRoot $state.session_path) 'REPORT.md'
+        $state.report_status = Get-ReportStatus $resumeReportPath
+        $state.status = if ($result.exit_code -eq 0 -and $state.report_status -eq 'SUBMITTED') {
+            'SUBMITTED_PENDING_PM'
+        } else {
+            'HERMES_FAILED'
+        }
         $state.updated_at = (Get-Date).ToString('o')
         $state.stdout_path = $result.stdout_path
         $state.stderr_path = $result.stderr_path
@@ -302,9 +324,19 @@ try {
             exit 0
         }
         $packet = Resolve-SessionPacket $state.session_path
+        $reportStatus = Get-ReportStatus $packet.report_path
+        if ($state.status -ne 'SUBMITTED_PENDING_PM' -or $reportStatus -ne 'SUBMITTED') {
+            throw "Close denied: state/report must be SUBMITTED_PENDING_PM/SUBMITTED, found $($state.status)/$reportStatus."
+        }
         $review = Get-Content -LiteralPath $packet.review_path -Raw
-        if ($review -notmatch '(?m)^\*\*Decision:\*\*\s+APPROVED') {
+        if ($review -notmatch '(?m)^\s*(?:-\s*)?\*\*Decision:\*\*\s+APPROVED\s*$') {
             throw 'PM_REVIEW.md is not APPROVED; close denied.'
+        }
+        if ($review -notmatch '(?m)^\s*(?:-\s*)?\*\*Reviewed commit/tree:\*\*\s+\S+') {
+            throw 'PM_REVIEW.md must record the reviewed commit/tree; close denied.'
+        }
+        if ($review -notmatch '(?m)^\s*(?:-\s*)?\*\*Quality Run ID:\*\*\s+\S+') {
+            throw 'PM_REVIEW.md must record a Quality Run ID; close denied.'
         }
         $state.status = 'CLOSED'
         $state | Add-Member -NotePropertyName closed_at -NotePropertyValue ((Get-Date).ToString('o')) -Force
