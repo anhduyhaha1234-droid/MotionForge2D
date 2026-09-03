@@ -1,0 +1,255 @@
+{
+  "calibration_revision": "1.0.0",
+  "calibration_sources": [
+    "tests/fixtures/s11_qc/calibration/av_sync.json",
+    "tests/fixtures/s11_qc/calibration/contact_zorder_clipping.json",
+    "tests/fixtures/s11_qc/calibration/identity_halo_flicker.json",
+    "tests/fixtures/s11_qc/calibration/trajectory_cut.json"
+  ],
+  "content_hash": "de215c6243e1c6bf300e2bfa1c8024fbda6d0358ecf3cad1730781e37419ea24",
+  "derivation_rule": "increasing: warning=level-2 raw_value, blocker=level-4 (max calibrated) raw_value, sanity=[0, max calibrated]; constant: warning=blocker=calibrated constant, sanity=[0, calibrated constant]; sanity min=0.0 physical non-negativity; every boundary is a raw_value cited in provenance from tests/fixtures/s11_qc/calibration/*.json (T06A2, builder tests/s11_qc_calibration_builders.py revision 1.0.0)",
+  "policy_id": "s11-qc-thresholds-v1",
+  "schema_version": 1,
+  "thresholds": {
+    "av_sync_drift": {
+      "blocker_boundary": 0.5,
+      "kind": "increasing",
+      "metric": "av_sync_drift",
+      "provenance": {
+        "blocker_boundary_source": "tests/fixtures/s11_qc/calibration/av_sync.json:metric=av_sync_drift:level=4:raw_value",
+        "deterministic_seed": 11009,
+        "fixture": "av_sync.json",
+        "measurement_function_revision": "1.0.0",
+        "metric_record": "av_sync.json:metrics[metric=av_sync_drift]",
+        "monotonic": "increasing",
+        "result_reference": "s11_qc_calibration_builders.py:measure_av_sync_drift",
+        "sanity_max_source": "tests/fixtures/s11_qc/calibration/av_sync.json:metric=av_sync_drift:level=4:raw_value (max calibrated envelope)",
+        "sanity_min_rule": "physical non-negativity: px/frame/count/second/ratio/level cannot be negative",
+        "source_reference": "s11_qc_calibration_builders.py:generate_av_sync_input",
+        "warning_boundary_source": "tests/fixtures/s11_qc/calibration/av_sync.json:metric=av_sync_drift:level=2:raw_value"
+      },
+      "sanity_bounds": {
+        "max": 0.5,
+        "min": 0.0
+      },
+      "unit": "s",
+      "warning_boundary": 0.1
+    },
+    "contact_break": {
+      "blocker_boundary": 16.0,
+      "kind": "increasing",
+      "metric": "contact_break",
+      "provenance": {
+        "blocker_boundary_source": "tests/fixtures/s11_qc/calibration/contact_zorder_clipping.json:metric=contact_break:level=4:raw_value",
+        "deterministic_seed": 11003,
+        "fixture": "contact_zorder_clipping.json",
+        "measurement_function_revision": "1.0.0",
+        "metric_record": "contact_zorder_clipping.json:metrics[metric=contact_break]",
+        "monotonic": "increasing",
+        "result_reference": "s11_qc_calibration_builders.py:measure_contact_break",
+        "sanity_max_source": "tests/fixtures/s11_qc/calibration/contact_zorder_clipping.json:metric=contact_break:level=4:raw_value (max calibrated envelope)",
+        "sanity_min_rule": "physical non-negativity: px/frame/count/second/ratio/level cannot be negative",
+        "source_reference": "s11_qc_calibration_builders.py:generate_contact_break_input",
+        "warning_boundary_source": "tests/fixtures/s11_qc/calibration/contact_zorder_clipping.json:metric=contact_break:level=2:raw_value"
+      },
+      "sanity_bounds": {
+        "max": 16.0,
+        "min": 0.0
+      },
+      "unit": "px",
+      "warning_boundary": 4.0
+    },
+    "cut_drift": {
+      "blocker_boundary": 12,
+      "kind": "increasing",
+      "metric": "cut_drift",
+      "provenance": {
+        "blocker_boundary_source": "tests/fixtures/s11_qc/calibration/trajectory_cut.json:metric=cut_drift:level=4:raw_value",
+        "deterministic_seed": 11002,
+        "fixture": "trajectory_cut.json",
+        "measurement_function_revision": "1.0.0",
+        "metric_record": "trajectory_cut.json:metrics[metric=cut_drift]",
+        "monotonic": "increasing",
+        "result_reference": "s11_qc_calibration_builders.py:measure_cut_drift",
+        "sanity_max_source": "tests/fixtures/s11_qc/calibration/trajectory_cut.json:metric=cut_drift:level=4:raw_value (max calibrated envelope)",
+        "sanity_min_rule": "physical non-negativity: px/frame/count/second/ratio/level cannot be negative",
+        "source_reference": "s11_qc_calibration_builders.py:generate_cut_drift_input",
+        "warning_boundary_source": "tests/fixtures/s11_qc/calibration/trajectory_cut.json:metric=cut_drift:level=2:raw_value"
+      },
+      "sanity_bounds": {
+        "max": 12,
+        "min": 0.0
+      },
+      "unit": "frame",
+      "warning_boundary": 3
+    },
+    "edge_halo": {
+      "blocker_boundary": 8.737606376,
+      "kind": "increasing",
+      "metric": "edge_halo",
+      "provenance": {
+        "blocker_boundary_source": "tests/fixtures/s11_qc/calibration/identity_halo_flicker.json:metric=edge_halo:level=4:raw_value",
+        "deterministic_seed": 11007,
+        "fixture": "identity_halo_flicker.json",
+        "measurement_function_revision": "1.0.0",
+        "metric_record": "identity_halo_flicker.json:metrics[metric=edge_halo]",
+        "monotonic": "increasing",
+        "result_reference": "s11_qc_calibration_builders.py:measure_edge_halo",
+        "sanity_max_source": "tests/fixtures/s11_qc/calibration/identity_halo_flicker.json:metric=edge_halo:level=4:raw_value (max calibrated envelope)",
+        "sanity_min_rule": "physical non-negativity: px/frame/count/second/ratio/level cannot be negative",
+        "source_reference": "s11_qc_calibration_builders.py:generate_edge_halo_input",
+        "warning_boundary_source": "tests/fixtures/s11_qc/calibration/identity_halo_flicker.json:metric=edge_halo:level=2:raw_value"
+      },
+      "sanity_bounds": {
+        "max": 8.737606376,
+        "min": 0.0
+      },
+      "unit": "px",
+      "warning_boundary": 2.021267777
+    },
+    "identity_drift": {
+      "blocker_boundary": 8.0,
+      "kind": "increasing",
+      "metric": "identity_drift",
+      "provenance": {
+        "blocker_boundary_source": "tests/fixtures/s11_qc/calibration/identity_halo_flicker.json:metric=identity_drift:level=4:raw_value",
+        "deterministic_seed": 11006,
+        "fixture": "identity_halo_flicker.json",
+        "measurement_function_revision": "1.0.0",
+        "metric_record": "identity_halo_flicker.json:metrics[metric=identity_drift]",
+        "monotonic": "increasing",
+        "result_reference": "s11_qc_calibration_builders.py:measure_identity_drift",
+        "sanity_max_source": "tests/fixtures/s11_qc/calibration/identity_halo_flicker.json:metric=identity_drift:level=4:raw_value (max calibrated envelope)",
+        "sanity_min_rule": "physical non-negativity: px/frame/count/second/ratio/level cannot be negative",
+        "source_reference": "s11_qc_calibration_builders.py:generate_identity_drift_input",
+        "warning_boundary_source": "tests/fixtures/s11_qc/calibration/identity_halo_flicker.json:metric=identity_drift:level=2:raw_value"
+      },
+      "sanity_bounds": {
+        "max": 8.0,
+        "min": 0.0
+      },
+      "unit": "px",
+      "warning_boundary": 2.0
+    },
+    "no_audio_source_fact": {
+      "blocker_boundary": 0,
+      "kind": "constant",
+      "metric": "no_audio_source_fact",
+      "provenance": {
+        "blocker_boundary_source": "tests/fixtures/s11_qc/calibration/av_sync.json:metric=no_audio_source_fact:level=1:raw_value",
+        "deterministic_seed": 11010,
+        "fixture": "av_sync.json",
+        "measurement_function_revision": "1.0.0",
+        "metric_record": "av_sync.json:metrics[metric=no_audio_source_fact]",
+        "monotonic": "constant",
+        "result_reference": "s11_qc_calibration_builders.py:measure_no_audio_source",
+        "sanity_max_source": "tests/fixtures/s11_qc/calibration/av_sync.json:metric=no_audio_source_fact:level=1:raw_value (max calibrated envelope)",
+        "sanity_min_rule": "physical non-negativity: px/frame/count/second/ratio/level cannot be negative",
+        "source_reference": "s11_qc_calibration_builders.py:generate_no_audio_input",
+        "warning_boundary_source": "tests/fixtures/s11_qc/calibration/av_sync.json:metric=no_audio_source_fact:level=1:raw_value"
+      },
+      "sanity_bounds": {
+        "max": 0,
+        "min": 0.0
+      },
+      "unit": "count",
+      "warning_boundary": 0
+    },
+    "silhouette_clipping": {
+      "blocker_boundary": 0.5,
+      "kind": "increasing",
+      "metric": "silhouette_clipping",
+      "provenance": {
+        "blocker_boundary_source": "tests/fixtures/s11_qc/calibration/contact_zorder_clipping.json:metric=silhouette_clipping:level=4:raw_value",
+        "deterministic_seed": 11005,
+        "fixture": "contact_zorder_clipping.json",
+        "measurement_function_revision": "1.0.0",
+        "metric_record": "contact_zorder_clipping.json:metrics[metric=silhouette_clipping]",
+        "monotonic": "increasing",
+        "result_reference": "s11_qc_calibration_builders.py:measure_silhouette_clipping",
+        "sanity_max_source": "tests/fixtures/s11_qc/calibration/contact_zorder_clipping.json:metric=silhouette_clipping:level=4:raw_value (max calibrated envelope)",
+        "sanity_min_rule": "physical non-negativity: px/frame/count/second/ratio/level cannot be negative",
+        "source_reference": "s11_qc_calibration_builders.py:generate_silhouette_clipping_input",
+        "warning_boundary_source": "tests/fixtures/s11_qc/calibration/contact_zorder_clipping.json:metric=silhouette_clipping:level=2:raw_value"
+      },
+      "sanity_bounds": {
+        "max": 0.5,
+        "min": 0.0
+      },
+      "unit": "ratio",
+      "warning_boundary": 0.166666667
+    },
+    "temporal_flicker": {
+      "blocker_boundary": 0.099582099,
+      "kind": "increasing",
+      "metric": "temporal_flicker",
+      "provenance": {
+        "blocker_boundary_source": "tests/fixtures/s11_qc/calibration/identity_halo_flicker.json:metric=temporal_flicker:level=4:raw_value",
+        "deterministic_seed": 11008,
+        "fixture": "identity_halo_flicker.json",
+        "measurement_function_revision": "1.0.0",
+        "metric_record": "identity_halo_flicker.json:metrics[metric=temporal_flicker]",
+        "monotonic": "increasing",
+        "result_reference": "s11_qc_calibration_builders.py:measure_temporal_flicker",
+        "sanity_max_source": "tests/fixtures/s11_qc/calibration/identity_halo_flicker.json:metric=temporal_flicker:level=4:raw_value (max calibrated envelope)",
+        "sanity_min_rule": "physical non-negativity: px/frame/count/second/ratio/level cannot be negative",
+        "source_reference": "s11_qc_calibration_builders.py:generate_temporal_flicker_input",
+        "warning_boundary_source": "tests/fixtures/s11_qc/calibration/identity_halo_flicker.json:metric=temporal_flicker:level=2:raw_value"
+      },
+      "sanity_bounds": {
+        "max": 0.099582099,
+        "min": 0.0
+      },
+      "unit": "level",
+      "warning_boundary": 0.024895525
+    },
+    "trajectory_drift": {
+      "blocker_boundary": 126.0,
+      "kind": "increasing",
+      "metric": "trajectory_drift",
+      "provenance": {
+        "blocker_boundary_source": "tests/fixtures/s11_qc/calibration/trajectory_cut.json:metric=trajectory_drift:level=4:raw_value",
+        "deterministic_seed": 11001,
+        "fixture": "trajectory_cut.json",
+        "measurement_function_revision": "1.0.0",
+        "metric_record": "trajectory_cut.json:metrics[metric=trajectory_drift]",
+        "monotonic": "increasing",
+        "result_reference": "s11_qc_calibration_builders.py:measure_trajectory_drift",
+        "sanity_max_source": "tests/fixtures/s11_qc/calibration/trajectory_cut.json:metric=trajectory_drift:level=4:raw_value (max calibrated envelope)",
+        "sanity_min_rule": "physical non-negativity: px/frame/count/second/ratio/level cannot be negative",
+        "source_reference": "s11_qc_calibration_builders.py:generate_trajectory_drift_input",
+        "warning_boundary_source": "tests/fixtures/s11_qc/calibration/trajectory_cut.json:metric=trajectory_drift:level=2:raw_value"
+      },
+      "sanity_bounds": {
+        "max": 126.0,
+        "min": 0.0
+      },
+      "unit": "px",
+      "warning_boundary": 31.5
+    },
+    "z_order_error": {
+      "blocker_boundary": 8,
+      "kind": "increasing",
+      "metric": "z_order_error",
+      "provenance": {
+        "blocker_boundary_source": "tests/fixtures/s11_qc/calibration/contact_zorder_clipping.json:metric=z_order_error:level=4:raw_value",
+        "deterministic_seed": 11004,
+        "fixture": "contact_zorder_clipping.json",
+        "measurement_function_revision": "1.0.0",
+        "metric_record": "contact_zorder_clipping.json:metrics[metric=z_order_error]",
+        "monotonic": "increasing",
+        "result_reference": "s11_qc_calibration_builders.py:measure_z_order_error",
+        "sanity_max_source": "tests/fixtures/s11_qc/calibration/contact_zorder_clipping.json:metric=z_order_error:level=4:raw_value (max calibrated envelope)",
+        "sanity_min_rule": "physical non-negativity: px/frame/count/second/ratio/level cannot be negative",
+        "source_reference": "s11_qc_calibration_builders.py:generate_z_order_error_input",
+        "warning_boundary_source": "tests/fixtures/s11_qc/calibration/contact_zorder_clipping.json:metric=z_order_error:level=2:raw_value"
+      },
+      "sanity_bounds": {
+        "max": 8,
+        "min": 0.0
+      },
+      "unit": "count",
+      "warning_boundary": 4
+    }
+  }
+}

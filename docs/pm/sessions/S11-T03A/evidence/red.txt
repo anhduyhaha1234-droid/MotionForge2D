@@ -1,0 +1,14 @@
+RED run (session start, BEFORE any implementation — real output):
+$ env -u MOTIONFORGE_DATABASE_URL python -m pytest tests/test_s11_t03a_thresholds_policy.py tests/test_s11_t03a_runner_registry.py -p no:cacheprovider --basetemp=C:/Users/Admin/AppData/Local/Temp/s11t03a-red -q
+___________ ERROR collecting tests/test_s11_t03a_runner_registry.py ___________
+ImportError while importing test module '...tests/test_s11_t03a_runner_registry.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+tests\test_s11_t03a_runner_registry.py:36: in <module>
+    from app.services.qc_checks import (
+E   ModuleNotFoundError: No module named 'app.services.qc_checks'
+=========================== short test summary info ===========================
+ERROR tests/test_s11_t03a_thresholds_policy.py
+ERROR tests/test_s11_t03a_runner_registry.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 2 errors during collection !!!!!!!!!!!!!!!!!!!
+2 errors in 0.20s

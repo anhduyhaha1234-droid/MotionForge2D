@@ -1,0 +1,31 @@
+S11-T03A baseline evidence (W5)
+===============================
+Captured from the FIRST commands of the session (pre-work):
+
+$ git status --porcelain | head -20
+(empty — porcelain = 0)
+
+$ git log --oneline -3 | cat
+8f27c6b S11-T06A2 (W4): raw QC calibration fixtures and measurements
+7f22d2f S11-T06A1 (W3): deterministic media/QC seed infrastructure
+cd4f792 docs(s11): T02B record commit SHA in LOG/REPORT
+
+$ test -d app/services/qc_checks && echo "qc_checks EXISTS (BAD)" || echo "qc_checks absent (OK)"
+qc_checks absent (OK)
+
+$ ls tests/fixtures/s11_golden/
+(empty — directory does not exist yet)
+
+$ ls docs/pm/sessions/S11-T06A2/
+LOG.md REPORT.md evidence
+
+$ python -c "import psutil; print('psutil', psutil.__version__)"
+psutil 7.2.2
+
+Post-work scope (git status --porcelain, pre-commit):
+?? app/services/qc_checks/
+?? docs/pm/sessions/S11-T03A/
+?? tests/fixtures/s11_golden/
+?? tests/test_s11_t03a_runner_registry.py
+?? tests/test_s11_t03a_thresholds_policy.py
+(NO modified files — HEAD untouched at 8f27c6b)

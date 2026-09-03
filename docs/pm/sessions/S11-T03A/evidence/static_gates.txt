@@ -1,0 +1,7 @@
+== ruff --select F (6 files) ==
+All checks passed!
+RUFF_EXIT=0
+== py_compile (6 files) ==
+PY_COMPILE_OK
+== golden fixture sha256 ==
+54e5e7eb2b95f2e43c0437fd48916769a4df05d89bbc5972a2cfc07d9af5c400 *tests/fixtures/s11_golden/qc_thresholds.json

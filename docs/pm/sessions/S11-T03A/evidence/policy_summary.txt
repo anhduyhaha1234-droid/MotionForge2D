@@ -1,0 +1,18 @@
+== policy summary ==
+policy_id: s11-qc-thresholds-v1
+schema_version: 1
+content_hash: de215c6243e1c6bf300e2bfa1c8024fbda6d0358ecf3cad1730781e37419ea24
+n_thresholds: 10
+  av_sync_drift          unit=s      kind=increasing warn=0.1           block=0.5           sanity={'min': 0.0, 'max': 0.5} <- av_sync.json
+  contact_break          unit=px     kind=increasing warn=4.0           block=16.0          sanity={'min': 0.0, 'max': 16.0} <- contact_zorder_clipping.json
+  cut_drift              unit=frame  kind=increasing warn=3             block=12            sanity={'min': 0.0, 'max': 12} <- trajectory_cut.json
+  edge_halo              unit=px     kind=increasing warn=2.021267777   block=8.737606376   sanity={'min': 0.0, 'max': 8.737606376} <- identity_halo_flicker.json
+  identity_drift         unit=px     kind=increasing warn=2.0           block=8.0           sanity={'min': 0.0, 'max': 8.0} <- identity_halo_flicker.json
+  no_audio_source_fact   unit=count  kind=constant  warn=0             block=0             sanity={'min': 0.0, 'max': 0} <- av_sync.json
+  silhouette_clipping    unit=ratio  kind=increasing warn=0.166666667   block=0.5           sanity={'min': 0.0, 'max': 0.5} <- contact_zorder_clipping.json
+  temporal_flicker       unit=level  kind=increasing warn=0.024895525   block=0.099582099   sanity={'min': 0.0, 'max': 0.099582099} <- identity_halo_flicker.json
+  trajectory_drift       unit=px     kind=increasing warn=31.5          block=126.0         sanity={'min': 0.0, 'max': 126.0} <- trajectory_cut.json
+  z_order_error          unit=count  kind=increasing warn=4             block=8             sanity={'min': 0.0, 'max': 8} <- contact_zorder_clipping.json
+hash_stable_two_builds: True
+load==build: True
+golden==load_policy: True
