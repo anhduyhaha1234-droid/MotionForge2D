@@ -619,8 +619,28 @@ class JobRepository:
             updated_at=now,
             revision=create_job_revision(),
         )
-        self._session.add(job)
-        self._session.flush()
+        try:
+            self._session.add(job)
+            self._session.flush()
+        except IntegrityError as exc:
+            # S10-T01C-C12/C6E F1 (bounded): the partial unique index
+            # ``uq_job_idempotency_key`` is the database-enforced concurrency
+            # backstop.  Two sessions racing the identical (workspace, key,
+            # generation) tuple — e.g. two concurrent identical repair
+            # replays that BOTH observed no existing job — are serialized here:
+            # the winner's INSERT commits, the loser's INSERT collides on the
+            # unique index and is converted to the stable job-domain
+            # ``IdempotencyKeyInUse`` so callers converge on the winner rather
+            # than treating it as a generic enqueue failure.  (S10 C6D exposed
+            # the hole where a NULL ``input_generation`` let SQLite treat the
+            # two rows as distinct — the S10 paths now derive a deterministic,
+            # non-NULL generation so this backstop actually fires.)
+            raise IdempotencyKeyInUse(
+                f"idempotency key {idempotency_key!r} is already in use by "
+                f"another active or completed Job in workspace {workspace_id} "
+                f"(concurrency backstop)",
+                key=idempotency_key or "",
+            ) from exc
         self._create_steps_for_job(job, steps, resource_class, priority, max_attempts)
 
         self._append_event(

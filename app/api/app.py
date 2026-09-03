@@ -38,6 +38,7 @@ from app.api.routes import (
     s09_correction,
     s09_demo_compare,
     s09_demo_loops,
+    s10_full_apply,
     structural_evidence,
 )
 from app.api.security import (
@@ -172,6 +173,12 @@ app.include_router(s09_correction.router)
 # get_db_session semantics (close-only dependency), so checkpoints survive
 # process restart/reload without any test-only auto-commit.
 app.include_router(s09_approval.router)
+
+
+# Durable FullApply orchestration API (S10-T01C) — /api/v2 FullApply.
+# Additive, project-scoped; HTTP returns without performing full render
+# synchronously — the durable worker executes outside the request.
+app.include_router(s10_full_apply.router)
 
 
 @app.get("/health")

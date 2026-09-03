@@ -104,6 +104,12 @@ __all__ = [
     "SceneGraphOcclusion",
     "SegmentMotion",
     "OccurrenceSegment",
+    "S10FullApplyChunk",
+    "S10FullApplyPublication",
+    "S10FullApplyRun",
+    "S10_FULL_APPLY_CHUNK_STATES",
+    "S10_FULL_APPLY_PUBLICATION_STATES",
+    "S10_FULL_APPLY_RUN_STATUSES",
     "VideoItem",
     "Workspace",
     "utc_now",
@@ -2684,3 +2690,287 @@ class S09Correction(TimestampMixin, Base):
     natural_key: Mapped[str | None] = mapped_column(String(255))
 
     segment: Mapped[OccurrenceSegment | None] = relationship()
+
+# ── S10 FullApply domain (S10-T01A) ─────────────────────────────────────────
+
+S10_FULL_APPLY_RUN_STATUSES = (
+    "pending",
+    "running",
+    "verifying",
+    "completed",
+    "failed",
+    "cancelled",
+)
+S10_FULL_APPLY_CHUNK_STATES = (
+    "pending",
+    "running",
+    "completed",
+    "failed",
+    "skipped",
+)
+S10_FULL_APPLY_PUBLICATION_STATES = (
+    "pending",
+    "verifying",
+    "completed",
+    "failed",
+)
+
+
+class S10FullApplyRun(TimestampMixin, Base):
+    """Durable FullApply run aggregate (S10-T01A)."""
+
+    __tablename__ = "s10_full_apply_run"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending','running','verifying','completed','failed','cancelled')",
+            name="ck_s10_run_status",
+        ),
+        CheckConstraint("length(plan_id) = 64", name="ck_s10_run_plan_id_len"),
+        CheckConstraint("length(plan_hash) = 64", name="ck_s10_run_plan_hash_len"),
+        CheckConstraint(
+            "length(apply_checkpoint_hash) = 64", name="ck_s10_run_checkpoint_hash_len"
+        ),
+        CheckConstraint(
+            "apply_checkpoint_revision >= 1", name="ck_s10_run_checkpoint_revision_positive"
+        ),
+        CheckConstraint("frame_count >= 1", name="ck_s10_run_frame_count_positive"),
+        CheckConstraint("fps_num IS NULL OR fps_num > 0", name="ck_s10_run_fps_num_positive"),
+        CheckConstraint("fps_den IS NULL OR fps_den > 0", name="ck_s10_run_fps_den_positive"),
+        CheckConstraint("attempt >= 1", name="ck_s10_run_attempt_positive"),
+        CheckConstraint("revision > 0", name="ck_s10_run_revision_positive"),
+        CheckConstraint(
+            "length(natural_key) <= 255", name="ck_s10_run_natural_key_len"
+        ),
+        CheckConstraint(
+            "length(idempotency_key) <= 255", name="ck_s10_run_idempotency_key_len"
+        ),
+        Index(
+            "uq_s10_run_natural",
+            "workspace_id",
+            "natural_key",
+            unique=True,
+            sqlite_where=sa_text("natural_key IS NOT NULL"),
+        ),
+        Index(
+            "uq_s10_run_workspace_idempotency",
+            "workspace_id",
+            "idempotency_key",
+            unique=True,
+            sqlite_where=sa_text("idempotency_key IS NOT NULL"),
+        ),
+        Index("ix_s10_run_workspace", "workspace_id"),
+        Index("ix_s10_run_project", "project_id"),
+        Index("ix_s10_run_video", "video_item_id"),
+        Index("ix_s10_run_checkpoint", "apply_checkpoint_id"),
+        Index("ix_s10_run_status", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    project_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("project.id", ondelete="RESTRICT"), nullable=False
+    )
+    video_item_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("video_item.id", ondelete="RESTRICT"), nullable=False
+    )
+    apply_checkpoint_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("apply_checkpoint.id", ondelete="RESTRICT"), nullable=False
+    )
+    apply_checkpoint_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    apply_checkpoint_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    plan_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    plan_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="pending")
+    frame_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    fps_num: Mapped[int | None] = mapped_column(Integer)
+    fps_den: Mapped[int | None] = mapped_column(Integer)
+    chunk_config_json: Mapped[str] = mapped_column(Text, nullable=False)
+    attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    natural_key: Mapped[str | None] = mapped_column(String(255))
+    idempotency_key: Mapped[str | None] = mapped_column(String(255))
+    revision: Mapped[int] = mapped_column(
+        Integer, default=1, server_default=sa_text("1"), nullable=False
+    )
+
+    workspace: Mapped[Workspace] = relationship()
+    project: Mapped[Project] = relationship()
+    video_item: Mapped[VideoItem] = relationship()
+    checkpoint: Mapped[ApplyCheckpoint] = relationship()
+
+
+class S10FullApplyChunk(TimestampMixin, Base):
+    """Deterministic shot/layer chunk (S10-T01A)."""
+
+    __tablename__ = "s10_full_apply_chunk"
+    __table_args__ = (
+        CheckConstraint("chunk_index >= 0", name="ck_s10_chunk_index_nonneg"),
+        CheckConstraint("order_index >= 0", name="ck_s10_chunk_order_nonneg"),
+        CheckConstraint("length(shot_id) > 0", name="ck_s10_chunk_shot_nonempty"),
+        CheckConstraint("core_start_frame >= 0", name="ck_s10_chunk_core_start_nonneg"),
+        CheckConstraint(
+            "core_end_frame >= core_start_frame", name="ck_s10_chunk_core_end_ge_start"
+        ),
+        CheckConstraint("overlap_before >= 0", name="ck_s10_chunk_overlap_before_nonneg"),
+        CheckConstraint("overlap_after >= 0", name="ck_s10_chunk_overlap_after_nonneg"),
+        CheckConstraint("length(content_hash) = 64", name="ck_s10_chunk_content_hash_len"),
+        CheckConstraint(
+            "state IN ('pending','running','completed','failed','skipped')",
+            name="ck_s10_chunk_state",
+        ),
+        CheckConstraint("attempt >= 1", name="ck_s10_chunk_attempt_positive"),
+        CheckConstraint("verified IN (0, 1)", name="ck_s10_chunk_verified_bool"),
+        CheckConstraint("revision > 0", name="ck_s10_chunk_revision_positive"),
+        CheckConstraint(
+            "length(natural_key) <= 255", name="ck_s10_chunk_natural_key_len"
+        ),
+        CheckConstraint(
+            "length(idempotency_key) <= 255", name="ck_s10_chunk_idempotency_key_len"
+        ),
+        UniqueConstraint(
+            "run_id", "chunk_index", "attempt", name="uq_s10_chunk_run_index_attempt"
+        ),
+        Index(
+            "uq_s10_chunk_natural",
+            "workspace_id",
+            "natural_key",
+            unique=True,
+            sqlite_where=sa_text("natural_key IS NOT NULL"),
+        ),
+        Index(
+            "uq_s10_chunk_workspace_idempotency",
+            "workspace_id",
+            "idempotency_key",
+            unique=True,
+            sqlite_where=sa_text("idempotency_key IS NOT NULL"),
+        ),
+        Index("ix_s10_chunk_run", "run_id"),
+        Index("ix_s10_chunk_state", "state"),
+        Index("ix_s10_chunk_shot", "shot_id"),
+        Index("ix_s10_chunk_run_state", "run_id", "state"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    run_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("s10_full_apply_run.id", ondelete="RESTRICT"), nullable=False
+    )
+    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    order_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    shot_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    layer_id: Mapped[str | None] = mapped_column(String(128))
+    object_role_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("object_role.id", ondelete="RESTRICT")
+    )
+    core_start_frame: Mapped[int] = mapped_column(Integer, nullable=False)
+    core_end_frame: Mapped[int] = mapped_column(Integer, nullable=False)
+    overlap_before: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    overlap_after: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    state: Mapped[str] = mapped_column(String(24), nullable=False, default="pending")
+    attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    artifact_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("artifact.id", ondelete="RESTRICT")
+    )
+    verified: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    natural_key: Mapped[str | None] = mapped_column(String(255))
+    idempotency_key: Mapped[str | None] = mapped_column(String(255))
+    revision: Mapped[int] = mapped_column(
+        Integer, default=1, server_default=sa_text("1"), nullable=False
+    )
+
+    run: Mapped[S10FullApplyRun] = relationship(back_populates="chunks")
+    artifact: Mapped[Artifact | None] = relationship()
+    object_role: Mapped[ObjectRole | None] = relationship()
+
+
+S10FullApplyRun.chunks = relationship(
+    "S10FullApplyChunk",
+    back_populates="run",
+    order_by="S10FullApplyChunk.order_index",
+    cascade="save-update, merge, refresh-expire, expunge",
+)
+
+
+class S10FullApplyPublication(TimestampMixin, Base):
+    """Atomic publish of one verified full output (S10-T01A)."""
+
+    __tablename__ = "s10_full_apply_publication"
+    __table_args__ = (
+        CheckConstraint("length(content_hash) = 64", name="ck_s10_pub_content_hash_len"),
+        CheckConstraint("frame_count >= 1", name="ck_s10_pub_frame_count_positive"),
+        CheckConstraint("length(checkpoint_hash) = 64", name="ck_s10_pub_checkpoint_hash_len"),
+        CheckConstraint(
+            "checkpoint_revision >= 1", name="ck_s10_pub_checkpoint_revision_positive"
+        ),
+        CheckConstraint(
+            "state IN ('pending','verifying','completed','failed')",
+            name="ck_s10_pub_state",
+        ),
+        CheckConstraint("revision > 0", name="ck_s10_pub_revision_positive"),
+        CheckConstraint(
+            "length(natural_key) <= 255", name="ck_s10_pub_natural_key_len"
+        ),
+        CheckConstraint(
+            "length(idempotency_key) <= 255", name="ck_s10_pub_idempotency_key_len"
+        ),
+        UniqueConstraint("run_id", "content_hash", name="uq_s10_pub_run_content_hash"),
+        Index(
+            "uq_s10_pub_natural",
+            "workspace_id",
+            "natural_key",
+            unique=True,
+            sqlite_where=sa_text("natural_key IS NOT NULL"),
+        ),
+        Index(
+            "uq_s10_pub_workspace_idempotency",
+            "workspace_id",
+            "idempotency_key",
+            unique=True,
+            sqlite_where=sa_text("idempotency_key IS NOT NULL"),
+        ),
+        Index("ix_s10_pub_run", "run_id"),
+        Index("ix_s10_pub_artifact", "artifact_id"),
+        Index("ix_s10_pub_state", "state"),
+        Index("ix_s10_pub_checkpoint", "checkpoint_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    run_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("s10_full_apply_run.id", ondelete="RESTRICT"), nullable=False
+    )
+    artifact_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("artifact.id", ondelete="RESTRICT"), nullable=False
+    )
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    frame_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    frame_metadata_json: Mapped[str] = mapped_column(Text, nullable=False)
+    checkpoint_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("apply_checkpoint.id", ondelete="RESTRICT"), nullable=False
+    )
+    checkpoint_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    checkpoint_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    state: Mapped[str] = mapped_column(String(24), nullable=False, default="pending")
+    natural_key: Mapped[str | None] = mapped_column(String(255))
+    idempotency_key: Mapped[str | None] = mapped_column(String(255))
+    revision: Mapped[int] = mapped_column(
+        Integer, default=1, server_default=sa_text("1"), nullable=False
+    )
+
+    run: Mapped[S10FullApplyRun] = relationship(back_populates="publications")
+    artifact: Mapped[Artifact] = relationship()
+    checkpoint: Mapped[ApplyCheckpoint] = relationship()
+
+
+S10FullApplyRun.publications = relationship(
+    "S10FullApplyPublication",
+    back_populates="run",
+    order_by="S10FullApplyPublication.created_at",
+    cascade="save-update, merge, refresh-expire, expunge",
+)

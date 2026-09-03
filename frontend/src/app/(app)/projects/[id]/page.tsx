@@ -371,6 +371,16 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               máy chủ).
             </p>
           </div>
+          <div className="flex flex-col items-start gap-1">
+            <Link
+              href={`/apply?project=${encodeURIComponent(project.id)}`}
+              className="inline-flex min-h-9 items-center rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500"
+              data-testid="project-go-apply"
+            >
+              Áp dụng toàn bộ video (Full Apply) →
+            </Link>
+            <p className="text-[11px] text-gray-400">Mở luồng Apply — cần checkpoint duyệt Demo trước.</p>
+          </div>
         </div>
 
         {state.loadingVideos ? (

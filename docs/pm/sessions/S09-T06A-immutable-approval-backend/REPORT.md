@@ -179,3 +179,39 @@ TDD: RED trước fix (2 FAILED đúng defect, refuse-path PASS) → GREEN sau f
 Evidence file: output/s09/20260823_sprint_full/t06a-c3/gate-evidence.txt
 
 Trạng thái dừng: STATUS: TASK_SUBMITTED — STOP chờ review.
+
+## PHASE — S10-T06A-C4-AUTHORITY-BRIDGE (S10-C6A: immutable approval v2)
+
+**Status: TASK_SUBMITTED** (owner session 20260824_120141_312e9e — resume đúng owner; write-set: app/services/s09_approval.py + app/api/routes/s09_approval.py + app/schemas/s09_approval.py + tests/test_s09_t06_backend_authority.py + output/s10/c6a/s09-t06a-c4/** + LOG/REPORT append-only)
+
+### Defect (F3 P0 — Codex C6 blocker)
+Snapshot `s09.approval/v1` chỉ lưu policy/SLM id + TOÀN BỘ `list_routes_for_video` alternatives; thiếu manifest_hash/canonical manifest, exact manifest-selected segments/routes, source artifact authority, role/layer→pack mapping, config params, affected geometry, eligibility → server KHÔNG thể tái tạo Full Apply plan deterministic không cần client scene/mapping.
+
+### Fix — additive `s09.approval/v2` (KHÔNG đụng v1)
+1. `submit_checkpoint_v2(...)` — deterministic reapproval tạo row mới với snapshot schema `s09.approval/v2` + nested `full_apply_authority` (authority_version `s09.full-apply-authority/v1`). Toàn bộ authority nằm TRONG checkpoint content hash (mọi v2 field hash-covered); v1 rows byte-identical (submit_checkpoint v1 giữ nguyên; reapprove chỉ INSERT v2 hoặc replay tương đương; conflict → zero mutation).
+2. Authority build CHỈ từ persisted/canonical rows: identity (workspace/project/video/config/revision/generation), source (VideoItem.source_artifact_id → Artifact relative_path/sha256/size_bytes + manifest frame_count/fps/time_base/start_time_ms), structural_lock (id/policy_version/STORED manifest_hash/canonical manifest — verify hash trước freeze), shot_order + EXACT manifest-selected segments (canonical_manifest.segments; alternatives từ list_routes_for_video KHÔNG làm selected), role_mappings (ObjectRole→ReskinConfig→CharacterPackVersion published/ready + assets + canonical params + dependency hashes), geometry (OccurrenceSegment.segmentation_json/prompt_json — missing/ambiguous → fail closed), eligibility (route unsupported → reason "no downgrade" + unsupported_routes; authority incomplete reasons).
+3. `full_apply_authority(checkpoint_id, workspace_id)` — read-only; v1 → `REAPPROVAL_REQUIRED` (zero mutation); tampered v2 → S09ApprovalIntegrityError.
+4. Routes additive: POST `/api/v2/s09-approvals/reapprove` (201/200), GET `/api/v2/s09-approvals/{checkpoint_id}/full-apply-authority`. Router đã mount production (T56) — không đụng app.py.
+
+### Acceptance evidence (lệnh thật)
+| Gate | Kết quả |
+|---|---|
+| Focused RUN1/RUN2 (domain+api+durability+authority, basetemp s09t06a-c4-run1/run2) | 60 passed in 63.19s / 60 passed in 63.66s |
+| Authority suite (21 tests) | 21 passed (multiple runs) |
+| ruff --select F + full (4-file write-set) | All checks passed! |
+| mypy (3 production files) | Success: no issues found in 3 source files |
+| git diff --check | exit 0 (chỉ CRLF warnings pre-existing) |
+| Alembic head | a10b11c12d3e single head, models/migrations zero change |
+| OpenAPI materialized | 263 paths / 329 ops / DUPLICATE_OPERATION_IDS NONE / reapprove + full-apply-authority present / removed=0 |
+| J1-v4 | 13/13 byte-match + EOL_GUARD PASS (trước + sau) |
+
+### Binary contract tests (21)
+v2 snapshot đầy đủ từ persisted + hash verify; selected ≠ alternatives; missing role mapping / geometry / source artifact / unpublished pack fail closed; unsupported route (mesh_warp) preserved + no downgrade + eligibility reason; no-manifest demo approval tồn tại nhưng Full Apply not executable; v1 immutable + reapproval distinct v2 + equivalent v2 replay converges + conflict zero mutation; mutate live config/routes/SLM sau approval → stored v2 bytes/hash KHÔNG đổi; tamper manifest/snapshot + cross-scope segment → fail closed zero mutation; v1 full-apply-authority → REAPPROVAL_REQUIRED; single head a10b11c12d3e; OpenAPI additive.
+
+### Pre-existing red (không phải của task này)
+`tests/test_s09_t06_backend_migration.py::test_single_head_unchanged` + `test_round_trip_head_parent_fk_clean` pin `EXPECTED_HEAD=b3c4d5e6f7a9` (head S09 cũ); live head hiện tại `a10b11c12d3e` (S10-T01A migration, S10-owned). Migration test file là append-only trong task này → KHÔNG sửa; S10-T01A/T01C ownership phải cập nhật expected head. Baseline 39 (domain+api+durability) vẫn xanh; test mới pin head mới PASS.
+
+### Write-set audit
+Đúng lock: 3 app files s09_approval* + 1 test file mới + output/t06a-c4/** + LOG/REPORT append. Không đụng MAIN, models.py, migrations/**, structural_lock.py, reskin_config.py, s09_correction.py, renderer, frontend, S10 implementation, app/api/app.py, git history. git status 53 = 49 pre-existing + 4 files này.
+
+Trạng thái dừng: STATUS: TASK_SUBMITTED — STOP chờ Manager join gate J6A / Codex review; không commit/push.

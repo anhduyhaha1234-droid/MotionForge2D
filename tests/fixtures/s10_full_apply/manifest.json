@@ -1,0 +1,163 @@
+{
+  "contact_edges": [
+    {
+      "anchor": {
+        "x": 0.42,
+        "y": 0.55
+      },
+      "contact_kind": "hand_phone",
+      "edge_id": "contact_phone_hand",
+      "end_frame": 99,
+      "source_layer": "layer_phone",
+      "start_frame": 50,
+      "target_layer": "layer_fg"
+    }
+  ],
+  "description": "S10 Full Apply deterministic compact multi-shot fixture \u2014 REAL canonical media (source.mp4 + per-layer assets), no user/reference media",
+  "files": [
+    {
+      "path": "media/assets/layer_bg.png",
+      "sha256": "b8319fd0a086994b9ec3557b3d7010f0778e1edfe2f65d9b4645237e4ca54ca5",
+      "size": 493
+    },
+    {
+      "path": "media/assets/layer_fg.png",
+      "sha256": "c4bcc73209d4890eaaad844628adb213e9b673197b93184aa9337cd0525e2b75",
+      "size": 521
+    },
+    {
+      "path": "media/assets/layer_phone.png",
+      "sha256": "ce4ee627b339af48e9d7a6dbb74e71dfdc98eb127adf4ddb44e7b2d1a842c2ab",
+      "size": 492
+    },
+    {
+      "path": "media/source.mp4",
+      "sha256": "f711c4de78e4e03ce661cd8faf2019f50034c57082150decc814e3f3081cc772",
+      "size": 17186
+    },
+    {
+      "path": "post_seed_real_authority.py",
+      "sha256": "a3a0ded9b4507ffe51b9af1fceafc90db8ea6944926627216a0a1b59e891a8c2",
+      "size": 21621
+    },
+    {
+      "path": "sprites/bg.png",
+      "sha256": "e2debff0a3a4faef1527e5fb0d18efa5ce529e8019ecbbb27a7e360188b6a196",
+      "size": 422
+    },
+    {
+      "path": "sprites/fg_table.png",
+      "sha256": "d89d80936d203cf80cf86e4a1458fdf77b6c4b86ae94b067c228e46140f74415",
+      "size": 405
+    },
+    {
+      "path": "sprites/phone.png",
+      "sha256": "bda151060846c532045dd5d88560ce848aca5fa47af3ef88a9e4b7b4d15fb90c",
+      "size": 438
+    }
+  ],
+  "fps_den": 1,
+  "fps_num": 30,
+  "frame_count": 100,
+  "layers": [
+    {
+      "kind": "background",
+      "layer_id": "layer_bg",
+      "route": "sprite_affine",
+      "z": 0
+    },
+    {
+      "is_foreground_occluder": true,
+      "kind": "foreground_occluder",
+      "layer_id": "layer_fg",
+      "route": "pose_swap",
+      "z": 20
+    },
+    {
+      "contact_anchor": {
+        "x": 0.42,
+        "y": 0.55
+      },
+      "kind": "prop",
+      "layer_id": "layer_phone",
+      "route": "sprite_affine",
+      "z": 12
+    }
+  ],
+  "media": {
+    "assets": {
+      "layer_bg": "media/assets/layer_bg.png",
+      "layer_fg": "media/assets/layer_fg.png",
+      "layer_phone": "media/assets/layer_phone.png"
+    },
+    "fps": 30.0,
+    "frame_count": 100,
+    "height": 120,
+    "source": "media/source.mp4",
+    "width": 160
+  },
+  "seed": 20260827,
+  "shots": [
+    {
+      "contact": false,
+      "cut_frame": 50,
+      "end_frame": 49,
+      "risk": "hard_cut",
+      "shot_id": "shot_a",
+      "start_frame": 0,
+      "z_order": [
+        {
+          "behind": "layer_bg",
+          "front": "layer_fg"
+        }
+      ]
+    },
+    {
+      "contact": true,
+      "contact_anchor": {
+        "layer": "layer_phone",
+        "target": "layer_fg",
+        "x": 0.42,
+        "y": 0.55
+      },
+      "end_frame": 99,
+      "risk": "group_occlusion",
+      "shot_id": "shot_b",
+      "start_frame": 50,
+      "z_order": [
+        {
+          "behind": "layer_bg",
+          "front": "layer_fg"
+        },
+        {
+          "behind": "layer_phone",
+          "front": "layer_fg"
+        }
+      ]
+    }
+  ],
+  "timebase": "1/30",
+  "timebase_fingerprint": "0815be9803427989",
+  "trajectory": {
+    "diagonal": 732.0,
+    "notes": "synthetic \u2014 trajectory median 0.2% diagonal, P95 0.6%",
+    "source_height": 360,
+    "source_width": 640
+  },
+  "z_order_edges": [
+    {
+      "behind_layer": "layer_bg",
+      "edge_id": "z_fg_over_bg",
+      "end_frame": 99,
+      "front_layer": "layer_fg",
+      "start_frame": 0
+    },
+    {
+      "behind_layer": "layer_phone",
+      "edge_id": "z_fg_over_phone",
+      "end_frame": 99,
+      "front_layer": "layer_fg",
+      "start_frame": 50
+    }
+  ]
+}

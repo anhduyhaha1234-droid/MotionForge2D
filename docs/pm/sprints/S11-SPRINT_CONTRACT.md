@@ -1,18 +1,18 @@
 # S11 SPRINT CONTRACT — Original Audio & Acceptance
 
-**Status:** IN_PROGRESS — T01 slice active
-**Authority:** CODEX/BA verdict SAFE_TO_PARALLELIZE_WITH_EVIDENCE (S11-T01 only, depends on E03 APPROVED)
-**Worktree:** C:\Users\Admin\MotionForge2D-worktrees\s08-integration (branch codex/s08-integration @ a43b20da742996bafcb2f9d1ac57b10d3f1a5204)
+**Status:** T01 CODEX_APPROVED; T02..T06 PRODUCTION_AUTHORIZED (19 IDs / 14 waves)
+**Authority:** `S10_C6H_R3_FINAL_PM_REVIEW_2026-09-03.md` + `S11-P02 rev-C6 CODEX_APPROVED`; execution prompt `S11_T02_T06_FULL_SPRINT_MANAGER_2026-09-03.md`
+**Worktree:** C:\Users\Admin\MotionForge2D-worktrees\s08-integration (branch codex/s08-integration @ d3f6f796558aa9c7247da7d51e7d34e65b56cdf7 review snapshot; Manager must rediscover actual HEAD)
 
 ## Task map
 
 | Task | Tên | State | Ghi chú |
 |---|---|---|---|
-| S11-T01A | Audio Import Policy and Contract | READY (Wave 1) | owning session riêng |
-| S11-T01B | Original Audio Remux Engine | READY (Wave 1) | owning session riêng |
-| S11-T01C | Durable ATTACH_ORIGINAL_AUDIO Job Wiring | BLOCKED_ON_T01B | dispatch khi T01B MANAGER_VERIFIED |
-| S11-T01D | Real Integration and Acceptance | BLOCKED_ON_T01A+B+C | dispatch khi A/B/C MANAGER_VERIFIED |
-| S11-T02..T06 | QCItem / Checks / Review Queue / Readiness Gate / Acceptance | **BLOCKED_ON_E06** | không mở packet/session |
+| S11-T01A | Audio Import Policy and Contract | CODEX_APPROVED | closed trong S11-T01 |
+| S11-T01B | Original Audio Remux Engine | CODEX_APPROVED | closed trong S11-T01 |
+| S11-T01C | Durable ATTACH_ORIGINAL_AUDIO Job Wiring | CODEX_APPROVED | closed trong S11-T01 |
+| S11-T01D | Real Integration and Acceptance | CODEX_APPROVED | 64/64 approved suite |
+| S11-T02..T06 | QCItem / Checks / Review Queue / Readiness Gate / Acceptance | **PRODUCTION_AUTHORIZED** | binding plan `output/s11-post-t01-readiness/r1/synthesis/S11_T02_T06_PRODUCTION_PLAN.md`, SHA 34247926..., 19 IDs / 14 waves |
 
 ## DAG
 
@@ -34,10 +34,10 @@ T01B ─→ T01C ────────────────────┘
 8. Không Demucs/ASR/TTS/dubbing/QC/final-render UI/frontend trong T01.
 9. S11 supersede duy nhất quyết định B5 non-AAC của VIDEO_PREFLIGHT_CONTRACT (append-only resolution).
 
-## Worker model (user directive 2026-08-21 16:00+07)
+## Worker model (latest user directive 2026-09-03)
 
-Mọi session worker/reviewer MỚI của lane S11 dùng:
-- model `alpha`, provider `custom` (9Router http://127.0.0.1:20128/v1)
+Mọi session worker/reviewer MỚI của production T02..T06 dùng:
+- exact model `ocg/deepseek-v4-flash`, provider `custom` (9Router)
 - reasoning max (global agent.reasoning_effort=max)
 - fallback disabled (không cấu hình fallback; route chết → báo user)
 
@@ -48,6 +48,7 @@ Focused tests song song chỉ khi temp DB/basetemp/managed root/port tách biệ
 
 ## Terminal state mục tiêu
 
-S11-T01A/B/C/D = MANAGER_VERIFIED → S11-T01 = MANAGER_VERIFIED_PENDING_CODEX_REVIEW
-Sprint: IN_PROGRESS / T01_PENDING_CODEX_REVIEW / T02..T06_BLOCKED_ON_E06
-KHÔNG tự ghi APPROVED/CLOSED/CODEX_APPROVED.
+Mỗi production Task ID sạch = MANAGER_VERIFIED_PENDING_SPRINT_REVIEW; Manager
+tiếp tục dependency nội bộ theo full-sprint prompt. Sau T06C + exit gate:
+`S11 = SPRINT_SUBMITTED / MANAGER_VERIFIED_PENDING_CODEX_REVIEW`.
+KHÔNG tự ghi APPROVED/CLOSED/CODEX_APPROVED và không mở S12/S13.

@@ -1821,4 +1821,174 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(req),
     }),
+
+  // ─── S10 Full Apply (T01C + T04A structural-compare) ─────────────────────
+
+  /** Server-derived Full Apply eligibility of ONE approval checkpoint
+   *  (mirrors GET /api/v2/s09-approvals/{id}/full-apply-authority).
+   *  A v1 checkpoint fails closed with 422 REAPPROVAL_REQUIRED (detail carries
+   *  the reason); a tampered v2 row fails closed 500; not found 404. */
+  getFullApplyAuthority: (checkpointId: string, workspaceId = "default") =>
+    apiFetch<{
+      checkpoint_id: string;
+      snapshot_schema: string;
+      verified: boolean;
+      eligibility: {
+        full_apply_executable: boolean;
+        reasons: string[];
+        unsupported_routes: string[];
+      };
+      full_apply_authority: Record<string, unknown>;
+    }>(
+      `/api/v2/s09-approvals/${encodeURIComponent(checkpointId)}/full-apply-authority?workspace_id=${encodeURIComponent(workspaceId)}`,
+    ),
+
+  /** S10 FullApply run status — mirrors GET /api/v2/full-apply/{run_id}. */
+  getS10FullApplyStatus: (runId: string, workspaceId = "default", projectId?: string) =>
+    apiFetch<{
+      run_id: string;
+      workspace_id: string;
+      project_id: string;
+      video_item_id: string;
+      apply_checkpoint_id: string;
+      apply_checkpoint_hash: string;
+      apply_checkpoint_revision: number;
+      plan_id: string;
+      plan_hash: string;
+      status: string;
+      frame_count: number;
+      attempt: number;
+      natural_key: string | null;
+      idempotency_key: string | null;
+      chunks: Array<{
+        id: string;
+        workspace_id: string;
+        run_id: string;
+        chunk_index: number;
+        order_index: number;
+        shot_id: string;
+        layer_id: string | null;
+        object_role_id: string | null;
+        core_start_frame: number;
+        core_end_frame: number;
+        overlap_before: number;
+        overlap_after: number;
+        content_hash: string;
+        state: string;
+        attempt: number;
+        artifact_id: string | null;
+        verified: boolean;
+      }>;
+      publications: Array<{
+        id: string;
+        workspace_id: string;
+        run_id: string;
+        artifact_id: string;
+        content_hash: string;
+        frame_count: number;
+        frame_metadata: Record<string, unknown>;
+        checkpoint_id: string;
+        checkpoint_hash: string;
+        checkpoint_revision: number;
+        state: string;
+      }>;
+      checkpoint: Record<string, unknown> | null;
+    }>(
+      `/api/v2/full-apply/${encodeURIComponent(runId)}?workspace_id=${encodeURIComponent(workspaceId)}${projectId ? `&project_id=${encodeURIComponent(projectId)}` : ""}`,
+    ),
+
+  submitS10FullApply: (
+    projectId: string,
+    body: {
+      /** Minimal public identity/CAS contract — server derives the plan and
+       *  render authority exclusively from the frozen v2 checkpoint. */
+      video_item_id: string;
+      apply_checkpoint_id: string;
+      expected_checkpoint_hash: string;
+      expected_checkpoint_revision: number;
+      /** Bounded chunk/idempotency controls (optional, server defaults). */
+      chunk_config?: Record<string, unknown> | null;
+      chunk_frames?: number | null;
+      overlap_frames?: number | null;
+      fps_num?: number | null;
+      fps_den?: number | null;
+      idempotency_key?: string | null;
+      natural_key?: string | null;
+      /** Legacy authority copies kept OPTIONAL for canonical-compare
+       *  compatibility only: if supplied the server compares each field
+       *  against the frozen v2 authority and rejects ANY mismatch before a
+       *  run/job is created (fail closed, zero mutation). The Apply UI never
+       *  sends these — server authority is the only truth. */
+      approved_checkpoint?: Record<string, unknown> | null;
+      structural_lock_manifest?: Record<string, unknown> | null;
+      scene_manifest?: unknown;
+      mapping?: unknown;
+      compatibility_policy?: Record<string, unknown> | null;
+    },
+    workspaceId = "default",
+  ) =>
+    apiFetch<{
+      run_id: string;
+      workspace_id: string;
+      project_id: string;
+      status: string;
+      created: boolean;
+      plan_id: string;
+      plan_hash: string;
+      frame_count: number;
+      reused: boolean;
+    }>(`/api/v2/projects/${encodeURIComponent(projectId)}/full-apply?workspace_id=${encodeURIComponent(workspaceId)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+
+  cancelS10FullApply: (runId: string, workspaceId = "default", projectId?: string) =>
+    apiFetch<{ run_id: string; status: string; cancelled: boolean }>(
+      `/api/v2/full-apply/${encodeURIComponent(runId)}/cancel?workspace_id=${encodeURIComponent(workspaceId)}${projectId ? `&project_id=${encodeURIComponent(projectId)}` : ""}`,
+      { method: "POST" },
+    ),
+
+  retryS10FullApply: (runId: string, workspaceId = "default", projectId?: string) =>
+    apiFetch<{ run_id: string; predecessor_run_id: string; status: string; attempt: number }>(
+      `/api/v2/full-apply/${encodeURIComponent(runId)}/retry?workspace_id=${encodeURIComponent(workspaceId)}${projectId ? `&project_id=${encodeURIComponent(projectId)}` : ""}`,
+      { method: "POST" },
+    ),
+
+  resumeS10FullApply: (runId: string, workspaceId = "default", projectId?: string) =>
+    apiFetch<{ run_id: string; status: string; resumed: boolean }>(
+      `/api/v2/full-apply/${encodeURIComponent(runId)}/resume?workspace_id=${encodeURIComponent(workspaceId)}${projectId ? `&project_id=${encodeURIComponent(projectId)}` : ""}`,
+      { method: "POST" },
+    ),
+
+  structuralCompareS10: (
+    runId: string,
+    body: Record<string, unknown>,
+    workspaceId = "default",
+    projectId?: string,
+  ) =>
+    apiFetch<{
+      status: string;
+      passed: boolean;
+      failures: Array<{
+        code: string;
+        reason: string;
+        role: string;
+        layer: string;
+        segment: string;
+        route: string;
+        metric: string;
+        value: unknown;
+        threshold: unknown;
+      }>;
+      checks: Record<string, unknown>;
+      policy_version: string | null;
+      expected_policy_version: string | null;
+      run_id: string;
+      workspace_id: string;
+    }>(`/api/v2/full-apply/${encodeURIComponent(runId)}/structural-compare?workspace_id=${encodeURIComponent(workspaceId)}${projectId ? `&project_id=${encodeURIComponent(projectId)}` : ""}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
 };

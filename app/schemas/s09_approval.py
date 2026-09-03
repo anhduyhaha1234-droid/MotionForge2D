@@ -63,6 +63,45 @@ class ConflictProbeRequest(_StrictModel):
 # ── responses ─────────────────────────────────────────────────────────────
 
 
+class ReapproveRequest(_StrictModel):
+    """Reapproval payload — creates a NEW ``s09.approval/v2`` checkpoint.
+
+    Mirrors :class:`SubmitCheckpointRequest` exactly: the SAME closed-domain
+    fields a v1 submission accepts.  The v2 path freezes the nested
+    ``full_apply_authority`` (persisted/canonical server authority) into the
+    snapshot, so the deterministic reapproval produces a NEW content
+    hash/audit identity.  Unknown fields fail closed (extra="forbid").
+    """
+
+    reskin_config_id: str = Field(min_length=1)
+    expected_reskin_revision: int = Field(ge=1)
+    pack_version_ids: list[str] = Field(min_length=1, max_length=64)
+    demo_artifact_ids: list[str] = Field(default_factory=list, max_length=256)
+    correction_ids: list[str] = Field(default_factory=list, max_length=4096)
+    accepted_warnings: list[str] = Field(default_factory=list, max_length=256)
+    overrides: list[str] = Field(default_factory=list, max_length=64)
+    note: str | None = Field(default=None, max_length=500)
+    idempotency_key: str | None = Field(default=None, max_length=255)
+
+
+class FullApplyAuthorityOut(_StrictModel):
+    """Server-derived Full Apply authority for ONE checkpoint.
+
+    ``snapshot_schema`` is the frozen snapshot schema (``s09.approval/v2``
+    for an executable authority; a v1 checkpoint fails closed with
+    ``REAPPROVAL_REQUIRED`` in the HTTP detail instead of a 200 here).
+    ``verified`` is the live recomputed checkpoint-hash result.  The
+    ``eligibility`` object is the immutable freeze-time capability verdict
+    (route unsupported / authority incomplete reasons — never a downgrade).
+    """
+
+    checkpoint_id: str
+    snapshot_schema: str
+    verified: bool
+    eligibility: dict[str, Any]
+    full_apply_authority: dict[str, Any]
+
+
 class CheckpointSegmentRouteOut(BaseModel):
     """CompatibilityPolicy evidence for ONE renderer route decision."""
 
@@ -125,6 +164,8 @@ __all__ = [
     "CheckpointOut",
     "CheckpointSegmentRouteOut",
     "ConflictProbeRequest",
+    "FullApplyAuthorityOut",
+    "ReapproveRequest",
     "ReplayProbeRequest",
     "SubmitCheckpointRequest",
     "SubmittedCheckpointOut",

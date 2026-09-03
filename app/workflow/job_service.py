@@ -223,6 +223,9 @@ class JobService:
             )
 
             register_attach_original_audio_handler(self._worker)
+            from app.workflow.s10_full_apply_jobs import register_s10_full_apply_handler
+
+            register_s10_full_apply_handler(self._worker)
         self._worker_owned = worker is None
         self._managed_root = resolved_root
 
@@ -519,6 +522,82 @@ class JobService:
             except JobNotFoundError:
                 return False
             return final.state == "cancelling"
+
+    def cancel_run_atomic(
+        self,
+        session: Session,
+        *,
+        run_writer: Callable[[], None],
+        job_key: str,
+    ) -> dict[str, Any]:
+        """Atomically cancel the durable job and the S10 run in ONE transaction.
+
+        S10-C6A F1 correction: the legacy route applied the run cancel in the
+        request session and *then* opened a second writer for the durable job
+        cancel — on rollback-journal SQLite that is a deterministic
+        ``database is locked`` deadlock (run writer RESERVED, job writer needs
+        EXCLUSIVE while a stale reader holds SHARED).  A swallowed failure then
+        returned ``cancelled: true`` while the durable job kept running.
+
+        This method collapses the whole lifecycle transition into the
+        *caller's* transaction (``session`` — the API request session bound to
+        the same SQLite database as the durable job rows):
+
+        1. The owned durable Job (idempotency key ``job_key``) is looked up
+           and, when ``queued|running``, transitioned ``-> cancelling`` via
+           :meth:`JobRepository.transition_job` on the SAME session (no
+           commit — a single connection cannot deadlock itself by
+           construction).  ``cancelling`` is an idempotent no-op; terminal
+           states are recorded honestly and never rewritten.
+        2. ``run_writer()`` then applies the run-side cancel on the same
+           session (validated by the FullApplyService; flushes the row).
+        3. The CALLER commits both atomically — commit yields BOTH
+           run-cancelled and job-cancelling/cancelled; rollback yields
+           NEITHER.  False success is impossible because the durable
+           cancellation signal shares the run-cancel transaction.
+
+        Returns a coherent result dict::
+
+            {"job_seen": bool,    # durable job row exists for this run
+             "job_state": str|None}  # live job state seen in this transaction
+
+        Fail-closed: any ``InvalidStateTransition`` or lock error re-raises —
+        the caller rolls the whole transaction back and surfaces HTTP 4xx/5xx.
+        """
+        from sqlalchemy import select as _select  # noqa: PLC0415
+
+        from app.persistence.models import Job as _Job  # noqa: PLC0415
+
+        job_id = session.scalar(_select(_Job.id).where(_Job.idempotency_key == job_key))
+        job_state: str | None = None
+        if job_id is not None:
+            repo = JobRepository(session)
+            for _attempt in range(_CANCEL_TRANSITION_RETRIES):
+                current = repo.get_job(str(job_id))
+                job_state = current.state
+                if current.state not in ("queued", "running"):
+                    # cancelling (idempotent no-op) or terminal (recorded
+                    # honestly, never rewritten — contract §6.2/§6.3).
+                    break
+                try:
+                    repo.transition_job(
+                        str(job_id),
+                        "cancelling",
+                        actor="api",
+                        expected_revision=current.revision,
+                        reason_code="CANCEL_REQUESTED",
+                    )
+                    job_state = "cancelling"
+                    break
+                except InvalidStateTransition:
+                    # Lost a revision race against the worker claim/terminal
+                    # transition: re-read the live row and retry within the
+                    # bounded window (cancel wins, §6.3).  Exhaustion raises
+                    # — fail-closed, never a silent fake success.
+                    if _attempt == _CANCEL_TRANSITION_RETRIES - 1:
+                        raise
+        run_writer()
+        return {"job_seen": job_id is not None, "job_state": job_state}
 
     # ── Internal helpers ──────────────────────────────────────────────────
 

@@ -571,6 +571,12 @@ class JobReconciler:
         creation — resume against changed inputs is refused (contract §4.3).
         A missing baseline (defensive) is treated as unchanged so Jobs never
         spuriously fail.
+
+        The legacy S10 additive-pin bypass is GONE: every S10 job
+        now binds its complete immutable manifest (render authority + source
+        media + replacement asset + timebase pins) at creation, so ANY later
+        mutation — including source/asset pins — is ``INPUT_CHANGED`` and
+        zero resume render/publication happens.
         """
         with self._session_factory() as session:
             repo = JobRepository(session)
@@ -582,7 +588,10 @@ class JobReconciler:
                 return False
         if not isinstance(recorded, str) or not recorded:
             return False
-        return recorded != manifest_fingerprint(job.input_manifest)
+        current_fp = manifest_fingerprint(job.input_manifest)
+        if recorded == current_fp:
+            return False
+        return True
 
     def _fence_reason(self, job_id: str) -> str | None:
         """The reason_code recorded on the Job's most recent fenced event."""
