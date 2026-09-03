@@ -34,3 +34,16 @@ Mọi lệnh chạy từ worktree task với isolation: `env -u MOTIONFORGE_DATA
 | Commit C2 | 1 commit local | SHA ghi REPORT.md / terminal |
 
 Không push/merge/rebase/reset/clean/stash/force. KHÔNG đụng s11-integration, MAIN, T02B repo, T06A1 media manifests, calibration fixtures (T06A2 — read-only), frontend/**, migrations/**, s08_golden/**.
+
+**CORRECTION S11-C1 lane C1-C (2026-09-04, Codex P2 trailing-whitespace — resume session T03A):**
+| Thời điểm | Hành động | Kết quả thật |
+|---|---|---|
+| FF | `git merge --ff-only 4d7ad8196c3f7a21af744906ef4174690159d889` (full fetch bị chặn bởi ref lạ `refs/codex/turn-diffs/...` trên remote; object canonical đã có local) | HEAD `4d7ad81`, porcelain=0 |
+| RED | `git diff --check 7751598214eedb6b72e3783e39a2a408721abe40..HEAD` (range Codex báo) | `provenance_audit.txt:2-11` trailing whitespace (xác nhận); `qc_checks_handler.py:12` thuộc lane T03G — forbidden, KHÔNG đụng |
+| Baseline | blob HEAD (LF-norm): sha256 `7b77af5d...`, 1032 bytes / 12 lines | — |
+| Fix | Bounded patch strip đúng 1 space cuối dòng 2–11; nội dung provenance KHÔNG đổi | worktree LF-norm 1022 bytes (delta đúng -10); 13 lines giữ nguyên (12 + trailing) |
+| Blob-proof | So HEAD blob vs worktree LF-norm từng dòng | Chỉ dòng 2–11 khác, trailing-WS-only; BLOB_CHECK_OK |
+| GREEN | `git diff --check HEAD -- docs/pm/sessions/S11-T03A/` | EXIT 0 (own-diff sạch) |
+| Forbidden | `git status --porcelain -- app/workflow/qc_checks_handler.py` | empty = untouched; scope = 1 file + LOG/REPORT |
+| Evidence | `C:\Users\Admin\MotionForge2D-evidence\s11-c1\lanes\c1c-t03a\{diffcheck_after,before_after}.txt` | — |
+| Commit C1-C | 1 commit local trên `codex/s11/t03a-0903w5` | SHA ghi REPORT.md / terminal; KHÔNG push/merge/rebase |

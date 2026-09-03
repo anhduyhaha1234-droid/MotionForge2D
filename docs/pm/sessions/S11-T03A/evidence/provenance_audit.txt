@@ -1,12 +1,12 @@
 == independent provenance audit ==
-OK av_sync_drift          warn=0.1           block=0.5           <- av_sync.json L2/L4 
-OK contact_break          warn=4.0           block=16.0          <- contact_zorder_clipping.json L2/L4 
-OK cut_drift              warn=3             block=12            <- trajectory_cut.json L2/L4 
-OK edge_halo              warn=2.021267777   block=8.737606376   <- identity_halo_flicker.json L2/L4 
-OK identity_drift         warn=2.0           block=8.0           <- identity_halo_flicker.json L2/L4 
-OK no_audio_source_fact   warn=0             block=0             <- av_sync.json L1/L1 
-OK silhouette_clipping    warn=0.166666667   block=0.5           <- contact_zorder_clipping.json L2/L4 
-OK temporal_flicker       warn=0.024895525   block=0.099582099   <- identity_halo_flicker.json L2/L4 
-OK trajectory_drift       warn=31.5          block=126.0         <- trajectory_cut.json L2/L4 
-OK z_order_error          warn=4             block=8             <- contact_zorder_clipping.json L2/L4 
+OK av_sync_drift          warn=0.1           block=0.5           <- av_sync.json L2/L4
+OK contact_break          warn=4.0           block=16.0          <- contact_zorder_clipping.json L2/L4
+OK cut_drift              warn=3             block=12            <- trajectory_cut.json L2/L4
+OK edge_halo              warn=2.021267777   block=8.737606376   <- identity_halo_flicker.json L2/L4
+OK identity_drift         warn=2.0           block=8.0           <- identity_halo_flicker.json L2/L4
+OK no_audio_source_fact   warn=0             block=0             <- av_sync.json L1/L1
+OK silhouette_clipping    warn=0.166666667   block=0.5           <- contact_zorder_clipping.json L2/L4
+OK temporal_flicker       warn=0.024895525   block=0.099582099   <- identity_halo_flicker.json L2/L4
+OK trajectory_drift       warn=31.5          block=126.0         <- trajectory_cut.json L2/L4
+OK z_order_error          warn=4             block=8             <- contact_zorder_clipping.json L2/L4
 AUDIT_ALL_OK

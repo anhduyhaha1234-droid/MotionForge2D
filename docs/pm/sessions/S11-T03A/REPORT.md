@@ -73,3 +73,12 @@ KHÔNG đụng: detector modules (T03B/C/D/E — chưa tồn tại, sở hữu t
 - Scope: CHỈ 2 production files (`git status` = 2 modified) + docs C2; zero file khác.
 - Verify thật: mypy 3 files `Success`; pytest `27 passed` ×2 (4.92s/4.91s, basetemp s11t03a-c2-*, `-p no:cacheprovider`, `env -u MOTIONFORGE_DATABASE_URL`); ruff `--select F` `All checks passed!`; py_compile OK; `git diff --check` sạch.
 - Commit C2 local 1 commit; SHA ghi terminal (không push/merge/rebase).
+
+## 8. CORRECTION S11-C1 lane C1-C — formatting sau Codex review P2 (resume session T03A, canonical-FF HEAD `4d7ad8196c3f7a21af744906ef4174690159d889`)
+
+- **Finding Codex P2:** `git diff --check 7751598214eedb6b72e3783e39a2a408721abe40..HEAD` báo trailing whitespace tại `docs/pm/sessions/S11-T03A/evidence/provenance_audit.txt:2-11`. Dòng `app/workflow/qc_checks_handler.py:12` cùng range thuộc lane T03G — KHÔNG đụng (forbidden).
+- **Fix:** strip đúng 1 trailing space cuối dòng 2–11; nội dung provenance KHÔNG đổi (không tái tạo evidence, không đổi code/test).
+- **Byte-proof thật:** HEAD blob (LF-norm, do `core.autocrlf=true`) sha256 `7b77af5d33b5d632707ee984733e4ee21032f8924fb4c7812e57313952408e24`, 1032 bytes / 12 lines → worktree LF-norm sha256 `09edfc7a6153b4dacc049d1b1fba38041c9a5ae492999ddcde178300b0bcca47`, 1022 bytes (delta đúng -10 = mười space bị strip), line-count giữ nguyên. So từng dòng: chỉ dòng 2–11 khác nhau, trailing-WS-only.
+- **Verify:** `git diff --check HEAD -- docs/pm/sessions/S11-T03A/` EXIT 0 (own-diff sạch); `qc_checks_handler.py` untouched (status empty); scope = 1 file + LOG/REPORT append.
+- **Không chạy pytest** (không đổi code/test, theo yêu cầu §5).
+- Commit C1-C local 1 commit; SHA ghi terminal (không push/merge/rebase).
