@@ -97,7 +97,8 @@ Forbidden verified: `git status --porcelain` chỉ 8 file allowlist + docs; `mod
   (`gate_full_run.txt`, `node_list.txt`, `gate_summary.txt`).
 - Blast radius: T05A seed FULL 2-audio → coverage-unproven (7 failed,
   pre-existing; stash A/B đã chứng minh). Thuộc owner khác — báo Manager.
-- Commit local trên `codex/s11/t03g-0903w8`: SHA xem `git log` sau commit
-  C1-A (parent: canonical `4d7ad8196c3f7a21af744906ef4174690159d889` + C1
-  `c00060afaafca6b35d640d501e8c127d5cee8c7a`).
+- Commit local trên `codex/s11/t03g-0903w8`: `2712a5e9d5367a1fa99177f4b6e84a3b02f978a5`
+  (C1-A correction: full-run authority + coverage gate + tests + docs).
+  Parent chain: canonical `4d7ad8196c3f7a21af744906ef4174690159d889`
+  (FF-only merge) ← C1 `c00060afaafca6b35d640d501e8c127d5cee8c7a`.
 - Trạng thái: TASK_SUBMITTED (chi tiết LOG.md §8).
