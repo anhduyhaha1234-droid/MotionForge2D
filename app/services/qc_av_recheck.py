@@ -372,7 +372,10 @@ def attach_recheck_evidence(
                 continue
             result = attempt.result or {}
             remux = result.get("remux")
-            checkpoint = remux.get("checkpoint") if isinstance(remux, dict) else None
-            if isinstance(checkpoint, dict):
-                return {"remux": dict(remux), "published": result.get("published")}
+            if not isinstance(remux, dict):
+                continue
+            checkpoint = remux.get("checkpoint")
+            if not isinstance(checkpoint, dict):
+                continue
+            return {"remux": dict(remux), "published": result.get("published")}
     return None
