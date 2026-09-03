@@ -1,0 +1,417 @@
+{
+  "all_ok": true,
+  "assertions": [
+    {
+      "detail": "missing suite files: []",
+      "name": "S11-T06C-00-suite-files-exist",
+      "ok": true
+    },
+    {
+      "detail": "exit_code=0 (RC124=124 means the harness hit its 2700s hard deadline)\n--- stdout tail ---\ntests/test_s11_t04a_navigation_resolver.py: 20 warnings\ntests/test_s11_t04b_correction_rerun.py: 10 warnings\ntests/test_s11_t04b_stale_reopen.py: 8 warnings\ntests/test_s11_t04c_attach_action_api.py: 10 warnings\ntests/test_s11_t05a_next_action_flip.py: 1 warning\ntests/test_s11_t05a_readiness_api.py: 9 warnings\n  C:\\Users\\Admin\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\contextlib.py:144: SAWarning: Skipped unsupported reflection of expression-based index uq_character_active_workspace_code\n    next(self.gen)\n\ntests/test_s11_t02a_qc_migration.py: 7 warnings\ntests/test_s11_t02b_qc_api_readonly.py: 11 warnings\ntests/test_s11_t03g_qc_check_api.py: 15 warnings\ntests/test_s11_t03g_qc_check_job.py: 17 warnings\ntests/test_s11_t04a_navigation_api.py: 14 warnings\ntests/test_s11_t04a_navigation_resolver.py: 20 warnings\ntests/test_s11_t04b_correction_rerun.py: 10 warnings\ntests/test_s11_t04b_stale_reopen.py: 8 warnings\ntests/test_s11_t04c_attach_action_api.py: 10 warnings\ntests/test_s11_t05a_next_action_flip.py: 1 warning\ntests/test_s11_t05a_readiness_api.py: 9 warnings\n  C:\\Users\\Admin\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\contextlib.py:144: SAWarning: Skipped unsupported reflection of expression-based index uq_channel_active_workspace_role_name\n    next(self.gen)\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n================ 314 passed, 245 warnings in 241.12s (0:04:01) ================\n--- stderr tail ---\n",
+      "name": "S11-T06C-01-one-command-exit-0",
+      "ok": true
+    },
+    {
+      "detail": "summary={'passed': 314, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-02-summary-no-failed-error",
+      "ok": true
+    },
+    {
+      "detail": "summary={'passed': 314, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-03-summary-positive-passed",
+      "ok": true
+    },
+    {
+      "detail": "per-file entries missing/extra: []",
+      "name": "S11-T06C-04-per-file-entry-every-file",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t02a_qc_migration.py: entry={'passed': 9, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-05-per-file-passed-tests/test_s11_t02a_qc_migration.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t02a_qc_migration.py: entry={'passed': 9, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-06-per-file-zero-failures-tests/test_s11_t02a_qc_migration.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t02a_qc_schema.py: entry={'passed': 28, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-05-per-file-passed-tests/test_s11_t02a_qc_schema.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t02a_qc_schema.py: entry={'passed': 28, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-06-per-file-zero-failures-tests/test_s11_t02a_qc_schema.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t02b_qc_api_readonly.py: entry={'passed': 14, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-05-per-file-passed-tests/test_s11_t02b_qc_api_readonly.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t02b_qc_api_readonly.py: entry={'passed': 14, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-06-per-file-zero-failures-tests/test_s11_t02b_qc_api_readonly.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t02b_qc_repository_lifecycle.py: entry={'passed': 26, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-05-per-file-passed-tests/test_s11_t02b_qc_repository_lifecycle.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t02b_qc_repository_lifecycle.py: entry={'passed': 26, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-06-per-file-zero-failures-tests/test_s11_t02b_qc_repository_lifecycle.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t03a_runner_registry.py: entry={'passed': 15, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-05-per-file-passed-tests/test_s11_t03a_runner_registry.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t03a_runner_registry.py: entry={'passed': 15, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-06-per-file-zero-failures-tests/test_s11_t03a_runner_registry.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t03a_thresholds_policy.py: entry={'passed': 12, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-05-per-file-passed-tests/test_s11_t03a_thresholds_policy.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t03a_thresholds_policy.py: entry={'passed': 12, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-06-per-file-zero-failures-tests/test_s11_t03a_thresholds_policy.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t03b_trajectory_cut_detectors.py: entry={'passed': 23, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-05-per-file-passed-tests/test_s11_t03b_trajectory_cut_detectors.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t03b_trajectory_cut_detectors.py: entry={'passed': 23, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-06-per-file-zero-failures-tests/test_s11_t03b_trajectory_cut_detectors.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t03c_contact_zorder_clipping_detectors.py: entry={'passed': 29, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-05-per-file-passed-tests/test_s11_t03c_contact_zorder_clipping_detectors.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t03c_contact_zorder_clipping_detectors.py: entry={'passed': 29, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-06-per-file-zero-failures-tests/test_s11_t03c_contact_zorder_clipping_detectors.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t03d_identity_halo_flicker_detectors.py: entry={'passed': 11, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-05-per-file-passed-tests/test_s11_t03d_identity_halo_flicker_detectors.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t03d_identity_halo_flicker_detectors.py: entry={'passed': 11, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-06-per-file-zero-failures-tests/test_s11_t03d_identity_halo_flicker_detectors.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t03e_audio_sync_checks.py: entry={'passed': 17, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-05-per-file-passed-tests/test_s11_t03e_audio_sync_checks.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t03e_audio_sync_checks.py: entry={'passed': 17, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-06-per-file-zero-failures-tests/test_s11_t03e_audio_sync_checks.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t03f_orchestrator.py: entry={'passed': 14, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-05-per-file-passed-tests/test_s11_t03f_orchestrator.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t03f_orchestrator.py: entry={'passed': 14, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-06-per-file-zero-failures-tests/test_s11_t03f_orchestrator.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t03g_qc_check_api.py: entry={'passed': 15, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-05-per-file-passed-tests/test_s11_t03g_qc_check_api.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t03g_qc_check_api.py: entry={'passed': 15, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-06-per-file-zero-failures-tests/test_s11_t03g_qc_check_api.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t03g_qc_check_job.py: entry={'passed': 17, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-05-per-file-passed-tests/test_s11_t03g_qc_check_job.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t03g_qc_check_job.py: entry={'passed': 17, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-06-per-file-zero-failures-tests/test_s11_t03g_qc_check_job.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t04a_navigation_api.py: entry={'passed': 16, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-05-per-file-passed-tests/test_s11_t04a_navigation_api.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t04a_navigation_api.py: entry={'passed': 16, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-06-per-file-zero-failures-tests/test_s11_t04a_navigation_api.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t04a_navigation_resolver.py: entry={'passed': 21, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-05-per-file-passed-tests/test_s11_t04a_navigation_resolver.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t04a_navigation_resolver.py: entry={'passed': 21, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-06-per-file-zero-failures-tests/test_s11_t04a_navigation_resolver.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t04b_correction_rerun.py: entry={'passed': 12, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-05-per-file-passed-tests/test_s11_t04b_correction_rerun.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t04b_correction_rerun.py: entry={'passed': 12, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-06-per-file-zero-failures-tests/test_s11_t04b_correction_rerun.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t04b_stale_reopen.py: entry={'passed': 9, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-05-per-file-passed-tests/test_s11_t04b_stale_reopen.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t04b_stale_reopen.py: entry={'passed': 9, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-06-per-file-zero-failures-tests/test_s11_t04b_stale_reopen.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t04c_attach_action_api.py: entry={'passed': 12, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-05-per-file-passed-tests/test_s11_t04c_attach_action_api.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t04c_attach_action_api.py: entry={'passed': 12, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-06-per-file-zero-failures-tests/test_s11_t04c_attach_action_api.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t05a_next_action_flip.py: entry={'passed': 5, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-05-per-file-passed-tests/test_s11_t05a_next_action_flip.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t05a_next_action_flip.py: entry={'passed': 5, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-06-per-file-zero-failures-tests/test_s11_t05a_next_action_flip.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t05a_readiness_api.py: entry={'passed': 9, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-05-per-file-passed-tests/test_s11_t05a_readiness_api.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t05a_readiness_api.py: entry={'passed': 9, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-06-per-file-zero-failures-tests/test_s11_t05a_readiness_api.py",
+      "ok": true
+    },
+    {
+      "detail": "per-file sum=314 vs summary={'passed': 314, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-07-per-file-total-reconciles-summary",
+      "ok": true
+    },
+    {
+      "detail": "durations={'inner_suite_s': 242.719, 'baseline_t01d_inner_s_reference': 166.7, 'baseline_note': 'T01D measured 52 passed in 166.7s inner — reference only, NOT a hard gate (AC2)', 'leak_window_s': 0.0, 'total_s': 242.719}",
+      "name": "S11-T06C-08-durations-recorded",
+      "ok": true
+    },
+    {
+      "detail": null,
+      "name": "S11-T06C-09-manifests-schema-valid",
+      "ok": true
+    },
+    {
+      "detail": "s11-qc-thresholds-v1",
+      "name": "S11-T06C-10-frozen-policy-id",
+      "ok": true
+    },
+    {
+      "detail": null,
+      "name": "S11-T06C-11-policy-hash-scenario_d_targeted_rerun",
+      "ok": true
+    },
+    {
+      "detail": "declared=None item_sum=2",
+      "name": "S11-T06C-12-total-count-dynamic-scenario_d_targeted_rerun",
+      "ok": true
+    },
+    {
+      "detail": null,
+      "name": "S11-T06C-11-policy-hash-e2e_01_vertical_review",
+      "ok": true
+    },
+    {
+      "detail": "declared=10 item_sum=10",
+      "name": "S11-T06C-12-total-count-dynamic-e2e_01_vertical_review",
+      "ok": true
+    },
+    {
+      "detail": null,
+      "name": "S11-T06C-11-policy-hash-e2e_02_blocker_readiness",
+      "ok": true
+    },
+    {
+      "detail": "declared=None item_sum=5",
+      "name": "S11-T06C-12-total-count-dynamic-e2e_02_blocker_readiness",
+      "ok": true
+    },
+    {
+      "detail": null,
+      "name": "S11-T06C-11-policy-hash-e2e_03_queue_states",
+      "ok": true
+    },
+    {
+      "detail": "declared=5 item_sum=5",
+      "name": "S11-T06C-12-total-count-dynamic-e2e_03_queue_states",
+      "ok": true
+    },
+    {
+      "detail": null,
+      "name": "S11-T06C-11-policy-hash-e2e_04_a11y_mobile",
+      "ok": true
+    },
+    {
+      "detail": "declared=None item_sum=2",
+      "name": "S11-T06C-12-total-count-dynamic-e2e_04_a11y_mobile",
+      "ok": true
+    },
+    {
+      "detail": "missing codes: []",
+      "name": "S11-T06C-13-e2e01-full-envelope",
+      "ok": true
+    },
+    {
+      "detail": "expected_total_count=10 envelope=10",
+      "name": "S11-T06C-14-e2e01-total-matches-envelope",
+      "ok": true
+    },
+    {
+      "detail": {
+        "expected_blocker_codes": [],
+        "note": "seed baseline is warning-only; readiness gate blocks only unresolved blockers (Decision F)",
+        "run_state": "completed",
+        "status": "ready"
+      },
+      "name": "S11-T06C-15-e2e01-readiness-after",
+      "ok": true
+    },
+    {
+      "detail": "blocked={'status': 'blocked', 'run_state': 'completed', 'expected_blocker_codes': ['audio_missing'], 'note': 'completed run with unresolved blocker(s) is NOT clean — verdict blocked'} dynamic blockers=['audio_missing']",
+      "name": "S11-T06C-16-e2e02-blocked-codes-dynamic",
+      "ok": true
+    },
+    {
+      "detail": {
+        "expected_blocker_codes": [],
+        "note": "blocker resolved via recheck with fresh evidence -> readiness gate opens",
+        "run_state": "completed",
+        "status": "ready"
+      },
+      "name": "S11-T06C-17-e2e02-flip-ready-after-fix",
+      "ok": true
+    },
+    {
+      "detail": {
+        "evidence_rule": "a terminal resolve attempt WITHOUT fresh evidence is rejected (no_evidence_consequence=fail_closed)",
+        "recheck_flow": "fresh evidence required for resolution; unfixed stays open; terminal statuses never reopen (T03F fail-closed GAP-8)",
+        "rerun_target": "affected_segment_only",
+        "trigger": "user corrects mask on the first bad frame in Review Queue",
+        "unchanged": "ready_scenes remain Ready — no re-check, no re-review, no re-render"
+      },
+      "name": "S11-T06C-18-scenarioD-targeted-rerun",
+      "ok": true
+    },
+    {
+      "detail": "ready_scenes remain Ready — no re-check, no re-review, no re-render",
+      "name": "S11-T06C-19-scenarioD-ready-scenes-unchanged",
+      "ok": true
+    },
+    {
+      "detail": {
+        "expected_blocker_codes": [],
+        "note": "mask corrected on affected segment -> recheck with fresh evidence resolves the segment items; untouched good scenes stay ready",
+        "run_state": "completed",
+        "status": "ready"
+      },
+      "name": "S11-T06C-20-scenarioD-after-rerun-ready",
+      "ok": true
+    },
+    {
+      "detail": [
+        "tests/test_s11_t04b_correction_rerun.py",
+        "tests/test_s11_t04b_stale_reopen.py"
+      ],
+      "name": "S11-T06C-21a-restart-resume-slice-present",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t04b_correction_rerun.py: entry={'passed': 12, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-21-restart-resume-tests/test_s11_t04b_correction_rerun.py",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t04b_stale_reopen.py: entry={'passed': 9, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-21-restart-resume-tests/test_s11_t04b_stale_reopen.py",
+      "ok": true
+    },
+    {
+      "detail": [
+        "tests/test_s11_t03e_audio_sync_checks.py"
+      ],
+      "name": "S11-T06C-22-audio-sync-slice-present",
+      "ok": true
+    },
+    {
+      "detail": "tests/test_s11_t03e_audio_sync_checks.py: entry={'passed': 17, 'failed': 0, 'errors': 0}",
+      "name": "S11-T06C-23-audio-sync-green-tests/test_s11_t03e_audio_sync_checks.py",
+      "ok": true
+    },
+    {
+      "detail": "ffmpeg/ffprobe processes leaked after the full S11-T02..T05 suite (ownership-scoped pids): []\nseen=[2016, 10888, 23740, 27356, 35848, 36532, 37068, 39268]\n--- stdout tail ---\ntests/test_s11_t04a_navigation_resolver.py: 20 warnings\ntests/test_s11_t04b_correction_rerun.py: 10 warnings\ntests/test_s11_t04b_stale_reopen.py: 8 warnings\ntests/test_s11_t04c_attach_action_api.py: 10 warnings\ntests/test_s11_t05a_next_action_flip.py: 1 warning\ntests/test_s11_t05a_readiness_api.py: 9 warnings\n  C:\\Users\\Admin\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\contextlib.py:144: SAWarning: Skipped unsupported reflection of expression-based index uq_character_active_workspace_code\n    next(self.gen)\n\ntests/test_s11_t02a_qc_migration.py: 7 warnings\ntests/test_s11_t02b_qc_api_readonly.py: 11 warnings\ntests/test_s11_t03g_qc_check_api.py: 15 warnings\ntests/test_s11_t03g_qc_check_job.py: 17 warnings\ntests/test_s11_t04a_navigation_api.py: 14 warnings\ntests/test_s11_t04a_navigation_resolver.py: 20 warnings\ntests/test_s11_t04b_correction_rerun.py: 10 warnings\ntests/test_s11_t04b_stale_reopen.py: 8 warnings\ntests/test_s11_t04c_attach_action_api.py: 10 warnings\ntests/test_s11_t05a_next_action_flip.py: 1 warning\ntests/test_s11_t05a_readiness_api.py: 9 warnings\n  C:\\Users\\Admin\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\contextlib.py:144: SAWarning: Skipped unsupported reflection of expression-based index uq_channel_active_workspace_role_name\n    next(self.gen)\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n================ 314 passed, 245 warnings in 241.12s (0:04:01) ================\n--- stderr tail ---\n",
+      "name": "S11-T06C-24-leak-gate-survivors-empty",
+      "ok": true
+    },
+    {
+      "detail": {
+        "leak_window_elapsed_s": 0.0,
+        "psutil_available": true,
+        "seen_pids": [
+          2016,
+          10888,
+          23740,
+          27356,
+          35848,
+          36532,
+          37068,
+          39268
+        ],
+        "survivors": [],
+        "window_s": 15.0
+      },
+      "name": "S11-T06C-25-leak-gate-window-recorded",
+      "ok": true
+    }
+  ],
+  "run_id": "20260903-155419-31900"
+}
