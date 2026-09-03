@@ -1,0 +1,18 @@
+== 1. Binding reason codes ==
+  contact_break: in QC_REASON_CODES = True
+  z_order_error: in QC_REASON_CODES = True
+  silhouette_clipping: in QC_REASON_CODES = True
+== 2. Severity mapping vs frozen T03A policy ==
+  contact_break: warn=4.0 block=16.0 unit=px kind=increasing fixture=contact_zorder_clipping.json
+  z_order_error: warn=4 block=8 unit=count kind=increasing fixture=contact_zorder_clipping.json
+  silhouette_clipping: warn=0.166666667 block=0.5 unit=ratio kind=increasing fixture=contact_zorder_clipping.json
+== 3. Evidence idempotency x2 (same args, in-process) ==
+  contact_break: items=1 byte_identical=True window_key_identical=True schema_version=1
+  z_order_error: items=1 byte_identical=True window_key_identical=True schema_version=1
+  silhouette_clipping: items=1 byte_identical=True window_key_identical=True schema_version=1
+== 4. Cross-process idempotency (bounded runner x2) ==
+  z_order_error: run1=QC_RUNNER_OK run2=QC_RUNNER_OK status=ok byte_identical=True
+== 5. Hard-code scan (boundary literals absent from detectors) ==
+  contact_break.py: boundary literals found = NONE
+  z_order_error.py: boundary literals found = NONE
+  silhouette_clipping.py: boundary literals found = NONE
