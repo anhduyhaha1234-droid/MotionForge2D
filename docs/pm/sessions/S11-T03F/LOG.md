@@ -123,3 +123,4 @@
 ## 8. Status
 
 TASK_SUBMITTED — xem REPORT.md (acceptance mapping + measured evidence). EXIT.4be8616e7ede37f18769ce6d1da4c8b288bea529
+C1 fix commit: a19deecb85fd016576af6de12b11ef003b300927
