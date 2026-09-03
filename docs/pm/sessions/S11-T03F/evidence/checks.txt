@@ -1,0 +1,11 @@
+=== static gates ===
+All checks passed!
+RUFF_EXIT=0
+PY_COMPILE_OK
+
+=== registry binding set ===
+registered: 10 names: ['audio_missing', 'av_sync_drift', 'contact_break', 'cut_drift', 'edge_halo', 'identity_drift', 'silhouette_clipping', 'temporal_flicker', 'trajectory_drift', 'z_order_error']
+matches QC_REASON_CODES: True
+
+=== git diff --check (pre-commit whitespace) ===
+DIFF_CHECK_EXIT=0

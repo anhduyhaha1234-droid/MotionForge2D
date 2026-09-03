@@ -1,0 +1,28 @@
+=== RED evidence: pytest suite BEFORE orchestrator implementation ===
+(real output of the first run at WAVE_BASE, captured before implementing
+ app/services/qc_checks/orchestrator.py; test file tests/test_s11_t03f_orchestrator.py
+ existed, orchestrator module did not)
+
+Command:
+  unset MOTIONFORGE_DATABASE_URL
+  python -m pytest tests/test_s11_t03f_orchestrator.py -p no:cacheprovider \
+    --basetemp="$LOCALAPPDATA/Temp/s11t03f_red"
+  (worktree s11-t03f-0903w7, branch codex/s11/t03f-0903w7, HEAD 0a7de285)
+
+=================================== ERRORS ====================================
+____________ ERROR collecting tests/test_s11_t03f_orchestrator.py _____________
+ImportError while importing test module 'C:\Users\Admin\MotionForge2D-worktrees\s11-t03f-0903w7\tests\test_s11_t03f_orchestrator.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\AppData\Local\Programs\Python\Python311\Lib\importlib\__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_s11_t03f_orchestrator.py:77: in <module>
+    from app.services.qc_checks.orchestrator import (
+E   ModuleNotFoundError: No module named 'app.services.qc_checks.orchestrator'
+=========================== short test summary info ===========================
+ERROR tests/test_s11_t03f_orchestrator.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.61s
+
+=== RED confirmed: fails for the EXACT expected reason (orchestrator absent) ===

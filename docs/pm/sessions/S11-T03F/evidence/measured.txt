@@ -1,0 +1,183 @@
+=== S11-T03F measured evidence (real orchestrator runs) ===
+python: 3.11.9 | cwd: s11-t03f-0903w7
+basetemp: C:\Users\Admin\AppData\Local\Temp\s11t03f_ev_oxrd2ow2
+MOTIONFORGE_DATABASE_URL set: False
+provider: custom | model: ocg/deepseek-v4-flash | TTFB: 900s
+
+--- 1. FULL-SET RUN (1 command, 1 video_item, 10 checks) ---
+registered set: ['audio_missing', 'av_sync_drift', 'contact_break', 'cut_drift', 'edge_halo', 'identity_drift', 'silhouette_clipping', 'temporal_flicker', 'trajectory_drift', 'z_order_error']
+expected per-detector issues (fixture manifest, dynamic): {'trajectory_drift': 1, 'cut_drift': 1, 'contact_break': 0, 'z_order_error': 0, 'silhouette_clipping': 0, 'identity_drift': 0, 'edge_halo': 0, 'temporal_flicker': 0, 'audio_missing': 1, 'av_sync_drift': 1}
+summary: {
+ "cancelled": false,
+ "checks_requested": 10,
+ "checks_run": 10,
+ "checks_skipped": 0,
+ "created": 4,
+ "deadline_exceeded": false,
+ "errors": 0,
+ "not_applicable": 0,
+ "per_detector": {
+  "audio_missing": {
+   "applicability": "applicable",
+   "created": 1,
+   "detector": "audio_missing",
+   "error_code": null,
+   "items_found": 1,
+   "ran": true,
+   "resolved_after_recheck": 0,
+   "reused": 0,
+   "run_sec": 0.125,
+   "skipped": false,
+   "status": "blocker"
+  },
+  "av_sync_drift": {
+   "applicability": "applicable",
+   "created": 1,
+   "detector": "av_sync_drift",
+   "error_code": null,
+   "items_found": 1,
+   "ran": true,
+   "resolved_after_recheck": 0,
+   "reused": 0,
+   "run_sec": 0.125,
+   "skipped": false,
+   "status": "warning"
+  },
+  "contact_break": {
+   "applicability": null,
+   "created": 0,
+   "detector": "contact_break",
+   "error_code": null,
+   "items_found": 0,
+   "ran": true,
+   "resolved_after_recheck": 0,
+   "reused": 0,
+   "run_sec": 0.125,
+   "skipped": false,
+   "status": null
+  },
+  "cut_drift": {
+   "applicability": null,
+   "created": 1,
+   "detector": "cut_drift",
+   "error_code": null,
+   "items_found": 1,
+   "ran": true,
+   "resolved_after_recheck": 0,
+   "reused": 0,
+   "run_sec": 0.5620000000344589,
+   "skipped": false,
+   "status": "blocker"
+  },
+  "edge_halo": {
+   "applicability": null,
+   "created": 0,
+   "detector": "edge_halo",
+   "error_code": null,
+   "items_found": 0,
+   "ran": true,
+   "resolved_after_recheck": 0,
+   "reused": 0,
+   "run_sec": 0.125,
+   "skipped": false,
+   "status": "pass"
+  },
+  "identity_drift": {
+   "applicability": null,
+   "created": 0,
+   "detector": "identity_drift",
+   "error_code": null,
+   "items_found": 0,
+   "ran": true,
+   "resolved_after_recheck": 0,
+   "reused": 0,
+   "run_sec": 0.125,
+   "skipped": false,
+   "status": "pass"
+  },
+  "silhouette_clipping": {
+   "applicability": null,
+   "created": 0,
+   "detector": "silhouette_clipping",
+   "error_code": null,
+   "items_found": 0,
+   "ran": true,
+   "resolved_after_recheck": 0,
+   "reused": 0,
+   "run_sec": 0.125,
+   "skipped": false,
+   "status": null
+  },
+  "temporal_flicker": {
+   "applicability": null,
+   "created": 0,
+   "detector": "temporal_flicker",
+   "error_code": null,
+   "items_found": 0,
+   "ran": true,
+   "resolved_after_recheck": 0,
+   "reused": 0,
+   "run_sec": 0.125,
+   "skipped": false,
+   "status": "pass"
+  },
+  "trajectory_drift": {
+   "applicability": null,
+   "created": 1,
+   "detector": "trajectory_drift",
+   "error_code": null,
+   "items_found": 1,
+   "ran": true,
+   "resolved_after_recheck": 0,
+   "reused": 0,
+   "run_sec": 0.5779999999795109,
+   "skipped": false,
+   "status": "blocker"
+  },
+  "z_order_error": {
+   "applicability": null,
+   "created": 0,
+   "detector": "z_order_error",
+   "error_code": null,
+   "items_found": 0,
+   "ran": true,
+   "resolved_after_recheck": 0,
+   "reused": 0,
+   "run_sec": 0.609000000054948,
+   "skipped": false,
+   "status": null
+  }
+ },
+ "reopened_stale": 0,
+ "resolved_after_recheck": 0,
+ "reused": 0,
+ "run_id": "39a9faf648e9219f...",
+ "run_sec": 2.719
+}
+DB rows: 4 | statuses: ['open']
+rows match expected: True
+
+--- 2. IDEMPOTENCY x2 (identical input) ---
+run2 created=0 reused=4 errors=0
+rows run1=4 run2=4 | same set: True
+distinct natural keys == rows: True
+run1.run_id == run2.run_id: True
+
+--- 3. RECHECK FLOW (unfixed run then fixed run) ---
+unfixed rerun: created=0 resolved_after_recheck=0 statuses=['open']
+fixed rerun:  created=0 resolved_after_recheck=4 statuses=['resolved']
+resolved evidence sample: [{"detector": "trajectory_drift", "recheck": "resolved", "recheck_result": "pass", "run_id": "269dce8ef9c386d988dd00f9bd60945da32d3cfeb95fca75cf03d92e5136c6d6"}, {"detector": "cut_drift", "recheck": "resolved", "recheck_result": "pass", "run_id": "269dce8ef9c386d988dd00f9bd60945da32d3cfeb95fca75cf03d92e5136c6d6"}, {"detector": "av_sync_drift", "recheck": "resolved", "recheck_result": "pass", "run_id": "269dce8ef9c386d988dd00f9bd60945da32d3cfeb95fca75cf03d92e5136c6d6"}, {"detector": "audio_missing", "recheck": "resolved", "recheck_result": "pass", "run_id": "269dce8ef9c386d988dd00f9bd60945da32d3cfeb95fca75cf03d92e5136c6d6"}]
+auto-resolve == previously open items: True
+
+--- 4. NO_AUDIO_SOURCE (C2-F2) ---
+summary: not_applicable=2 created=0 errors=0
+audio_missing applicability=not_applicable items_found=0
+av_sync_drift applicability=not_applicable items_found=0
+DB rows (must be 0): 0
+
+--- 5. ZERO-PATH GREP (C2-F2) ---
+terminal-transition callers outside orchestrator+owner: []
+terminal status writes outside owner+orchestrator: []
+scan domain: app/** with QCItem surface -> zero exceptions
+
+=== END evidence probe (all real runtime output) ===

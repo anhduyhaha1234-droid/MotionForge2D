@@ -1,0 +1,32 @@
+=== S11-T03F regression combo (real run output) ===
+Command:
+  unset MOTIONFORGE_DATABASE_URL
+  python -m pytest \
+    tests/test_s11_t02b_qc_repository_lifecycle.py \
+    tests/test_s11_t02b_qc_api_readonly.py \
+    tests/test_s11_t03a_thresholds_policy.py \
+    tests/test_s11_t03a_runner_registry.py \
+    tests/test_s11_t03b_trajectory_cut_detectors.py \
+    tests/test_s11_t03c_contact_zorder_clipping_detectors.py \
+    tests/test_s11_t03d_identity_halo_flicker_detectors.py \
+    tests/test_s11_t03e_audio_sync_checks.py \
+    tests/test_s11_t03f_orchestrator.py \
+    tests/test_s11_t06a1_fixture_harness.py \
+    tests/test_s11_t06a2_calibration_inputs.py \
+    -p no:cacheprovider --basetemp=%TEMP%/s11t03f_reg3 -q
+
+Output (tail):
+=========================== short test summary info ===========================
+177 passed, 29 warnings in 103.77s (0:01:43)
+EXIT=0
+
+Notes:
+- includes T03F (14 tests) + T02B repo/API + T03A policy/runner + T03B/C/D/E
+  detectors + T06A1 harness + T06A2 calibration — zero regressions.
+- a pre-fix combo run also exercised the deadline invariant: 1 failed
+  (checks_skipped == 9 != 10, OS timer granularity race with 1e-9 deadline)
+  -> the deadline assertion was rewritten to machine-independent invariants
+  (checks_run==0, created==0, deadline_exceeded, checks accounted); the
+  cancel path remains fully deterministic (pre-set event -> 10 skipped).
+- SQLAlchemy SAWarnings (unsupported reflection of expression-based index)
+  are pre-existing in T06A1 harness runs, not introduced by T03F.

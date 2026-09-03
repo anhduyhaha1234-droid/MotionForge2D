@@ -1,0 +1,13 @@
+=== baseline: git status porcelain ===
+?? app/services/qc_checks/orchestrator.py
+?? docs/pm/sessions/S11-T03F/
+?? tests/test_s11_t03f_orchestrator.py
+=== branch ===
+codex/s11/t03f-0903w7
+=== HEAD ===
+0a7de285e3501ce51a2c934df48c1ca9871ddf40
+=== WAVE_BASE ===
+0a7de285e3501ce51a2c934df48c1ca9871ddf40
+=== orchestrator.py existed at baseline? ===
+fatal: path 'app/services/qc_checks/orchestrator.py' exists on disk, but not in '0a7de285e3501ce51a2c934df48c1ca9871ddf40'
+ABSENT (new file)
