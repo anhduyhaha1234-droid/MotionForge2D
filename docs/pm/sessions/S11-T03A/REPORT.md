@@ -65,3 +65,11 @@ KHÔNG đụng: detector modules (T03B/C/D/E — chưa tồn tại, sở hữu t
 - Runner child protocol: detector function nhận `args` dict, trả JSON-serializable; runner chỉ chấp nhận line JSON cuối stdout; mọi fail đều kill-tree + reap trong remaining budget (T01D).
 - `no_audio_source_fact` kind=constant: sanity [0,0] — mọi deviation → INVALID (fail-closed); threshold 0/0 belt-and-braces.
 - Chưa chạm E06/S09 output; zero S12/S13 dispatch; không resume session task khác (session rule W5: NEW SESSION).
+
+## 7. CORRECTION C2 — exit-gate mypy (resume session T03A, canonical-FF HEAD `15f434928c1b24d88a8649468873c3da8295f3a6`)
+
+- **Finding 1** `thresholds.py:280 no-any-return`: `load_policy()` là lru_cache-wrapper → mypy thấy Any; `return entry` chạm `dict[str, Any]`. Fix: `cast(dict[str, Any], entry)` sau None-check + `from typing import Any, cast` — KHÔNG nới ignore, KHÔNG đổi hành vi (policy schema đảm bảo entry là dict).
+- **Finding 2** `runner.py:160 unused-ignore`: `# type: ignore[import-not-found]` dư vì mypy resolve được psutil. Fix: xóa comment ignore, GIỮ try/except ImportError fallback runtime.
+- Scope: CHỈ 2 production files (`git status` = 2 modified) + docs C2; zero file khác.
+- Verify thật: mypy 3 files `Success`; pytest `27 passed` ×2 (4.92s/4.91s, basetemp s11t03a-c2-*, `-p no:cacheprovider`, `env -u MOTIONFORGE_DATABASE_URL`); ruff `--select F` `All checks passed!`; py_compile OK; `git diff --check` sạch.
+- Commit C2 local 1 commit; SHA ghi terminal (không push/merge/rebase).

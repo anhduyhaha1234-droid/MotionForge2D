@@ -23,4 +23,14 @@ Mọi lệnh chạy từ worktree task với isolation: `env -u MOTIONFORGE_DATA
 | Final scope | `git status --porcelain` | Chỉ untracked allowlist (4 new files + 2 dirs) + docs/pm/sessions/S11-T03A/; KHÔNG file modified; HEAD bất biến (evidence/baseline.txt bottom) |
 | Commit | Stage CHỈ allowlist + `docs/pm/sessions/S11-T03A/**`; commit local | SHA ghi trong REPORT.md / terminal |
 
+**CORRECTION C2 (2026-09-03, exit-gate mypy — resume session T03A):**
+| Thời điểm | Hành động | Kết quả thật |
+|---|---|---|
+| RED | `python -m mypy app/services/qc_checks/{thresholds,runner,registry}.py` trên canonical-FF HEAD `15f4349` (porcelain=0) | `thresholds.py:280 no-any-return` + `runner.py:160 unused-ignore` — đúng 2 findings |
+| Fix 1 | `thresholds.py get_threshold`: `return cast(dict[str, Any], entry)` + `from typing import Any, cast` (lru_cache wrapper → Any; cast đúng, không nới ignore, không đổi hành vi) | — |
+| Fix 2 | `runner.py _kill_tree`: xóa `# type: ignore[import-not-found]` dư (mypy thấy psutil; giữ try/except ImportError fallback runtime) | — |
+| GREEN | mypy 3 files → `Success: no issues found in 3 source files`; pytest 2 files `27 passed in 4.92s` + `27 passed in 4.91s` (basetemp s11t03a-c2-1/2, env strip); ruff F `All checks passed!`; py_compile OK; `git diff --check` sạch | — |
+| Scope | `git status --porcelain` = chỉ `M app/services/qc_checks/{runner,thresholds}.py` + docs C2 append; KHÔNG đụng file khác; KHÔNG push/merge/rebase | — |
+| Commit C2 | 1 commit local | SHA ghi REPORT.md / terminal |
+
 Không push/merge/rebase/reset/clean/stash/force. KHÔNG đụng s11-integration, MAIN, T02B repo, T06A1 media manifests, calibration fixtures (T06A2 — read-only), frontend/**, migrations/**, s08_golden/**.

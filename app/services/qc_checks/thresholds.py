@@ -39,7 +39,7 @@ import json
 import math
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 #: Frozen policy identity — v1 is the first FREEZE (W5).
 POLICY_ID = "s11-qc-thresholds-v1"
@@ -277,7 +277,10 @@ def get_threshold(metric: str) -> dict[str, Any]:
         raise QcThresholdError(
             QC_THRESHOLD_UNKNOWN_METRIC, f"unknown metric: {metric!r}"
         )
-    return entry
+    # load_policy is lru_cache-wrapped -> mypy sees Any from the wrapper.
+    # The entry is a dict by policy schema after the None check — cast
+    # here instead of relaxing the return annotation.
+    return cast(dict[str, Any], entry)
 
 
 def classify(metric: str, value: float) -> tuple[str, str]:

@@ -157,7 +157,7 @@ def _kill_tree(proc: Any) -> None:
     back to ``proc.kill()`` alone when psutil is unavailable.
     """
     try:
-        import psutil  # type: ignore[import-not-found]
+        import psutil
     except ImportError:
         psutil = None
     if psutil is not None:
