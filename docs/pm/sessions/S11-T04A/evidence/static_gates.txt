@@ -1,0 +1,10 @@
+== ruff --select F (6 files) ==
+All checks passed!
+== py_compile (4 prod files) ==
+OK
+== GET-only grep ==
+GET decorators: 2
+mutation decorators: 0
+app.py include_router(qc_navigation.router): 1
+== alembic heads ==
+f9a0b1c2d3e4 (head)
