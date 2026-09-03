@@ -117,3 +117,54 @@ Commit LOCAL trên task branch — KHÔNG push/merge/rebase/reset/clean/stash/fo
 ## 7. Status
 
 `TASK_SUBMITTED` — toàn bộ acceptance criteria 1–4 đạt (bảng đối chiếu trong REPORT.md). EXIT.
+---
+
+## 8. CORRECTION C1 (resume exact session — finding P1 contract violation)
+
+Resume: session `20260903_122658_633b7e`, branch fast-forward tới canonical
+`746b129a35783b132ff7e29f6a35389288a67ac1` (T02A-C1 fix enum: 10 reason codes).
+Finding: manifests dùng reason-code cũ → seed fail DB CHECK (28 fail gate cumulative; diagnosis 2/2 fail harness).
+
+### Fix (2 manifest — seed_plan)
+
+```
+two_scene_source.json:            ["trajectory_drift","cut_drift","identity","flicker"]
+                                  -> ["trajectory_drift","cut_drift","identity_drift","temporal_flicker"]
+multistream_duration_variant.json:["audio_timecode","cut_drift","clipping"]
+                                  -> ["audio_missing","av_sync_drift","cut_drift"]
+```
+
+`tests/s11_qc_seed.py` + `tests/test_s11_t06a1_fixture_harness.py`: KHÔNG cần sửa —
+seed/harness derive từ `QC_REASON_CODES` (10 codes binding) nên kỳ vọng tự đúng; scan xác nhận
+zero token cũ trong cả 3 file + 7 manifests.
+
+### Verify (chạy thật sau sửa)
+
+```
+$ grep -rnE 'z_order"|"clipping"|"identity"|"flicker"|"audio_timecode"' \
+      tests/fixtures/s11_qc/media_manifests/ tests/s11_qc_media_builders.py \
+      tests/s11_qc_seed.py tests/test_s11_t06a1_fixture_harness.py
+  -> (rỗng) RESCAN_EXIT=1 = zero token cũ (PASS)
+
+$ python -m pytest tests/test_s11_t06a1_fixture_harness.py \
+      -p no:cacheprovider --basetemp "C:/Users/Admin/AppData/Local/Temp/s11t06a1-c1-463-1" \
+      (env -u MOTIONFORGE_DATABASE_URL)
+  -> 8 passed in 10.77s — PYTEST_EXIT=0
+     (test_seed_every_reason_code giờ seed FULL 10 codes qua repository)
+
+$ python %TEMP%/s11t06a1-w3-evidence/ev_seed_counts.py
+  -> reason_codes_total: 10 | count_after_first_seed: 10 | count_after_reseed: 10
+     ids_identical_across_seeds: True
+  -> rows: trajectory_drift, cut_drift, contact_break, z_order_error,
+     silhouette_clipping, identity_drift, edge_halo, temporal_flicker,
+     audio_missing, av_sync_drift  (evidence/seed_counts.json đã cập nhật)
+
+$ ruff check --select F tests/s11_qc_media_builders.py tests/s11_qc_seed.py \
+      tests/test_s11_t06a1_fixture_harness.py
+  -> All checks passed!
+$ python -m py_compile ... -> py_compile OK
+```
+
+### Commit C1
+
+`git add` CHỈ 2 manifest + docs/S11-T06A1 (LOG/REPORT + evidence/seed_counts.json); commit local 1 commit.

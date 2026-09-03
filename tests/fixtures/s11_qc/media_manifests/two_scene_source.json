@@ -24,7 +24,7 @@
     ]
   },
   "seed_plan": {
-    "reason_codes": ["trajectory_drift", "cut_drift", "identity", "flicker"],
+    "reason_codes": ["trajectory_drift", "cut_drift", "identity_drift", "temporal_flicker"],
     "severity": "warning"
   }
 }

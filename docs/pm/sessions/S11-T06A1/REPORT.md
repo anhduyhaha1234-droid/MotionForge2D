@@ -54,3 +54,32 @@ KHÔNG đụng: `tests/fixtures/s11_golden/` (không tồn tại — cấm tuy�
 - T06A2 calibration: KHÔNG nằm trong T06A1 — zero tham chiếu (AC2). T03A thresholds: zero tham chiếu.
 - `app/persistence/qc_items.py`: CHỈ import (bất biến — T02B ownership).
 - W3 là serial wave: 1 worker duy nhất, session mới, không resume task khác.
+---
+
+## 7. CORRECTION C1 — Finding P1 (contract violation) — RESOLVED
+
+**Finding:** media manifests dùng reason-code KHÔNG tồn tại trong enum binding mới
+(T02A-C1: 10 codes = 8 overlay + 2 audio) → seed fail DB CHECK tại gate cumulative
+(28 fail; 2/2 harness test seed fail).
+
+**Root cause:** manifest seed_plan freeze từ trước T02A-C1; harness/seed không hardcode
+nên KHÔNG phải nguồn lỗi (scan xác nhận zero token cũ trong seed + builders + harness).
+
+**Fix (hữu hạn, 2 file):**
+| Manifest | Trước (cũ) | Sau (binding 10 codes) |
+|---|---|---|
+| `two_scene_source.json` | trajectory_drift, cut_drift, identity, flicker | trajectory_drift, cut_drift, identity_drift, temporal_flicker |
+| `multistream_duration_variant.json` | audio_timecode, cut_drift, clipping | audio_missing, av_sync_drift, cut_drift (2 audio riêng Decision D + cut_drift) |
+
+Giữ nguyên semantics fixture: two_scene = 4 overlay trên 2-cảnh; multistream 5-stream audio = 2 audio codes + cut_drift. Negative scenarios (unsupported/corrupt/no_audio) giữ seed_plan rỗng.
+
+**Verify (thật, sau sửa):**
+- grep zero token cũ trong manifests + seed + builders + harness → RESCAN_EXIT=1 ✓
+- Harness: 8 passed in 10.77s, EXIT 0 (fresh basetemp `s11t06a1-c1-463-1`, `-p no:cacheprovider`, `env -u MOTIONFORGE_DATABASE_URL`) ✓
+- Seed AC3: 10/10 reason codes (8 overlay + audio_missing + av_sync_drift) qua `QCItemRepository`; reseed idempotent (count 10→10, ids identical) — evidence/seed_counts.json cập nhật ✓
+- Determinism ×2 + ffprobe asserts: giữ nguyên (test determinism vẫn xanh) ✓
+- ruff `--select F` All checks passed; py_compile OK; JSON 7/7 valid ✓
+
+**Diff scope vs WAVE_BASE `746b129a…`:** CHỈ 2 manifest + `docs/pm/sessions/S11-T06A1/**` (LOG/REPORT append + evidence/seed_counts.json). KHÔNG push/merge/rebase/reset/clean/stash.
+
+Status: **TASK_SUBMITTED (correction)** — terminal `CORRECTION_C1_SUBMITTED`.

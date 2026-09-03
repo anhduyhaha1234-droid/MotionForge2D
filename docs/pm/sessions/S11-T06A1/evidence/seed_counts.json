@@ -1,8 +1,8 @@
 {
-  "count_after_first_seed": 8,
-  "count_after_reseed": 8,
+  "count_after_first_seed": 10,
+  "count_after_reseed": 10,
   "ids_identical_across_seeds": true,
-  "reason_codes_total": 8,
+  "reason_codes_total": 10,
   "rows": [
     {
       "category": "trajectory_drift",
@@ -23,7 +23,7 @@
         "seed_source": "s11_qc_seed"
       },
       "evidence_window_key": "two_scene_source:all:trajectory_drift",
-      "id": "b1d1c6c8-e893-49d1-9cc5-545d05dd62d8",
+      "id": "2e34d5ab-f93e-41c8-a854-35e0c8f4a23e",
       "reason_code": "trajectory_drift",
       "severity": "warning",
       "status": "open"
@@ -47,7 +47,7 @@
         "seed_source": "s11_qc_seed"
       },
       "evidence_window_key": "two_scene_source:all:cut_drift",
-      "id": "e909e473-f679-4744-aab5-3cdac55859d8",
+      "id": "f97c53df-a017-4297-b4c2-4c425eb28824",
       "reason_code": "cut_drift",
       "severity": "warning",
       "status": "open"
@@ -71,13 +71,13 @@
         "seed_source": "s11_qc_seed"
       },
       "evidence_window_key": "two_scene_source:all:contact_break",
-      "id": "e8d9b6fe-1507-460e-b80b-e1a2ad768bbf",
+      "id": "8b23b316-4329-4215-811c-260b6dd4002b",
       "reason_code": "contact_break",
       "severity": "warning",
       "status": "open"
     },
     {
-      "category": "z_order",
+      "category": "z_order_error",
       "checkpoint_ref": "s11-t06a1:two_scene_source",
       "confidence": 0.9,
       "confidence_source": "derived",
@@ -94,14 +94,14 @@
         "schema_version": 1,
         "seed_source": "s11_qc_seed"
       },
-      "evidence_window_key": "two_scene_source:all:z_order",
-      "id": "62ecb891-a5b5-4da1-b45f-bfe727517564",
-      "reason_code": "z_order",
+      "evidence_window_key": "two_scene_source:all:z_order_error",
+      "id": "67448645-4f85-4fac-94c2-90eaa50b8238",
+      "reason_code": "z_order_error",
       "severity": "warning",
       "status": "open"
     },
     {
-      "category": "clipping",
+      "category": "silhouette_clipping",
       "checkpoint_ref": "s11-t06a1:two_scene_source",
       "confidence": 0.9,
       "confidence_source": "derived",
@@ -118,14 +118,14 @@
         "schema_version": 1,
         "seed_source": "s11_qc_seed"
       },
-      "evidence_window_key": "two_scene_source:all:clipping",
-      "id": "2af2cee0-46c1-4455-8c64-6a5e93ac54a9",
-      "reason_code": "clipping",
+      "evidence_window_key": "two_scene_source:all:silhouette_clipping",
+      "id": "8677e474-ad29-4232-b9ed-9ec09e728a35",
+      "reason_code": "silhouette_clipping",
       "severity": "warning",
       "status": "open"
     },
     {
-      "category": "identity",
+      "category": "identity_drift",
       "checkpoint_ref": "s11-t06a1:two_scene_source",
       "confidence": 0.9,
       "confidence_source": "derived",
@@ -142,14 +142,14 @@
         "schema_version": 1,
         "seed_source": "s11_qc_seed"
       },
-      "evidence_window_key": "two_scene_source:all:identity",
-      "id": "c6089ddf-6124-473d-8f81-a0e72006a97c",
-      "reason_code": "identity",
+      "evidence_window_key": "two_scene_source:all:identity_drift",
+      "id": "7219463c-afd6-477f-b4b9-e520e21a4b7c",
+      "reason_code": "identity_drift",
       "severity": "warning",
       "status": "open"
     },
     {
-      "category": "flicker",
+      "category": "edge_halo",
       "checkpoint_ref": "s11-t06a1:two_scene_source",
       "confidence": 0.9,
       "confidence_source": "derived",
@@ -166,14 +166,14 @@
         "schema_version": 1,
         "seed_source": "s11_qc_seed"
       },
-      "evidence_window_key": "two_scene_source:all:flicker",
-      "id": "bbb6f947-2a30-4676-a203-510297e40481",
-      "reason_code": "flicker",
+      "evidence_window_key": "two_scene_source:all:edge_halo",
+      "id": "0d437374-98f2-42dd-b0aa-22a12de98531",
+      "reason_code": "edge_halo",
       "severity": "warning",
       "status": "open"
     },
     {
-      "category": "audio_timecode",
+      "category": "temporal_flicker",
       "checkpoint_ref": "s11-t06a1:two_scene_source",
       "confidence": 0.9,
       "confidence_source": "derived",
@@ -190,9 +190,57 @@
         "schema_version": 1,
         "seed_source": "s11_qc_seed"
       },
-      "evidence_window_key": "two_scene_source:all:audio_timecode",
-      "id": "04d97c38-79c1-48b3-aea4-2a65042b5433",
-      "reason_code": "audio_timecode",
+      "evidence_window_key": "two_scene_source:all:temporal_flicker",
+      "id": "477e6c23-559b-4205-94b9-226665765f98",
+      "reason_code": "temporal_flicker",
+      "severity": "warning",
+      "status": "open"
+    },
+    {
+      "category": "audio_missing",
+      "checkpoint_ref": "s11-t06a1:two_scene_source",
+      "confidence": 0.9,
+      "confidence_source": "derived",
+      "detector": "s11-seed-media",
+      "evidence": {
+        "manifest": {
+          "manifest_version": 1,
+          "scenario": "two_scene_source"
+        },
+        "media": {
+          "builder": "build_two_scene_source",
+          "relative_path": "media/two_scene_source.mp4"
+        },
+        "schema_version": 1,
+        "seed_source": "s11_qc_seed"
+      },
+      "evidence_window_key": "two_scene_source:all:audio_missing",
+      "id": "a59ffffb-1bc1-4c74-a534-7d615af5ceaa",
+      "reason_code": "audio_missing",
+      "severity": "warning",
+      "status": "open"
+    },
+    {
+      "category": "av_sync_drift",
+      "checkpoint_ref": "s11-t06a1:two_scene_source",
+      "confidence": 0.9,
+      "confidence_source": "derived",
+      "detector": "s11-seed-media",
+      "evidence": {
+        "manifest": {
+          "manifest_version": 1,
+          "scenario": "two_scene_source"
+        },
+        "media": {
+          "builder": "build_two_scene_source",
+          "relative_path": "media/two_scene_source.mp4"
+        },
+        "schema_version": 1,
+        "seed_source": "s11_qc_seed"
+      },
+      "evidence_window_key": "two_scene_source:all:av_sync_drift",
+      "id": "2f637e61-96e8-455e-9aca-451b8c6bec83",
+      "reason_code": "av_sync_drift",
       "severity": "warning",
       "status": "open"
     }

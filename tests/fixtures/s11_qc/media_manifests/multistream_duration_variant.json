@@ -21,7 +21,7 @@
     ]
   },
   "seed_plan": {
-    "reason_codes": ["audio_timecode", "cut_drift", "clipping"],
+    "reason_codes": ["audio_missing", "av_sync_drift", "cut_drift"],
     "severity": "warning"
   }
 }
