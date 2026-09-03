@@ -52,6 +52,5 @@ WAVE_BASE: `b2501598078c702d875f57ac0a17a78e3e40237b` | Commit: LOCAL (xem cuố
 
 ## 7. Commit SHA
 
-```
-(ghi sau khi commit — xem git log -1 trên branch)
-```
+- feat commit: `f3e294a` (allowlist 7 path + docs/S11-T06B, 12 files, 1173 insertions)
+- docs SHA backfill: (commit 2 — xem git log -2)
