@@ -65,7 +65,7 @@ diff; các file S11-T02..T05 0 diff.
 
 ## Commit
 
-- SHA: `c3cc46e` (feat: test + REPORT + evidence) + `(docs SHA — commit 2, xem dưới)`
+- SHA: `c3cc46e` (feat: test + REPORT + evidence) + `e795f1c`
 - Parent: fce13a06b4b51b736d13434e812700094a8adaca (WAVE_BASE)
 
 **Status: TASK_SUBMITTED** — chờ Manager verify. KHÔNG tự ghi APPROVED.
