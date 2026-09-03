@@ -6,6 +6,30 @@
 - Model route: provider `custom` (9Router), `ocg/deepseek-v4-flash`, reasoning max, fallback off, TTFB 900s
 - Session rule: NEW SESSION (this is the only S11-T03F worker session)
 
+## 0. Correction C1 (EXIT-GATE mypy — resume, bounded)
+
+- Resumed on branch `codex/s11/t03f-0903w7` fast-forwarded to canonical
+  `15f434928c1b24d88a8649468873c3da8295f3a6` (worktree clean, porcelain 0).
+- Findings (mypy retained scope, orchestrator.py):
+  1. `:175` Unused "type: ignore" comment [unused-ignore]
+  2. `:177` Incompatible types in assignment (Callable[[Any], Any] vs overloaded dict.get) [assignment]
+- Fix (bounded patch, preimage, NO behavior change, ONLY orchestrator.py):
+  - removed the unused `# type: ignore[assignment]`;
+  - added explicit `get: Callable[[str], Any]` annotation before the branches —
+    both `dict.get` and the lambda satisfy (str) -> Any; `Callable` added to
+    the typing import.
+- Verify (real outputs in `evidence/c1_mypy_before.txt` / `c1_mypy_after.txt`):
+  - retained scope `mypy orchestrator.py --follow-imports=skip` -> Success (exit 0);
+  - full 4-file command: 4 errors BEFORE (2 T03F + 2 T03A) -> 2 errors AFTER,
+    both FOREIGN-OWNED (T03A, pre-existing since W5 on mypy 2.3.0):
+    thresholds.py:280 `no-any-return`, runner.py:160 `unused-ignore`.
+    T03F write-set forbids touching those files -> routed to T03A owner.
+  - pytest tests/test_s11_t03f_orchestrator.py: 14 passed in 35.54s
+    (fresh root %TEMP%/s11t03fc1_r1, `-p no:cacheprovider`, env stripped);
+  - ruff `--select F` on orchestrator.py + test file: All checks passed;
+    py_compile OK.
+- Commits (local): C1 fix + docs record SHA — see REPORT.md.
+
 ## 1. Baseline (verified at start)
 
 - `git status --porcelain` = empty; branch correct; HEAD == WAVE_BASE.

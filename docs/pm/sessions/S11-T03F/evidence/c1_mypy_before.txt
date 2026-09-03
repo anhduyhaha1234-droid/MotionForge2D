@@ -1,0 +1,5 @@
+app\services\qc_checks\thresholds.py:280: error: Returning Any from function declared to return "dict[str, Any]"  [no-any-return]
+app\services\qc_checks\runner.py:160: error: Unused "type: ignore" comment  [unused-ignore]
+app\services\qc_checks\orchestrator.py:175: error: Unused "type: ignore" comment  [unused-ignore]
+app\services\qc_checks\orchestrator.py:177: error: Incompatible types in assignment (expression has type "Callable[[Any], Any]", variable has type overloaded function)  [assignment]
+Found 4 errors in 3 files (checked 4 source files)

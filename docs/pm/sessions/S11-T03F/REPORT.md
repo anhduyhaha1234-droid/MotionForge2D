@@ -4,6 +4,25 @@ Task: **W7 · T03F — Full per-video orchestrator + recheck resolution + measur
 Branch: `codex/s11/t03f-0903w7` | Parent (WAVE_BASE): `0a7de285e3501ce51a2c934df48c1ca9871ddf40`
 Model: `ocg/deepseek-v4-flash` (custom 9Router, reasoning max, fallback off, TTFB 900s)
 
+## Correction C1 — EXIT-GATE mypy (retained scope)
+
+Findings fixed (bounded patch, ONLY `app/services/qc_checks/orchestrator.py`, no behavior change):
+
+| Finding | Fix |
+|---|---|
+| `orchestrator.py:175` Unused "type: ignore" comment | removed the unused `# type: ignore[assignment]` |
+| `orchestrator.py:177` Incompatible types in assignment (Callable vs overloaded dict.get) | explicit `get: Callable[[str], Any]` annotation before the branches; `Callable` added to typing import |
+
+Verify (real output: `evidence/c1_mypy_before.txt`, `evidence/c1_mypy_after.txt`):
+- `mypy app/services/qc_checks/orchestrator.py --follow-imports=skip` → **Success: no issues found** (exit 0) — T03F retained scope clean.
+- Full 4-file command `mypy orchestrator.py thresholds.py runner.py registry.py`:
+  BEFORE 4 errors (2 T03F + 2 T03A) → AFTER **2 errors, both FOREIGN-OWNED (T03A, pre-existing since W5 on mypy 2.3.0)**:
+  `thresholds.py:280` `no-any-return` and `runner.py:160` `unused-ignore`.
+  T03F write-set forbids touching those files → **route to T03A owner**; not a T03F regression (verified present on the pre-fix HEAD).
+- pytest `tests/test_s11_t03f_orchestrator.py`: **14 passed in 35.54s** (fresh root %TEMP%/s11t03fc1_r1, `-p no:cacheprovider`, MOTIONFORGE_DATABASE_URL unset).
+- `ruff check --select F` on allowlist files: **All checks passed**; py_compile OK.
+- Commit: C1 fix (1 commit) + docs SHA record — SHA in LOG.md §0 / commit message.
+
 ## Write-set (allowlist — nothing else touched)
 
 | Path | Kind |
