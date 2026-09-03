@@ -118,5 +118,5 @@ JobService worker.
 
 ## 6. Commit local
 
-- SHA: (điền sau commit — `git rev-parse HEAD` tại thời điểm submit)
+- SHA: `7629ab24b00ecbd82f753df5d467ecb609825072`
 - Parent: b9176544d3a6af5566c61fe67a5d545b407d404b (WAVE_BASE canonical)
