@@ -81,6 +81,6 @@ Forbidden verified: `git status --porcelain` chỉ 8 file allowlist + docs; `mod
 
 ## 7. Commit
 
-- Commit local trên `codex/s11/t03g-0903w8`: `c3c088f79091d680b95985617f000c622d367f82` (production) + `<<<<<<<<DOCS_SHA>>>>>>>>` (docs/evidence)
+- Commit local trên `codex/s11/t03g-0903w8`: `c3c088f79091d680b95985617f000c622d367f82` (production) + `ccee77b72f57211084209427f38f9394d3d533c7` (docs/evidence)
 - Parent: WAVE_BASE `f6942593304742501ba88f671160b83addbb980b`
 - Scope staged: 8 file allowlist + `docs/pm/sessions/S11-T03G/**`
