@@ -1121,6 +1121,7 @@ def _attach_output_validator(
         final_rel = published.get("final_rel")
         if final_rel:
             raise RuntimeError("NO_AUDIO_PRESENT result carries a published path")
+        _trigger_av_recheck_after_validation(ctx, result)
         return {
             "original_audio": {
                 "status": "NO_AUDIO_PRESENT",
@@ -1144,6 +1145,7 @@ def _attach_output_validator(
             "published original audio sha256/size do not match the handler "
             "evidence"
         )
+    _trigger_av_recheck_after_validation(ctx, result)
     return {
         "original_audio": {
             "relative_path": final_rel,
@@ -1152,6 +1154,37 @@ def _attach_output_validator(
             "status": published.get("status"),
         }
     }
+
+
+def _trigger_av_recheck_after_validation(
+    ctx: WorkerContext, result: dict[str, Any]
+) -> None:
+    """S11-T04C verified-completion hook: enqueue the A/V recheck.
+
+    Called ONLY after :func:`_attach_output_validator` verified the
+    published audio on disk (bytes OK) or the terminal NO_AUDIO_PRESENT
+    outcome — i.e. on the verified output-validation completion path, never
+    before.  Any enqueue failure raises, so the durable step NEVER reaches
+    ``completed`` without its recheck coverage (fail-closed, C4-F3).
+
+    A context WITHOUT a session factory is a pure disk-validation seam
+    (the durable worker always binds the factory — the source phase fails
+    closed without it), so the recheck hook is skipped there and the
+    disk-validation contract stays intact.
+    """
+    if getattr(ctx, "session_factory", None) is None:
+        return
+    from app.services.qc_av_recheck import ensure_av_recheck
+
+    manifest = ctx.input_manifest
+    ensure_av_recheck(
+        ctx.session_factory,
+        workspace_id=str(manifest.get("workspace_id") or ""),
+        project_id=str(manifest.get("project_id") or ""),
+        video_item_id=str(manifest.get("video_item_id") or ""),
+        attach_result=result,
+        generation=str(manifest.get("generation") or "1"),
+    )
 
 
 # ── Step plan + registration ─────────────────────────────────────────────────

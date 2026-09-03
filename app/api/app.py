@@ -31,6 +31,7 @@ from app.api.routes import (
     object_extraction,
     object_grouping,
     object_intelligence,
+    original_audio_action,
     project_cast,
     projects,
     qc_check_runs,
@@ -155,6 +156,11 @@ app.include_router(reskin_config.router)
 app.include_router(qc_items.router)
 app.include_router(qc_check_runs.router)
 app.include_router(qc_navigation.router)
+# Server-owned original-audio attach action (S11-T04C) — Decision H: the
+# client payload carries ONLY {video_item_id}; the A/V recheck triggers on
+# the verified attach completion (worker-side) with a route-side backfill
+# for completed/reused attach jobs.
+app.include_router(original_audio_action.router)
 
 
 # Durable S09 demo-loop API (S09-T03) — /api/v2/s09-demo-loops, disjoint
