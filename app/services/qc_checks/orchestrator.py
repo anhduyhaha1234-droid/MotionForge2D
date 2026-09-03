@@ -59,7 +59,7 @@ import json
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 from sqlalchemy.orm import Session
 
@@ -171,8 +171,12 @@ def _run_fingerprint(
 
 def _natural_key(obj: Any) -> tuple[Any, ...]:
     """Natural-key tuple from a QCItemRecord OR a candidate dict."""
+    # Explicit callable annotation: assigning the overloaded ``dict.get`` to
+    # a variable would otherwise leak the overloaded type into the lambda
+    # branch (mypy assignment error) — both branches satisfy (str) -> Any.
+    get: Callable[[str], Any]
     if isinstance(obj, dict):
-        get = obj.get  # type: ignore[assignment]
+        get = obj.get
     else:
         get = lambda k: getattr(obj, k)  # noqa: E731
     return (

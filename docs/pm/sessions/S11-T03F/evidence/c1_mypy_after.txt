@@ -1,0 +1,15 @@
+=== C1 mypy: AFTER fix ===
+--- retained scope (orchestrator.py, --follow-imports=skip) ---
+Success: no issues found in 1 source file
+MYPY_SCOPE_EXIT=0
+
+--- full 4-file command ---
+app\services\qc_checks\thresholds.py:280: error: Returning Any from function declared to return "dict[str, Any]"  [no-any-return]
+app\services\qc_checks\runner.py:160: error: Unused "type: ignore" comment  [unused-ignore]
+Found 2 errors in 2 files (checked 4 source files)
+MYPY_FULL_EXIT=1
+
+--- note ---
+Remaining 2 errors are FOREIGN-OWNED (T03A, pre-existing since W5 on mypy 2.3.0):
+  thresholds.py:280 no-any-return | runner.py:160 unused-ignore
+  T03F write-set forbids touching those files -> route to T03A owner.
