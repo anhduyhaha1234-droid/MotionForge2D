@@ -1,0 +1,6 @@
+audio_missing run1 sha256: 307d8a161799fec347d6f829c4383cde35b49b5a00b05ef10122e4d4e2744117
+audio_missing run2 sha256: 307d8a161799fec347d6f829c4383cde35b49b5a00b05ef10122e4d4e2744117
+audio_missing idempotent: True | qc_items count: 0 | applicability: not_applicable
+av_sync_drift run1 sha256: a1adb27c3b8e05145624cee66e5f8df7fbdbc515db99a198c12ff8bd38d926c4
+av_sync_drift run2 sha256: a1adb27c3b8e05145624cee66e5f8df7fbdbc515db99a198c12ff8bd38d926c4
+av_sync_drift idempotent: True | status: warning | drift_exact: 1/4

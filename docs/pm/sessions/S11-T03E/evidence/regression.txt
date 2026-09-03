@@ -1,0 +1,16 @@
+...........................................                              [100%]
+============================== warnings summary ===============================
+tests/test_s11_t06a1_fixture_harness.py::test_seed_every_reason_code_via_repository
+tests/test_s11_t06a1_fixture_harness.py::test_seed_idempotent_natural_key_reuse
+tests/test_s11_t06a1_fixture_harness.py::test_seed_from_manifest_plans_negative_scenarios_empty
+  C:\Users\Admin\AppData\Local\Programs\Python\Python311\Lib\contextlib.py:144: SAWarning: Skipped unsupported reflection of expression-based index uq_character_active_workspace_code
+    next(self.gen)
+
+tests/test_s11_t06a1_fixture_harness.py::test_seed_every_reason_code_via_repository
+tests/test_s11_t06a1_fixture_harness.py::test_seed_idempotent_natural_key_reuse
+tests/test_s11_t06a1_fixture_harness.py::test_seed_from_manifest_plans_negative_scenarios_empty
+  C:\Users\Admin\AppData\Local\Programs\Python\Python311\Lib\contextlib.py:144: SAWarning: Skipped unsupported reflection of expression-based index uq_channel_active_workspace_role_name
+    next(self.gen)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+43 passed, 6 warnings in 16.27s

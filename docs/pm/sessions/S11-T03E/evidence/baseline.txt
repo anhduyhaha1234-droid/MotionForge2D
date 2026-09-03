@@ -1,0 +1,18 @@
+BASELINE (resume tại canonical sau correction cascade):
+- git status --porcelain trước RED: chỉ `?? tests/test_s11_t03e_audio_sync_checks.py` (draft file còn lại từ trước pause)
+- git log --oneline -3:
+  c1a6777 docs(s11): T02B-C1 record correction commit SHA in LOG/REPORT
+  77be343 fix(s11): T02B-C1 update test fixtures to binding 10-code QC enum (correction)
+  88dc372 S11-T06A1 (W3) CORRECTION C1: reason codes -> binding 10-code enum
+- branch: codex/s11/t03e-0903w6
+- tests/__init__.py: ABSENT (import builders phải dùng top-level module name — conftest chèn project root)
+- QC_REASON_CODES / QC_ITEM_CATEGORIES: binding 10 codes (audio_missing, av_sync_drift là 2 code audio riêng)
+
+POLICY VERIFY (frozen s11-qc-thresholds-v1):
+- av_sync_drift warning_boundary=0.1, blocker_boundary=0.5, sanity=[0.0, 0.5], unit=s
+- classify(0.05)=pass, classify(0.1)=warning, classify(0.25)=warning, classify(0.5)=blocker, classify(2000.0)=invalid
+
+FINAL SCOPE (trước commit):
+- git status --porcelain: chỉ untracked = 2 module allowlist + 1 test allowlist + docs/pm/sessions/S11-T03E/** (LOG.md, REPORT.md, evidence/*)
+- ZERO modified tracked files; HEAD bất biến c1a6777864c1169435d7b7f263ce5fa7a0014c78
+- grep "audio_timecode" trên 3 file allowlist: ZERO matches (exit 1)

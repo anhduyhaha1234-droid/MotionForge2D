@@ -1,0 +1,17 @@
+RED before implementation — tests written first, run with isolation:
+
+$ env -u MOTIONFORGE_DATABASE_URL python -m pytest -p no:cacheprovider --basetemp=C:/Users/Admin/AppData/Local/Temp/s11t03e-red2 tests/test_s11_t03e_audio_sync_checks.py -q
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\AppData\Local\Programs\Python\Python311\Lib\importlib\__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests\test_s11_t03e_audio_sync_checks.py:43: in <module>
+    from app.services.qc_checks import (
+E   ImportError: cannot import name 'audio_missing' from 'app.services.qc_checks' (C:\Users\Admin\MotionForge2D-worktrees\s11-t03e-0903w6\app\services\qc_checks\__init__.py)
+=========================== short test summary info ===========================
+ERROR tests/test_s11_t03e_audio_sync_checks.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.69s
+
+Correct RED: the two detector modules did not exist yet; failure is the
+feature-missing error, not a typo.
