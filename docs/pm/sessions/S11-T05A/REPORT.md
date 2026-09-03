@@ -101,6 +101,6 @@ Hai file này NẰM NGOÀI write-set T05A (allowlist chỉ 2 test file mới) n�
 
 ## 9. Commit
 
-- Commit local trên `codex/s11/t05a-0903w12` (SHA ghi sau khi commit)
+- Commit local trên `codex/s11/t05a-0903w12`: `85de5c1b9eb3489f148805b9f805300e040b7d67`
 - Parent: WAVE_BASE `a146034d2282d2857fb9aee6d0ca4af3c178efb5`
 - Scope staged: 7 file allowlist + `docs/pm/sessions/S11-T05A/**`
