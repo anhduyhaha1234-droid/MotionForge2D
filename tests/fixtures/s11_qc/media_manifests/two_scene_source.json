@@ -1,0 +1,30 @@
+{
+  "manifest_version": 1,
+  "manifest_type": "s11_qc_media_manifest",
+  "scenario": "two_scene_source",
+  "media": {
+    "builder": "build_two_scene_source",
+    "params": {
+      "duration_a": 2.0,
+      "duration_b": 2.0,
+      "width": 320,
+      "height": 240,
+      "rate": 30
+    },
+    "relative_path": "media/two_scene_source.mp4",
+    "description": "MP4 H.264 + AAC: two contrasting solid-color scenes concatenated (known cut boundary at 2.0 s) with one AAC 440 Hz audio stream."
+  },
+  "probe_expectations": {
+    "format_name_contains": "mp4",
+    "duration_sec": 4.0,
+    "duration_tolerance_sec": 0.35,
+    "streams": [
+      {"codec_type": "video", "codec_name": "h264", "count": 1},
+      {"codec_type": "audio", "codec_name": "aac", "count": 1}
+    ]
+  },
+  "seed_plan": {
+    "reason_codes": ["trajectory_drift", "cut_drift", "identity", "flicker"],
+    "severity": "warning"
+  }
+}

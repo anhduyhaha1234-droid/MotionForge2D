@@ -1,0 +1,21 @@
+{
+  "manifest_version": 1,
+  "manifest_type": "s11_qc_media_manifest",
+  "scenario": "corrupt_truncate",
+  "media": {
+    "builder": "build_corrupt_truncate",
+    "params": {
+      "source_duration": 2.0,
+      "remove_ratio": 0.5
+    },
+    "relative_path": "media/corrupt_truncate.mp4",
+    "description": "A valid H.264 MP4 whose middle byte window [25 %, 75 %) was removed — real byte truncation (lane-B §2.2). ffprobe rejects it ('moov atom not found'), the engine's fail-closed import precondition."
+  },
+  "probe_expectations": {
+    "probe_must_fail": true
+  },
+  "seed_plan": {
+    "reason_codes": [],
+    "severity": "warning"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "manifest_version": 1,
+  "manifest_type": "s11_qc_media_manifest",
+  "scenario": "no_audio_source",
+  "media": {
+    "builder": "build_no_audio_source",
+    "params": {
+      "duration": 2.0
+    },
+    "relative_path": "media/no_audio_source.mp4",
+    "description": "H.264 video with ZERO audio streams — the explicit NO_AUDIO_PRESENT path (frozen decision 5; nothing fabricated)."
+  },
+  "probe_expectations": {
+    "format_name_contains": "mp4",
+    "duration_sec": 2.0,
+    "duration_tolerance_sec": 0.35,
+    "streams": [
+      {"codec_type": "video", "codec_name": "h264", "count": 1},
+      {"codec_type": "audio", "codec_name": "aac", "count": 0}
+    ]
+  },
+  "seed_plan": {
+    "reason_codes": [],
+    "severity": "warning"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "manifest_version": 1,
+  "manifest_type": "s11_qc_media_manifest",
+  "scenario": "multistream_duration_variant",
+  "media": {
+    "builder": "build_multistream_duration_variant",
+    "params": {
+      "duration": 3.0,
+      "audio_streams": 4
+    },
+    "relative_path": "media/multistream_duration_variant.mp4",
+    "description": "MP4 H.264 + 4 AAC streams (440/880/1320/1760 Hz), duration-variant of the S11 _make_multistream_aac pattern (3.0 s)."
+  },
+  "probe_expectations": {
+    "format_name_contains": "mp4",
+    "duration_sec": 3.0,
+    "duration_tolerance_sec": 0.35,
+    "streams": [
+      {"codec_type": "video", "codec_name": "h264", "count": 1},
+      {"codec_type": "audio", "codec_name": "aac", "count": 4}
+    ]
+  },
+  "seed_plan": {
+    "reason_codes": ["audio_timecode", "cut_drift", "clipping"],
+    "severity": "warning"
+  }
+}

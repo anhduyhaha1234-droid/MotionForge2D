@@ -1,0 +1,26 @@
+{
+  "manifest_version": 1,
+  "manifest_type": "s11_qc_media_manifest",
+  "scenario": "unsupported_non_mp4",
+  "media": {
+    "builder": "build_unsupported_non_mp4",
+    "params": {
+      "duration": 2.0
+    },
+    "relative_path": "media/unsupported_non_mp4.mkv",
+    "description": "H.264 + AAC in a Matroska (.mkv) container — non-MP4 negative; the engine accepts MP4 only (frozen decision 2)."
+  },
+  "probe_expectations": {
+    "format_name_contains": "matroska",
+    "duration_sec": 2.0,
+    "duration_tolerance_sec": 0.35,
+    "streams": [
+      {"codec_type": "video", "codec_name": "h264", "count": 1},
+      {"codec_type": "audio", "codec_name": "aac", "count": 1}
+    ]
+  },
+  "seed_plan": {
+    "reason_codes": [],
+    "severity": "warning"
+  }
+}

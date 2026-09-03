@@ -1,0 +1,32 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\Admin\AppData\Local\Programs\Python\Python311\python.exe
+rootdir: C:\Users\Admin\MotionForge2D-worktrees\s11-t06a1-0903w3
+configfile: pyproject.toml
+plugins: anyio-4.14.2, hydra-core-1.3.4, asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 8 items
+
+tests/test_s11_t06a1_fixture_harness.py::test_manifests_load_and_schema PASSED [ 12%]
+tests/test_s11_t06a1_fixture_harness.py::test_build_all_media_dataset_matches_manifests PASSED [ 25%]
+tests/test_s11_t06a1_fixture_harness.py::test_determinism_two_runs_identical_probe_facts PASSED [ 37%]
+tests/test_s11_t06a1_fixture_harness.py::test_corrupt_truncate_decode_rejected PASSED [ 50%]
+tests/test_s11_t06a1_fixture_harness.py::test_seed_every_reason_code_via_repository PASSED [ 62%]
+tests/test_s11_t06a1_fixture_harness.py::test_seed_idempotent_natural_key_reuse PASSED [ 75%]
+tests/test_s11_t06a1_fixture_harness.py::test_seed_from_manifest_plans_negative_scenarios_empty PASSED [ 87%]
+tests/test_s11_t06a1_fixture_harness.py::test_no_orphan_ffmpeg_processes PASSED [100%]
+
+============================== warnings summary ===============================
+tests/test_s11_t06a1_fixture_harness.py::test_seed_every_reason_code_via_repository
+tests/test_s11_t06a1_fixture_harness.py::test_seed_idempotent_natural_key_reuse
+tests/test_s11_t06a1_fixture_harness.py::test_seed_from_manifest_plans_negative_scenarios_empty
+  C:\Users\Admin\AppData\Local\Programs\Python\Python311\Lib\contextlib.py:144: SAWarning: Skipped unsupported reflection of expression-based index uq_character_active_workspace_code
+    next(self.gen)
+
+tests/test_s11_t06a1_fixture_harness.py::test_seed_every_reason_code_via_repository
+tests/test_s11_t06a1_fixture_harness.py::test_seed_idempotent_natural_key_reuse
+tests/test_s11_t06a1_fixture_harness.py::test_seed_from_manifest_plans_negative_scenarios_empty
+  C:\Users\Admin\AppData\Local\Programs\Python\Python311\Lib\contextlib.py:144: SAWarning: Skipped unsupported reflection of expression-based index uq_channel_active_workspace_role_name
+    next(self.gen)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 8 passed, 6 warnings in 10.71s ========================

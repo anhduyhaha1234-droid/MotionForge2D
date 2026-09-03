@@ -1,0 +1,209 @@
+{
+  "corrupt_truncate": {
+    "facts": {
+      "probe_error": "ffprobe rejected <ABS>: [mov,mp4,m4a,3gp,3g2,mj2 0xPTR] moov atom not found <ABS>: Invalid data found when processing input",
+      "probe_ok": false,
+      "size_bytes": 13219
+    },
+    "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\s11t06a1-w3-evidence\\media_build\\media\\corrupt_truncate.mp4",
+    "size_bytes": 13219
+  },
+  "multistream_duration_variant": {
+    "facts": {
+      "duration_sec": 3.0,
+      "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+      "probe_ok": true,
+      "size_bytes": 142022,
+      "streams": [
+        {
+          "channels": null,
+          "codec_name": "h264",
+          "codec_type": "video",
+          "height": 240,
+          "index": 0,
+          "sample_rate": null,
+          "width": 320
+        },
+        {
+          "channels": 1,
+          "codec_name": "aac",
+          "codec_type": "audio",
+          "height": null,
+          "index": 1,
+          "sample_rate": "44100",
+          "width": null
+        },
+        {
+          "channels": 1,
+          "codec_name": "aac",
+          "codec_type": "audio",
+          "height": null,
+          "index": 2,
+          "sample_rate": "44100",
+          "width": null
+        },
+        {
+          "channels": 1,
+          "codec_name": "aac",
+          "codec_type": "audio",
+          "height": null,
+          "index": 3,
+          "sample_rate": "44100",
+          "width": null
+        },
+        {
+          "channels": 1,
+          "codec_name": "aac",
+          "codec_type": "audio",
+          "height": null,
+          "index": 4,
+          "sample_rate": "44100",
+          "width": null
+        }
+      ]
+    },
+    "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\s11t06a1-w3-evidence\\media_build\\media\\multistream_duration_variant.mp4",
+    "size_bytes": 142022
+  },
+  "no_audio_source": {
+    "facts": {
+      "duration_sec": 2.0,
+      "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+      "probe_ok": true,
+      "size_bytes": 26437,
+      "streams": [
+        {
+          "channels": null,
+          "codec_name": "h264",
+          "codec_type": "video",
+          "height": 240,
+          "index": 0,
+          "sample_rate": null,
+          "width": 320
+        }
+      ]
+    },
+    "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\s11t06a1-w3-evidence\\media_build\\media\\no_audio_source.mp4",
+    "size_bytes": 26437
+  },
+  "two_scene_source": {
+    "facts": {
+      "duration_sec": 4.0,
+      "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+      "probe_ok": true,
+      "size_bytes": 39810,
+      "streams": [
+        {
+          "channels": null,
+          "codec_name": "h264",
+          "codec_type": "video",
+          "height": 240,
+          "index": 0,
+          "sample_rate": null,
+          "width": 320
+        },
+        {
+          "channels": 1,
+          "codec_name": "aac",
+          "codec_type": "audio",
+          "height": null,
+          "index": 1,
+          "sample_rate": "44100",
+          "width": null
+        }
+      ]
+    },
+    "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\s11t06a1-w3-evidence\\media_build\\media\\two_scene_source.mp4",
+    "size_bytes": 39810
+  },
+  "unsupported_mpeg4": {
+    "facts": {
+      "duration_sec": 2.0,
+      "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+      "probe_ok": true,
+      "size_bytes": 78780,
+      "streams": [
+        {
+          "channels": null,
+          "codec_name": "mpeg4",
+          "codec_type": "video",
+          "height": 240,
+          "index": 0,
+          "sample_rate": null,
+          "width": 320
+        },
+        {
+          "channels": 1,
+          "codec_name": "aac",
+          "codec_type": "audio",
+          "height": null,
+          "index": 1,
+          "sample_rate": "44100",
+          "width": null
+        }
+      ]
+    },
+    "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\s11t06a1-w3-evidence\\media_build\\media\\unsupported_mpeg4.mp4",
+    "size_bytes": 78780
+  },
+  "unsupported_non_mp4": {
+    "facts": {
+      "duration_sec": 2.023,
+      "format_name": "matroska,webm",
+      "probe_ok": true,
+      "size_bytes": 43598,
+      "streams": [
+        {
+          "channels": null,
+          "codec_name": "h264",
+          "codec_type": "video",
+          "height": 240,
+          "index": 0,
+          "sample_rate": null,
+          "width": 320
+        },
+        {
+          "channels": 1,
+          "codec_name": "aac",
+          "codec_type": "audio",
+          "height": null,
+          "index": 1,
+          "sample_rate": "44100",
+          "width": null
+        }
+      ]
+    },
+    "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\s11t06a1-w3-evidence\\media_build\\media\\unsupported_non_mp4.mkv",
+    "size_bytes": 43598
+  },
+  "unsupported_vp9": {
+    "facts": {
+      "duration_sec": 2.0,
+      "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+      "probe_ok": true,
+      "size_bytes": 49262,
+      "streams": [
+        {
+          "channels": null,
+          "codec_name": "vp9",
+          "codec_type": "video",
+          "height": 240,
+          "index": 0,
+          "sample_rate": null,
+          "width": 320
+        },
+        {
+          "channels": 1,
+          "codec_name": "aac",
+          "codec_type": "audio",
+          "height": null,
+          "index": 1,
+          "sample_rate": "44100",
+          "width": null
+        }
+      ]
+    },
+    "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\s11t06a1-w3-evidence\\media_build\\media\\unsupported_vp9.mp4",
+    "size_bytes": 49262
+  }
+}
