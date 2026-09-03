@@ -372,15 +372,28 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             </p>
           </div>
           <div className="flex flex-col items-start gap-1">
-            <Link
-              href={`/apply?project=${encodeURIComponent(project.id)}`}
-              className="inline-flex min-h-9 items-center rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500"
-              data-testid="project-go-apply"
-            >
-              Áp dụng toàn bộ video (Full Apply) →
-            </Link>
-            <p className="text-[11px] text-gray-400">Mở luồng Apply — cần checkpoint duyệt Demo trước.</p>
-          </div>
+                      {/* S11-T04D additive: review-queue entry (level-2, G14 — no new top nav). */}
+                      <Link
+                        href={`/projects/${encodeURIComponent(project.id)}/review`}
+                        data-testid="project-go-review"
+                        className="inline-flex min-h-9 items-center rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-1.5 text-xs font-semibold text-zinc-100 hover:bg-zinc-800"
+                      >
+                        Hàng đợi QC (Review)
+                      </Link>
+                      <p className="text-[11px] text-gray-400">
+                        Xem các issue kiểm tra chất lượng — mở thẳng vị trí lỗi.
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-start gap-1">
+                      <Link
+                        href={`/apply?project=${encodeURIComponent(project.id)}`}
+                        className="inline-flex min-h-9 items-center rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500"
+                        data-testid="project-go-apply"
+                      >
+                        Áp dụng toàn bộ video (Full Apply) →
+                      </Link>
+                      <p className="text-[11px] text-gray-400">Mở luồng Apply — cần checkpoint duyệt Demo trước.</p>
+                    </div>
         </div>
 
         {state.loadingVideos ? (

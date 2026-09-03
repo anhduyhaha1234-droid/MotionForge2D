@@ -205,8 +205,45 @@ export function ObjectGalleryPanel({ projectId, videoParam, onVideoChange }: Obj
   // (grouping/merge surfaces keep the full active-role list unfiltered).
   const roles = useGalleryRolesPaged(videoItemId, generationForVideo ?? "1");
   const [expandedRoleId, setExpandedRoleId] = useState<string | null>(null);
-  const detailQuery = useRoleDetail(expandedRoleId, generationForVideo ?? "1");
-  const expandedRole = detailQuery.data ?? null;
+    const detailQuery = useRoleDetail(expandedRoleId, generationForVideo ?? "1");
+    const expandedRole = detailQuery.data ?? null;
+
+    // ── S11-T04D additive: review-queue deep link (?frame=&role=) ──────────
+        // When the review page navigates here with canonical anchors, expand the
+        // exact role (and load more pages only if the anchor isn't on page 1).
+        // Purely additive — no other gallery behavior changes.  window access is
+        // confined to useEffect (client-only — safe during SSR/prerender).
+        const deepLinkRef = useRef<{ frame: string | null; role: string | null } | null>(null);
+            const deepLinkExpandedRef = useRef(false);
+            const deepLinkLoadMoreRef = useRef(false);
+            const {
+              loading: rolesLoading,
+              allRoles: rolesAll,
+              hasMore: rolesHasMore,
+              loadingMore: rolesLoadingMore,
+              loadMore: rolesLoadMore,
+            } = roles;
+            useEffect(() => {
+              if (deepLinkRef.current === null) {
+                const params = new URLSearchParams(window.location.search);
+                deepLinkRef.current = { frame: params.get("frame"), role: params.get("role") };
+              }
+              const target = deepLinkRef.current;
+              if (!target || !target.role || rolesLoading) return;
+              const found = rolesAll.find((r) => r.id === target.role);
+              if (found && !deepLinkExpandedRef.current) {
+                deepLinkExpandedRef.current = true;
+                setExpandedRoleId(target.role);
+                requestAnimationFrame(() => {
+                  document
+                    .querySelector('[data-testid="role-detail"]')
+                    ?.scrollIntoView({ behavior: "smooth", block: "center" });
+                });
+              } else if (!found && rolesHasMore && !rolesLoadingMore && !deepLinkLoadMoreRef.current) {
+                deepLinkLoadMoreRef.current = true;
+                void rolesLoadMore();
+              }
+            }, [rolesLoading, rolesAll, rolesHasMore, rolesLoadingMore, rolesLoadMore]);
   const allRoles = roles.allRoles;
   const roleNames = useStableRoleNames(allRoles);
   const activeRoles = useMemo(
