@@ -223,6 +223,14 @@ class JobService:
             )
 
             register_attach_original_audio_handler(self._worker)
+            # The RUN_QC_CHECKS handler (S11-T03G): durable check-run
+            # wiring of the T03F orchestrator — thin server-owned adapter,
+            # one registered handler per job type (the worker dispatches by
+            # job_type), completion evidence written via the standard
+            # JobAttempt result / step checkpoint path.
+            from app.workflow.qc_checks_handler import register_qc_checks_handler
+
+            register_qc_checks_handler(self._worker)
             from app.workflow.s10_full_apply_jobs import register_s10_full_apply_handler
 
             register_s10_full_apply_handler(self._worker)

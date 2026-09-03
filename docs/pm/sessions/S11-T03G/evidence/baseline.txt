@@ -1,0 +1,21 @@
+# Baseline (captured at session start)
+
+## git status --porcelain (start)
+(empty — verified: porcelain = 0, worktree clean)
+
+## branch / HEAD / WAVE_BASE
+branch: codex/s11/t03g-0903w8
+HEAD:   f6942593304742501ba88f671160b83addbb980b
+WAVE_BASE: f6942593304742501ba88f671160b83addbb980b  (git cat-file -t = commit; HEAD == WAVE_BASE)
+
+## baseline hashes (pre-patch, sha256sum output verbatim)
+cd6c2fb9352caf5549b8bd2c0e771b0ee7e60d789eebb0582c4abd2e23000522 *app/workflow/job_service.py
+d7a7cf3bfaea077f83c71a17110840092a99b6e6360f3a36be4c3d7974a2aa0d *app/api/app.py
+
+## binding plan SHA (authority)
+342479267086485ef6fd44cb8b3a5f94e6f7b1afcc4439afda2910068fc76f4f *S11_T02_T06_PRODUCTION_PLAN.md
+(path: C:\Users\Admin\MotionForge2D-worktrees\s08-integration\output\s11-post-t01-readiness\r1\synthesis\)
+
+## post-implementation hashes (existing files, bounded patches only)
+25b935a7289f065a49a17b757aa4af77f913587415caed01cca5e5d88cb5dc33 *app/workflow/job_service.py  (709 -> 717 lines)
+cccb80cdfa70f00184bb9a5086a43a91587530deba6a62339db391c2ed001f28 *app/api/app.py            (207 -> 209 lines)

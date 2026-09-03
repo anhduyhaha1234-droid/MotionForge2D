@@ -1,0 +1,15 @@
+# Static gates (verbatim)
+$ ruff check --select F <8 allowlist files>
+All checks passed!
+$ python -m py_compile <8 allowlist files>
+(exit 0)
+$ git diff --check
+(clean)
+$ python -m alembic heads
+f9a0b1c2d3e4 (head)
+$ git diff --stat
+ app/api/app.py              | 2 ++
+ app/workflow/job_service.py | 8 ++++++++
+ 2 files changed, 10 insertions(+)
+$ grep -c include_router(qc_check_runs.router) app/api/app.py
+1

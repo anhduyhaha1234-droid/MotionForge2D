@@ -1,0 +1,5 @@
+# Regression (verbatim tails)
+$ pytest tests/test_s11_t02b_qc_api_readonly.py -p no:cacheprovider --basetemp=...s11t03g_reg1 -q
+14 passed, 23 warnings in 15.35s
+$ pytest tests/test_s11_t03f_orchestrator.py -p no:cacheprovider --basetemp=...s11t03g_reg2 -q
+14 passed in 34.57s

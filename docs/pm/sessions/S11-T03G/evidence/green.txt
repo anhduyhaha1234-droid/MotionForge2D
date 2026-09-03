@@ -1,0 +1,7 @@
+# GREEN — combined 32-pass run, fresh root (verbatim tail)
+$ pytest tests/test_s11_t03g_qc_check_job.py tests/test_s11_t03g_qc_check_api.py -p no:cacheprovider --basetemp=C:/Users/Admin/AppData/Local/Temp/s11t03g_green2 -q
+32 passed, 65 warnings in 39.36s
+
+# Per-suite runs
+job suite (r5): 17 passed, 34 warnings in 21.60s
+api suite (r6): 15 passed, 31 warnings in 19.10s

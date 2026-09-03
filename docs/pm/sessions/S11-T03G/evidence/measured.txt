@@ -1,0 +1,11 @@
+# Measured runs + isolation flags
+RED       0.60s   (1 error, pre-implementation collection)
+job r5    21.60s  (17 passed)
+api r6    19.10s  (15 passed)
+GREEN     39.36s  (32 passed, both files one command, fresh root)
+T02B reg  15.35s  (14 passed)
+T03F reg  34.57s  (14 passed, real media)
+
+Isolation: --basetemp=C:/Users/Admin/AppData/Local/Temp/s11t03g_* (short unique),
+           -p no:cacheprovider, PYTHONDONTWRITEBYTECODE=1,
+           MOTIONFORGE_DATABASE_URL unset, per-test temp SQLite via alembic upgrade head

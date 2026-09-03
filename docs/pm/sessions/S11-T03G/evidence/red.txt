@@ -1,0 +1,9 @@
+# RED — pytest collection before implementation (verbatim)
+$ python -m pytest tests/test_s11_t03g_qc_check_job.py tests/test_s11_t03g_qc_check_api.py -p no:cacheprovider --basetemp=... -x -q
+=================================== ERRORS ====================================
+____________ ERROR collecting tests/test_s11_t03g_qc_check_job.py _____________
+ImportError while importing test module
+E   ModuleNotFoundError: No module named 'app.persistence.qc_check_runs'
+=========================== short test summary info ===========================
+ERROR tests/test_s11_t03g_qc_check_job.py
+1 error in 0.60s
