@@ -66,6 +66,17 @@ __all__ = [
     "OWNER_TYPES",
     "PACK_STATUSES",
     "PROJECT_STATUSES",
+    "QC_ITEM_BLOCKER_DISMISSED_CHECK_SQL",
+    "QC_ITEM_CATEGORIES",
+    "QC_ITEM_CATEGORY_CHECK_SQL",
+    "QC_ITEM_SEGMENT_PAIR_NULL_CHECK_SQL",
+    "QC_ITEM_SEVERITIES",
+    "QC_ITEM_SEVERITY_CHECK_SQL",
+    "QC_ITEM_STATUSES",
+    "QC_ITEM_STATUS_CHECK_SQL",
+    "QC_CONFIDENCE_SOURCE_CHECK_SQL",
+    "QC_REASON_CODES",
+    "QC_REASON_CODE_CHECK_SQL",
     "RESOURCE_CLASSES",
     "REMOVAL_ONLY_KINDS",
     "SCENE_STATUSES",
@@ -92,6 +103,7 @@ __all__ = [
     "ObjectRoleArtifact",
     "OcclusionEdge",
     "Project",
+    "QCItem",
     "RoleOperation",
     "Scene",
     "SceneGraphContact",
@@ -2974,3 +2986,231 @@ S10FullApplyRun.publications = relationship(
     order_by="S10FullApplyPublication.created_at",
     cascade="save-update, merge, refresh-expire, expunge",
 )
+
+
+# ── QC domain (S11-T02A) ────────────────────────────────────────────────────
+
+#: Canonical QCItem workflow states (lane-A QC_DOMAIN_CONTRACT §1.1): a QC
+#: issue is created ``open``, may be ``acknowledged`` while being worked, and
+#: ends ``resolved`` (fixed) or ``dismissed`` (rejected).  EXACTLY these four
+#: values are authoritative across ORM CHECK, migration CHECK and Pydantic —
+#: never a second copy of the taxonomy.
+QC_ITEM_STATUSES = ("open", "acknowledged", "resolved", "dismissed")
+#: SQL literal for the ``qc_item.status`` CHECK, DERIVED from
+#: ``QC_ITEM_STATUSES`` (single authority — CONTACT_KIND_CHECK_SQL pattern).
+QC_ITEM_STATUS_CHECK_SQL = (
+    "status IN (" + ",".join("'" + s + "'" for s in QC_ITEM_STATUSES) + ")"
+)
+#: Canonical QCItem severities: ``blocker`` stops readiness (may only end
+#: resolved/acknowledged/open — NEVER dismissed, lane-A §1.3 rule 2),
+#: ``warning`` and ``info`` are non-blocking.
+QC_ITEM_SEVERITIES = ("blocker", "warning", "info")
+#: SQL literal for the ``qc_item.severity`` CHECK, DERIVED from
+#: ``QC_ITEM_SEVERITIES``.
+QC_ITEM_SEVERITY_CHECK_SQL = (
+    "severity IN (" + ",".join("'" + s + "'" for s in QC_ITEM_SEVERITIES) + ")"
+)
+#: Canonical QCItem categories (lane-A §1.1 trajectory/QC taxonomy):
+#: trajectory drift, cut drift, contact break, z-order, clipping, identity,
+#: flicker and audio/timecode — the S09/S10 reviewable failure classes.
+QC_ITEM_CATEGORIES = (
+    "trajectory_drift",
+    "cut_drift",
+    "contact_break",
+    "z_order",
+    "clipping",
+    "identity",
+    "flicker",
+    "audio_timecode",
+)
+#: SQL literal for the ``qc_item.category`` CHECK, DERIVED from
+#: ``QC_ITEM_CATEGORIES``.
+QC_ITEM_CATEGORY_CHECK_SQL = (
+    "category IN (" + ",".join("'" + c + "'" for c in QC_ITEM_CATEGORIES) + ")"
+)
+#: Canonical QCItem reason codes — the closed set of QC reasons named by
+#: lane-A; currently 1:1 with ``QC_ITEM_CATEGORIES`` and kept as its own
+#: tuple because ``reason_code`` is a NATURAL-KEY discriminator column.
+QC_REASON_CODES = (
+    "trajectory_drift",
+    "cut_drift",
+    "contact_break",
+    "z_order",
+    "clipping",
+    "identity",
+    "flicker",
+    "audio_timecode",
+)
+#: SQL literal for the ``qc_item.reason_code`` CHECK, DERIVED from
+#: ``QC_REASON_CODES``.
+QC_REASON_CODE_CHECK_SQL = (
+    "reason_code IN (" + ",".join("'" + r + "'" for r in QC_REASON_CODES) + ")"
+)
+#: SQL literal for the ``qc_item.confidence_source`` CHECK, DERIVED from the
+#: existing ``OCCURRENCE_CONFIDENCE_SOURCES`` taxonomy (single authority —
+#: a QC observation is a detection/observation and shares the source set).
+QC_CONFIDENCE_SOURCE_CHECK_SQL = (
+    "confidence_source IN ("
+    + ",".join("'" + c + "'" for c in OCCURRENCE_CONFIDENCE_SOURCES)
+    + ")"
+)
+#: SQL literal for the segment pair-null CHECK: ``segment_row_id`` and
+#: ``segment_logical_id`` must be BOTH NULL (video-level issue) or BOTH set
+#: (segment-anchored issue) — a partial pair is a domain error and is frozen
+#: at DB level.
+QC_ITEM_SEGMENT_PAIR_NULL_CHECK_SQL = (
+    "(segment_row_id IS NULL AND segment_logical_id IS NULL) OR "
+    "(segment_row_id IS NOT NULL AND segment_logical_id IS NOT NULL)"
+)
+#: SQL literal for the lane-A §1.3 rule 2 CHECK: a ``blocker`` may NEVER be
+#: ``dismissed`` — fail-closed at DB level, not only in repository code.
+QC_ITEM_BLOCKER_DISMISSED_CHECK_SQL = (
+    "NOT (severity = 'blocker' AND status = 'dismissed')"
+)
+
+
+class QCItem(TimestampMixin, Base):
+    """Durable QC issue record (S11-T02A, lane-A QC_DOMAIN_CONTRACT §1).
+
+    The persistence tier of the QC domain, fail-closed and frozen at DB
+    level:
+
+    - natural-key UNIQUE over (workspace_id, project_id, video_item_id,
+      layer_ref_type, layer_ref_id, reason_code, evidence_window_key) — every
+      component is NOT NULL so SQLite NULL semantics can never bypass
+      uniqueness;
+    - ``segment_row_id`` is a REAL nullable FK to the immutable
+      ``occurrence_segment.id`` (the durable join key, RESTRICT) while
+      ``segment_logical_id`` is the scoped lineage VALUE and deliberately NOT
+      an FK; the pair-null CHECK forces both-or-none;
+    - layer references, ``evidence_window_key`` (canonical stable key/hash
+      materialized as its own column — the uniqueness mechanism, never only
+      inside evidence_json), ``evidence_json`` (schema-versioned +
+      content-derived), detector identity, confidence/confidence_source and
+      ``checkpoint_ref`` are all NOT NULL;
+    - every enum CHECK is derived from its single Python tuple
+      (CONTACT_KIND_CHECK_SQL pattern) and blocker+dismissed is rejected by a
+      real DB CHECK (lane-A §1.3 rule 2).
+    """
+
+    __tablename__ = "qc_item"
+    __table_args__ = (
+        CheckConstraint(
+            QC_ITEM_STATUS_CHECK_SQL, name="ck_qc_item_status"
+        ),
+        CheckConstraint(
+            QC_ITEM_SEVERITY_CHECK_SQL, name="ck_qc_item_severity"
+        ),
+        CheckConstraint(
+            QC_ITEM_CATEGORY_CHECK_SQL, name="ck_qc_item_category"
+        ),
+        CheckConstraint(
+            QC_REASON_CODE_CHECK_SQL, name="ck_qc_item_reason_code"
+        ),
+        CheckConstraint(
+            QC_CONFIDENCE_SOURCE_CHECK_SQL, name="ck_qc_item_confidence_source"
+        ),
+        CheckConstraint(
+            QC_ITEM_SEGMENT_PAIR_NULL_CHECK_SQL,
+            name="ck_qc_item_segment_pair_null",
+        ),
+        CheckConstraint(
+            QC_ITEM_BLOCKER_DISMISSED_CHECK_SQL,
+            name="ck_qc_item_blocker_not_dismissed",
+        ),
+        CheckConstraint(
+            "confidence >= 0 AND confidence <= 1",
+            name="ck_qc_item_confidence_range",
+        ),
+        CheckConstraint("revision > 0", name="ck_qc_item_revision_positive"),
+        CheckConstraint(
+            "length(layer_ref_type) BETWEEN 1 AND 32",
+            name="ck_qc_item_layer_ref_type_len",
+        ),
+        CheckConstraint(
+            "length(layer_ref_id) BETWEEN 1 AND 64",
+            name="ck_qc_item_layer_ref_id_len",
+        ),
+        CheckConstraint(
+            "length(reason_code) BETWEEN 1 AND 48",
+            name="ck_qc_item_reason_code_len",
+        ),
+        CheckConstraint(
+            "length(evidence_window_key) BETWEEN 1 AND 64",
+            name="ck_qc_item_evidence_window_key_len",
+        ),
+        CheckConstraint(
+            "length(evidence_json) >= 1", name="ck_qc_item_evidence_json_nonempty"
+        ),
+        CheckConstraint(
+            "length(detector) BETWEEN 1 AND 64", name="ck_qc_item_detector_len"
+        ),
+        CheckConstraint(
+            "length(detector_revision) BETWEEN 1 AND 64",
+            name="ck_qc_item_detector_revision_len",
+        ),
+        CheckConstraint(
+            "length(checkpoint_ref) BETWEEN 1 AND 64",
+            name="ck_qc_item_checkpoint_ref_len",
+        ),
+        UniqueConstraint(
+            "workspace_id",
+            "project_id",
+            "video_item_id",
+            "layer_ref_type",
+            "layer_ref_id",
+            "reason_code",
+            "evidence_window_key",
+            name="uq_qc_item_natural_key",
+        ),
+        Index("ix_qc_item_workspace", "workspace_id"),
+        Index("ix_qc_item_project", "project_id"),
+        Index("ix_qc_item_video", "video_item_id"),
+        Index("ix_qc_item_segment", "segment_row_id"),
+        Index("ix_qc_item_status", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    project_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("project.id", ondelete="RESTRICT"), nullable=False
+    )
+    video_item_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("video_item.id", ondelete="RESTRICT"), nullable=False
+    )
+    #: The exact immutable occurrence row this QC issue is anchored to
+    #: (S08-A02 ``occurrence_segment.id`` — the durable join key, never the
+    #: lineage logical_id).  NULL for video-level issues; the pair-null CHECK
+    #: keeps it consistent with ``segment_logical_id``.
+    segment_row_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("occurrence_segment.id", ondelete="RESTRICT"),
+    )
+    #: Scoped lineage VALUE (the segment's ``logical_id``), denormalized for
+    #: scoped lookup and deliberately NOT an FK — the logical_id is a lineage
+    #: key, not a row id.
+    segment_logical_id: Mapped[str | None] = mapped_column(String(64))
+    #: Layer reference scope.  Video-level issues use ``video_item`` with
+    #: ``layer_ref_id`` = video_item_id; part of the natural key so a
+    #: layer-scoped issue can never collide with a video-scoped one.
+    layer_ref_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    layer_ref_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    reason_code: Mapped[str] = mapped_column(String(48), nullable=False)
+    #: Canonical stable window key/hash materialized as its own column — the
+    #: uniqueness mechanism; never ONLY inside ``evidence_json``.
+    evidence_window_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    #: Schema-versioned, content-derived evidence payload.  Deliberately NOT
+    #: the uniqueness mechanism (``evidence_window_key`` is).
+    evidence_json: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="open")
+    severity: Mapped[str] = mapped_column(String(16), nullable=False)
+    category: Mapped[str] = mapped_column(String(48), nullable=False)
+    detector: Mapped[str] = mapped_column(String(64), nullable=False)
+    detector_revision: Mapped[str] = mapped_column(String(64), nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    confidence_source: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="model"
+    )
+    checkpoint_ref: Mapped[str] = mapped_column(String(64), nullable=False)
