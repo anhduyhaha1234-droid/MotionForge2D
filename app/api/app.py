@@ -35,6 +35,7 @@ from app.api.routes import (
     projects,
     qc_check_runs,
     qc_items,
+    qc_navigation,
     reskin_config,
     s09_approval,
     s09_correction,
@@ -153,6 +154,7 @@ app.include_router(reskin_config.router)
 # Durable QC Item READ-ONLY API (S11-T02B) - GET list/detail/filter only (Decision A).
 app.include_router(qc_items.router)
 app.include_router(qc_check_runs.router)
+app.include_router(qc_navigation.router)
 
 
 # Durable S09 demo-loop API (S09-T03) — /api/v2/s09-demo-loops, disjoint
