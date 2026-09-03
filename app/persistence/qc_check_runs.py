@@ -4,10 +4,14 @@ Compute-on-the-fly ONLY (Decision F): this module reads the existing
 Job/JobStep/JobAttempt rows plus the QCItem table — there is NO check-run
 table and NO migration.  It answers, for one video_item:
 
-- ``latest_check_run_state`` — the latest RUN_QC_CHECKS Job for the video
-  with its durable state, and -- for the completed case -- whether the run
-  is CURRENT (matches the caller-supplied current video evidence
-  fingerprint + policy content hash) or STALE;
+- ``latest_check_run_state`` — the latest **SCOPE_FULL** RUN_QC_CHECKS
+  Job for the video with its durable state, and -- for the completed case
+  -- whether the run is CURRENT (matches the caller-supplied current video
+  evidence fingerprint + policy content hash) or STALE.  ONLY a completed
+  full run whose completion envelope proves the binding 10-detector
+  coverage (manifest scope + scope fingerprint + detector names + zero
+  errors + zero skipped) is the readiness authority; newest-audio/partial
+  runs never substitute (C1-A).
 - ``check_run_readiness`` — the fail-closed readiness verdict:
   ``ready`` only for a completed current run with zero unresolved
   blocker-severity items; ``blocked`` for a completed current run that
@@ -35,7 +39,61 @@ from app.services.qc_checks.thresholds import POLICY_ID, load_policy
 from app.workflow.qc_checks_handler import (
     JOB_TYPE_RUN_QC_CHECKS,
     RUN_QC_SCHEMA_VERSION,
+    SCOPE_FULL,
+    scope_fingerprint,
 )
+
+#: The binding FULL-scope detector band (server-owned): 8 visual checks +
+#: 2 audio checks.  Derived — not guessed — from the frozen T03A policy
+#: calibration metric names (``thresholds`` owns the single production
+#: policy path): every policy metric maps to exactly one detector, with
+#: the ``no_audio_source_fact`` metric owned by the ``audio_missing``
+#: detector (T03E contract: the metric is the source-fact the detector
+#: evaluates, not a detector name).
+_POLICY_METRIC_TO_DETECTOR: dict[str, str] = {
+    "trajectory_drift": "trajectory_drift",
+    "cut_drift": "cut_drift",
+    "contact_break": "contact_break",
+    "z_order_error": "z_order_error",
+    "silhouette_clipping": "silhouette_clipping",
+    "identity_drift": "identity_drift",
+    "edge_halo": "edge_halo",
+    "temporal_flicker": "temporal_flicker",
+    "no_audio_source_fact": "audio_missing",
+    "av_sync_drift": "av_sync_drift",
+}
+
+# (The server-owned audio-band names come from ``scope_detectors`` at the
+# call sites that need them; this module only names the FULL authority.)
+
+
+def full_coverage_detectors() -> list[str]:
+    """The binding FULL-scope detector band (frozen metric → detector map).
+
+    Built from the frozen policy thresholds ("thresholds" metric keys, in
+    sorted order) through ``_POLICY_METRIC_TO_DETECTOR`` so the authority
+    never guesses a detector name: an unmapped policy metric raises
+    fail-closed instead of silently narrowing coverage.
+    """
+    policy = load_policy()
+    thresholds = policy.get("thresholds")
+    if not isinstance(thresholds, dict) or not thresholds:
+        raise ValueError("frozen policy has no thresholds; coverage unknowable")
+    band: list[str] = []
+    for metric in sorted(thresholds):
+        detector = _POLICY_METRIC_TO_DETECTOR.get(str(metric))
+        if detector is None:
+            raise ValueError(
+                f"policy metric {metric!r} has no mapped detector; "
+                "full-run coverage is unknowable (fail closed)"
+            )
+        band.append(detector)
+    return band
+
+
+def full_scope_fingerprint() -> str:
+    """Content-derived identity the FULL scope fingerprint must equal."""
+    return scope_fingerprint(SCOPE_FULL)
 
 #: Durable run states the authority can report (closed set).
 RUN_STATE_NEVER_RUN = "never_run"
@@ -117,6 +175,97 @@ def _completion_from_attempts(
     return None
 
 
+def _manifest_scope_fingerprint(manifest: Any) -> str:
+    """The manifest's recorded scope fingerprint (empty when absent)."""
+    if isinstance(manifest, dict):
+        return str(manifest.get("scope_fingerprint") or "")
+    return ""
+
+
+def _completion_proves_full_coverage(
+    completion: dict[str, Any],
+    *,
+    manifest_scope: str,
+    manifest_scope_fp: str,
+) -> tuple[bool, str]:
+    """Whether a completion block proves the binding FULL-scope coverage.
+
+    ALL of these must hold (fail-closed, with the reason named):
+      1. manifest scope is ``full`` (the server-owned full band);
+      2. manifest scope fingerprint equals the content-derived FULL
+         fingerprint (the submit-time band was the full band);
+      3. completion scope + scope fingerprint agree with the manifest
+         (the envelope the handler wrote matches the submitted band);
+      4. completion detectors equal the binding full band (order-insensitive;
+         audio-only / visual-only / partial runs never substitute, and
+         partial runs are never summed into coverage);
+      5. completion revisions cover every full-band detector;
+      6. summary errors == 0 AND checks_skipped == 0 (an errored or
+         partially-skipped run is never authority).
+    """
+    if manifest_scope != SCOPE_FULL:
+        return False, (
+            f"manifest scope {manifest_scope!r} is not the full band "
+            "(audio-only/partial runs never substitute for full authority)"
+        )
+    expected_fp = full_scope_fingerprint()
+    if manifest_scope_fp != expected_fp:
+        return False, (
+            "manifest scope fingerprint does not match the content-derived "
+            "full-band identity (the submitted band was not the full band)"
+        )
+    completion_scope = completion.get("scope")
+    if completion_scope != SCOPE_FULL:
+        return False, (
+            f"completion scope {completion_scope!r} does not match the full "
+            "band (completion/manifest scope mismatch)"
+        )
+    if str(completion.get("scope_fingerprint") or "") != expected_fp:
+        return False, (
+            "completion scope fingerprint does not match the content-derived "
+            "full-band identity"
+        )
+    expected_detectors = full_coverage_detectors()
+    completion_detectors = completion.get("detectors")
+    if (
+        not isinstance(completion_detectors, list)
+        or sorted(str(name) for name in completion_detectors)
+        != sorted(expected_detectors)
+    ):
+        return False, (
+            "completion detectors do not equal the binding full band "
+            f"(expected {sorted(expected_detectors)}; "
+            "audio-only/partial runs never substitute, and partial runs "
+            "are never summed into coverage)"
+        )
+    revisions = completion.get("detector_revisions")
+    if not isinstance(revisions, dict) or any(
+        name not in revisions for name in expected_detectors
+    ):
+        return False, (
+            "completion detector revisions do not cover the full band"
+        )
+    summary = completion.get("summary")
+    if not isinstance(summary, dict):
+        return False, "completion summary is missing (cannot prove coverage)"
+    try:
+        errors = int(summary.get("errors") or 0)
+        skipped = int(summary.get("checks_skipped") or 0)
+    except (TypeError, ValueError):
+        return False, "completion summary counts are unreadable"
+    if errors != 0:
+        return False, (
+            f"completion summary reports {errors} error(s); an errored run "
+            "is never the readiness authority"
+        )
+    if skipped != 0:
+        return False, (
+            f"completion summary reports {skipped} skipped check(s); a "
+            "partially-skipped run is never the readiness authority"
+        )
+    return True, ""
+
+
 def latest_check_run_state(
     session: Session,
     *,
@@ -126,13 +275,29 @@ def latest_check_run_state(
     evidence_fingerprint: str,
     policy_content_hash: str,
 ) -> CheckRunState:
-    """Latest RUN_QC_CHECKS run for the video, classified fail-closed.
+    """Latest FULL-scope RUN_QC_CHECKS run for the video, fail-closed.
 
-    Never-run is reported ONLY when no RUN_QC_CHECKS Job exists for the
-    video (a completed zero-item run is provably distinct through its
-    durable completion evidence).  A completed run whose recorded evidence
-    fingerprint or policy hash differs from the caller's CURRENT values is
-    STALE — it must not be treated as the current run.
+    The readiness authority is the newest FULL-scope run row — NEVER the
+    newest RUN_QC_CHECKS row regardless of scope:
+
+    - never-run is reported ONLY when no FULL-scope RUN_QC_CHECKS Job
+      exists for the video (audio-only/partial runs never create full
+      authority; a completed full zero-item run is provably distinct
+      through its durable completion evidence);
+    - audio-only/partial runs are INVISIBLE to this authority: a newer
+      audio-only completed run never displaces a completed full run, and
+      a newer audio-only run over a stale/absent full run still reports
+      not_run;
+    - the newest FULL-scope Job wins even when it is queued/running/
+      failed/stale/corrupt — the authority NEVER falls back to an older
+      completed full run (newest-full fail-closed);
+    - ONLY a completed full run whose completion envelope proves the
+      binding 10-detector coverage (manifest scope + scope fingerprint +
+      detector names + revisions + zero errors + zero skipped) is the
+      current run; anything weaker is stale/corrupt (not_run).
+
+    The ``latest_job_id`` of the readiness verdict is therefore the newest
+    FULL-scope Job id (never an audio/partial Job id).
     """
     del project_id  # ownership is validated by the caller / submit authority
     repo = JobRepository(session)
@@ -142,17 +307,24 @@ def latest_check_run_state(
         owner_id=video_item_id,
         limit=50,
     )
-    run_jobs = [j for j in jobs if j.job_type == JOB_TYPE_RUN_QC_CHECKS]
-    if not run_jobs:
+    full_jobs = [
+        j
+        for j in jobs
+        if j.job_type == JOB_TYPE_RUN_QC_CHECKS
+        and isinstance(j.input_manifest, dict)
+        and str(j.input_manifest.get("scope") or "") == SCOPE_FULL
+    ]
+    if not full_jobs:
         return CheckRunState(
             video_item_id=video_item_id,
             run_state=RUN_STATE_NEVER_RUN,
-            check_state_detail="no RUN_QC_CHECKS job has ever been submitted "
-            "for this video (never-run vs completed-zero-item is decided by "
+            check_state_detail="no SCOPE_FULL RUN_QC_CHECKS job has ever been submitted "
+            "for this video (audio-only/partial runs never create full-run "
+            "authority; never-run vs completed-zero-item is decided by "
             "durable run evidence, never by QCItem-table emptiness)",
         )
 
-    job = run_jobs[0]  # newest first (list_jobs ordering)
+    job = full_jobs[0]  # newest FULL-scope run first (list_jobs ordering)
     attempts = repo.list_attempts(job.id, limit=50)
     completion = _completion_from_attempts(attempts)
 
@@ -185,9 +357,30 @@ def latest_check_run_state(
             return CheckRunState(
                 run_state=RUN_STATE_FAILED,
                 check_state_detail=(
-                    "latest RUN_QC_CHECKS job is completed but carries no "
+                    "latest FULL-scope RUN_QC_CHECKS job is completed but carries no "
                     "valid completion evidence (corrupt/foreign attempt "
                     "history); state is not trustworthy"
+                ),
+                **base,
+            )
+        coverage_ok, coverage_reason = _completion_proves_full_coverage(
+            completion,
+            manifest_scope=str(manifest.get("scope") or ""),
+            manifest_scope_fp=_manifest_scope_fingerprint(manifest),
+        )
+        if not coverage_ok:
+            return CheckRunState(
+                run_state=RUN_STATE_FAILED,
+                zero_item_completion=(
+                    bool(completion.get("zero_item_completion", {}).get("evidence"))
+                    if isinstance(completion.get("zero_item_completion"), dict)
+                    else None
+                ),
+                summary=completion.get("summary"),
+                detector_revisions=completion.get("detector_revisions"),
+                check_state_detail=(
+                    "completed FULL-scope run does NOT prove full coverage "
+                    f"({coverage_reason}); readiness stays not_run"
                 ),
                 **base,
             )
@@ -202,7 +395,7 @@ def latest_check_run_state(
                 summary=completion.get("summary"),
                 detector_revisions=completion.get("detector_revisions"),
                 check_state_detail=(
-                    "completed run is STALE: "
+                    "completed FULL-scope run is STALE: "
                     + ("evidence fingerprint changed" if not evidence_matches else "")
                     + ("; policy content hash changed" if not policy_matches else "")
                 ),
@@ -213,9 +406,9 @@ def latest_check_run_state(
             zero_item_completion=_zero_item_flag(completion),
             summary=completion.get("summary"),
             detector_revisions=completion.get("detector_revisions"),
-            check_state_detail="completed current run with durable completion "
-            "evidence matching the current video evidence fingerprint and "
-            "policy hash",
+            check_state_detail="completed current FULL-scope run with durable completion "
+            "evidence proving the binding 10-detector coverage and matching "
+            "the current video evidence fingerprint and policy hash",
             **base,
         )
 
@@ -223,24 +416,26 @@ def latest_check_run_state(
         return CheckRunState(
             run_state=RUN_STATE_QUEUED,
             zero_item_completion=None,
-            check_state_detail=f"latest RUN_QC_CHECKS job is {job.state} "
-            "(not completed)",
+            check_state_detail="latest FULL-scope RUN_QC_CHECKS job is "
+            f"{job.state} (not completed; the authority never falls back to "
+            "an older completed full run)",
             **base,
         )
     if job.state in ("running", "cancelling"):
         return CheckRunState(
             run_state=RUN_STATE_RUNNING,
             zero_item_completion=None,
-            check_state_detail=f"latest RUN_QC_CHECKS job is {job.state} "
-            "(not completed)",
+            check_state_detail="latest FULL-scope RUN_QC_CHECKS job is "
+            f"{job.state} (not completed; the authority never falls back to "
+            "an older completed full run)",
             **base,
         )
     # cancelled / failed / fenced
     return CheckRunState(
         run_state=RUN_STATE_FAILED,
         zero_item_completion=None,
-        check_state_detail=f"latest RUN_QC_CHECKS job is {job.state} "
-        "(not completed; readiness stays not_run)",
+        check_state_detail="latest FULL-scope RUN_QC_CHECKS job is "
+        f"{job.state} (not completed; readiness stays not_run)",
         **base,
     )
 
@@ -261,12 +456,15 @@ def check_run_readiness(
     evidence_fingerprint: str,
     policy_content_hash: str,
 ) -> CheckRunReadiness:
-    """Fail-closed readiness for one video (Decision F, AC2/AC3).
+    """Fail-closed readiness for one video (Decision F, AC2/AC3, C1-A).
 
-    - no completed current run (never_run / queued / running / failed /
-      stale) ⇒ ``not_run`` with check-state detail;
-    - completed current run with zero unresolved blocker items ⇒ ``ready``;
-    - completed current run that found blockers ⇒ ``blocked``.
+    - no completed CURRENT FULL-scope run (never_run / queued / running /
+      failed / stale / coverage-unproven) ⇒ ``not_run`` with check-state
+      detail; audio-only/partial runs never create authority and newest
+      non-completed full runs never fall back to an older completed full;
+    - completed current FULL run with zero unresolved blocker items ⇒
+      ``ready``;
+    - completed current FULL run that found blockers ⇒ ``blocked``.
     """
     state = latest_check_run_state(
         session,

@@ -65,3 +65,42 @@ Forbidden không đụng: models.py, migrations/**, detector modules, thresholds
 
 - Stage: đúng 8 file allowlist + `docs/pm/sessions/S11-T03G/**`.
 - Commit message + SHA: xem `REPORT.md` §7.
+
+## 8. S11-C1 lane C1-A — full-run authority (correction, Codex P1)
+
+- Finding: `latest_check_run_state()` chọn newest RUN_QC_CHECKS bất kể
+  scope/coverage → audio-only run mới nhất thành authority, readiness
+  `ready` trong khi 8 visual checks chưa từng chạy (Codex probe).
+- Fix (allowlist, bounded patches có preimage):
+  - `app/persistence/qc_check_runs.py`: authority = newest FULL-scope run;
+    `_completion_proves_full_coverage()` gate 6 điều kiện (manifest scope
+    full + manifest scope_fp == content-derived + completion scope/fp khớp
+    + detectors == binding band order-insensitive + revisions đủ + errors
+    == 0 và checks_skipped == 0); coverage-unproven → failed/not_run;
+    audio/partial runs invisible; newest-full non-completed/stale không
+    fallback; + `full_coverage_detectors()` derive từ frozen T03A policy
+    metrics (10 metric → 10 detectors, `no_audio_source_fact` →
+    `audio_missing`) + `full_scope_fingerprint()`.
+  - `app/workflow/qc_checks_handler.py`: `SCOPE_BANDS[SCOPE_FULL]` = frozen
+    binding 10-detector band (thay registry live order — registry là
+    runtime discovery view, tests có thể populate partial); xóa trailing
+    whitespace `:12` (invariant 7).
+  - `tests/test_s11_t03g_qc_check_job.py`: 12 tests C1-A mới (band derive,
+    Codex probe, newer-audio giữ authority, audio-over-stale, newest-full
+    queued/running/failed/stale no-fallback, scope/fp mismatch,
+    missing-detector, errors/skipped, ready candidate, no-summing) + 6
+    tests cũ encode hành vi buggy chuyển sang FULL authority (invariant
+    1–3); blocked test thêm invariant 5 (audio mới hơn không xóa blocker).
+  - `tests/test_s11_t03g_qc_check_api.py`: 2 tests encode buggy cập nhật
+    (audio-only completed ⇒ never_run/not_run) + contrast FULL seeded
+    current⇒completed / evidence-moved⇒stale.
+- Blast radius T05A (forbidden, read-only check): T05A seed FULL completion
+  chỉ 2 audio detectors → coverage-unproven dưới gate mới (7 failed,
+  pre-existing, đã chứng minh bằng stash A/B: stash fix → 9 passed; pop →
+  7 failed). T05A thuộc owner khác — KHÔNG chạm, báo Manager để T05A owner
+  seed đủ 10-detector FULL completion.
+- Gate: 44 passed (29 job + 15 api, 51.33s, basetemp `%TEMP%/s11c1a_gate1`,
+  `-p no:cacheprovider`, `env -u MOTIONFORGE_DATABASE_URL`); ruff F clean;
+  diff-check clean. Evidence: `C:/Users/Admin/MotionForge2D-evidence/s11-c1/lanes/c1a-t03g/`
+  (`gate_full_run.txt`, `node_list.txt` 44 nodes, `gate_summary.txt`).
+- Commit (local only): xem `REPORT.md` §8.

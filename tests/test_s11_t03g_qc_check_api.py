@@ -37,7 +37,9 @@ from app.services.qc_checks import audio_missing, av_sync_drift  # noqa: F401  (
 from app.services.qc_checks.registry import registry
 from app.workflow.qc_checks_handler import (
     JOB_TYPE_RUN_QC_CHECKS,
+    RUN_QC_SCHEMA_VERSION,
     SCOPE_AUDIO,
+    SCOPE_FULL,
     evidence_fingerprint,
     policy_bundle,
 )
@@ -298,7 +300,13 @@ def test_post_server_owned_runs_to_completed_zero_item(
 ) -> None:
     """End-to-end: the server-owned POST creates the durable RUN_QC_CHECKS
     job, the real worker completes it (zero QCItems — NO_AUDIO_PRESENT), and
-    the read authority exposes the completion evidence."""
+    the server-owned manifest exposes the submission evidence.
+
+    C1-A: a completed audio-only run is NOT the full authority — the GET
+    state/readiness therefore report never_run / not_run (the FULL band
+    has no server-side evidence composition path, so no completed FULL
+    run can exist for this video; nothing is fabricated).
+    """
     _seed_attach_evidence(qc_session, ws=WS, pid=P1, vid=V1)
 
     resp = client.post(
@@ -331,20 +339,20 @@ def test_post_server_owned_runs_to_completed_zero_item(
     with deps.get_job_service().session_factory() as s:  # type: ignore[union-attr]
         assert _job_state(s, job_id) == "completed"
 
-    # read authority: completed, zero-item completion evidence, ready
+    # C1-A read authority: the audio-only job is invisible to the FULL
+    # authority — no FULL run ever submitted ⇒ never_run / not_run.
     get = client.get(f"/api/v2/projects/{P1}/qc-check-runs/{V1}")
     assert get.status_code == 200
     state = get.json()
-    assert state["run_state"] == "completed"
-    assert state["zero_item_completion"] is True
-    assert state["summary"]["created"] == 0
-    assert state["job_id"] == job_id
+    assert state["run_state"] == "never_run"
+    assert state["zero_item_completion"] is None
+    assert state["job_id"] is None
 
     ready = client.get(f"/api/v2/projects/{P1}/qc-check-runs/{V1}/readiness")
     assert ready.status_code == 200
     rr = ready.json()
-    assert rr["status"] == "ready"  # AC3: completed + zero blocker
-    assert rr["zero_item_completion"] is True
+    assert rr["status"] == "not_run"  # C1-A: audio-only ≠ full authority
+    assert rr["run_state"] == "never_run"
 
 
 def test_post_active_duplicate_conflict_and_completed_reuse(
@@ -424,6 +432,17 @@ def test_read_authority_never_run_not_run_with_detail(
 def test_read_authority_stale_after_evidence_fingerprint_change(
     client: TestClient, qc_session: Any
 ) -> None:
+    """C1-A: staleness semantics attach to the FULL authority.
+
+    An audio-only completed run never creates FULL authority (GET reports
+    never_run before AND after the evidence change), while a directly
+    seeded completed CURRENT FULL run goes stale on evidence change.
+    """
+    from app.workflow.qc_checks_handler import (
+        evidence_fingerprint as _fp,
+        policy_bundle as _bundle,
+    )
+
     _seed_attach_evidence(qc_session, ws=WS, pid=P1, vid=V1)
     resp = client.post(
         f"/api/v2/projects/{P1}/qc-check-runs",
@@ -432,12 +451,13 @@ def test_read_authority_stale_after_evidence_fingerprint_change(
     assert resp.status_code == 202
     _run_worker_once()
 
+    # audio-only ⇒ no FULL authority, before and after the evidence change.
     get = client.get(f"/api/v2/projects/{P1}/qc-check-runs/{V1}")
-    assert get.json()["run_state"] == "completed"
+    assert get.json()["run_state"] == "never_run"
 
     # The video's evidence changed: a new generation is recorded on the
-    # item (simulating re-import / source replacement).  The completed run
-    # no longer matches the current evidence fingerprint → stale → not_run.
+    # item (simulating re-import / source replacement).  The audio run
+    # still creates no FULL authority.
     with deps.get_job_service().session_factory() as s:  # type: ignore[union-attr]
         item = s.get(VideoItem, V1)
         assert item is not None
@@ -459,15 +479,160 @@ def test_read_authority_stale_after_evidence_fingerprint_change(
     get2 = client.get(f"/api/v2/projects/{P1}/qc-check-runs/{V1}")
     assert get2.status_code == 200
     state2 = get2.json()
-    assert state2["run_state"] == "stale"
-    assert state2["evidence_matches"] is False
+    assert state2["run_state"] == "never_run"  # C1-A: still no FULL run
 
     ready = client.get(f"/api/v2/projects/{P1}/qc-check-runs/{V1}/readiness")
     rr = ready.json()
     assert rr["status"] == "not_run"
-    assert rr["run_state"] == "stale"
+    assert rr["run_state"] == "never_run"
     assert rr["check_state_detail"]
     assert rr["current_evidence_fingerprint"] == new_fp
+
+    # Contrast: a completed CURRENT FULL run goes stale on evidence
+    # change (proves staleness still works for the authority — seeded
+    # directly through the repo; the FULL band has no HTTP submit path).
+    import uuid as _uuid
+
+    from app.persistence.jobs import JobRepository as _Repo
+    from app.persistence.jobs import StepInput as _StepInput
+    from app.persistence.qc_check_runs import (
+        full_coverage_detectors as _band,
+    )
+    from app.persistence.qc_check_runs import (
+        latest_check_run_state as _latest,
+    )
+    from app.workflow.qc_checks_handler import scope_fingerprint as _sfp
+
+    V3 = f"v-s11-t03g-full-{_uuid.uuid4().hex[:8]}"
+    with deps.get_job_service().session_factory() as s:  # type: ignore[union-attr]
+        from sqlalchemy import text as _t
+
+        s.execute(
+            _t("INSERT INTO workspace(id, name) VALUES (:w, :w) ON CONFLICT(id) DO NOTHING"),
+            {"w": WS},
+        )
+        s.execute(
+            _t(
+                "INSERT INTO project(id, workspace_id, name, description, status) "
+                "VALUES (:p, :w, :p, '', 'active') ON CONFLICT(id) DO NOTHING"
+            ),
+            {"p": P1, "w": WS},
+        )
+        s.execute(
+            _t(
+                "INSERT INTO video_item(id, project_id, title, position, status) "
+                "VALUES (:v, :p, :v, "
+                "(SELECT COALESCE(MAX(position),0)+1 FROM video_item WHERE project_id=:p), "
+                "'imported') ON CONFLICT(id) DO NOTHING"
+            ),
+            {"v": V3, "p": P1},
+        )
+        s.commit()
+        bundle = _bundle()
+        band = _band()
+        fp3 = _fp(s, workspace_id=WS, video_item_id=V3)
+        manifest = {
+            "schema_version": RUN_QC_SCHEMA_VERSION,
+            "workspace_id": WS,
+            "project_id": P1,
+            "video_item_id": V3,
+            "evidence_fingerprint": fp3,
+            "policy_content_hash": bundle["policy_content_hash"],
+            "scope": SCOPE_FULL,
+            "scope_fingerprint": _sfp(SCOPE_FULL),
+        }
+        repo = _Repo(s)
+        record = repo.create_job(
+            workspace_id=WS,
+            job_type=JOB_TYPE_RUN_QC_CHECKS,
+            owner_type="video_item",
+            owner_id=V3,
+            input_manifest=manifest,
+            idempotency_key=f"{JOB_TYPE_RUN_QC_CHECKS}:video_item:{V3}:c1a:1",
+            input_generation="1",
+            steps=[_StepInput(step_code="run_qc_checks", position=0, step_type="sync")],
+            actor="api",
+        )
+        step = repo.list_steps(record.id)[0]
+        repo.transition_step(
+            step.id, "ready", actor="system",
+            expected_revision=step.revision, fence_token="c1a",
+        )
+        step = repo.list_steps(record.id)[0]
+        repo.transition_step(
+            step.id, "running", actor="system",
+            expected_revision=step.revision, fence_token="c1a",
+        )
+        step = repo.list_steps(record.id)[0]
+        completion = {
+            "schema_version": RUN_QC_SCHEMA_VERSION,
+            "job_type": JOB_TYPE_RUN_QC_CHECKS,
+            "completed": True,
+            "run_id": "d" * 64,
+            "policy_id": bundle["policy_id"],
+            "policy_content_hash": bundle["policy_content_hash"],
+            "source_generation": "1",
+            "source_artifact_id": None,
+            "source_artifact_fingerprint": "",
+            "evidence_fingerprint": fp3,
+            "scope": SCOPE_FULL,
+            "scope_fingerprint": _sfp(SCOPE_FULL),
+            "detectors": list(band),
+            "detector_revisions": {name: "1.0.0" for name in band},
+            "summary": {
+                "run_id": "d" * 64,
+                "checks_requested": len(band),
+                "checks_run": len(band),
+                "checks_skipped": 0,
+                "created": 0,
+                "reused": 0,
+                "resolved_after_recheck": 0,
+                "reopened_stale": 0,
+                "not_applicable": len(band),
+                "errors": 0,
+                "cancelled": False,
+                "deadline_exceeded": False,
+                "run_sec": 0.001,
+                "per_detector": {},
+            },
+            "zero_item_completion": {
+                "evidence": True,
+                "qc_items_created": 0,
+                "issues_found": 0,
+                "checks_run": len(band),
+                "not_applicable": len(band),
+            },
+        }
+        repo.record_attempt(
+            job_id=record.id, step_id=step.id, step_code="run_qc_checks",
+            attempt=1, worker_id="seed-c1a", fence_token="c1a",
+            result=completion,
+        )
+        repo.transition_step(
+            step.id, "completed", actor="system",
+            expected_revision=step.revision, fence_token="c1a",
+        )
+        r1 = repo.transition_job(
+            record.id, "running", actor="system",
+            expected_revision=record.revision,
+        )
+        repo.transition_job(
+            record.id, "completed", actor="system",
+            expected_revision=r1.revision,
+        )
+        s.commit()
+        cur = _latest(
+            s, workspace_id=WS, project_id=P1, video_item_id=V3,
+            evidence_fingerprint=fp3,
+            policy_content_hash=bundle["policy_content_hash"],
+        )
+        assert cur.run_state == "completed"  # current FULL ⇒ authority
+        stale = _latest(
+            s, workspace_id=WS, project_id=P1, video_item_id=V3,
+            evidence_fingerprint="7" * 64,
+            policy_content_hash=bundle["policy_content_hash"],
+        )
+        assert stale.run_state == "stale"  # evidence moved ⇒ stale
 
 
 def test_read_authority_unknown_video_404(client: TestClient, qc_session: Any) -> None:
