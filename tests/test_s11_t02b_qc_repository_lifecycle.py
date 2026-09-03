@@ -58,7 +58,7 @@ NATURAL_KEY = dict(
     video_item_id=V1,
     layer_ref_type="video_item",
     layer_ref_id=V1,
-    reason_code="clipping",
+    reason_code="silhouette_clipping",
     evidence_window_key="ewk-t02b-1",
 )
 
@@ -115,11 +115,11 @@ def _create(
         "video_item_id": V1,
         "layer_ref_type": "video_item",
         "layer_ref_id": V1,
-        "reason_code": "clipping",
+        "reason_code": "silhouette_clipping",
         "evidence_window_key": ewk,
         "evidence": _evidence(),
         "severity": "warning",
-        "category": "clipping",
+        "category": "silhouette_clipping",
         "detector": "qc-t02b-detector",
         "detector_revision": "1.0.0",
         "confidence": 0.87,
@@ -308,7 +308,7 @@ def test_dismiss_with_fresh_recheck_evidence(tmp_path: Path) -> None:
     engine = _fresh_engine(tmp_path)
     with Session(engine) as session:
         repo = QCItemRepository(session)
-        record = _create(repo, severity="info", reason_code="audio_timecode", category="audio_timecode")
+        record = _create(repo, severity="info", reason_code="av_sync_drift", category="av_sync_drift")
         dismissed = repo.recheck_dismissed(
             record.id, WS, evidence=_evidence(content="accepted-risk")
         )
@@ -420,17 +420,17 @@ def test_list_filters_and_workspace_scope(tmp_path: Path) -> None:
         repo = QCItemRepository(session)
         # 6 local items spanning status/severity/category/video_item_id.
         a = _create(repo, ewk="ewk-a", severity="blocker")  # open/blocker/clipping
-        b = _create(repo, ewk="ewk-b", category="clipping")  # open/warning/clipping
+        b = _create(repo, ewk="ewk-b", category="silhouette_clipping")  # open/warning/silhouette_clipping
         repo.acknowledge(b.id, WS)  # acknowledged
-        c = _create(repo, ewk="ewk-c", category="identity", reason_code="identity")
+        c = _create(repo, ewk="ewk-c", category="identity_drift", reason_code="identity_drift")
         repo.acknowledge(c.id, WS)
         repo.recheck_resolved(c.id, WS, evidence=_evidence(content="pass"))  # resolved
-        d = _create(repo, ewk="ewk-d", category="identity", reason_code="identity",
+        d = _create(repo, ewk="ewk-d", category="identity_drift", reason_code="identity_drift",
                     severity="info")
         repo.recheck_dismissed(d.id, WS, evidence=_evidence(content="accepted"))  # dismissed
         e = _create(repo, ewk="ewk-e", category="trajectory_drift",
                     reason_code="trajectory_drift")  # open/warning
-        f = _create(repo, ewk="ewk-f", category="flicker", reason_code="flicker",
+        f = _create(repo, ewk="ewk-f", category="temporal_flicker", reason_code="temporal_flicker",
                     severity="blocker")  # open/blocker
         # Foreign item (different workspace AND project) must never appear.
         foreign = _create(repo, workspace_id=WS2, project_id=P2, video_item_id=V2,
@@ -449,7 +449,7 @@ def test_list_filters_and_workspace_scope(tmp_path: Path) -> None:
         assert total == 2
         assert {r.id for r in filtered} == {a.id, f.id}
 
-        filtered, total = repo.list(WS, category="clipping")
+        filtered, total = repo.list(WS, category="silhouette_clipping")
         assert total == 2
         assert {r.id for r in filtered} == {a.id, b.id}
 
@@ -464,7 +464,7 @@ def test_list_filters_and_workspace_scope(tmp_path: Path) -> None:
         assert {r.id for r in filtered} == {a.id, f.id}
 
         combined, total = repo.list(
-            WS, project_id=P1, status="open", severity="blocker", category="clipping"
+            WS, project_id=P1, status="open", severity="blocker", category="silhouette_clipping"
         )
         assert total == 1
         assert combined[0].id == a.id

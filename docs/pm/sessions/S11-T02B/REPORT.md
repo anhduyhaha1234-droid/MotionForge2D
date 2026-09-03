@@ -181,6 +181,36 @@ s11-integration canonical worktree. KHÔNG push/merge/rebase/reset/clean/stash/f
 - Raw output của mọi lệnh trong §2 là output thật từ terminal (không tóm tắt suy diễn).
 
 ---
-**Status: TASK_SUBMITTED** — commit local `9c9878a51bf5da7b913593478f04fccc5c798e2a` trên
-`codex/s11/t02b-0903w2` (allowlist + evidence; 10 files: 1 M + 9 A). KO push, KO merge.
+**Status: TASK_SUBMITTED (correction)** — commits local `9c9878a5` (feat) + `cd4f7925`
+(docs) + `CORRECTION_C1` commit (xem LOG) trên `codex/s11/t02b-0903w2`. KO push, KO merge.
 Chờ Manager verify độc lập.
+
+---
+
+## 8. CORRECTION ROUND C1 (FINDING T02B-C1 P1 — fixture enum cũ)
+
+**Root cause:** T02A-C1 đổi `QC_REASON_CODES`/`QC_ITEM_CATEGORIES` sang 10 codes binding
+(Decision B + D); DB CHECKs chặn tên cũ (`z_order`, `clipping`, `identity`, `flicker`,
+`audio_timecode`...). Fixture seed của T02B dùng tên cũ → create raise → chuỗi assertion vỡ
+(26 tests fail cumulative, kể cả mutation-verbs 405 vì seed hỏng trước).
+
+**Fix (hữu hạn, đúng finding):** 18 edits byte-exact trong 2 test files
+(`clipping→silhouette_clipping`, `identity→identity_drift`, `flicker→temporal_flicker`,
+`audio_timecode→av_sync_drift`; category giữ 1:1 reason_code). App code
+(qc_items.py/schemas/routes) scan 0 hard-code cũ → KHÔNG đụng (đúng yêu cầu).
+
+**Verify (real output):**
+```
+$ python scan regex cũ trên 2 test files        → TOTAL_OLD_CODE_REFERENCES = 0
+$ pytest <2 files> -p no:cacheprovider --basetemp=mfc_t02b_c1_r1|r2 -q
+  → 40 passed, 23 warnings in 34.70s / 34.88s   [EXIT 0 ×2 — không giảm so với trước correction]
+$ python -m py_compile <2 files>                 → PY_COMPILE-OK
+$ ruff check --select F <2 files>                → All checks passed!
+$ git diff --stat 88dc372                        → CHỈ 2 test files (18+/18-)
+```
+
+**Scope:** chỉ 2 test files + docs/pm/sessions/S11-T02B/** append. Không đụng
+models.py/migrations/detectors/thresholds/golden/frontend/MAIN.
+
+**Status: CORRECTION_C1_SUBMITTED** — commit local 1 commit (fix + docs) trên
+`codex/s11/t02b-0903w2`. KO push, KO merge. Chờ Manager verify.

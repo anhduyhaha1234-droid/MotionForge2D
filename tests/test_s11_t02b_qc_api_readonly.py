@@ -76,8 +76,8 @@ def _create_item(
     project_id: str = P1,
     video_item_id: str = V1,
     layer_ref_id: str | None = None,
-    reason_code: str = "clipping",
-    category: str = "clipping",
+    reason_code: str = "silhouette_clipping",
+    category: str = "silhouette_clipping",
     severity: str = "warning",
     ewk: str = "ewk-api",
     evidence: dict[str, Any] | None = None,
@@ -157,7 +157,7 @@ def test_list_seeded_via_repository_shows_items(client: TestClient, qc_session: 
     # Seed through the INTERNAL repository — the only legal creation path
     # (Decision A: no public POST exists).
     a = _create_item(qc_session, ewk="ewk-api-a")
-    b = _create_item(qc_session, ewk="ewk-api-b", reason_code="flicker", category="flicker")
+    b = _create_item(qc_session, ewk="ewk-api-b", reason_code="temporal_flicker", category="temporal_flicker")
 
     response = client.get(f"/api/v2/projects/{P1}/qc-items")
     assert response.status_code == 200
@@ -179,14 +179,14 @@ def test_list_seeded_via_repository_shows_items(client: TestClient, qc_session: 
 def test_list_filters(client: TestClient, qc_session: Any) -> None:
     a = _create_item(qc_session, ewk="ewk-f-a", severity="blocker")
     b = _create_item(qc_session, ewk="ewk-f-b")
-    c = _create_item(qc_session, ewk="ewk-f-c", reason_code="identity", category="identity")
+    c = _create_item(qc_session, ewk="ewk-f-c", reason_code="identity_drift", category="identity_drift")
     # Foreign workspace/project must never leak into the default workspace list.
     _create_item(
         qc_session, workspace_id=WS2, project_id=P2, video_item_id=V2,
         layer_ref_id=V2, ewk="ewk-f-foreign",
     )
 
-    params = {"status": "open", "severity": "blocker", "category": "clipping"}
+    params = {"status": "open", "severity": "blocker", "category": "silhouette_clipping"}
     response = client.get(f"/api/v2/projects/{P1}/qc-items", params=params)
     assert response.status_code == 200
     body = response.json()
@@ -205,7 +205,7 @@ def test_list_filters(client: TestClient, qc_session: Any) -> None:
     assert response.json()["total"] == 3
 
     response = client.get(
-        f"/api/v2/projects/{P1}/qc-items", params={"category": "identity"}
+        f"/api/v2/projects/{P1}/qc-items", params={"category": "identity_drift"}
     )
     assert response.status_code == 200
     ids = {item["id"] for item in response.json()["items"]}
@@ -262,8 +262,8 @@ def test_detail_returns_item_with_evidence(client: TestClient, qc_session: Any) 
     assert body["video_item_id"] == V1
     assert body["status"] == "open"
     assert body["severity"] == "warning"
-    assert body["category"] == "clipping"
-    assert body["reason_code"] == "clipping"
+    assert body["category"] == "silhouette_clipping"
+    assert body["reason_code"] == "silhouette_clipping"
     assert body["evidence"] == {
         "schema_version": 1,
         "content": "detail-evidence",

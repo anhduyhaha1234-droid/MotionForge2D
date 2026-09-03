@@ -110,3 +110,26 @@ WAVE_BASE: 6861177149e1d12653f045ab2a44933b8d0f6d57 (canonical codex/s11-integra
 - Commit local trên codex/s11/t02b-0903w2 (allowlist + evidence + sessions):
   commit `9c9878a51bf5da7b913593478f04fccc5c798e2a` (`feat(s11): T02B QCItem repository + internal idempotent lifecycle + read-only API (W2)`), 10 files staged (1 M + 9 A). KHÔNG push/merge/rebase/reset/clean/stash/force.
   Working tree sạch sau commit (porcelain 0). TASK_SUBMITTED — chờ Manager verify.
+
+## CORRECTION ROUND C1 (2026-09-03 +07, resume session 20260903_114001_e3c1ef)
+
+- HEAD trước khi sửa: 88dc3726d84ec69bdfe776823eb48bbfc8e1c426 (canonical, chứa T02A-C1
+  enum fix 10 codes binding + T06A1-C1); porcelain 0; branch codex/s11/t02b-0903w2.
+- FINDING T02B-C1 [P1]: fixture seed QCItem dùng reason code cũ (clipping/identity/flicker/
+  audio_timecode) bị DB CHECK enum mới chặn → 26 tests fail cumulative. Gốc: T02A-C1 đổi
+  QC_REASON_CODES/QC_ITEM_CATEGORIES thành 10 codes binding (8 overlay Decision B:
+  trajectory_drift/cut_drift/contact_break/z_order_error/silhouette_clipping/identity_drift/
+  edge_halo/temporal_flicker + 2 audio Decision D: audio_missing/av_sync_drift).
+- Scan: regex `["'](z_order|clipping|identity|flicker|audio_timecode)["']` trên 2 test files
+  → 10 hits (repo) + 8 hits (api). App code (qc_items.py/schemas/routes) = 0 hits — không
+  hard-code tên cũ (repo derive từ tuple models) → KHÔNG đụng app files.
+- Fix (18 edits byte-exact, mỗi preimage assert unique): clipping→silhouette_clipping,
+  identity→identity_drift, flicker→temporal_flicker, audio_timecode→av_sync_drift
+  (category giữ 1:1 với reason_code). Toàn bộ hành vi lifecycle/read-only/404/405 asserts
+  giữ nguyên.
+- Re-scan: TOTAL_OLD_CODE_REFERENCES = 0.
+- GREEN trên HEAD mới: 40 passed ×2 fresh roots (mfc_t02b_c1_r1 34.70s / r2 34.88s, EXIT 0)
+  — không giảm so với trước correction. `py_compile` OK; `ruff check --select F` 2 files →
+  All checks passed.
+- Diff scope vs WAVE_BASE 88dc372: CHỈ 2 test files (18+/18-) + docs append — không đụng
+  models.py/migrations/detectors/thresholds/frontend/MAIN. KHÔNG push/merge/rebase/reset/clean/stash.
