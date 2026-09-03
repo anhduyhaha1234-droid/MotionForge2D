@@ -34,6 +34,19 @@ Hermes phải:
 4. Tóm tắt plan ngắn trong chat.
 5. Dừng và báo `BLOCKED` nếu requirement mâu thuẫn, migration có nguy cơ mất dữ liệu hoặc cần mở rộng write scope.
 
+### Byte checkpoint trước writer
+
+Trước khi sửa file hiện hữu, đặc biệt file untracked/dirty, test authority hoặc
+file lớn không thể restore từ Git, owner/Manager phải:
+
+- ghi SHA-256, byte size, line count và tracked/dirty attribution;
+- tạo byte snapshot trong task evidence và xác minh snapshot hash;
+- lưu manifest bằng `docs/pm/tools/write_set_guard.py` hoặc guard tương đương;
+- pin protected-file hashes và ngưỡng destructive shrink trước dispatch.
+
+Manager chỉ tạo/verify evidence; Manager không được dùng snapshot để tự sửa
+implementation.
+
 ## 4. Quy tắc trong khi code
 
 - Không sửa PRD, MP, roadmap hoặc task contract.
@@ -45,6 +58,13 @@ Hermes phải:
 - Long-running operation không chạy đồng bộ trong request/UI.
 - Frontend phải tuân thủ `frontend/AGENTS.md` và đọc tài liệu Next.js local liên quan trước khi code.
 - Không che test fail bằng skip, ignore hoặc nới assertion nếu task không cho phép.
+- File đã tồn tại chỉ được sửa bằng bounded patch có preimage. Cấm `write_file`,
+  full-file replace, shell redirection, `Set-Content`, `Out-File`, heredoc,
+  script direct-write hoặc copy/move-overwrite vào source/test hiện hữu. Chỉ file
+  mới chưa tồn tại trong allowlist mới được whole-file generation.
+- Sau mỗi patch phải kiểm lại hash/byte/line count. Nếu file mất, giảm bất
+  thường hoặc guard báo destructive shrink thì dừng writer ngay; không tiếp tục
+  implementation hoặc broad gate.
 
 ## 5. Deliverables bắt buộc
 
@@ -73,8 +93,11 @@ Trước khi submit, Hermes phải:
 - Ở chế độ full-sprint đã được PM ghi rõ trong sprint contract, Hermes manager
   được mở dependency nội bộ kế tiếp sau khi writer thoát và manager ghi
   `MANAGER_VERIFIED_PENDING_SPRINT_REVIEW`. Trạng thái này không phải PM
-  approval, không cho phép commit/merge/push và chỉ có hiệu lực bên trong đúng
-  sprint/worktree đã được PM mở.
+  approval. Mặc định nó không cho phép commit/merge/push; ngoại lệ chỉ khi prompt
+  hiện hành cấp rõ isolated-worktree transport: product worker commit đúng
+  allowlist trên task branch, một integration owner riêng merge exact commit đã
+  Manager verify và push canonical sau green wave gate. Ngoại lệ Git này không
+  nâng trạng thái thành `APPROVED`.
 
 PM kiểm tra theo thứ tự:
 
@@ -87,6 +110,21 @@ PM kiểm tra theo thứ tự:
 7. Regression risk.
 
 Nếu chưa đạt, PM không sửa lẫn vào task hiện tại. PM ghi `CHANGES_REQUESTED` với danh sách hữu hạn; Hermes tiếp tục đúng session hoặc PM tạo repair task riêng.
+
+### Incident source/test destruction
+
+- Bảo toàn ngay file hỏng, snapshot, cache/pyc, tool logs và state database;
+  không chạy command có thể ghi đè evidence trước khi freeze hash.
+- Manager/PM không reconstruct source/test. Exact worker owner hoặc recovery
+  owner được Codex cấp quyền phải dựng candidate bên ngoài path chính từ byte
+  snapshot/full tool payload/deterministic patch replay.
+- Nếu có reviewed SHA, candidate phải match exact SHA trước khi patch file
+  chính. Compile, node-name match hoặc semantic rewrite không thay thế exact
+  source authority.
+- Full relevant module phải được collect/run và report cả fail lẫn pass; selection
+  xanh không được đại diện cho toàn file.
+- Một guarded resume được phép khi Codex cấp quyền. Vi phạm overwrite/scope lần
+  hai phải dừng `BLOCKED_CONTEXT_HEALTH / OWNER_TRANSFER_REQUIRED`.
 
 ## 7. Session handoff
 
@@ -125,7 +163,10 @@ Nếu Codex trả correction ở sprint exit:
 `SPRINT_SUBMITTED -> CHANGES_REQUESTED ->` resume đúng session của Task ID liên
 quan `-> SPRINT_SUBMITTED`.
 
-Không được nhảy trực tiếp từ `HERMES_RUNNING` sang `APPROVED`, và không được có hai Task ID ở trạng thái ghi đồng thời.
+Không được nhảy trực tiếp từ `HERMES_RUNNING` sang `APPROVED`. Không được có hai
+Task ID ghi đồng thời trên cùng worktree; nhiều writer chỉ hợp lệ trên các clean
+worktree/branch tách biệt, đúng parallel wave và resource isolation đã được PM
+cấp trước.
 
 ### Full-sprint manager gate
 

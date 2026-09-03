@@ -49,6 +49,8 @@ Manager **không được tự viết hoặc sửa production code, test, migrat
 - Không dùng một session đã hoàn thành task A để làm task B.
 - Không tạo session thay thế trong khi session cũ còn sống hoặc có thể resume.
 - Chỉ được recovery sang session mới khi session cũ đã chết, không thể resume hoặc context hỏng. Manager phải xác nhận session cũ không còn active, ghi bằng chứng và lý do recovery; tuyệt đối không để hai owner cùng sửa một task.
+- Trước khi tiếp tục một correction trên session dài, Manager phải audit **context health**: số lượt/compaction, iteration exit liên tiếp, việc lặp lại phần đã xong, dùng quyết định/trạng thái cũ, hiểu sai scope hiện hành, token/độ trễ tăng bất thường và số lượt không tạo usable bytes. Một dấu hiệu đơn lẻ thông thường không đủ để bỏ owner; context chỉ được coi là hỏng khi có bằng chứng lặp lại hoặc session không còn giữ đúng current contract. Một lần phá hủy file hoặc overwrite sai scope là incident nghiêm trọng: dừng writer, bảo toàn evidence và chỉ được resume một lượt recovery có guard nếu Codex cấp quyền; lần vi phạm an toàn thứ hai trong cùng lineage là bằng chứng lặp lại đủ để yêu cầu owner transfer.
+- Nếu recovery vì context hỏng được chứng minh, phải dừng/xác nhận không còn writer của session cũ trước, tạo đúng một recovery session, ghi owner transfer trong registry và giao handoff gọn chỉ gồm current verdict, landed bytes, finding còn mở, write-set, acceptance và gates còn thiếu. Không nhồi lại toàn bộ chat/log lịch sử vào recovery prompt.
 - Task quá lớn phải được BA/PM tách trước thành các Task ID đủ nhỏ cho một session, mỗi task có outcome, dependency, exclusive write-set và acceptance criteria riêng.
 
 Manager phải duy trì **Session Registry**:
@@ -108,12 +110,88 @@ Mỗi prompt phải pin rõ workspace/worktree tuyệt đối, branch, HEAD/pref
 Mặc định dự án hiện tại:
 
 - MAIN: `C:\Users\Admin\MotionForge2D` — vùng tham chiếu/protected, trừ thay đổi được người dùng cấp quyền rõ ràng;
-- integration worktree thường dùng: `C:\Users\Admin\MotionForge2D-worktrees\s08-integration`;
-- branch thường dùng: `codex/s08-integration`.
+- integration worktree phải là checkout sạch, sprint-specific từ checkpoint đã
+  được Codex duyệt; prompt hiện hành phải pin path/branch/commit cụ thể;
+- S11 hiện dùng `C:\Users\Admin\MotionForge2D-worktrees\s11-integration`, branch
+  `codex/s11-integration`; không dùng worktree S10 dirty làm implementation tree.
 
 Manager phải khám phá và pin HEAD thực tế ở đầu prompt; không sao chép HEAD cũ như một sự thật hiện tại.
 
 Không được `reset --hard`, `clean`, `stash`, `restore`, `checkout` đè file, commit, push, merge hoặc xóa thay đổi không rõ chủ sở hữu nếu chưa có quyền rõ ràng. Không dùng database thật cho test. Không mở rộng allowlist theo suy đoán.
+
+### 8.1. Checkpoint sạch và parallel worktree có kiểm soát
+
+- Khi một sprint đã `CODEX_APPROVED / CLOSED` và user/Codex cấp quyền Git rõ
+  ràng, phải ưu tiên tạo approved-scope checkpoint trước sprint kế tiếp: chỉ
+  stage source/migration/test/harness/docs đã duyệt; loại backup/recovered file,
+  cache, report kết xuất, test-results và evidence tạm; chạy gate tương xứng;
+  verify remote ref sau push.
+- Parallel implementation chỉ được bật từ một immutable checkpoint đã push.
+  Mỗi Task ID có branch + clean worktree + session riêng; mọi task trong cùng
+  wave phải cùng wave-base commit, write-set disjoint và runtime/evidence tách
+  biệt. Worktree sprint cũ còn dirty chỉ là read-only archive/evidence.
+- Một task worktree chỉ có một writer. Worker được commit đúng allowlist của
+  task trên local task branch khi prompt cấp quyền rõ; commit đó chỉ là transport
+  checkpoint, không phải `APPROVED`. Correction tiếp tục exact session/branch và
+  tạo commit bổ sung, không rewrite lịch sử đã tích hợp.
+- Sprint phải có đúng một integration owner/session riêng cho toàn sprint.
+  Owner này chỉ được tích hợp exact commit range đã Manager verify vào canonical
+  integration branch bằng fast-forward hoặc conflict-free merge/cherry-pick; cấm sửa
+  tay production/test, cấm rebase/reset/force-push. Conflict phải abort, giữ
+  canonical tree sạch và route về exact task owner trên baseline mới.
+- Manager được tạo/remove disposable task/verifier worktrees và push canonical
+  integration branch sau wave gate nếu prompt/user đã cấp quyền; Manager vẫn
+  không được sửa implementation. Không xóa worktree/branch còn uncommitted hoặc
+  chưa lưu evidence.
+- Dispatch tối đa mọi task dependency-ready/disjoint trong wave. Manager có thể
+  verify một task commit và chạy read-only lane cô lập trong khi worker disjoint
+  khác còn chạy; global/migration/Playwright/leak gate chỉ chạy khi toàn bộ writer
+  đã thoát và integration HEAD đã đóng băng.
+
+### 8.2. Byte-safe write-set guard bắt buộc
+
+Trước mỗi worker có quyền sửa source/test/migration/config, Manager phải tạo
+baseline cho toàn bộ exclusive write-set và protected set:
+
+1. Ghi absolute/relative path, tracked/untracked/dirty attribution, SHA-256,
+   byte size, logical line count và mtime.
+2. Với file hiện hữu nhưng untracked, dirty không thể khôi phục từ Git, file test
+   authority hoặc file lớn/quan trọng, tạo byte-for-byte snapshot trong evidence
+   mới và xác minh snapshot hash bằng source hash trước dispatch. Snapshot là
+   recovery evidence; Manager không được tự chép nó đè lại implementation.
+3. Dùng guard xác định như
+   `docs/pm/tools/write_set_guard.py` hoặc cơ chế tương đương để verify protected
+   drift và destructive shrink sau mỗi worker terminal. Raw manifest/report phải
+   được giữ trong task output.
+4. File đã tồn tại không được sửa bằng `write_file`, full-file replace, shell
+   redirection, `Set-Content`, `Out-File`, heredoc, script direct-write hoặc
+   copy/move-overwrite. Mặc định chỉ dùng bounded patch có preimage (`apply_patch`
+   hoặc cơ chế tương đương) và kiểm hash/size/line count ngay sau patch. Whole-file
+   generation chỉ được dùng cho file mới chưa tồn tại, đúng allowlist.
+5. Nếu file biến mất, line/byte count giảm bất thường, nhiều definition biến
+   mất, hoặc guard báo destructive shrink, phải dừng ngay; không tiếp tục code,
+   không chạy broad gate và không cố che bằng rebuild từ memory.
+
+### 8.3. Recovery khi source/test authority bị phá hủy
+
+- Đóng băng writer và mọi production write; bảo toàn file hỏng, backup, pyc,
+  tool log, state database và message/tool payload liên quan. Không chạy lệnh có
+  thể ghi đè cache/pyc ground truth trước khi snapshot evidence.
+- Manager và Codex Reviewer không được sửa/rebuild implementation. Recovery
+  bytes thuộc đúng worker owner hoặc recovery owner được Codex cấp quyền.
+- Candidate phải được dựng ngoài path chính từ nguồn có provenance (Git/blob,
+  byte snapshot, full tool payload hoặc deterministic patch replay). Nếu có
+  reviewed SHA cũ, candidate phải match exact SHA trước khi patch path chính.
+  Tên test, docstring, compile, pyc function list hoặc test xanh không thay thế
+  exact source authority.
+- State/session database chỉ được mở read-only; mọi query/script/export phải
+  được giữ trong evidence, không chỉ `%TEMP%`. Không vacuum hoặc mutate DB.
+- Report recovery phải ghi cả pass lẫn fail của full relevant module, collect
+  node IDs, duplicate definitions, unresolved symbols và raw command. Không
+  được suy rộng từ một selection thành trạng thái toàn file.
+- Nếu exact authority không thể phục hồi, dừng `BLOCKED_TEST_AUTHORITY`; không
+  tự chấp nhận semantic reconstruction. Nếu guarded owner tái phạm hành vi phá
+  hủy/sai scope, dừng `BLOCKED_CONTEXT_HEALTH / OWNER_TRANSFER_REQUIRED`.
 
 ## 9. Cấu trúc bắt buộc của một prompt quản lý chuẩn
 
@@ -123,7 +201,8 @@ Mỗi prompt phải có đầy đủ:
 2. **Mandatory rules load** — đọc toàn bộ file này và báo `RULES_LOADED`.
 3. **Current verdict/status** — sprint/task nào đã duyệt, bị correction hay đang chờ review.
 4. **Authorized scope / out of scope** — quyền làm chính xác và ranh giới dừng.
-5. **Workspace preflight** — path, branch, HEAD, dirty tree, runtime, DB guard.
+5. **Workspace preflight** — path, branch, HEAD, dirty tree, runtime, DB guard,
+   byte-safe write-set manifest/snapshot và destructive-shrink guard.
 6. **Model policy** — model/reasoning/fallback cho manager chat và từng worker mới; bảo toàn session cũ.
 7. **Task map** — từng Task ID có outcome, dependencies, exclusive write allowlist, forbidden paths, acceptance criteria và owner session rule.
 8. **Parallel waves** — task nào chạy đồng thời, bằng chứng an toàn và task nào phải chờ.
@@ -144,6 +223,16 @@ Finding phải có mức độ (`P0/P1/P2`), file/dòng, cách tái hiện hoặ
 
 Nếu `CHANGES_REQUESTED`, prompt tiếp theo phải resume đúng session owner của từng finding. Nếu `APPROVED`, Codex/BA mới lập và cấp quyền cho sprint hoặc parallel wave tiếp theo.
 
+Sau **mọi** verdict/review, Codex phải đưa ngay một **Session Opening Proposal** cho bước kế tiếp, kể cả khi gate còn blocked. Proposal tối thiểu phải nêu:
+
+1. Task ID nào mở session mới, Task ID nào resume exact session cũ, và session nào cần context-health audit hoặc recovery có điều kiện.
+2. Dependency/activation condition, parallel wave tối đa an toàn, exclusive write-set và lý do các task chưa được mở.
+3. Provider/model/reasoning/fallback dự kiến theo chỉ thị user mới nhất.
+4. Với recovery: bằng chứng context hỏng cần đạt, cách dừng owner cũ, handoff tối thiểu và đảm bảo zero concurrent writer.
+5. Trạng thái quyền hạn: `PROPOSED_ONLY`, `AUTHORIZED_TO_DISPATCH` hoặc `BLOCKED_DEPENDENCY`. Proposal không tự động tạo/mở session nếu Codex/user chưa cấp dispatch authority.
+
+Nếu review đồng thời tạo prompt Hermes tiếp theo, phần Session Opening Proposal phải khớp chính xác task/session/model/wave trong prompt; không được đưa một phương án trong chat nhưng cấp quyền khác trong file.
+
 ## 11. Từ vựng trạng thái chuẩn
 
 - `RULES_LOADED`
@@ -154,6 +243,9 @@ Nếu `CHANGES_REQUESTED`, prompt tiếp theo phải resume đúng session owner
 - `BLOCKED_MODEL_ROUTE`
 - `BLOCKED_DEPENDENCY`
 - `BLOCKED_LIVENESS`
+- `BLOCKED_TEST_AUTHORITY`
+- `BLOCKED_CONTEXT_HEALTH`
+- `BLOCKED_ROLE_VIOLATION`
 - `TASK_SUBMITTED`
 - `TASK_MANAGER_VERIFIED`
 - `SPRINT_SUBMITTED / MANAGER_VERIFIED_PENDING_CODEX_REVIEW`
@@ -173,7 +265,12 @@ Không dùng `DONE`, `CLOSED` hoặc `APPROVED` theo cách làm mờ quyền rev
 - [ ] Có dependency DAG, exclusive write-set và parallel wave tối đa an toàn.
 - [ ] Có heartbeat 20 phút, liveness audit 8 phút và báo lỗi ngay.
 - [ ] Manager không code.
+- [ ] Có write-set SHA/size/line manifest, snapshot cho critical untracked/dirty
+      bytes, patch-only guard cho file hiện hữu và post-worker shrink verification.
+- [ ] Gate chạy theo thứ tự micro -> matrix -> focused/static -> final broad;
+      không dùng broad xanh để waive một binary row còn mở.
 - [ ] Có test/evidence/terminal state và dừng để Codex review sau sprint.
+- [ ] Sau review đã đưa Session Opening Proposal: new/resume/recovery, context health, model, dependency, write-set, parallel wave và dispatch authority.
 
 ---
 

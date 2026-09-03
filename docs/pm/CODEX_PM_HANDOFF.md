@@ -9,6 +9,506 @@ Trước file này, bắt buộc đọc toàn bộ
 canonical cho orchestration; file handoff này chỉ giữ trạng thái điều hành và
 không được dùng để ghi đè rules.
 
+### Live update — 2026-09-03 11:07 +07 (Git checkpoint; S11 true parallel worktrees)
+
+- User explicitly authorized committing/pushing the approved state and asked
+  every new sprint to maximize safe worker parallelism.
+- Approved S09/S10 scope was staged with 88 source/migration/test/harness/session
+  files; cache, `.codex-review`, `.playwright-cli`, Playwright report/results,
+  ad-hoc probes and all destroyed/recovered/backup tests were excluded. Backend
+  checkpoint gate was 290 pass plus the sole long-path case pass on a correctly
+  sized 48-character basetemp; frontend TSC + scoped ESLint passed.
+- GitHub `origin/codex/s08-integration` now contains checkpoint
+  `4cec376bd7589bfd5bbd8c2260fdd63b751aca73`. New clean canonical worktree
+  `C:\Users\Admin\MotionForge2D-worktrees\s11-integration`, branch
+  `codex/s11-integration`, is pushed and clean at
+  `7751598214eedb6b72e3783e39a2a408721abe40`.
+- S11 uses one task branch/worktree/session per Task ID and one Git-only
+  integration owner `S11-INT01`. Real implementation concurrency is W6=4,
+  W9=2 and W12=2; other waves remain dependency-serial. Only Manager-verified
+  branches merge; conflicts abort with zero manual resolution; canonical pushes
+  happen only after green wave gates.
+- Canonical rules now have 277 lines, SHA
+  `C9B068B2195461B1F867A5EC95714CEA3AB09881757F5607094574D15DDA428F`.
+  Binding S11 contract SHA is
+  `591FAB3F9354DC9EF869FEDE5F2FA4AD760B04EF9334F558BACFA06CBB3558CF`.
+  Revised execution prompt:
+  `docs/pm/prompts/S11_T02_T06_FULL_SPRINT_MANAGER_2026-09-03.md` (SHA
+  `57E9434AC7E8DF3A71C2437F9B100F72F024DDC8CC2566C95AF50F433B5E363E`).
+- Local fetch/fsck reports one unrelated broken Codex turn-capture ref with a
+  zero object ID. It was not deleted. Direct `ls-remote` and both pushes proved
+  GitHub heads exactly, so this is a local P2 tooling-ref issue, not an S11
+  blocker.
+
+### Live update — 2026-09-03 10:40 +07 (S10 final approval; S11 production opened)
+
+- Verdict: `S10-C6H R3 = CODEX_APPROVED / CLOSED`; whole `S10 =
+  CODEX_APPROVED / SPRINT_CLOSED`. No open P0/P1/P2 remains in S10 closure.
+- R3 replaced two JSON-spacing LIKE variants with one escaped exact-run literal
+  containment followed by parsed exact run/project/plan classification. Codex
+  independently reran the current full API module at 71/71 and two new
+  adversarial probes at 2/2, including non-identity-field false-claimant and
+  mixed CR/LF/tab/space cases.
+- Raw state audit confirms a genuinely new R3 Manager
+  `20260903_093758_ddcd2b`, effective worker `20260903_094146_7b7197`, exact
+  `ocg/deepseek-v4-flash`, four bounded unified critical hunks and zero
+  overwrite/copy-restore/direct-write on critical files.
+- Review:
+  `docs/pm/reviews/S10_C6H_R3_FINAL_PM_REVIEW_2026-09-03.md` (SHA
+  `BAE409BC698B8FFD3598AC296E761021222F632CE5EF81414154403D695CAE40`).
+- S11-T01 and S11-P02 rev-C6 were already approved. S11 production T02..T06 is
+  now `AUTHORIZED_TO_DISPATCH` as one 19-ID/14-wave full sprint. Open one new
+  Manager; every new task gets a new worker, corrections resume exact owner.
+  Exact new-worker route is custom `ocg/deepseek-v4-flash`, max requested,
+  fallback off, TTFB 900. Current dirty worktree keeps one implementation writer
+  token; read-only isolated gates may parallelize. Binding prompt:
+  `docs/pm/prompts/S11_T02_T06_FULL_SPRINT_MANAGER_2026-09-03.md` (SHA
+  `BC312D6A4055FF4974D9BFB3096E43E5E60E9E7D88F9D7E475C26F7782EC95E4`).
+- Production S13 remains `NOT_OPENED`.
+
+### Historical update — 2026-09-03 (S10-C6H R2 independent review; R3 authorized)
+
+- Verdict: `S10-C6H = CHANGES_REQUESTED / R3_AUTHORIZED / NOT_APPROVED /
+  S10_NOT_CLOSED`.
+- R2 genuinely fixed unrelated-manifest global parse blocking and the stale
+  per-row signal; its recovery worker `20260903_012248_d29911` used safe unified
+  patches and completed quickly. Current retained gates are 70/70 API,
+  95/95 focused twice and 290/290 broad twice.
+- One P1 remains: manifest discovery recognizes only compact and one-space JSON
+  encodings. Codex reserialized the exact valid target manifest as
+  `"run_id"\t:\t"<id>"`, tampered key+generation, and replay returned
+  `200 reused=true` while Job count grew 1 -> 2. Durable identity must be
+  independent of JSON whitespace.
+- Manager `20260902_211154_54134d` also ignored the required fresh-manager
+  transfer and now has 366 messages/663k input tokens. It is retired. R3 must
+  open a genuinely new Manager chat and resume the safe exact worker owner
+  `20260903_012248_d29911` for the same Task ID.
+- Review:
+  `docs/pm/reviews/S10_C6H_R2_PM_REVIEW_2026-09-03.md`. Binding prompt:
+  `docs/pm/prompts/S10_C6H_R3_FORMAT_INDEPENDENT_MANIFEST_IDENTITY_MANAGER_2026-09-03.md`.
+- Worker route remains exact `ocg/deepseek-v4-flash`, custom/max requested,
+  fallback OFF, TTFB 900. S11-T02..T06 and production S13 remain blocked.
+
+### Live update — 2026-09-02 (C6G authority blocked; C6H rebaseline authorized)
+
+- C14-T3 ended truthfully at `BLOCKED_TEST_AUTHORITY`: its 116 read pages cover
+  only 2,204/2,548 lines and leave 344 source lines absent. Old C14 sessions
+  `20260902_013803_4d5ce5` and `20260902_102609_ee5195` are terminal/frozen.
+- Codex independently found three VSS snapshots from 2026-08-30 13:03. Each
+  contains the same real 13-test ancestor, SHA-256
+  `5B312719C7D7349670C9E17DCA87682820ED5A885C55122B8335D923E5FCD6F6`,
+  but not the lost 57-test target. Local/backup/history search and VSS+DB replay
+  did not recover target SHA `963ED50E...`; proposal 2 is exhausted.
+- Decision: C6G remains historically `BLOCKED_TEST_AUTHORITY` and is superseded
+  by bounded C6H. C6H authorizes a semantic authority rebaseline; it does not
+  accept DAD70AE3 as-is and must say `REBASELINED_AFTER_SOURCE_LOSS`, never
+  `RESTORED_EXACT`.
+- New Task ID `S10-T01C-C15` must use one fresh compact worker session with
+  exact `comboBAI`, custom/max/fallback OFF. It gets one implementation pass and
+  at most one combined correction; old long/destructive sessions are not
+  resumed.
+- Authority gate: exact 13 VSS behaviors, 57/57 retained contracts + five C6G
+  contracts = 62 unique nodes, real route/fresh DB, no duplicate/unresolved/
+  skip/weak assertions. Route stays frozen at `6ADCC48A...` until Manager
+  R-GATE; existing files remain patch-only with byte guards.
+- After R-GATE, C15 closes the locked 14-row resolver/Retry ownership matrix.
+  Manager runs three isolated read-only lanes in parallel after writer exit,
+  then focused/broad gates on frozen bytes. S11/S12/S13 production stays blocked.
+- Decision:
+  `docs/pm/reviews/S10_C6G_BLOCKED_AUTHORITY_C6H_REBASELINE_PM_DECISION_2026-09-02.md`.
+  Binding prompt:
+  `docs/pm/prompts/S10_C6H_TEST_AUTHORITY_REBASELINE_AND_FINAL_CLOSURE_MANAGER_2026-09-02.md`.
+
+### Live update — 2026-09-02 (S10-C6G C14 test-destruction decision)
+
+- Permanent hardening requested by user is now canonical: rules revision is
+  246 lines, SHA-256
+  `9328C8C0672EA0040D278B2A00C81C1DBD24B4C72FF87C68FDA3A357A44B61BC`.
+  It requires byte snapshots for critical untracked/dirty files, patch-only
+  edits for existing source/tests, destructive-shrink detection, forensic
+  exact-hash recovery and a hard owner-transfer threshold after repeat unsafe
+  behavior. Guard:
+  `docs/pm/tools/write_set_guard.py`; next-review checklist:
+  `docs/pm/reviews/S10_C6G_NEXT_REVIEW_READINESS_CHECKLIST_2026-09-02.md`.
+- Current status: `S10-C6G = INCIDENT_RECOVERY_REQUIRED / NOT_SUBMITTED /
+  NOT_APPROVED`. C14 used `write_file` on the untracked 2,547-line API test and
+  reduced it to 278 lines; the destroyed copy is preserved.
+- Manager's reconstructed 2,692-line module is not accepted as authority.
+  Codex independently collected 63 tests and ran the whole module: 58 failed,
+  5 passed. It contains a duplicate test definition and missing
+  `_C10BoomService`; the report's “9 fail” statement is superseded.
+- Read-only state.db inspection shows the actual C14 writer is
+  `20260902_013803_4d5ce5` (88 messages/41 tools), not registry ID
+  `20260901_230235_b80d4b`. Option 2 is authorized with one guarded resume of
+  the actual owner; Manager/Codex test reconstruction is rejected.
+- T3 Phase A is forensic test recovery only. It must produce an external
+  candidate matching exact pre-C14 test SHA
+  `963ED50E350ABB5441829737149867D488462AC6DF6C5FA38F01C3DFD758CBC3`
+  from read-only state.db chronology before applying any patch to the main test.
+  No `write_file`, redirection, copy-over or memory rebuild is allowed.
+- A second unsafe write/scope violation triggers
+  `BLOCKED_CONTEXT_HEALTH / OWNER_TRANSFER_REQUIRED`. If exact bytes are not
+  recoverable, stop `BLOCKED_TEST_AUTHORITY`; do not fabricate a semantic
+  replacement. Only after Manager R-GATE may the same owner finish C6G.
+- Decision:
+  `docs/pm/reviews/S10_C6G_C14_TEST_DESTRUCTION_PM_DECISION_2026-09-02.md`.
+  Binding prompt:
+  `docs/pm/prompts/S10_C6G_C14_T3_FORENSIC_TEST_AUTHORITY_RECOVERY_MANAGER_2026-09-02.md`.
+- Worker route remains `comboBAI`, custom/max/fallback OFF. S11/S12/S13
+  production remains blocked.
+
+### Live update — 2026-09-02 (Codex S10-C6F independent review)
+
+- Verdict: `S10-C6F = CHANGES_REQUESTED / NOT_APPROVED`.
+- C6F materially closes the single wrong-key claimant and sequential repeat-
+  Retry 500 cases; Codex independently reran the current risk selection 13/13,
+  and Ruff/mypy passed for reviewed bytes.
+- P1 durable discovery remains non-invariant: `_s10_wrong_identity_claimant`
+  returns a claimant only for exactly one row. Codex created two wrong-key jobs
+  with the same workspace/generation/manifest; replay returned 200 reused and
+  inserted a third canonical job (count 2 -> 3), instead of failing ambiguity.
+- P1 Retry ownership remains false: `_s10_retry_claim_predecessor` still uses
+  `cancelled -> cancelled`. Direct independent calls in two sessions returned
+  `true, true` while status stayed cancelled. The later unique successor
+  constraint masks the duplicate claim but does not make the CAS exclusive.
+- P2 evidence arithmetic: C13 LOG/REPORT/registry say 15 rows/6 retained while
+  the binding prompt and actual matrix contain 14 rows/5 retained.
+- Only bounded `S10-C6G` is authorized. Resume exact compact recovery owner
+  `20260901_230235_b80d4b`; do not create another worker and do not resume the
+  superseded old lineage. Route remains exact `comboBAI`, custom/max, Hermes
+  fallback OFF, TTFB 900.
+- Review: `docs/pm/reviews/S10_C6F_PM_REVIEW_2026-09-02.md`. Prompt:
+  `docs/pm/prompts/S10_C6G_EXCLUSIVE_RETRY_CLAIM_AMBIGUOUS_JOB_RESOLUTION_MANAGER_2026-09-02.md`.
+- S11-T02..T06 and production S13 remain blocked; S13-P01 Character Fit
+  Recommender remains planned.
+
+### Live update — 2026-09-01 (Codex S10-C6E independent review)
+
+- Verdict: `S10-C6E = CHANGES_REQUESTED / NOT_APPROVED`.
+- C6E đã đóng các blocker C6D về true concurrent identical repair (một run/
+  một job, generation non-NULL), full manifest `project_root/schema_version`
+  và terminal-run/active-job lifecycle contradiction. Codex focused hiện tại
+  8/8 + Ruff/mypy/diff-check đều xanh cho case đã viết.
+- P1 còn lại: `_s10_find_durable_job` lookup bằng expected key nên một job bị
+  đổi chỉ `idempotency_key` trở thành invisible; identical replay trả 200
+  reused và tạo job queued thứ hai cùng run/generation. Test “wrong identity”
+  không hề mutate key/job type/owner type như docstring tuyên bố.
+- P1 Retry: CAS cho phép `cancelled -> cancelled` và vẫn coi rowcount=1 là
+  exclusive winner. Retry lần hai cùng cancelled predecessor hiện trả 500 do
+  unique S10 run conflict thay vì stable 409/convergence.
+- P2 evidence: `test_c6e_worker_claim_vs_retry_barrier` vẫn tuần tự — claim/
+  commit xong mới gọi Retry, không có thread/barrier/Event.
+- Context-health audit cho logical owner T01C xác nhận recovery threshold:
+  effective lineage `20260831_151420_07b6c2` có 617 messages/14 user turns/
+  304 tool entries trong request dump 1,200,867 bytes, kèm repeated contract
+  misses. Old writer đã dừng, ports free; C6F được phép mở đúng một compact
+  recovery session và ghi owner transfer, không resume old lineage sau transfer.
+- Latest user model override: exact `comboBAI`, provider custom, reasoning max,
+  Hermes fallback chain OFF, TTFB 900. Combo hiện chứa BAI DeepSeek vision-exp
+  và OCG DeepSeek v4 flash; phải ghi effective-member ledger.
+- Review: `docs/pm/reviews/S10_C6E_PM_REVIEW_2026-09-01.md`. Prompt:
+  `docs/pm/prompts/S10_C6F_EXACT_JOB_DISCOVERY_RETRY_CAS_RECOVERY_MANAGER_2026-09-01.md`.
+- S11-T02..T06 và production S13 tiếp tục blocked; S13-P01 Character Fit
+  Recommender vẫn planned.
+
+### Live update — 2026-09-01 (Codex S10-C6D independent review)
+
+- Verdict: `S10-C6D = CHANGES_REQUESTED / NOT_APPROVED`.
+- Codex dùng real route/JobService/SQLite và barrier thật: hai simultaneous
+  repaired replays đều trả 200 reused nhưng tạo hai job `queued` khác ID cùng
+  idempotency key. Test C6D mang tên concurrent thực tế gọi A rồi B tuần tự.
+- Validator không thực hiện lifecycle check như docstring: run `cancelled` +
+  job `queued` vẫn replay 200 reused. Manifest compare cũng bỏ qua
+  `project_root`/`schema_version`/extra keys; tamper chỉ `project_root` vẫn 200.
+- Existing C6D sequential tests 8/8, Ruff/mypy/Alembic/OpenAPI xanh; phần sửa
+  ordinary repair/retry và gross manifest tamper được chấp nhận nhưng chưa đủ
+  sprint exit.
+- BAI DeepSeek C6D: khoảng 50 phút/2 turns, 59 requests, router estimate
+  0.688993; GLM C6C: khoảng 5h10/5 turns, 126 requests, 5.765848. DeepSeek nhanh
+  và rẻ hơn rõ, nhưng concurrency reasoning chưa đáng tin nếu thiếu barrier.
+- Chỉ authorize bounded `S10-C6E` cho exact T01C owner
+  `20260828_003035_859fe5`, model exact
+  `BAI/deepseek-v4-flash-vision-exp`, custom/max/fallback OFF. Completion-CAS,
+  planner/rendering, frontend/T04B/T04C/build/evidence frozen.
+- Review: `docs/pm/reviews/S10_C6D_PM_REVIEW_2026-09-01.md`. Prompt:
+  `docs/pm/prompts/S10_C6E_TRUE_CONCURRENCY_IMMUTABLE_LIFECYCLE_MANAGER_2026-09-01.md`.
+- S11-T02..T06 và production S13 vẫn blocked; S13-P01 Character Fit
+  Recommender vẫn planned.
+
+### Live update — 2026-09-01 (Codex S10-C6C independent review)
+
+- Verdict: `S10-C6C = CHANGES_REQUESTED / NOT_APPROVED`. C10 đã sửa đúng
+  zero-job orphan compensation và completion-CAS race, nhưng replay repair vẫn
+  để run `failed` trong khi tạo job `queued`; immediate Retry tạo attempt/job
+  thứ hai cho cùng lineage.
+- Durable-job replay chỉ kiểm tra key tồn tại. Codex thay manifest bằng
+  `{"tampered":true}` rồi identical replay vẫn nhận 200 `reused=true`; immutable
+  authority/owner/job identity chưa được chứng minh trước success.
+- Existing C10 tests 6/6 x2 và full suite gần như xanh nhưng không cover hai
+  invariants này. Independent full: 230 passed + một fixture root đúng 260 ký
+  tự; isolated longer-root rerun pass. Ruff/mypy/Alembic/OpenAPI green.
+- C6C GLM cần năm turn, khoảng 5h10 wall-clock worker, có static fallout và test quá
+  permissive. Local comparison không hoàn toàn đồng điều kiện nhưng direct
+  DeepSeek C6 rộng hơn đã hoàn tất khoảng 1h17 và router estimate thấp hơn.
+  User final override cho C6D là exact `BAI/deepseek-v4-flash-vision-exp`,
+  custom/max/fallback OFF; model ID đã được xác nhận có trong 9Router `/v1/models`.
+- Chỉ authorize bounded `S10-C6D` cho exact T01C owner
+  `20260828_003035_859fe5`; completion-CAS/frontend/T04B/T04C frozen. C6D phải
+  chứng minh coherent repaired replay, immutable manifest/owner và at most one
+  active work across replay/retry/worker races.
+- Review: `docs/pm/reviews/S10_C6C_PM_REVIEW_2026-09-01.md`. Prompt:
+  `docs/pm/prompts/S10_C6D_REPLAY_SINGLE_WORK_CORRECTION_MANAGER_2026-09-01.md`.
+- S11-T02..T06 và production S13 tiếp tục blocked đến khi S10 được Codex
+  APPROVED/CLOSED; S13-P01 Character Fit Recommender vẫn giữ nguyên.
+
+### Live update — 2026-09-01 (Codex S10-C6B independent review)
+
+- Verdict: `S10-C6B = CHANGES_REQUESTED / NOT_APPROVED`. Manager C6B đã hoàn
+  tất phần lớn lifecycle/UI/vertical và full suite hiện không có regression
+  rộng, nhưng Codex tái hiện hai P1 acceptance-critical trong T01C.
+- Submit enqueue failure để lại pending run không job; identical replay trả 200
+  `reused=true` dù durable job count vẫn bằng 0. Retry enqueue failure cũng để
+  lại attempt 2 pending không job. Đây là active orphan/false-success.
+- Nhánh worker resume với pre-existing completed publication execute completion
+  CAS nhưng không kiểm rowcount/live status, sau đó unconditionally ghi
+  `completed:true`; cancel có thể thắng CAS nhưng durable checkpoint vẫn nói
+  completed.
+- Chỉ authorize bounded `S10-C6C` cho exact T01C owner
+  `20260828_003035_859fe5`. T04B/T04C/frontend/harness frozen; retain 20/20 và
+  đúng hai final verticals dưới `run2-c6b-green/run1` + `/run2` nếu hashes không
+  đổi.
+- Model decision: worker correction dùng direct exact
+  `BAI/glm-5.3-flash`, reasoning max, fallback OFF; cấm `comboBAI`. C6B alias
+  thực tế route 984 request vào GLM và chỉ 3 vào DeepSeek vision, nên không phải
+  controlled comparison. GLM được chọn cho complex coding, nhưng findings này
+  chứng minh independent Codex review vẫn bắt buộc.
+- Review:
+  `docs/pm/reviews/S10_C6B_PM_REVIEW_2026-09-01.md`. Prompt:
+  `docs/pm/prompts/S10_C6C_ENQUEUE_CAS_EXIT_CORRECTION_MANAGER_2026-09-01.md`.
+- S11-T02..T06 và production S13 vẫn blocked đến khi S10 được Codex
+  APPROVED/CLOSED. S13-P01 Character Fit Recommender vẫn nằm trong kế hoạch.
+
+### Live update — 2026-08-31 14:51 +07 (Codex S10-C6A cancel lifecycle decision)
+
+- Verdict: `S10-C6A = CONTINUATION_AUTHORIZED / NOT_APPROVED`. Hermes không bị
+  treo: exact T04B frontend owner dừng đúng `BLOCKED_SCOPE_EXPANSION` sau khi
+  20-case live UI suite phát hiện backend T01C cancel-route race.
+- Independent root cause: request session giữ SQLite write transaction, route
+  mở read session rồi gọi second writer; `database is locked` bị
+  `except Exception: pass` nuốt. Route vẫn trả cancelled, durable job tiếp tục
+  và worker unconditional update ghi đè run `cancelled -> completed`, có thể
+  tạo completed publication. Resume route có multi-session/silent-success risk
+  cùng họ và phải được audit trong một bounded lifecycle round.
+- Authorized C6B exact-owner DAG:
+  `T01C-C9-LIFECYCLE -> J6C -> resume T04B-C3 -> J6-UI -> J6-BUILD -> resume
+  T04C-C5 -> EXIT`. Manager phải tự tiếp tục qua iteration limits bằng cùng
+  exact sessions; chỉ quay lại Codex khi có blocker cross-owner mới hoặc final
+  sprint review.
+- User model override mới nhất: mọi C6B worker/resume quay lại dùng chính xác
+  `ocg/deepseek-v4-flash`, reasoning max, fallback OFF, TTFB 900; probe exact
+  route, không tự sửa alias/spelling/case và không fallback. Override tạm
+  `BAI/deepseeekv4flash` đã bị rút vì không ổn định.
+- Review:
+  `docs/pm/reviews/S10_C6A_CANCEL_LIFECYCLE_PM_DECISION_2026-08-31.md`. Prompt:
+  `docs/pm/prompts/S10_C6B_CANCEL_LIFECYCLE_CONTINUATION_MANAGER_2026-08-31.md`.
+- S10 vẫn chưa APPROVED/CLOSED; S11-T02..T06 và production S13 vẫn blocked.
+
+### Live update — 2026-08-31 10:01 +07 (Codex S10-C6 blocker decision)
+
+- Verdict: `S10-C6 = CONTINUATION_AUTHORIZED / NOT_APPROVED`. Hermes dừng đúng
+  tại `BLOCKED_SCOPE_EXPANSION`; Codex bác expose hash đơn thuần, nới equality
+  hoặc waiver.
+- Root cause P0 sâu hơn UI: `FullApplyService.submit` vẫn plan bằng
+  scene/mapping client gửi và route tiếp tục ghi các body đó vào job
+  `render_authority`. C5 E2E và C6 probe từng đổi `mesh_warp -> sprite_affine`
+  và tự gắn affected region, nên phần backend/authority-green của review C5 bị
+  supersede.
+- Approval v1 không đủ authority: nó không pin SLM canonical hash/manifest,
+  exact selected route, source, mapping/config/geometry. Fresh C6 DB còn chứa
+  sáu route alternatives cho hai segments; checkpoint hash, timebase fingerprint
+  và SLM hash là ba giá trị khác nhau.
+- Authorized serialized C6A: exact S09-T06A owner tạo immutable approval v2;
+  exact S10-T01C owner chuyển Full Apply sang server-derived minimal submit;
+  rồi resume exact T04B 20-case live UI, fresh build và exact T04C hai vertical
+  runs không DB/client authority fabrication.
+- Exact owner/model: T06A `20260824_120141_312e9e`, T01C
+  `20260828_003035_859fe5`, T04B `20260828_020206_b1f8af`, T04C
+  `20260828_023122_76b87e`; mọi resume dùng `ocg/deepseek-v4-flash`, reasoning
+  max, fallback OFF, TTFB 900.
+- Review: `docs/pm/reviews/S10_C6_BLOCKER_PM_DECISION_2026-08-31.md`. Prompt:
+  `docs/pm/prompts/S10_C6A_SERVER_DERIVED_APPLY_AUTHORITY_MANAGER_2026-08-31.md`.
+- S11-T02..T06 và production S13 vẫn blocked; S13-P01 Character Fit
+  Recommender planning delta vẫn giữ nguyên.
+
+### Live update — 2026-08-30 18:01 +07 (Codex S10-C5 independent review)
+
+- Verdict: `S10-C5 = CHANGES_REQUESTED / NOT_APPROVED`. C5 đã sửa đúng Apply
+  lint, exact frontend lint/TSC/build validator xanh, current BUILD_ID
+  `rbYCsFU8q82gvOvcRhJSA`, backend full suite 206/206 và hai fresh vertical run
+  C5 có DB/artifact/media/recovery/structural truth độc lập xanh.
+- P1 blocker còn lại là acceptance integrity trong
+  `frontend/e2e/s10-apply-ui.spec.ts`: test progress/evidence/actions có thể pass
+  ở empty state; test cancel/retry/resume không click hành động; disabled Apply
+  không assert disabled; mobile bị skip trong current config. T04C API vertical
+  runs không thay thế user-facing `/apply` browser acceptance.
+- Bounded C6: resume exact T04B owner `20260828_020206_b1f8af`, model exact
+  `ocg/deepseek-v4-flash`, reasoning max, fallback OFF, để viết live-product UI
+  acceptance trên fresh isolated product services. Backend frozen; chỉ nếu test
+  phát hiện T04B frontend defect mới sửa trong original scope. Nếu production
+  build input đổi, exact T04C owner `20260828_023122_76b87e` phải chạy lại hai
+  fresh current-build vertical runs.
+- Review: `docs/pm/reviews/S10_C5_PM_REVIEW_2026-08-30.md`. Prompt:
+  `docs/pm/prompts/S10_C6_REAL_APPLY_UI_ACCEPTANCE_MANAGER_2026-08-30.md`.
+- S11-T02..T06 và production S13 vẫn blocked. S13-P01 Character Fit
+  Recommender vẫn là planning delta bắt buộc trước production S13.
+
+### Live update — 2026-08-30 16:27 +07 (Codex S10-C4 final re-review)
+
+- Verdict: `S10-C4 = CHANGES_REQUESTED / NOT_APPROVED`. C4 đã đóng thực chất
+  các finding backend C3: Codex độc lập xác nhận Ruff/mypy/Alembic/OpenAPI/J1,
+  effective backend 206/206, durable correction, measured structural gate,
+  long-path media và hai DB vertical run có authority/restart/affected-only
+  truth.
+- Blocker duy nhất là frontend gate trong S10-owned
+  `frontend/src/app/(app)/apply/page.tsx:90`: synchronous `setRunId` trong
+  effect làm exact Apply ESLint exit 1 (`react-hooks/set-state-in-effect`).
+  T04B evidence cũ chỉ lint `src/features/apply/**`, bỏ sót chính route page.
+  Cùng command còn bốn warning trong hai S10 E2E files.
+- Bounded C5 DAG: resume exact T04B owner `20260828_020206_b1f8af` để sửa
+  URL/state và own warning; J5 build/lint; resume exact T04C owner
+  `20260828_023122_76b87e` để dọn own warnings và chạy hai fresh vertical runs
+  trên corrected current BUILD_ID; backend frozen.
+- Review: `docs/pm/reviews/S10_C4_FINAL_PM_REVIEW_2026-08-30.md`. Prompt:
+  `docs/pm/prompts/S10_C5_APPLY_LINT_CURRENT_BUILD_EXIT_MANAGER_2026-08-30.md`.
+- Worker model vẫn bắt buộc exact `ocg/deepseek-v4-flash`, reasoning max,
+  fallback OFF. S11-T02..T06 và production S13 vẫn blocked.
+
+### Live update — 2026-08-30 10:05 +07 (Codex S10-C4 blocker decision)
+
+- Hermes dừng đúng tại `S10-C4 = BLOCKED_SCOPE_EXPANSION / PENDING_CODEX_DECISION`.
+  Independent Ruff rerun trên exact 9 production + 8 S10 test files xác nhận
+  đúng một lỗi `F841`: dead assignment
+  `tests/test_s10_full_apply_domain.py:172`.
+- File thuộc exclusive write-set S10-T01A; exact owner là
+  `20260827_234001_9d7f39`. Codex không waiver Ruff và đã cấp quyền tối thiểu
+  resume owner này để xóa đúng một dòng, re-run J4, rồi chỉ khi J4 xanh mới
+  resume T04C owner `20260828_023122_76b87e` cho hai strict C4 vertical runs.
+- Decision review:
+  `docs/pm/reviews/S10_C4_BLOCKER_PM_DECISION_2026-08-30.md`. Prompt tiếp theo:
+  `docs/pm/prompts/S10_C4A_T01A_STATIC_UNBLOCK_AND_EXIT_MANAGER_2026-08-30.md`.
+- Worker route giữ đúng user override: exact `ocg/deepseek-v4-flash`, reasoning
+  max, fallback OFF; raw alias/OpenRouter/CMC/Meta bị cấm. `S10` vẫn chưa
+  APPROVED/CLOSED; production S11/S12/S13 vẫn không mở.
+
+### Live update — 2026-08-29 21:55 +07 (S13 Character Fit Recommender requirement)
+
+- User yêu cầu khi tạo pose/reskin phải dựa trên nhân vật mẫu để AI đề xuất các
+  nhân vật/Pack Version hoặc generation starting profile tương đương, nhằm giảm
+  biến dạng và số lần regenerate.
+- Roadmap đã thêm `S13-P01` là planning delta bắt buộc trước production S13.
+  Tính năng phải hard-gate topology/pose-view coverage/anchors/proportion trước,
+  sau đó mới dùng embedding/style similarity để xếp hạng Top-K có giải thích.
+  AI chỉ tư vấn; user xác nhận và không được bypass compatibility/Demo/publish.
+- `S13-P00 C6` vẫn là approved 22-task baseline và không bị sửa hồi tố. Codex
+  BA/PM phải review/decompose P01 rồi mới đưa delta vào prompt production tương
+  lai. `S13-T01` hiện `BLOCKED_PLANNING_DELTA / NOT_DISPATCH_AUTHORIZED`; S10-C4
+  vẫn là lane đang được cấp quyền.
+
+### Live update — 2026-08-29 19:30 +07 (Codex S10-C3 independent review)
+
+- `S10-C3 = CHANGES_REQUESTED`; S10 chưa `APPROVED/CLOSED`. Review:
+  `docs/pm/reviews/S10_C3_PM_REVIEW_2026-08-29.md`.
+- P0 authority/fence: FullApply production route tự tạo 100-frame NumPy source
+  và hash-colored assets; `job_reconciler._input_changed` trả unchanged cho
+  mọi S10 job. Đây là production write ngoài T04C scope và phá immutable-input
+  restart contract.
+- P0 semantics: T03 đã gọi T02 executor nhưng vẫn dựng fallback checkpoint/
+  zero-hash/gen-1/frame100 authority và chỉ perturb affected region theo hash
+  correction ID; không bind/apply durable correction thật. T04A vẫn mirror
+  cuts, dùng fixed-low metric arrays và missing evidence=`0/False`.
+- Independent gates: J1-v4 13/13 retained; full S10 `169 passed, 1 failed`
+  trên fresh nested Windows root (269-char sidecar), exact nine-file mypy
+  `15 errors/3 files`, Ruff F* `6 errors`, alembic/OpenAPI/diff-check green.
+- T04C run1/run2 có artifact plumbing tiến bộ thật: mỗi DB 24 verified chunks,
+  2 publications, recompute 4/4, 30 DB-bound MP4 đều SHA/size/ffprobe green.
+  Nhưng cả hai dùng cùng synthetic source SHA, fixed mapping, zero persisted
+  structural rows, direct SQLite manifest patch và direct lease requeue nên
+  không phải vertical acceptance hợp lệ.
+- Registry claim “ALL 9 GATES GREEN” tự mâu thuẫn với mypy failure; S10 sprint
+  report không được append sau C3 và vẫn là R0/R1 snapshot cũ.
+- C4 serialized exact-owner DAG:
+  `T01C-authority/fence -> T03-real-correction -> T04A-real-measurement ->
+  T01C-static -> T04C-strict -> EXIT`. Prompt:
+  `docs/pm/prompts/S10_C4_AUTHORITY_SEMANTICS_EXIT_CORRECTION_MANAGER_2026-08-29.md`.
+- Latest user model override for every C4 worker, including resumed exact owner
+  sessions: Hermes selector `deepseek-v4-flash`, effective
+  `ocg/deepseek-v4-flash`, reasoning `max`, fallback OFF. This supersedes the
+  prior C3 `custom/meta` route; wrong/unavailable route is
+  `BLOCKED_MODEL_ROUTE`, never auto-fallback.
+- S11-P02 rev-C6 và S13-P00 C6 vẫn approved planning-only. Production S11
+  remains blocked on E06/S10; production S13 remains `NOT_OPENED`.
+
+### Live update — 2026-08-29 11:35 +07 (Codex S10-C2 independent review)
+
+- `S10-C2 = CHANGES_REQUESTED`; S10 chưa `APPROVED/CLOSED`. Review độc lập:
+  `docs/pm/reviews/S10_C2_PM_REVIEW_2026-08-29.md`.
+- Hai P0 production blockers: T03 recompute tại
+  `app/services/s10_recompute.py:637-688` vẫn dựng frame màu/hash và tự gán
+  correction kind thành adapter; T04A route tại
+  `app/api/routes/s10_full_apply.py:1086-1239` vẫn dùng source-cut synthetic,
+  fixed-low metrics và missing-evidence=`0/False`/fallback annotations.
+- Full fresh nested-Windows S10 gate độc lập: `2 failed, 164 passed`; đúng hai
+  test T03 pass trên short root, xác nhận path-budget defect tại atomic
+  `*.evidence.json.staging`, không phải logic green cho root được yêu cầu.
+  Nine-file S10 mypy còn `76 errors in 5 files`.
+- T04C-C1 không có worker result C2. Hai retained roots là byte-copy của R1,
+  BUILD_ID cũ, `.bin` không ffprobe-decodable, artifact SHA/size NULL, không
+  publication/recompute; harness còn terminal/missing-route/caller-metric
+  fallbacks. Chúng không phải acceptance evidence hợp lệ.
+- Gates vẫn pass: J1-v4 direct 13/13 (12 LF + 1 CRLF), Ruff functional F*,
+  Alembic one head `a10b11c12d3e`, OpenAPI materialization, TSC, Apply ESLint,
+  current build validator 7/7 BUILD_ID `UoAHhbO6043uUWKNz2JTZ` và
+  `git diff --check`.
+- C3 correction serialize exact owners:
+  `T03 20260828_011920_b79bd6 -> T04A 20260828_014304_25d94a -> T01C-static
+  20260828_003035_859fe5 -> T04C 20260828_023122_76b87e`. Route giữ
+  `custom/meta/max/no-fallback`; T01A/T01B/T02/T04B frozen. Prompt:
+  `docs/pm/prompts/S10_C3_REALITY_EXIT_CORRECTION_MANAGER_2026-08-29.md`.
+- `S11-P02 rev-C6 = CODEX_APPROVED` cho planning/readiness packet 19 IDs/14
+  waves; production S11 vẫn blocked trên E06/S10. `S13-P00 C6` vẫn approved
+  planning-only; production S13 vẫn `NOT_OPENED` vì shared paths còn dirty/
+  active trong S10.
+
+### Live update — 2026-08-29 04:00 +07 (S10-C2 submitted for Codex re-review)
+
+- Integration authority remains
+  `C:\Users\Admin\MotionForge2D-worktrees\s08-integration`, branch
+  `codex/s08-integration`, reviewed base HEAD `d3f6f796558aa9c7247da7d51e7d34e65b56cdf7`;
+  S10 is still an uncommitted dirty write-set. A new reviewer must rediscover
+  actual branch/HEAD/status/processes before using this snapshot.
+- S10 Manager registry stops at `2026-08-29 03:58 +07` with
+  `S10-C2 = PENDING_CODEX_REREVIEW`; this is not `APPROVED/CLOSED`.
+- J1-J5 are manager-claimed green after exact-owner corrections. They still
+  require independent Codex source/test/evidence review.
+- T04C-C1 did not produce a successful C2 worker result: both resume wrappers
+  exited 1 with no usable worker output. Manager retained `TASK_SUBMITTED` and
+  copied/migrated the old R1 Run1/Run2 evidence into
+  `output/s10/c2/t04c-c1/**`.
+- T04C's retained report explicitly says the old runs completed all 12 chunks
+  before the manual stop, tolerated an absent recompute route, produced twelve
+  `chunk_*.bin` files per run, and used BUILD_ID
+  `g3s0EKHByfzsFsRNZpWRI`; the current C2 build manifest is
+  `UoAHhbO6043uUWKNz2JTZ`. These facts conflict with C2's strict mid-run
+  restart, real recompute, decodable-media and same-current-build acceptance.
+  They are review leads, not a pre-recorded Codex verdict.
+- Immediate review packet for the next long-lived Codex PM session:
+  `docs/pm/prompts/CODEX_PROJECT_PM_CONTINUATION_S10_C2_REVIEW_2026-08-29.md`.
+  That session must independently review S10-C2 first and always issue the
+  bounded Hermes prompt corresponding to its verdict.
+- S09 remains Codex-approved/closed. S11-T01 is approved, but S11-T02..T06 and
+  production S13 remain unopened pending S10/E06 exit and a fresh dependency/
+  write-set review. S13-P00 planning only is approved.
+
 ### Live update — 2026-08-27 21:40 +07 (Codex S09-C7-R2 final review)
 
 - `S09-C7-R2 = CODEX_APPROVED / CLOSED`; toàn Sprint `S09 = CODEX_APPROVED /

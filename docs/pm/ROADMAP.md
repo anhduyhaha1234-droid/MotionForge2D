@@ -1,7 +1,8 @@
 # MotionForge 2D - Epic, Sprint and Task Roadmap
 
 **Planning model:** outcome-based, dependency-gated  
-**Execution rule:** one Task ID = one Hermes chat/session  
+**Execution rule:** one Task ID = one Hermes chat/session; dependency-ready
+disjoint tasks use isolated worktrees and run concurrently  
 **Estimate unit:** session-sized, not calendar commitment
 
 **Approved target overlay:** [Source-Locked 2D Target Profile](TARGET_PROFILE_2D_SOURCE_LOCKED.md)
@@ -311,16 +312,218 @@ P2 items are carried forward without opening C8.
 
 | Task ID | Session outcome | Depends on | Status |
 |---|---|---|---|
-| S10-T01 | Shot/layer chunked full-video reskin job with overlap, deterministic checkpoint and resume | S09 exit | READY — authorized full-sprint packet 2026-08-27 |
-| S10-T02 | Multi-role mappings process independently while preserving contact/z-order edges | S10-T01 | INTRA_SPRINT_BLOCKED_ON_T01_MANAGER_GATE |
-| S10-T03 | Partial recompute preserves approved/unaffected segments | S10-T02 | INTRA_SPRINT_BLOCKED_ON_T02_MANAGER_GATE |
-| S10-T04 | End-to-end Demo→Apply restart plus frame/cut/trajectory/contact regression evidence | S10-T03 | INTRA_SPRINT_BLOCKED_ON_T03_MANAGER_GATE |
+| S10-T01 | Shot/layer chunked full-video reskin job with overlap, deterministic checkpoint and resume | S09 exit | APPROVED / CLOSED — C6H R3 final review 2026-09-03 |
+| S10-T02 | Multi-role mappings process independently while preserving contact/z-order edges | S10-T01 | APPROVED / CLOSED |
+| S10-T03 | Partial recompute preserves approved/unaffected segments | S10-T02 | APPROVED / CLOSED |
+| S10-T04 | End-to-end Demo→Apply restart plus frame/cut/trajectory/contact regression evidence | S10-T03 | APPROVED / CLOSED |
 
 **Execution authority (2026-08-27):** Codex packet
 `prompts/S10_FULL_APPLY_MANAGER_2026-08-27.md` freezes eight owner sessions and
 the exact internal DAG. Only T01A/T01B may write in parallel; shared
 workflow/API/schema integration is serialized. Hermes must stop once at
 `SPRINT_SUBMITTED / PENDING_CODEX_REVIEW`.
+
+**Codex C2 independent review update (2026-08-29 11:35 +07):** S10 remains
+`CHANGES_REQUESTED`. T03 still fabricates recompute frames/adapter evidence;
+T04A still emits hard-coded/fallback structural truth; nested-Windows full gate
+is `2 failed, 164 passed`; T04C retained only invalid R1 evidence and has no
+fresh C2 run. C3 is a bounded serialized correction on exact T03→T04A→T01C-
+static→T04C owners. Review: `reviews/S10_C2_PM_REVIEW_2026-08-29.md`; prompt:
+`prompts/S10_C3_REALITY_EXIT_CORRECTION_MANAGER_2026-08-29.md`. No S11/S13
+production opens before Codex approves/closes S10.
+
+**Codex C4 blocker decision (2026-08-30 10:05 +07):** C4 J1-J3 are
+Manager-verified but not Codex-approved. J4 is blocked by one independently
+confirmed `F841` in T01A-owned `tests/test_s10_full_apply_domain.py:172`.
+Codex authorized exact owner `20260827_234001_9d7f39` to remove only that dead
+assignment, re-run J4, then continue exact T04C owner for two strict C4 vertical
+runs. S10 remains `CONTINUATION_AUTHORIZED / NOT_APPROVED`; S11/S13 production
+remains blocked.
+
+**Codex C4 final independent review update (2026-08-30 16:27 +07):** S10
+remains `CHANGES_REQUESTED`, now only for a bounded frontend exit correction.
+Backend C4 authority/recompute/structural/long-path/restart gates are
+independently green, but exact scoped Apply ESLint exits 1 at S10-owned
+`frontend/src/app/(app)/apply/page.tsx:90` because state is synchronously set in
+an effect. The old lint evidence omitted this route page. Authorized prompt is
+`prompts/S10_C5_APPLY_LINT_CURRENT_BUILD_EXIT_MANAGER_2026-08-30.md`: exact
+T04B owner fixes URL/state without suppression, then exact T04C owner runs two
+fresh vertical acceptances on the corrected current build. Backend is frozen;
+S11/S13 production remains blocked pending S10 approval/close.
+
+**Codex C5 independent review update (2026-08-30 18:01 +07):** backend,
+authority, recovery, structural evidence, full suite 206/206, Apply lint/TSC,
+current build and two distinct C5 vertical runs are independently green. S10
+still remains `CHANGES_REQUESTED` because `s10-apply-ui.spec.ts` can pass its
+progress/evidence/action cases on an empty page, never clicks
+Cancel/Retry/Resume and skips mobile under the recorded config. Authorized C6
+is exact-owner, live-product UI acceptance only; backend stays frozen. If no
+production source changes, retain the hashed C5 build/runs and avoid needless
+rerun cost. Prompt:
+`prompts/S10_C6_REAL_APPLY_UI_ACCEPTANCE_MANAGER_2026-08-30.md`.
+
+**Codex C6 blocker decision (2026-08-31 10:01 +07):** Hermes correctly stopped
+at `BLOCKED_SCOPE_EXPANSION`, but the blocker is broader than a missing public
+SLM hash. Full Apply still plans and writes job authority from client scene/
+mapping; C5/C6 evidence fabricated affected region and downgraded an unsupported
+route. C5's backend/authority-green conclusion is superseded. Authorized C6A is
+serialized exact-owner work: additive immutable S09 approval v2 bridge, S10-T01C
+server-derived minimal submit, then resume the existing 20-case T04B suite,
+fresh build and two fresh T04C vertical runs without DB/client authority
+fabrication. Review: `reviews/S10_C6_BLOCKER_PM_DECISION_2026-08-31.md`; prompt:
+`prompts/S10_C6A_SERVER_DERIVED_APPLY_AUTHORITY_MANAGER_2026-08-31.md`. S10
+remains `CONTINUATION_AUTHORIZED / NOT_APPROVED`; S11-T02..T06 and production
+S13 remain blocked.
+
+**Codex C6A cancel-lifecycle decision (2026-08-31 14:51 +07):** C6A materially
+completed approval v2, server-derived minimal submit and T03 alignment; Manager
+fresh full S10 gate reached 216 passed, and T04B's executable live fixture then
+exposed a real T01C transaction race. Cancel can return success while a
+second-writer SQLite lock is swallowed, leaving the durable job live; worker
+completion can overwrite `cancelled` and publish. Resume has a related
+multi-session/silent-success risk. S10 remains
+`CONTINUATION_AUTHORIZED / NOT_APPROVED`. Authorized C6B is serialized exact
+owner work: `T01C-C9-LIFECYCLE -> J6C -> T04B-C3 -> J6-UI -> J6-BUILD ->
+T04C-C5 -> EXIT`, with automatic same-session continuation through ordinary
+iteration limits. Latest user model override for every C6B worker is restored
+to exact `ocg/deepseek-v4-flash`, reasoning max, fallback OFF; the temporary
+`BAI/deepseeekv4flash` route is withdrawn as unstable. Review:
+`reviews/S10_C6A_CANCEL_LIFECYCLE_PM_DECISION_2026-08-31.md`; prompt:
+`prompts/S10_C6B_CANCEL_LIFECYCLE_CONTINUATION_MANAGER_2026-08-31.md`.
+
+**Codex C6B independent review update (2026-09-01):** C6B Manager evidence is
+green for existing tests, current build, 20/20 live UI and two final vertical
+runs, but S10 remains `CHANGES_REQUESTED / NOT_APPROVED`. Codex reproduced two
+T01C P1 gaps omitted by the suite: Submit failure plus identical replay can
+return 200 `reused=true` for a pending run with zero durable job; Retry enqueue
+failure leaves an active pending successor with zero durable job. The
+pre-existing-publication resume branch also fails to verify its completion CAS
+before writing `completed:true`, allowing contradictory checkpoint truth when
+cancel wins the race. Authorized C6C resumes only exact T01C owner
+`20260828_003035_859fe5`; frontend/T04B/T04C stay frozen. Direct worker model is
+`BAI/glm-5.3-flash`, max, fallback OFF; `comboBAI` is prohibited. Review:
+`reviews/S10_C6B_PM_REVIEW_2026-09-01.md`; prompt:
+`prompts/S10_C6C_ENQUEUE_CAS_EXIT_CORRECTION_MANAGER_2026-09-01.md`. S11-T02..T06
+and production S13 remain blocked.
+
+**Codex C6C independent review update (2026-09-01):** C10 correctly closes the
+zero-job orphan compensation and pre-existing-publication completion-CAS
+finding, and broad existing gates remain green. S10 nevertheless remains
+`CHANGES_REQUESTED / NOT_APPROVED`: replay repair creates a queued job while
+the run remains failed, so immediate Retry creates a second active job for the
+same lineage; replay also returns 200 reused for a tampered immutable job
+manifest because it checks only key existence. Authorized C6D resumes only
+exact T01C owner `20260828_003035_859fe5` to make repair coherent, enforce one
+canonical work across replay/retry/claim races, and validate complete durable
+job identity before success. Completion-CAS/frontend/T04B/T04C stay frozen.
+Direct worker route is the user's final exact selector
+`BAI/deepseek-v4-flash-vision-exp`, custom/max/fallback OFF after the local GLM
+quality/speed review. Review:
+`reviews/S10_C6C_PM_REVIEW_2026-09-01.md`; prompt:
+`prompts/S10_C6D_REPLAY_SINGLE_WORK_CORRECTION_MANAGER_2026-09-01.md`. S11 and
+production S13 remain blocked pending S10 approval/close.
+
+**Codex C6D independent review update (2026-09-01):** ordinary repaired replay
+coherence, immediate Retry rejection and gross manifest-tamper rejection are
+improved, but S10 remains `CHANGES_REQUESTED / NOT_APPROVED`. Codex's true
+two-thread barrier produced two HTTP 200 reused responses and two queued jobs
+with the same S10 idempotency key; the shipped “concurrent” test is serial.
+Replay also returns 200 for terminal-run/active-job contradiction and for a
+stored manifest whose `project_root` alone is tampered, because lifecycle is
+not checked and immutable comparison is only a whitelist. Authorized C6E
+resumes exact T01C owner `20260828_003035_859fe5`; exact worker model remains
+`BAI/deepseek-v4-flash-vision-exp`, custom/max/fallback OFF. Review:
+`reviews/S10_C6D_PM_REVIEW_2026-09-01.md`; prompt:
+`prompts/S10_C6E_TRUE_CONCURRENCY_IMMUTABLE_LIFECYCLE_MANAGER_2026-09-01.md`.
+S11-T02..T06 and production S13 remain blocked; S13-P01 Character Fit
+Recommender remains planned.
+
+**Codex C6E independent review update (2026-09-01):** C6E now closes the prior
+true-concurrent identical-repair duplicate, full manifest-default comparison
+and explicit run/job lifecycle matrix, but S10 remains
+`CHANGES_REQUESTED / NOT_APPROVED`. Codex independently changed only a stored
+durable job idempotency key; replay returned 200 reused and inserted a second
+queued job for the same run/generation because discovery searches only the
+expected key. Retry uses a no-op `cancelled -> cancelled` update as an exclusive
+claim; a second Retry on the same predecessor returns 500 on the unique run
+identity. The claimed worker-claim/Retry barrier test is sequential. Context
+health for the heavily resumed T01C owner has crossed the canonical recovery
+threshold (617-message effective lineage plus repeated current-contract misses),
+so authorized C6F opens exactly one compact recovery session after confirming
+zero old writer and recording owner transfer. User-selected worker route is
+exact `comboBAI`, custom/max, Hermes fallback chain OFF, with effective member
+ledger required. Review: `reviews/S10_C6E_PM_REVIEW_2026-09-01.md`; prompt:
+`prompts/S10_C6F_EXACT_JOB_DISCOVERY_RETRY_CAS_RECOVERY_MANAGER_2026-09-01.md`.
+S11-T02..T06 and production S13 remain blocked; S13-P01 remains planned.
+
+**Codex C6F independent review update (2026-09-02):** S10 remains
+`CHANGES_REQUESTED / NOT_APPROVED`. C6F fixes the single wrong-key claimant and
+sequential repeat-Retry 500, but exact durable resolution still treats multiple
+same-generation wrong-key claimants as a true orphan: Codex's real-route probe
+returned 200 reused and grew Job count 2 -> 3. Retry also still treats the
+same-state `cancelled -> cancelled` update as exclusive; two direct claims both
+returned true. Authorized C6G resumes exact compact recovery owner
+`20260901_230235_b80d4b` to implement one ambiguity-safe resolver and truthful
+Retry ownership, then run one final phased exit. Review:
+`reviews/S10_C6F_PM_REVIEW_2026-09-02.md`; prompt:
+`prompts/S10_C6G_EXCLUSIVE_RETRY_CLAIM_AMBIGUOUS_JOB_RESOLUTION_MANAGER_2026-09-02.md`.
+S11-T02..T06 and production S13 remain blocked; S13-P01 remains planned.
+
+**Codex C6G C14 incident decision (2026-09-02):** S10 is
+`INCIDENT_RECOVERY_REQUIRED / NOT_SUBMITTED / NOT_APPROVED`. The C14 worker
+overwrote the untracked API test from 2,547 lines to 278. The Manager's
+reconstruction is not yet authoritative: Codex independently obtained 58
+failed/5 passed, 63 collected nodes, a duplicate test definition and missing
+helper symbols. Canonical role separation rejects further Manager test edits
+and Codex semantic reconstruction. One guarded resume of the actual state.db
+C14 owner `20260902_013803_4d5ce5` is authorized: recover an exact candidate
+matching pre-C14 SHA `963ED50E...`, apply only verified patches, pass a Manager
+recovery gate, then finish the original 14-row C6G contract. Exact recovery
+failure stops `BLOCKED_TEST_AUTHORITY`; a second unsafe write stops
+`BLOCKED_CONTEXT_HEALTH / OWNER_TRANSFER_REQUIRED`. Decision:
+`reviews/S10_C6G_C14_TEST_DESTRUCTION_PM_DECISION_2026-09-02.md`; prompt:
+`prompts/S10_C6G_C14_T3_FORENSIC_TEST_AUTHORITY_RECOVERY_MANAGER_2026-09-02.md`.
+S11-T02..T06 and production S13 remain blocked.
+
+**Codex C6G authority terminal / C6H decision (2026-09-02):** guarded C14-T3
+proved the pre-destruction 57-test SHA is not recoverable from state.db. Codex
+also found three identical VSS copies, but they are only a 13-test ancestor
+(`5B312719...`); local history search and VSS+DB replay still cannot reach
+`963ED50E...`. `S10-C6G = BLOCKED_TEST_AUTHORITY / SUPERSEDED_BY_S10-C6H /
+NOT_APPROVED`. C6H authorizes a formal semantic authority rebaseline, never an
+exact-restoration claim and never acceptance of DAD70AE3 as-is. New task
+`S10-T01C-C15` uses one fresh compact `comboBAI` custom/max/fallback-OFF session,
+patch-only guarded writes, exact 57 retained + five C6G = 62-node authority
+gate, then the locked 14-row closure. Manager may run isolated read-only lanes
+in parallel only after writer exit. Decision:
+`reviews/S10_C6G_BLOCKED_AUTHORITY_C6H_REBASELINE_PM_DECISION_2026-09-02.md`;
+prompt:
+`prompts/S10_C6H_TEST_AUTHORITY_REBASELINE_AND_FINAL_CLOSURE_MANAGER_2026-09-02.md`.
+S11-T02..T06 and production S13 remain blocked.
+
+**Codex C6H R2 independent review update (2026-09-03):** S10 remains
+`CHANGES_REQUESTED / NOT_APPROVED`. R2 safely fixed the unrelated-malformed-row
+global block and stale per-row classifier, with current 70/70 API and 290/290
+broad gates. A remaining P1 makes stored-manifest identity depend on exactly
+two JSON whitespace encodings: a valid tab-formatted target manifest plus
+tampered key/generation is missed, replay returns `200 reused=true`, and Job
+count grows 1 -> 2. Authorized R3 must use one representation-independent exact
+target-run prefilter, resume safe owner `20260903_012248_d29911`, and run in a
+genuinely new compact Manager chat. Review:
+`reviews/S10_C6H_R2_PM_REVIEW_2026-09-03.md`; prompt:
+`prompts/S10_C6H_R3_FORMAT_INDEPENDENT_MANIFEST_IDENTITY_MANAGER_2026-09-03.md`.
+S11-T02..T06 and production S13 remain blocked.
+
+**Codex C6H R3 final review update (2026-09-03 10:40 +07):** R3 closes the
+format-dependent manifest identity finding with one escaped exact-run literal
+containment plus parsed exact run/project/plan classification. Current Manager
+gates are 71/71 API, 96/96 focused twice and 291/291 broad twice; Codex
+independently reran 71/71 and added two distinct real-stack probes, both green.
+Raw-session audit found zero forbidden critical write. `S10-C6H R3 =
+CODEX_APPROVED / CLOSED`; whole `S10 = CODEX_APPROVED / SPRINT_CLOSED`.
+Review: `reviews/S10_C6H_R3_FINAL_PM_REVIEW_2026-09-03.md`. S11 production is
+opened by `prompts/S11_T02_T06_FULL_SPRINT_MANAGER_2026-09-03.md`; production
+S13 remains not opened.
 
 **Epic exit:** Scenarios A-E pass; no full apply begins without explicit Demo approval.
 
@@ -336,13 +539,24 @@ workflow/API/schema integration is serialized. Hermes must stop once at
 | Task ID | Session outcome | Depends on | Status |
 |---|---|---|---|
 | S11-T01 | Original audio remux/codec fallback consumes S05 stream facts and preserves source synchronization | E03 | APPROVED — Codex direct review 2026-08-23, 64/64 suite |
-| S11-T02 | QCItem domain normalizes visual/audio/timecode issues | E06,S11-T01 | BLOCKED_DEPENDENCY |
-| S11-T03 | Structural drift, contact, z-order, clipping, identity/flicker and A/V checks create QC items | S11-T02 | BLOCKED_DEPENDENCY |
-| S11-T04 | Review Queue navigates issue, correction and affected rerun | S11-T03 | BLOCKED_DEPENDENCY |
-| S11-T05 | Readiness gate blocks only unresolved blockers | S11-T04 | BLOCKED_DEPENDENCY |
-| S11-T06 | Original-audio and targeted-review acceptance suite | S11-T05 | BLOCKED_DEPENDENCY |
+| S11-T02 | QCItem domain normalizes visual/audio/timecode issues | E06,S11-T01 | READY / FULL_SPRINT_AUTHORIZED |
+| S11-T03 | Structural drift, contact, z-order, clipping, identity/flicker and A/V checks create QC items | S11-T02 | AUTHORIZED_AFTER_INTERNAL_DEPENDENCY |
+| S11-T04 | Review Queue navigates issue, correction and affected rerun | S11-T03 | AUTHORIZED_AFTER_INTERNAL_DEPENDENCY |
+| S11-T05 | Readiness gate blocks only unresolved blockers | S11-T04 | AUTHORIZED_AFTER_INTERNAL_DEPENDENCY |
+| S11-T06 | Original-audio and targeted-review acceptance suite | S11-T05 | AUTHORIZED_AFTER_INTERNAL_DEPENDENCY |
 
-**Current gate (2026-08-27 21:40 +07):** S11-T01 is APPROVED. S11-P02 rev-C5 is `CHANGES_REQUESTED`; correction C6 must resume synthesis owner `20260823_145947_057312`. S09 is now approved, but T02..T06 remain blocked on E06/S10 Full Apply exit and P02 approval. Readiness correction may run docs-only in a separate lane; production S11 must not overlap S10.
+**Current gate (2026-09-03 11:07 +07, clean Git checkpoint activated):** S11-T01 is
+APPROVED, S11-P02 rev-C6 is `CODEX_APPROVED` as the binding 19-ID/14-wave
+packet, and E06/S10 is now closed. Production T02..T06 is
+`AUTHORIZED_TO_DISPATCH` through one new full-sprint Manager. Immediate wave is
+W1/T02A; each Task ID uses a new worker, correction resumes exact owner.
+Approved code is pushed at `4cec376bd7589bfd5bbd8c2260fdd63b751aca73` and
+clean canonical S11 branch/worktree is pushed at
+`7751598214eedb6b72e3783e39a2a408721abe40` / `codex/s11-integration` /
+`C:\Users\Admin\MotionForge2D-worktrees\s11-integration`. W6 runs four real
+isolated implementation workers, W9 and W12 run two; all other waves follow the
+DAG serially. One Git-only `S11-INT01` owner merges only Manager-verified task
+branches and pushes only green wave heads. S13 remains not opened.
 
 **Epic exit:** unchanged source voice/BGM/SFX play in sync; Scenario D works without reviewing the full timeline.
 
@@ -378,7 +592,8 @@ workflow/API/schema integration is serialized. Hermes must stop once at
 | Task ID | Session outcome | Depends on | Status |
 |---|---|---|---|
 | S13-P00 | Readiness package: dependency proof, domain/provider/validation contracts, write-set matrix and task packets | E04 | APPROVED — Codex C6 re-review 2026-08-23; binding 22-task planning baseline |
-| S13-T01 | Character Profile and stable reference-code prompt contract | E04,S13-P00 | READY_BY_DEPENDENCY / NOT_DISPATCH_AUTHORIZED — S09 closed, but serialize shared schema/API paths behind active-authorized S10 |
+| S13-P01 | AI-assisted Character Fit Recommender delta: rank existing packs and generation starting profiles against the source/sample character with explainable compatibility evidence | S13-P00,S09 exit | USER_REQUESTED / PLANNED — required BA/PM delta review before any S13 production prompt; no dispatch authority |
+| S13-T01 | Character Profile and stable reference-code prompt contract | E04,S13-P00,S13-P01 | BLOCKED_PLANNING_DELTA / NOT_DISPATCH_AUTHORIZED — S13-P01 must be decomposed and approved; then serialize shared schema/API paths behind active-authorized S10 |
 | S13-T02 | ComfyUI/provider adapter with capability and failure contracts | S13-T01 | PLANNED |
 | S13-T03 | Pose-conditioned six-panel generation job | S13-T02,E01 | PLANNED |
 | S13-T04 | Identity/style/pose validation and panel status | S13-T03 | PLANNED |
@@ -387,13 +602,21 @@ workflow/API/schema integration is serialized. Hermes must stop once at
 | S13-T07 | Publish complete approved output as immutable Pack Version | S13-T06 | PLANNED |
 | S13-T08 | Scenario J quality/performance benchmark report | S13-T07 | PLANNED |
 
-**Execution update (2026-08-23 23:20 +07):** S13-P00 C6 is Codex
-`APPROVED`; no P0/P1/P2 finding remains. Production S13 is still `NOT_OPENED`
-because S09 I02/I03 is active in the shared integration worktree and later S09
-write-sets overlap early S13 schema/migration/router paths. The existing
-`prepare-s13-t01` worktree is behind the integration HEAD. The current Hermes
-prompt is preflight/wait-only; a new Codex production prompt is required after
-the integration lane is stable.
+**Execution update (2026-08-29 19:30 +07):** S13-P00 C6 remains Codex
+`APPROVED` planning-only; no P0/P1/P2 planning finding remains. Production S13
+is still `NOT_OPENED`: authorized S10-C4 correction and early S13 share the
+integration tree and authority paths, with later overlap on
+`frontend/src/lib/api.ts`. The existing
+`prepare-s13-t01` worktree must be re-preflighted against the eventual stable
+integration HEAD. A new Codex production prompt is required only after S10 is
+APPROVED/CLOSED and shared write-set ownership is reconciled.
+
+**Additive product update (2026-08-29 21:55 +07):** the user requires
+`S13-P01` before production S13. This is an additive planning delta and does
+not rewrite or silently invalidate the approved 22-task S13-P00 evidence.
+Codex BA/PM must decompose and review the recommender write-set, dependency DAG,
+privacy/model policy, acceptance gates and benchmark additions, then fold the
+approved delta into the future production prompt.
 
 ### S13 mandatory identity-quality requirements
 
@@ -427,6 +650,39 @@ weakened by a provider-specific shortcut:
 - S13-T08 must use a 20-40 character golden set with approved six-slot truth, controlled
   variations and negative identity-drift examples. The primary metric is false-accept
   rate, followed by review/regeneration rate, repeatability, latency and cost per pack.
+
+### S13 AI-assisted Character Fit Recommender requirements
+
+These requirements implement the user request to use the source/sample
+character to recommend equivalent characters or generation starting profiles
+that are easier to pose and reskin:
+
+- Build a source requirement profile from approved source-role evidence; rank
+  eligible immutable Pack Versions and, when no pack is sufficient, compatible
+  generation starting profiles/templates. Never recommend drafts or incomplete
+  packs as ready-to-use replacements.
+- Apply hard compatibility gates before AI similarity: topology/limb count,
+  required view and pose coverage, articulation range, anchors/contacts/prop
+  needs, scale, proportion and silhouette. A style or embedding score may never
+  override a hard geometric blocker.
+- AI similarity may assist ranking with appearance/style embeddings plus
+  outline, palette, clothing/accessory and proportion signals. The system must
+  remain provider-agnostic and local-first; an unavailable AI model falls back
+  to deterministic compatibility evidence, not fabricated confidence.
+- Return an explainable Top-K list with per-dimension scores, blockers,
+  missing pose/view coverage, confidence/calibration and the expected renderer
+  or controlled-redraw risk. Do not expose only one opaque global score.
+- The recommendation is advisory. The user confirms the character/pack or
+  generation profile; AI may not silently change identity, auto-publish a pack,
+  bypass Demo/compatibility gates or alter approved slots.
+- Pose generation keeps the chosen target identity/reference hash immutable
+  across all slots. Source-character similarity guides compatibility and pose
+  conditioning only; it must not copy the source character's protected visual
+  identity into the target.
+- Extend the golden benchmark with Top-K compatible-hit rate, hard-blocker
+  leakage (target: zero), explanation correctness, calibration, and measured
+  review/regeneration/render-route reduction versus selection without the
+  recommender. Benchmark inputs and expected matches are frozen before runs.
 
 **Epic exit:** generator failure cannot block manual library usage; only complete reviewed packs can be published.
 
