@@ -1,0 +1,21 @@
+=== RUFF F ===
+All checks passed!
+=== PY_COMPILE ===
+PY_COMPILE_OK
+=== ALEMBIC HEADS ===
+f9a0b1c2d3e4 (head)
+=== MIGRATIONS TOUCHED ===
+0
+=== DIFF STAT ===
+ M app/api/app.py
+ M app/persistence/summaries.py
+?? app/api/routes/readiness.py
+?? app/persistence/readiness.py
+?? app/schemas/readiness.py
+?? docs/pm/sessions/S11-T05A/
+?? tests/test_s11_t05a_next_action_flip.py
+?? tests/test_s11_t05a_readiness_api.py
+=== DIFF SUMMARY ===
+ app/api/app.py               | 2 ++
+ app/persistence/summaries.py | 2 +-
+ 2 files changed, 3 insertions(+), 1 deletion(-)

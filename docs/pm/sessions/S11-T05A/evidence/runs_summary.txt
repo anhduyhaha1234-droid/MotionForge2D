@@ -1,0 +1,14 @@
+=== BASELINE (start) ===
+summaries.py 60256a4fa0658166c3beef02ade77a8a38cf51af6c850e2652b4d85f717e3c69
+app.py bd3c63c5062b1a16adfa5099f263d6c88cd660564d731ec399b3c582132b198c
+porcelain=0; HEAD=a146034d2282d2857fb9aee6d0ca4af3c178efb5 (WAVE_BASE)
+=== RED (pre-impl) ===
+11 failed, 3 passed (ModuleNotFoundError + flip pre-state) — fails exactly the missing pieces
+=== GREEN fresh roots ===
+s11t05a_green1: 3 failed -> fixture fix; s11t05a_green3/4/5: 14 passed x3 fresh roots (14.54/14.93/14.59s, basetemp %TEMP%/s11t05a_*_greenN)
+=== REGRESSION backend consumers ===
+121 passed (T02B x2 + T03G x2 + T04A x2 + T04C) in 123.73s — basetemp s11t05a_reg1
+=== REGRESSION summaries flip impact (PRE-FLIP assertions, files ngoai allowlist) ===
+5 failed = test_next_action_maps_status_deterministically, capability_honesty_vocabulary, future_capability_disabled_with_blocker (test_project_summary.py) + maps_each_status_deterministically, future_capabilities_emit_stable_blockers (test_project_summary_mapping.py) — TAT CA deu assert review_work == qc_unavailable / enabled=False PRE-FLIP; FREEZE C2-F3 bat buoc flip; owner update ngoai T05A write-set -> manager dispatch follow-on
+=== ISOLATION ===
+basetemp=%TEMP%/s11t05a_* short unique; -p no:cacheprovider; PYTHONDONTWRITEBYTECODE=1; MOTIONFORGE_DATABASE_URL khong dat; temp SQLite qua alembic upgrade head (a1b2c3... -> f9a0b1c2d3e4)

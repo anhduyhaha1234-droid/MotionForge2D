@@ -1,0 +1,42 @@
+INFO  [alembic.runtime.migration] Running upgrade a10b11c12d3e -> e11a02a2026f, S11-T02A: QCItem persistence — fail-closed QC freeze at DB level.
+INFO  [alembic.runtime.migration] Running upgrade e11a02a2026f -> f9a0b1c2d3e4, S11-T02A-C1: QCItem category/reason-code enum correction (Decision B + D).
+_____________ test_not_run_readiness_still_fail_closed_after_flip _____________
+---------------------------- Captured stderr setup ----------------------------
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> a1b2c3d4e5f6, initial S01 persistence schema
+INFO  [alembic.runtime.migration] Running upgrade a1b2c3d4e5f6 -> 23b308b1fd0b, durable job schema (S02-T02)
+INFO  [alembic.runtime.migration] Running upgrade 23b308b1fd0b -> 1c9f2a4b7d8e, active-only case-insensitive channel name uniqueness (S03-T01)
+INFO  [alembic.runtime.migration] Running upgrade 1c9f2a4b7d8e -> d5e6f7a8b9c0, Add character library schema (S06-T01)
+INFO  [alembic.runtime.migration] Running upgrade d5e6f7a8b9c0 -> e7f8a9b0c1d2, Add durable object intelligence schema (S08-T01).
+INFO  [alembic.runtime.migration] Running upgrade e7f8a9b0c1d2 -> f2a3b4c5d6e7, Add extraction surfaces for durable object candidate discovery (S08-T02).
+INFO  [alembic.runtime.migration] Running upgrade f2a3b4c5d6e7 -> f3a4b5c6d7e8, Add cross-scene grouping and curation surfaces (S08-T03).
+INFO  [alembic.runtime.migration] Running upgrade f3a4b5c6d7e8 -> f4a5b6c7d8e9, Add the durable targeted-correction surface (S08-T05).
+INFO  [alembic.runtime.migration] Running upgrade f4a5b6c7d8e9 -> f5a6b7c8d9e0, Add durable ObjectRole->Artifact association (S08-T02 correction round).
+INFO  [alembic.runtime.migration] Running upgrade f5a6b7c8d9e0 -> f6a7b8c9d0e1, Add durable media supersession for corrected objects (S08-T05-C1, finding D).
+INFO  [alembic.runtime.migration] Running upgrade f6a7b8c9d0e1 -> f7a8b9c0d1e2, Widen ObjectRole.kind to the canonical seven Source-Locked 2D kinds (S08-A01).
+INFO  [alembic.runtime.migration] Running upgrade f7a8b9c0d1e2 -> a0b1c2d3e4f5, Add S08-A02 structural evidence bridge schema (occurrence segments,
+segment motion, scene-graph occlusion/contact edges).
+INFO  [alembic.runtime.migration] Running upgrade a0b1c2d3e4f5 -> b2c3d4e5f6a7b, Add S07-T01 Project Cast Mapping schema (project_cast_mapping).
+INFO  [alembic.runtime.migration] Running upgrade b2c3d4e5f6a7b -> c9d0e1f2a3b4, S09-T01: add reskin_config + apply_checkpoint schema (SOLE S09 migration).
+INFO  [alembic.runtime.migration] Running upgrade c9d0e1f2a3b4 -> d8e9f0a1b2c3, S09-T00-I01: structural lock + renderer route schema (additive).
+INFO  [alembic.runtime.migration] Running upgrade d8e9f0a1b2c3 -> b3c4d5e6f7a9, S09-T05A: targeted correction archive schema (additive).
+INFO  [alembic.runtime.migration] Running upgrade b3c4d5e6f7a9 -> a10b11c12d3e, S10-T01A: durable FullApply domain — run/chunk/publication + checkpoint contract.
+INFO  [alembic.runtime.migration] Running upgrade a10b11c12d3e -> e11a02a2026f, S11-T02A: QCItem persistence — fail-closed QC freeze at DB level.
+INFO  [alembic.runtime.migration] Running upgrade e11a02a2026f -> f9a0b1c2d3e4, S11-T02A-C1: QCItem category/reason-code enum correction (Decision B + D).
+=========================== short test summary info ===========================
+PASSED ..\..\..\MotionForge2D-worktrees\s11-t05a-0903w12\tests\test_s11_t05a_readiness_api.py::test_readiness_blocked_only_by_unresolved_blockers_warnings_just_count
+PASSED ..\..\..\MotionForge2D-worktrees\s11-t05a-0903w12\tests\test_s11_t05a_readiness_api.py::test_readiness_ready_after_blocker_resolved_warning_count_stays
+PASSED ..\..\..\MotionForge2D-worktrees\s11-t05a-0903w12\tests\test_s11_t05a_readiness_api.py::test_readiness_not_run_wins_for_unchecked_video
+PASSED ..\..\..\MotionForge2D-worktrees\s11-t05a-0903w12\tests\test_s11_t05a_readiness_api.py::test_readiness_completed_zero_item_run_is_clean_not_not_run
+PASSED ..\..\..\MotionForge2D-worktrees\s11-t05a-0903w12\tests\test_s11_t05a_readiness_api.py::test_readiness_queued_running_failed_stale_not_run_with_detail
+PASSED ..\..\..\MotionForge2D-worktrees\s11-t05a-0903w12\tests\test_s11_t05a_readiness_api.py::test_readiness_blocker_dismissal_never_helps_ready
+PASSED ..\..\..\MotionForge2D-worktrees\s11-t05a-0903w12\tests\test_s11_t05a_readiness_api.py::test_readiness_unknown_project_404
+PASSED ..\..\..\MotionForge2D-worktrees\s11-t05a-0903w12\tests\test_s11_t05a_readiness_api.py::test_readiness_blocker_unknown_kind_fail_closed_explain
+PASSED ..\..\..\MotionForge2D-worktrees\s11-t05a-0903w12\tests\test_s11_t05a_readiness_api.py::test_readiness_static_gates_router_app_migrations
+PASSED ..\..\..\MotionForge2D-worktrees\s11-t05a-0903w12\tests\test_s11_t05a_next_action_flip.py::test_review_work_flipped_enabled_after_t05a
+PASSED ..\..\..\MotionForge2D-worktrees\s11-t05a-0903w12\tests\test_s11_t05a_next_action_flip.py::test_only_review_work_entry_changed_by_the_flip
+PASSED ..\..\..\MotionForge2D-worktrees\s11-t05a-0903w12\tests\test_s11_t05a_next_action_flip.py::test_s10_s12_capabilities_stay_disabled_untouched
+PASSED ..\..\..\MotionForge2D-worktrees\s11-t05a-0903w12\tests\test_s11_t05a_next_action_flip.py::test_flip_keeps_vocabulary_contract_intact
+PASSED ..\..\..\MotionForge2D-worktrees\s11-t05a-0903w12\tests\test_s11_t05a_next_action_flip.py::test_not_run_readiness_still_fail_closed_after_flip
+====================== 14 passed, 21 warnings in 14.69s =======================

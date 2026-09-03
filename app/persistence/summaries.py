@@ -156,7 +156,7 @@ FUTURE_CAPABILITY_BLOCKERS = {
     "map_objects": "capability_unavailable",  # S08 object intelligence PLANNED
     "create_demo": "capability_unavailable",  # S09 demo-first reskin PLANNED
     "apply_reskin": "capability_unavailable",  # S10 full apply PLANNED
-    "review_work": "qc_unavailable",  # S11 QC/review queue PLANNED
+    "review_work": None,  # S11 QC readiness LIVE (T05A/W12) — blocker lifted
     "export_video": "output_unavailable",  # S12 validated output PLANNED
     "retry_failed": "capability_unavailable",  # video retry pipeline PLANNED
 }

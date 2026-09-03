@@ -37,6 +37,7 @@ from app.api.routes import (
     qc_check_runs,
     qc_items,
     qc_navigation,
+    readiness,
     reskin_config,
     s09_approval,
     s09_correction,
@@ -156,6 +157,7 @@ app.include_router(reskin_config.router)
 app.include_router(qc_items.router)
 app.include_router(qc_check_runs.router)
 app.include_router(qc_navigation.router)
+app.include_router(readiness.router)
 # Server-owned original-audio attach action (S11-T04C) — Decision H: the
 # client payload carries ONLY {video_item_id}; the A/V recheck triggers on
 # the verified attach completion (worker-side) with a route-side backfill
