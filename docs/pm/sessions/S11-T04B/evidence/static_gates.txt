@@ -1,0 +1,22 @@
+=== static gates ===
+-- ruff --select F (3 new files):
+All checks passed!
+-- py_compile:
+OK
+-- alembic heads:
+f9a0b1c2d3e4 (head)
+-- git status (allowlist only):
+?? app/services/qc_correction_bridge.py
+?? docs/pm/sessions/S11-T04B/
+?? tests/test_s11_t04b_correction_rerun.py
+?? tests/test_s11_t04b_stale_reopen.py
+-- bridge route decorators (expect 0):
+0
+-- whole-project rerun symbols in bridge (expect 0):
+0
+-- qc_items router mutation decorators (expect 0):
+0
+-- corrections retry posts:
+2
+-- reskin code refs in bridge (expect 0):
+0

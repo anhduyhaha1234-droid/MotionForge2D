@@ -1,0 +1,2 @@
+=== regression: consumed surfaces (T02B lifecycle + T03G API + S08 correction API) ===
+52 passed, 53 warnings in 51.66s

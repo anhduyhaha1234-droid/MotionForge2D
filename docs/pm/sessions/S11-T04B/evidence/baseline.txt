@@ -1,0 +1,9 @@
+=== baseline (start) ===
+?? app/services/qc_correction_bridge.py
+?? docs/pm/sessions/S11-T04B/
+?? tests/test_s11_t04b_correction_rerun.py
+?? tests/test_s11_t04b_stale_reopen.py
+b9176544d3a6af5566c61fe67a5d545b407d404b
+codex/s11/t04b-0903w10
+=== RED gate: bridge absent at WAVE_BASE ===
+fatal: path 'app/services/qc_correction_bridge.py' exists on disk, but not in 'b9176544d3a6af5566c61fe67a5d545b407d404b'

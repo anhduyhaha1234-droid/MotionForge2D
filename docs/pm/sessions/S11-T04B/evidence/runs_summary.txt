@@ -1,0 +1,8 @@
+=== run1 (first full suite, 13 fail -> 8 pass, before fixes) ===
+FAILED 13 (diagnosed+fixed), PASSED 8 -- see LOG
+
+=== run r5 (first GREEN full suite) ===
+21 passed, 37 warnings in 23.35s
+
+=== run r6 (verbose GREEN, second fresh root) ===
+21 passed, 37 warnings in 23.04s
