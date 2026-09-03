@@ -101,5 +101,6 @@ $ git add app/api/routes/original_audio_action.py app/services/qc_av_recheck.py 
           app/workflow/original_audio_handler.py app/api/app.py \
           tests/test_s11_t04c_attach_action_api.py docs/pm/sessions/S11-T04C/
 $ git commit -m "feat(s11-t04c): original-audio attach action API + A/V recheck trigger (W11)"
-SHA: (điền sau khi commit)
+SHA: 241e5393bf5fdfb6cad8aeb71a8b32c195057c74 (production+test+docs)
+docs SHA bổ sung: (commit docs ghi SHA)
 ```

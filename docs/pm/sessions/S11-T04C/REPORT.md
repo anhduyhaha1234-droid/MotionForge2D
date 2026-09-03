@@ -111,4 +111,5 @@ NEW  docs/pm/sessions/S11-T04C/LOG.md
 NEW  docs/pm/sessions/S11-T04C/REPORT.md
 ```
 
-Commit local: (SHA ghi sau khi commit) — KHÔNG push/merge/rebase.
+Commit local: `241e5393bf5fdfb6cad8aeb71a8b32c195057c74` (production + test + docs; KHÔNG push/merge/rebase).
+Docs SHA bổ sung: (docs commit ghi SHA).
