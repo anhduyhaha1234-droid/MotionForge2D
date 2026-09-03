@@ -1,0 +1,27 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\Admin\AppData\Local\Programs\Python\Python311\python.exe
+rootdir: C:\Users\Admin\MotionForge2D-worktrees\s11-t03e-0903w6
+configfile: pyproject.toml
+plugins: anyio-4.14.2, hydra-core-1.3.4, asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 17 items
+
+tests/test_s11_t03e_audio_sync_checks.py::test_no_audio_present_real_source_not_applicable_zero_items PASSED [  5%]
+tests/test_s11_t03e_audio_sync_checks.py::test_no_audio_present_checkpoint_status_alone_is_terminal PASSED [ 11%]
+tests/test_s11_t03e_audio_sync_checks.py::test_source_audio_attach_job_failed_blocker_open PASSED [ 17%]
+tests/test_s11_t03e_audio_sync_checks.py::test_source_audio_expected_output_missing_blocker_open PASSED [ 23%]
+tests/test_s11_t03e_audio_sync_checks.py::test_source_audio_validated_output_lost_audio_blocker_open PASSED [ 29%]
+tests/test_s11_t03e_audio_sync_checks.py::test_source_audio_output_present_passes_zero_items PASSED [ 35%]
+tests/test_s11_t03e_audio_sync_checks.py::test_av_sync_frames_timeline_exact_fraction_pass PASSED [ 41%]
+tests/test_s11_t03e_audio_sync_checks.py::test_av_sync_unit_mismatch_ms_caught PASSED [ 47%]
+tests/test_s11_t03e_audio_sync_checks.py::test_av_sync_unit_mismatch_frames_caught PASSED [ 52%]
+tests/test_s11_t03e_audio_sync_checks.py::test_av_sync_drift_warning_band_t06a2_level3 PASSED [ 58%]
+tests/test_s11_t03e_audio_sync_checks.py::test_av_sync_drift_warning_boundary_inclusive PASSED [ 64%]
+tests/test_s11_t03e_audio_sync_checks.py::test_av_sync_drift_blocker_boundary_inclusive PASSED [ 70%]
+tests/test_s11_t03e_audio_sync_checks.py::test_av_sync_drift_beyond_blocker_is_blocker PASSED [ 76%]
+tests/test_s11_t03e_audio_sync_checks.py::test_av_sync_drift_below_warning_is_pass PASSED [ 82%]
+tests/test_s11_t03e_audio_sync_checks.py::test_av_sync_no_audio_not_applicable PASSED [ 88%]
+tests/test_s11_t03e_audio_sync_checks.py::test_both_checks_idempotent_x2 PASSED [ 94%]
+tests/test_s11_t03e_audio_sync_checks.py::test_detectors_registered_and_runnable_via_runner PASSED [100%]
+
+============================= 17 passed in 2.56s ==============================
