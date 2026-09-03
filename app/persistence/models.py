@@ -3010,36 +3010,45 @@ QC_ITEM_SEVERITIES = ("blocker", "warning", "info")
 QC_ITEM_SEVERITY_CHECK_SQL = (
     "severity IN (" + ",".join("'" + s + "'" for s in QC_ITEM_SEVERITIES) + ")"
 )
-#: Canonical QCItem categories (lane-A §1.1 trajectory/QC taxonomy):
-#: trajectory drift, cut drift, contact break, z-order, clipping, identity,
-#: flicker and audio/timecode — the S09/S10 reviewable failure classes.
+#: Canonical QCItem categories — EXACTLY the binding codes: the 8 overlay
+#: codes (Decision B, overlay §S11 L370-371: trajectory_drift, cut_drift,
+#: contact_break, z_order_error, silhouette_clipping, identity_drift,
+#: edge_halo, temporal_flicker) plus the 2 audio codes (Decision D, T03E:
+#: audio_missing, av_sync_drift) — the S09/S10 reviewable failure classes.
 QC_ITEM_CATEGORIES = (
     "trajectory_drift",
     "cut_drift",
     "contact_break",
-    "z_order",
-    "clipping",
-    "identity",
-    "flicker",
-    "audio_timecode",
+    "z_order_error",
+    "silhouette_clipping",
+    "identity_drift",
+    "edge_halo",
+    "temporal_flicker",
+    "audio_missing",
+    "av_sync_drift",
 )
 #: SQL literal for the ``qc_item.category`` CHECK, DERIVED from
 #: ``QC_ITEM_CATEGORIES``.
 QC_ITEM_CATEGORY_CHECK_SQL = (
     "category IN (" + ",".join("'" + c + "'" for c in QC_ITEM_CATEGORIES) + ")"
 )
-#: Canonical QCItem reason codes — the closed set of QC reasons named by
-#: lane-A; currently 1:1 with ``QC_ITEM_CATEGORIES`` and kept as its own
-#: tuple because ``reason_code`` is a NATURAL-KEY discriminator column.
+#: Canonical QCItem reason codes — EXACTLY the binding codes, kept as its
+#: own tuple because ``reason_code`` is a NATURAL-KEY discriminator column:
+#: 8 overlay codes (Decision B: trajectory_drift, cut_drift, contact_break,
+#: z_order_error, silhouette_clipping, identity_drift, edge_halo,
+#: temporal_flicker) + 2 audio codes (Decision D: audio_missing,
+#: av_sync_drift).  1:1 with ``QC_ITEM_CATEGORIES``.
 QC_REASON_CODES = (
     "trajectory_drift",
     "cut_drift",
     "contact_break",
-    "z_order",
-    "clipping",
-    "identity",
-    "flicker",
-    "audio_timecode",
+    "z_order_error",
+    "silhouette_clipping",
+    "identity_drift",
+    "edge_halo",
+    "temporal_flicker",
+    "audio_missing",
+    "av_sync_drift",
 )
 #: SQL literal for the ``qc_item.reason_code`` CHECK, DERIVED from
 #: ``QC_REASON_CODES``.

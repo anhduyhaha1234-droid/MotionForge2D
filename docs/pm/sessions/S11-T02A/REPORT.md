@@ -1,157 +1,117 @@
-# S11-T02A — REPORT (W1)
+# S11-T02A — REPORT — CORRECTION ROUND C1 (finding T02A-C1 [P1])
 
-**Task:** S11-T02A — QCItem schema + migration + schema/migration tests (full-sprint S11 T02..T06, isolated-worktree mode)
-**Session rule:** NEW SESSION (no manager resume)
-**Worktree:** `C:\Users\Admin\MotionForge2D-worktrees\s11-t02a-0903w1`
-**Branch:** `codex/s11/t02a-0903w1`
-**WAVE_BASE / HEAD lúc dispatch:** `7751598214eedb6b72e3783e39a2a408721abe40`
-**Status:** **TASK_SUBMITTED** (không tự nhận APPROVED/CLOSED; chờ manager verify độc lập)
+**Task:** S11-T02A — QCItem schema + migration + schema/migration tests (W1) — CORRECTION C1
+**Session:** resume exact owner (same T02A session), branch `codex/s11/t02a-0903w1`
+**WAVE_BASE (C1):** `b34d801c60e9bdfdfed2a887b493e7eb8f54a8b9` (canonical fast-forward; worktree sạch lúc bắt đầu)
+**Status:** **TASK_SUBMITTED** (CORRECTION_C1_SUBMITTED) — chờ Manager verify độc lập
 
 ---
 
-## 1. Outcome
+## 1. Finding được sửa (T02A-C1 [P1 — contract violation])
 
-QCItem tồn tại ở tầng persistence với state machine fail-closed freeze ở DB-level —
-đủ contract lane-A §1.1/§1.3 (acceptance binary #1..#5), kèm 2 test files (schema +
-migration) xanh trong 1 lệnh với isolation chuẩn, migration mới single head
-`e11a02a2026f`, round-trip upgrade/downgrade/upgrade byte-identical + foreign_key_check=0,
-downgrade fail-closed có row, mọi enum CHECK derive từ tuple Python duy nhất.
+`QC_REASON_CODES` / `QC_ITEM_CATEGORIES` cũ (8 codes) → **10 codes binding**:
 
-## 2. Commands + real output
-
-### 2.1 Baseline
 ```
-$ git status --porcelain            → (empty) — 0 changes
-$ git branch --show-current         → codex/s11/t02a-0903w1
-$ git rev-parse HEAD                → 7751598214eedb6b72e3783e39a2a408721abe40
-$ env | grep -i MOTIONFORGE         → (no output) — runtime env sạch
-$ python -m alembic heads           → a10b11c12d3e (head)      [single, exit 0]
-$ sha256sum app/persistence/models.py
-  → a3a6f150f26c0481768320df1f9717f404990675371ac9b947d8e1dbd3b545f4   (2976 lines)
+trajectory_drift, cut_drift, contact_break, z_order_error, silhouette_clipping,
+identity_drift, edge_halo, temporal_flicker, audio_missing, av_sync_drift
+```
+- 8 overlay codes (Decision B, overlay §S11 L370-371): renames `z_order`→`z_order_error`,
+  `clipping`→`silhouette_clipping`, `identity`→`identity_drift`, `flicker`→`temporal_flicker`;
+  thêm `edge_halo`; loại `audio_timecode` khỏi overlay set.
+- + 2 audio codes (Decision D, T03E): `audio_missing`, `av_sync_drift`.
+- Cả hai tuple giữ 1:1 (`QC_REASON_CODES == QC_ITEM_CATEGORIES`); mọi CHECK SQL trong
+  models.py derive tự động từ tuple (pattern CONTACT_KIND_CHECK_SQL) — không sửa cấu trúc khác.
+
+## 2. Thay đổi (chỉ allowlist + expansion authorized)
+
+| Path | Type | Ghi chú |
+|---|---|---|
+| `app/persistence/models.py` | M (bounded patch, byte-exact preimage) | numsat vs b34d801 = **25/16** — 16 removed = 10 tuple literals cũ + 6 docstring lines (đúng phạm vi "cho phép thay đổi nội dung tuple"); zero dòng cấu trúc bị xóa |
+| `migrations/versions/f9a0b1c2d3e4_s11_t02a_qc_reason_codes_fix.py` | NEW (expansion authorized, đúng 1 file) | revision `f9a0b1c2d3e4`, down_revision `e11a02a2026f` (single head đo được). Table rebuild (SQLite không ALTER CHECK): qc_item_new + CHECK mới (byte twin ORM) → copy → drop → rename → recreate indexes. Fail-closed 2 chiều `_assert_rows_compatible`. PRAGMA integrity/fk_check mọi path |
+| `tests/test_s11_t02a_qc_schema.py` | M | enum cũ → 10 codes mới; giữ 6 binary C4-F1; thêm assert 10 codes (edge_halo/audio_missing/av_sync_drift); invalid values mới (clipping/z_order/audio_timecode bị CHECK chặn); derived-tuple test 10 codes |
+| `tests/test_s11_t02a_qc_migration.py` | M | REV_FIX chain assert; single head = f9a0b1c2d3e4; old literals GONE khỏi DDL; thêm data-preserve upgrade + upgrade/downgrade fail-closed có row enum (3 test mới); 8 × 'clipping' → 'silhouette_clipping' |
+| `app/persistence/__init__.py` | KHÔNG đổi | symbols không thay đổi (không cần) |
+| `docs/pm/sessions/S11-T02A/LOG.md`, `REPORT.md` | M | append C1 |
+
+**Forbidden không đụng:** detector modules, orchestrator, runner/registry (T03A freeze),
+qc_items repo (T02B), frontend, migrations khác, MAIN. KHÔNG push/merge/rebase/reset/clean/stash.
+
+## 3. Commands + real output (verify bắt buộc)
+
+### 3.1 alembic heads + round-trip (temp DB `mfc_t02a_c1_cli.db`)
+```
+$ python -m alembic heads
+→ f9a0b1c2d3e4 (head)                       [đúng 1 head = revision fix mới]
+
+upgrade head        → (37 tables, 180 indexes, foreign_key_check=[], integrity=ok, rev=f9a0b1c2d3e4)
+downgrade a10b11c12d3e → (36, 173, [], ok, rev=a10b11c12d3e)     [chain 2 downgrades; qc_item dropped]
+upgrade head        → (37, 180, [], ok, rev=f9a0b1c2d3e4)        [byte-identical signature]
+NEW-CHECK-PRESENT (z_order_error, edge_halo) = True ; OLD-CHECK-GONE = True
+Live insert: edge_halo → OK ; z_order → REJECTED (CHECK live trên migrated DB)
+FK-CHECK-FINAL = []
 ```
 
-### 2.2 RED (trước implement)
-```
-$ python -m pytest tests/test_s11_t02a_qc_schema.py tests/test_s11_t02a_qc_migration.py \
-    -p no:cacheprovider --basetemp=C:/Users/Admin/AppData/Local/Temp/mfc_t02a_r1 -q
-→ ImportError: cannot import name 'QC_ITEM_CATEGORIES' from 'app.persistence.models'
-  2 errors in 0.52s        [fail đúng lý do: behavior mới chưa tồn tại]
-```
-
-### 2.3 GREEN (sau implement — 1 lệnh, isolation chuẩn)
+### 3.2 Cả 2 test files — 1 lệnh, isolation chuẩn
 ```
 $ unset MOTIONFORGE_DATABASE_URL; python -m pytest tests/test_s11_t02a_qc_schema.py \
     tests/test_s11_t02a_qc_migration.py -p no:cacheprovider \
-    --basetemp=C:/Users/Admin/AppData/Local/Temp/mfc_t02a_r10 -q
-→ 31 passed, 8 warnings in 24.98s
+    --basetemp=C:/Users/Admin/AppData/Local/Temp/mfc_t02a_c1r2 -q
+→ 37 passed, 14 warnings in 30.09s
 ```
-(8 warnings = SAWarning reflection expression-based index legacy `uq_*_workspace_role_name`
-/ `uq_character_active_workspace_code` — pre-existing, không phải file của task.)
+RED trước khi sửa test (sau khi đổi models): 2 failed đúng lý do (downgrade fail-closed giờ
+chạy fix migration trước — message "refusing to proceed"; preserve seed dùng code cũ tại
+revision cũ) → đã sửa bounded: match pattern "refusing to (downgrade|proceed)"; seed
+'trajectory_drift' (valid cả 2 enum). GREEN = 37 passed.
 
-Test inventory (31 tests):
-- `tests/test_s11_t02a_qc_schema.py` (25): C4-F1 #1 FK segment_row_id → immutable occurrence row
-  (kể cả DELETE RESTRICT); #2 hai lineage versions cùng logical_id hợp lệ + QCItem neo đúng
-  segment_row_id; #3 partial segment pair (2 chiều) bị CHECK chặn + both-NULL hợp lệ;
-  #4 duplicate sequential + concurrent (threads, barrier) không tạo 2 rows; #5 PRAGMA
-  foreign_key_check=[] + integrity ok; #6 NULL mọi thành phần natural key bị NOT NULL chặn
-  + unique index non-partial (PRAGMA index_list partial=0) đủ 7 cột đúng thứ tự; blocker→
-  dismissed bị chặn DB-level; CHECK chặn status/severity/category/reason_code/confidence_source
-  ngoài enum + confidence range; derived-from-tuple byte-identical; field contract column/FK.
-- `tests/test_s11_t02a_qc_migration.py` (6): revision chain (e11a02a2026f ← a10b11c12d3e);
-  single head; round-trip upgrade→downgrade→upgrade byte-identical (schema_sig dict equality)
-  + fk_check [] + integrity ok; downgrade fail-closed có row (RuntimeError "refusing to
-  downgrade", row nguyên vẹn); CHECK literals byte-twin ORM + live trên migrated DB
-  (bogus status + blocker/dismissed → IntegrityError với parent rows đã seed, không phải FK);
-  FK segment_row_id enforced trên migrated DB.
-
-### 2.4 Gates
+### 3.3 Gates
 ```
-$ python -m alembic heads            → e11a02a2026f (head)      [đúng 1 head = revision vừa tạo]
-$ python -m py_compile <5 files>     → PY_COMPILE-OK
-$ ruff check --select F <5 files>    → All checks passed!       [exit 0]
-$ git diff --numstat app/persistence/models.py      → 240  0   [removed = 0]
-$ git diff --numstat app/persistence/__init__.py    →  27  0   [removed = 0]
+$ ruff check --select F (5 files)  → All checks passed!   [exit 0]
+$ python -m py_compile (6 files)   → PY_COMPILE-OK
+$ test_concurrent_duplicate_natural_key_creates_one_row ×3 → 1 passed ×3 (2.39/2.40/2.40s)
+$ git diff --numstat b34d801 -- app/persistence/models.py → 25  16
 ```
+16 removed lines = chỉ tuple literals cũ (10 dòng) + docstrings (6 dòng) — xác nhận bằng
+`git diff | grep "^-"` (không có dòng cấu trúc/khác).
 
-### 2.5 Round-trip CLI trên temp DB (C:/Users/Admin/AppData/Local/Temp/mfc_t02a_cli.db)
+### 3.4 Scope diff vs b34d801
 ```
-upgrade head        → (37 tables, 180 indexes, foreign_key_check=[], integrity=ok, rev=e11a02a2026f)
-downgrade a10b11c12d3e → (36, 173, [], ok, rev=a10b11c12d3e)   [qc_item dropped]
-upgrade head        → (37, 180, [], ok, rev=e11a02a2026f)      [byte-identical signature]
-qc_item present: True
+M  app/persistence/models.py
+M  tests/test_s11_t02a_qc_schema.py
+M  tests/test_s11_t02a_qc_migration.py
+?? migrations/versions/f9a0b1c2d3e4_s11_t02a_qc_reason_codes_fix.py
++ docs/pm/sessions/S11-T02A/** (LOG/REPORT append C1)
 ```
+(porcelain check: không path nào ngoài allowlist.)
 
-### 2.6 Concurrency stability
+## 4. Finding phụ — T02B dependency (báo Manager, KHÔNG sửa)
+
+Sau enum fix, `tests/test_s11_t02b_qc_api_readonly.py` (T02B-owned) fail **9 tests**
+(5 pass). Lỗi gốc (raw output):
 ```
-test_concurrent_duplicate_natural_key_creates_one_row → 1 passed ×3 (2.48s/2.49s/2.36s)
+app.persistence.qc_items.QCItemParamsError: invalid category 'clipping' (allowed:
+('trajectory_drift','cut_drift','contact_break','z_order_error','silhouette_clipping',
+'identity_drift','edge_halo','temporal_flicker','audio_missing','av_sync_drift'))
 ```
+Repo T02B (`app/persistence/qc_items.py`) dùng constants mới — tự propagate đúng.
+Chỉ test T02B hard-code `'clipping'/'flicker'/'identity'` (L79-80, L160, L182, L189,
+L208, L265-266). **Manager cần route correction riêng cho T02B** (update enum values trong
+test file) — ngoài write-set T02A-C1 (task cấm đụng T02B).
 
-## 3. Files changed (chỉ allowlist + sessions evidence)
+## 5. Acceptance (correction) — binary check
 
-| Path | Type | Delta |
-|---|---|---|
-| `app/persistence/models.py` | M (ADDITIVE-ONLY) | +240 / -0; SHA before `a3a6f150f26c0481768320df1f9717f404990675371ac9b947d8e1dbd3b545f4` → after `9dafe988b41bc0454ae5e61634d0fa9ea2784a572d393a48b04220d45b9c26d9`; 2976 → 3216 lines |
-| `app/persistence/__init__.py` | M (chỉ export mới) | +27 / -0 |
-| `migrations/versions/e11a02a2026f_s11_t02a_qc_item.py` | NEW | revision `e11a02a2026f`, down_revision `a10b11c12d3e` (đo được) |
-| `tests/test_s11_t02a_qc_schema.py` | NEW | 25 tests |
-| `tests/test_s11_t02a_qc_migration.py` | NEW | 6 tests |
-| `docs/pm/sessions/S11-T02A/LOG.md`, `REPORT.md` | NEW | evidence |
+1. ✅ `alembic heads` = 1 head `f9a0b1c2d3e4`; round-trip upgrade/downgrade/upgrade temp DB + foreign_key_check=0.
+2. ✅ Cả 2 test files pass 1 lệnh `-p no:cacheprovider`, basetemp Windows-native ngắn, env strip MOTIONFORGE_DATABASE_URL (37 passed).
+3. ✅ `ruff check --select F` 5 files; py_compile.
+4. ✅ models.py diff removed=0 ngoài tuple literal + docstring (16 dòng — được phép); giữ nguyên mọi CHECK khác.
+5. ✅ Scope diff vs b34d801: CHỈ models.py + migration fix mới + 2 test files + sessions evidence (__init__.py không cần).
+6. ✅ 10 codes hiện diện (assert trong test: edge_halo, audio_missing, av_sync_drift có mặt); CHECK chặn invalid mới (clipping/z_order/audio_timecode).
 
-**Forbidden scope không đụng:** app/api/**, app/services/**, frontend/**, docs/**, data/fixtures,
-tests ngoài allowlist, migrations khác, MAIN, s08 archive, s11-integration.
-KHÔNG push/merge/rebase/reset/clean/stash/force.
+## 6. Evidence paths
 
-## 4. Model contract (QCItem, table `qc_item`)
-
-- Natural-key UNIQUE 7 cột `uq_qc_item_natural_key`: (workspace_id, project_id, video_item_id,
-  layer_ref_type, layer_ref_id, reason_code, evidence_window_key) — mọi cột NOT NULL,
-  non-partial (test chứng minh SQLite NULL semantics không phá uniqueness).
-- `segment_row_id` String(36) NULL, FK THẬT → `occurrence_segment.id` ON DELETE RESTRICT.
-- `segment_logical_id` String(64) NULL, scoped lineage VALUE, KHÔNG phải FK.
-- CHECK `ck_qc_item_segment_pair_null`: cả hai NULL hoặc cả hai non-NULL.
-- `layer_ref_type`/`layer_ref_id` NOT NULL (video-level issue: layer_ref_type='video_item',
-  layer_ref_id=video_item_id).
-- `evidence_window_key` String(64) NOT NULL — canonical stable key/hash materialize riêng
-  (cơ chế duy nhất enforce uniqueness; evidence_json KHÔNG phải cơ chế đó).
-- `evidence_json` Text NOT NULL schema-versioned/content-derived.
-- `detector`/`detector_revision`/`checkpoint_ref` NOT NULL; `confidence` Float CHECK 0..1;
-  `confidence_source` CHECK derive từ OCCURRENCE_CONFIDENCE_SOURCES; TimestampMixin
-  (created_at/updated_at/revision).
-- Enum CHECKs derive từ tuple Python duy nhất (pattern CONTACT_KIND_CHECK_SQL):
-  status ∈ {open, acknowledged, resolved, dismissed} = QC_ITEM_STATUSES;
-  severity ∈ {blocker, warning, info} = QC_ITEM_SEVERITIES;
-  category/reason_code ∈ 8 lane-A reasons = QC_ITEM_CATEGORIES / QC_REASON_CODES.
-- lane-A §1.3 rule 2: `ck_qc_item_blocker_not_dismissed` = NOT (severity='blocker' AND
-  status='dismissed') — DB-level, test binary chặn insert.
-
-## 5. Acceptance criteria check (binary)
-
-1. ✅ `alembic heads` runtime = đúng 1 head `e11a02a2026f`; round-trip OK temp DB; foreign_key_check=0.
-2. ✅ `git diff models.py removed=0` (240/0); mọi enum QC derive SQL CHECK từ tuple Python duy nhất.
-3. ✅ status/severity đúng enum; insert blocker→dismissed bị CHECK DB chặn (2 test).
-4. ✅ Fields đủ lane-A §1.1 contract (xem §4) — test_qcitem_column_contract + migration parity.
-5. ✅ 2 test files pass 1 lệnh `-p no:cacheprovider`, basetemp Windows-native ngắn, env strip
-   MOTIONFORGE_DATABASE_URL (31 passed).
-6. ✅ Round-trip byte-identical; downgrade fail-closed có row; CHECK chặn enum ngoài;
-   blocker+dismissed DB-level.
-
-## 6. Findings / notes
-
-- `create_all` (ORM DDL) không có server_default cho project.description/status,
-  video_item.status — schema tests seed explicit (không phải bug của task).
-- SQLite lưu table-level UNIQUE constraint thành auto-index (sqlite_autoindex_*),
-  sqlite_master.sql = NULL → test non-partial dùng `PRAGMA index_list` (origin='u', partial=0).
-- patch tool fuzzy-match làm hỏng indent __all__ models.py 2 lần → xử lý bằng byte-exact
-  replace script có preimage assertion (bounded patch protocol giữ nguyên; SHA cuối verify).
-- Test không chạy: không có — toàn bộ 31 tests đã chạy và pass. Không skip/ignore/xfail.
-
-## 7. Evidence paths
-
-- `docs/pm/sessions/S11-T02A/LOG.md` (baseline, plan, chronological log)
+- `docs/pm/sessions/S11-T02A/LOG.md` (baseline W1 + C1 baseline, thực thi, verify, finding phụ)
 - `docs/pm/sessions/S11-T02A/REPORT.md` (file này)
-- Raw output của mọi lệnh trong §2 là output thật từ terminal (không tóm tắt suy diễn).
+- Mọi số liệu §3 là output thật từ terminal (không tóm tắt suy diễn).
 
 ---
-**Status: TASK_SUBMITTED** — commit local `7365f910e16ff0d9863c6c5e57c07ee92b6b151b` trên
-`codex/s11/t02a-0903w1` (allowlist + evidence; 7 files: 2 M + 5 A).
-KO push, KO merge. Chờ Manager verify độc lập.
+**Status: TASK_SUBMITTED / CORRECTION_C1_SUBMITTED** — commit local duy nhất trên
+`codex/s11/t02a-0903w1` (SHA ghi sau khi commit). KO push, KO merge. Chờ Manager verify.

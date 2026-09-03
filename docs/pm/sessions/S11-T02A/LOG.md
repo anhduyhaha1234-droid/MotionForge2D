@@ -1,10 +1,12 @@
 # S11-T02A — QCItem schema + migration + schema/migration tests (W1)
+# + CORRECTION ROUND C1 (resume exact owner, finding T02A-C1 [P1])
 
 Task: S11-T02A (W1, full-sprint S11 T02..T06, isolated-worktree mode)
 Session rule: NEW SESSION (no manager resume, no other task session)
 Worktree: C:\Users\Admin\MotionForge2D-worktrees\s11-t02a-0903w1
 Branch: codex/s11/t02a-0903w1
-WAVE_BASE / HEAD lúc dispatch: 7751598214eedb6b72e3783e39a2a408721abe40
+WAVE_BASE (W1): 7751598214eedb6b72e3783e39a2a408721abe40
+WAVE_BASE (C1, canonical fast-forward): b34d801c60e9bdfdfed2a887b493e7eb8f54a8b9
 
 ## Baseline (2026-09-03 +07)
 
@@ -105,3 +107,70 @@ WAVE_BASE / HEAD lúc dispatch: 7751598214eedb6b72e3783e39a2a408721abe40
   commit `7365f910e16ff0d9863c6c5e57c07ee92b6b151b` (`feat(s11): T02A QCItem schema +
   migration e11a02a2026f + schema/migration tests (W1)`), 7 files staged (2 M + 5 A).
   KHÔNG push/merge/rebase/reset/clean/stash/force. Working tree sạch sau commit.
+## CORRECTION ROUND C1 (2026-09-03) — finding T02A-C1 [P1]
+
+Manager finding: QC_REASON_CODES / QC_ITEM_CATEGORIES không khớp binding Decision B
+(overlay §S11 L370-371) + Decision D. Cần đúng 10 codes: 8 overlay (trajectory_drift,
+cut_drift, contact_break, z_order_error, silhouette_clipping, identity_drift,
+edge_halo, temporal_flicker) + 2 audio (audio_missing, av_sync_drift).
+
+### C1 baseline
+- `git status --porcelain` → (empty) — worktree sạch; `git rev-parse HEAD` →
+  b34d801c60e9bdfdfed2a887b493e7eb8f54a8b9 (canonical fast-forward).
+- `python -m alembic heads` → `e11a02a2026f (head)` — single head trước khi tạo fix.
+- models.py enum cũ (8 codes) vẫn còn — xác nhận finding.
+
+### C1 thực thi
+- models.py (bounded patch, byte-exact preimage script): QC_ITEM_CATEGORIES +
+  QC_REASON_CODES → 10 codes binding, docstrings cập nhật. CHECK SQL tự derive.
+  Verify: `QC_ITEM_CATEGORY_CHECK_SQL` / `QC_REASON_CODE_CHECK_SQL` chứa đủ 10 codes.
+  `git diff --numstat` vs b34d801 = `25 16` — 16 removed = 10 tuple literals cũ
+  (z_order/clipping/identity/flicker/audio_timecode × 2 tuples) + 6 dòng docstring
+  (nội dung tuple/thay đổi docstring — đúng phạm vi correction cho phép). Không dòng
+  cấu trúc nào bị xóa.
+- Migration fix mới (AUTHORIZED WRITE-SET EXPANSION, đúng 1 file):
+  `migrations/versions/f9a0b1c2d3e4_s11_t02a_qc_reason_codes_fix.py`
+  (revision `f9a0b1c2d3e4`, down_revision `e11a02a2026f` — single head đo được).
+  SQLite không ALTER CHECK → table rebuild chuẩn: tạo qc_item_new với CHECK literals
+  MỚI (byte twin ORM derive từ tuple mới, `_CATEGORY_CHECK`/`_REASON_CODE_CHECK`),
+  copy mọi row verbatim, drop cũ, rename, recreate 5 explicit indexes sau rename
+  (index names database-global). Fail-closed 2 chiều: upgrade từ chối nếu row dùng
+  code cũ không hợp lệ mới; downgrade từ chối nếu row dùng code mới không hợp lệ cũ
+  (`_assert_rows_compatible`, named-params expand). PRAGMA integrity/fk_check mọi path.
+- 2 test files T02A cập nhật (bounded, byte-exact): mọi tham chiếu enum cũ → 10 codes
+  mới ('clipping'→'silhouette_clipping' ×8 trong migration test; 'identity'→
+  'identity_drift'); GIỮ NGUYÊN 6 binary C4-F1 + round-trip + downgrade fail-closed;
+  thêm: assert đủ 10 codes (gồm edge_halo, audio_missing, av_sync_drift); invalid mới
+  (category='clipping', reason_code='z_order', reason_code='audio_timecode' → CHECK
+  chặn); migration: REV_FIX chain assert, single head = f9a0b1c2d3e4, old literals GONE
+  khỏi DDL, data-preserve upgrade, upgrade/downgrade fail-closed với enum row.
+
+### C1 verification (raw output)
+- `python -m alembic heads` → `f9a0b1c2d3e4 (head)` — đúng 1 head (revision fix).
+- pytest cả 2 files 1 lệnh (isolation chuẩn) → `37 passed, 14 warnings in 30.09s`
+  (basetemp mfc_t02a_c1r2). Chạy lại lần verify cuối: 37 passed.
+- Round-trip CLI temp DB (mfc_t02a_c1_cli.db):
+  upgrade → (37 tables, 180 indexes, fk_check=[], ok, rev=f9a0b1c2d3e4);
+  downgrade a10b11c12d3e → (36, 173, [], ok); re-upgrade → (37, 180, [], ok,
+  f9a0b1c2d3e4). NEW-CHECK-PRESENT (z_order_error, edge_halo) = True;
+  OLD-CHECK-GONE = True; live insert edge_halo OK, insert z_order → rejected.
+- ruff check --select F (models.py, __init__.py, fix migration, 2 tests) →
+  `All checks passed!` exit 0.
+- python -m py_compile 6 files → PY_COMPILE-OK.
+- Concurrency test `test_concurrent_duplicate_natural_key_creates_one_row` ×3 →
+  `1 passed` ×3 (2.39s/2.40s/2.40s).
+
+### C1 finding phụ (ngoài scope T02A-C1 — báo manager)
+- `tests/test_s11_t02b_qc_api_readonly.py` (T02B-owned) hard-code enum cũ
+  ('clipping'/'flicker'/'identity') → 9 tests FAILED sau enum fix
+  (test khác 5 pass). Lỗi: `QCItemParamsError: invalid category 'clipping'
+  (allowed: (<10 codes mới>))` — repo T02B (app/persistence/qc_items.py) tự
+  propagate constants mới đúng, NHƯNG test T02B cần correction riêng cập nhật
+  các giá trị enum (KHÔNG thuộc write-set T02A-C1 — task bắt buộc không đụng T02B).
+  Manager cần route correction cho T02B.
+
+### C1 commit
+- Commit local duy nhất trên codex/s11/t02a-0903w1 — SHA ghi ở REPORT C1.
+  KHÔNG push/merge/rebase/reset/clean/stash. Scope diff vs b34d801 = models.py +
+  migration fix mới + 2 test files + docs/pm/sessions/S11-T02A/** (__init__.py không
+  đổi — symbols không thay đổi).

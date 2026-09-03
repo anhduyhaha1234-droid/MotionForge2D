@@ -167,12 +167,12 @@ def _qc_params(qid: str, **over) -> dict:
         "segment_logical_id": LOGICAL,
         "layer_ref_type": "video_item",
         "layer_ref_id": V1,
-        "reason_code": "clipping",
+        "reason_code": "silhouette_clipping",
         "evidence_window_key": f"ewk-{qid}",
         "evidence_json": '{"schema_version": 1, "content": "x"}',
         "status": "open",
         "severity": "warning",
-        "category": "clipping",
+        "category": "silhouette_clipping",
         "detector": "qc-lane-a",
         "detector_revision": "1.0.0",
         "confidence": 0.87,
@@ -310,7 +310,7 @@ def _natural_key() -> dict:
         "video_item_id": V1,
         "layer_ref_type": "video_item",
         "layer_ref_id": V1,
-        "reason_code": "clipping",
+        "reason_code": "silhouette_clipping",
         "evidence_window_key": "ewk-same",
     }
 
@@ -395,8 +395,8 @@ def test_foreign_key_check_zero_after_full_seed(tmp_path: Path) -> None:
         "q-fk-c",
         segment_row_id=None,
         segment_logical_id=None,
-        reason_code="identity",
-        category="identity",
+        reason_code="identity_drift",
+        category="identity_drift",
     )
     with engine.connect() as conn:
         violations = conn.execute(text("PRAGMA foreign_key_check")).fetchall()
@@ -463,6 +463,9 @@ def test_blocker_dismissed_rejected_db_level(tmp_path: Path) -> None:
         {"severity": "fatal"},
         {"category": "not_a_category"},
         {"reason_code": "not_a_reason"},
+        {"category": "clipping"},
+        {"reason_code": "z_order"},
+        {"reason_code": "audio_timecode"},
         {"confidence_source": "alien"},
         {"confidence": -0.1},
         {"confidence": 1.5},
@@ -472,6 +475,9 @@ def test_blocker_dismissed_rejected_db_level(tmp_path: Path) -> None:
         "severity",
         "category",
         "reason_code",
+        "category-old-removed",
+        "reason_code-renamed",
+        "reason_code-audio-timecode-removed",
         "confidence_source",
         "confidence-low",
         "confidence-high",
@@ -504,13 +510,28 @@ def test_enum_check_sql_derived_from_single_python_tuple() -> None:
         "trajectory_drift",
         "cut_drift",
         "contact_break",
-        "z_order",
-        "clipping",
-        "identity",
-        "flicker",
-        "audio_timecode",
+        "z_order_error",
+        "silhouette_clipping",
+        "identity_drift",
+        "edge_halo",
+        "temporal_flicker",
+        "audio_missing",
+        "av_sync_drift",
     )
     assert QC_REASON_CODES == QC_ITEM_CATEGORIES
+    # Binding completeness (Decision B + D): all 10 codes present,
+    # including edge_halo and the two T03E audio codes.
+    for code in (
+        "edge_halo",
+        "audio_missing",
+        "av_sync_drift",
+        "z_order_error",
+        "silhouette_clipping",
+        "identity_drift",
+        "temporal_flicker",
+    ):
+        assert code in QC_ITEM_CATEGORIES
+        assert code in QC_REASON_CODES
 
     # Every SQL literal is DERIVED from its tuple — rebuilding from the tuple
     # must reproduce the constant byte-for-byte (single authority, no drift).

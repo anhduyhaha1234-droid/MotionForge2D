@@ -38,6 +38,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ALEMBIC_INI = PROJECT_ROOT / "alembic.ini"
 PRE = "a10b11c12d3e"
 REV = "e11a02a2026f"
+REV_FIX = "f9a0b1c2d3e4"
 NEW_TABLE = "qc_item"
 
 _SEGMENT_PAIR_CHECK = (
@@ -116,10 +117,14 @@ def _qc_ddl(db: Path) -> str:
 
 def test_revision_chain_and_single_head() -> None:
     import migrations.versions.e11a02a2026f_s11_t02a_qc_item as mig
+    import migrations.versions.f9a0b1c2d3e4_s11_t02a_qc_reason_codes_fix as fix
 
     assert mig.revision == REV
     assert mig.down_revision == PRE
     assert mig.branch_labels is None
+    assert fix.revision == REV_FIX
+    assert fix.down_revision == REV
+    assert fix.branch_labels is None
 
 
 def test_single_head_via_alembic() -> None:
@@ -129,7 +134,7 @@ def test_single_head_via_alembic() -> None:
     script = ScriptDirectory.from_config(cfg)
     heads = list(script.get_heads())
     assert heads == [_live_head()], f"expected exactly one live head, got {heads}"
-    assert heads == [REV]
+    assert heads == [REV_FIX]
 
 
 def test_upgrade_downgrade_upgrade_empty_graph_byte_identical(
@@ -215,8 +220,8 @@ def _seed_qc_row(db: Path, qid: str = "q-mig-row") -> None:
                 "category, detector, detector_revision, confidence, "
                 "confidence_source, checkpoint_ref) "
                 "VALUES (:qid, 'ws-mig', 'p-mig', 'v-mig', 'seg-mig', "
-                "'lin-mig', 'video_item', 'v-mig', 'clipping', 'ewk-mig', "
-                "'{\"schema_version\": 1}', 'open', 'warning', 'clipping', "
+                "'lin-mig', 'video_item', 'v-mig', 'silhouette_clipping', 'ewk-mig', "
+                "'{\"schema_version\": 1}', 'open', 'warning', 'silhouette_clipping', "
                 "'qc-lane-a', '1.0.0', 0.8, 'model', 'ckpt-mig')"
             ),
             {"qid": qid},
@@ -236,7 +241,9 @@ def test_downgrade_refused_atomically_with_any_row(tmp_path: Path) -> None:
         ).first()
     assert before is not None
 
-    with pytest.raises(RuntimeError, match="refusing to downgrade"):
+    with pytest.raises(
+        RuntimeError, match="refusing to (downgrade|proceed)"
+    ):
         command.downgrade(cfg, PRE)
 
     with create_engine_for_path(db).connect() as conn:
@@ -273,6 +280,15 @@ def test_migration_checks_byte_identical_to_orm_and_live(tmp_path: Path) -> None
         assert literal in mig_ddl, f"migration DDL missing CHECK {literal!r}"
         assert literal in orm_ddl, f"ORM DDL missing CHECK {literal!r}"
 
+    # The pre-correction W1 literals (z_order / clipping / identity /
+    # flicker / audio_timecode) must be GONE from the migrated DDL.
+    for removed_literal in (
+        "category IN ('trajectory_drift','cut_drift','contact_break','z_order',",
+        "reason_code IN ('trajectory_drift','cut_drift','contact_break','z_order',",
+        "'flicker','audio_timecode')",
+    ):
+        assert removed_literal not in mig_ddl, f"old CHECK still present: {removed_literal!r}"
+
     # The live migrated DB enforces them (they are real reflected CHECKs).
     # Parents exist, so the failures below are genuinely the CHECKs, not FKs.
     with create_engine_for_path(db_mig).begin() as conn, pytest.raises(IntegrityError):
@@ -284,8 +300,8 @@ def test_migration_checks_byte_identical_to_orm_and_live(tmp_path: Path) -> None
                 "category, detector, detector_revision, confidence, "
                 "confidence_source, checkpoint_ref) "
                 "VALUES ('q-bad', 'ws-mig', 'p-mig', 'v-mig', 'video_item', "
-                "'v-mig', 'clipping', 'ewk-bad', '{}', 'bogus', 'warning', "
-                "'clipping', 'qc-lane-a', '1.0.0', 0.8, 'model', 'ckpt-mig')"
+                "'v-mig', 'silhouette_clipping', 'ewk-bad', '{}', 'bogus', 'warning', "
+                "'silhouette_clipping', 'qc-lane-a', '1.0.0', 0.8, 'model', 'ckpt-mig')"
             )
         )
     with create_engine_for_path(db_mig).begin() as conn, pytest.raises(IntegrityError):
@@ -297,8 +313,8 @@ def test_migration_checks_byte_identical_to_orm_and_live(tmp_path: Path) -> None
                 "category, detector, detector_revision, confidence, "
                 "confidence_source, checkpoint_ref) "
                 "VALUES ('q-bd', 'ws-mig', 'p-mig', 'v-mig', 'video_item', "
-                "'v-mig', 'clipping', 'ewk-bd', '{}', 'dismissed', 'blocker', "
-                "'clipping', 'qc-lane-a', '1.0.0', 0.8, 'model', 'ckpt-mig')"
+                "'v-mig', 'silhouette_clipping', 'ewk-bd', '{}', 'dismissed', 'blocker', "
+                "'silhouette_clipping', 'qc-lane-a', '1.0.0', 0.8, 'model', 'ckpt-mig')"
             )
         )
     assert _fk_violations(db_mig) == []
@@ -319,9 +335,94 @@ def test_segment_fk_enforced_on_migrated_db(tmp_path: Path) -> None:
                 "category, detector, detector_revision, confidence, "
                 "confidence_source, checkpoint_ref) "
                 "VALUES ('q-fk', 'ws-mig', 'p-mig', 'v-mig', 'no-such-seg', "
-                "'lin-mig', 'video_item', 'v-mig', 'clipping', 'ewk-fk', "
-                "'{}', 'open', 'warning', 'clipping', 'qc-lane-a', '1.0.0', "
+                "'lin-mig', 'video_item', 'v-mig', 'silhouette_clipping', 'ewk-fk', "
+                "'{}', 'open', 'warning', 'silhouette_clipping', 'qc-lane-a', '1.0.0', "
                 "0.8, 'model', 'ckpt-mig')"
             )
         )
     assert _fk_violations(db) == []
+
+def test_fix_migration_preserves_existing_rows(tmp_path: Path) -> None:
+    """A row using codes valid under BOTH enums survives the rebuild."""
+    db = tmp_path / "preserve.db"
+    cfg = _cfg(db)
+    command.upgrade(cfg, REV)  # stop BEFORE the fix migration
+    _seed_parents(db)
+    # Codes valid under BOTH enums (trajectory_drift unchanged by the
+    # correction) — the old CHECK at REV must accept them.
+    _seed_qc_row_raw(db, "q-keep", category="trajectory_drift", reason_code="trajectory_drift")
+    _seed_qc_row_raw(db, "q-keep2", category="cut_drift", reason_code="cut_drift")
+    with create_engine_for_path(db).connect() as conn:
+        before = conn.execute(
+            text("SELECT id, reason_code, category, evidence_window_key "
+                 "FROM qc_item ORDER BY id")
+        ).fetchall()
+
+    command.upgrade(cfg, "head")
+    with create_engine_for_path(db).connect() as conn:
+        after = conn.execute(
+            text("SELECT id, reason_code, category, evidence_window_key "
+                 "FROM qc_item ORDER BY id")
+        ).fetchall()
+    assert after == before, "rebuild mutated or lost rows"
+    assert _rev(db) == _live_head()
+    assert _integrity(db) == "ok"
+    assert _fk_violations(db) == []
+
+
+def _seed_qc_row_raw(db: Path, qid: str, category: str, reason_code: str) -> None:
+    with create_engine_for_path(db).begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO qc_item (id, workspace_id, project_id, "
+                "video_item_id, segment_row_id, segment_logical_id, "
+                "layer_ref_type, layer_ref_id, reason_code, "
+                "evidence_window_key, evidence_json, status, severity, "
+                "category, detector, detector_revision, confidence, "
+                "confidence_source, checkpoint_ref) "
+                "VALUES (:qid, 'ws-mig', 'p-mig', 'v-mig', 'seg-mig', "
+                "'lin-mig', 'video_item', 'v-mig', :rc, :ewk, "
+                "'{\"schema_version\": 1}', 'open', 'warning', :cat, "
+                "'qc-lane-a', '1.0.0', 0.8, 'model', 'ckpt-mig')"
+            ),
+            {"qid": qid, "rc": reason_code, "ewk": f"ewk-{qid}", "cat": category},
+        )
+
+
+def test_fix_upgrade_refused_when_row_uses_pre_correction_code(
+    tmp_path: Path,
+) -> None:
+    """A row with a renamed/removed W1 code blocks the upgrade (fail-closed)."""
+    db = tmp_path / "blockup.db"
+    cfg = _cfg(db)
+    command.upgrade(cfg, REV)
+    _seed_parents(db)
+    _seed_qc_row_raw(db, "q-oldcode", category="clipping", reason_code="z_order")
+
+    with pytest.raises(RuntimeError, match="refusing to proceed"):
+        command.upgrade(cfg, "head")
+
+    with create_engine_for_path(db).connect() as conn:
+        row = conn.execute(text("SELECT id FROM qc_item WHERE id='q-oldcode'")).first()
+        assert row is not None, "upgrade refusal mutated data"
+        assert _rev(db) == REV
+        assert _integrity(db) == "ok"
+
+
+def test_fix_downgrade_refused_when_row_uses_new_code(tmp_path: Path) -> None:
+    """A row using a NEW binding code blocks the downgrade (fail-closed)."""
+    db = tmp_path / "blockdown.db"
+    cfg = _cfg(db)
+    command.upgrade(cfg, "head")
+    _seed_parents(db)
+    _seed_qc_row_raw(db, "q-newcode", category="edge_halo", reason_code="av_sync_drift")
+
+    with pytest.raises(RuntimeError, match="refusing to proceed"):
+        command.downgrade(cfg, REV)
+
+    with create_engine_for_path(db).connect() as conn:
+        row = conn.execute(text("SELECT id FROM qc_item WHERE id='q-newcode'")).first()
+        assert row is not None, "downgrade refusal mutated data"
+        assert _rev(db) == _live_head()
+        assert _integrity(db) == "ok"
+        assert _fk_violations(db) == []
