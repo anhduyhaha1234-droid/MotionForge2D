@@ -26,7 +26,7 @@ whole-project rerun — AC1/AC2):
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Mapping, NoReturn
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -331,7 +331,7 @@ def _occurrence_for_role(
     role_id: str,
     *,
     video_item_id: str,
-    scene_id: int | None = None,
+    scene_id: str | None = None,
     start_frame: int | None = None,
     end_frame: int | None = None,
     preferred_id: str | None = None,
@@ -612,7 +612,7 @@ def preview_for_item(
     )
 
 
-def _raise_pipeline_conflict(err: Exception) -> None:
+def _raise_pipeline_conflict(err: Exception) -> NoReturn:
     """Translate a stale/CAS/ownership pipeline answer to the stable
     ``ROLE_CHANGED`` guard (never a raw 5xx; never a silent retry)."""
     raise QcCorrectionBridgeError(
