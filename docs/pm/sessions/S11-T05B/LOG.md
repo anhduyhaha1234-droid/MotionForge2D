@@ -65,8 +65,13 @@ Branch: codex/s11/t05b-0903w13 — local commit only. WAVE_BASE b3aa2e1 (canonic
   serial isolation cho error/a11y/mobile tests bằng fresh seed).
 - next build --webpack: pending → REPORT.
 
-### 6. Pending
-- next build result, self-review diff scope, commit, REPORT.md, TASK_SUBMITTED + EXIT.
+### 6. Final gate (đã xong)
+- next build --webpack: OK — 11/11 routes (ƒ /projects/[id], ƒ /projects/[id]/review), 0 lỗi.
+- Self-review diff scope: chỉ đúng allowlist + docs S11-T05B (git status sạch, 3 modified
+  additive + 4 NEW; api.ts diff additive +71/-1 với 1 "deletion" EOL-only của comment header).
+- Commit local: `7864b9bf02f10029367eb26588b626fd6e7f56bd` (9 files, +1067/-1),
+  parent = b3aa2e1 (WAVE_BASE). Docs SHA: commit thứ 2 (LOG/REPORT final).
+- Ghi TASK_SUBMITTED + EXIT.
 
 ## Isolation flags
 - KHÔNG chạm backend app/**, AppNav.tsx, globals.css, MAIN, s11-integration canonical.
