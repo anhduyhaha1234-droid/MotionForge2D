@@ -290,13 +290,20 @@ test("confirm → applied + recompute progress không chặn điều hướng", 
 });
 
 test("refresher reloads queue", async ({ page }) => {
+  // Deterministic: count REAL qc-items refetches (no clock-granularity flake).
+  let qcCalls = 0;
+  page.on("request", (req) => {
+    if (/\/api\/v2\/projects\/[^/]+\/qc-items/.test(req.url())) qcCalls++;
+  });
   await page.goto(`${FE}/projects/${state.projectId}/review`);
   await expect(page.getByTestId("qc-queue")).toBeVisible();
-  const before = await page.getByTestId("refresher-status").textContent();
+  await expect(page.getByTestId(`qc-row-${state.blockerFrameItemId}`)).toBeVisible();
+  const callsBefore = qcCalls;
   await page.getByTestId("refresh-button").click();
   await expect(page.getByTestId("qc-queue")).toBeVisible();
   await expect(page.getByTestId(`qc-row-${state.blockerFrameItemId}`)).toBeVisible();
-  await expect(page.getByTestId("refresher-status")).not.toHaveText(before ?? "");
+  // Refresh fires a NEW blocker+warning fetch pair (vs the initial load).
+  await expect.poll(() => qcCalls).toBeGreaterThan(callsBefore);
 });
 
 test("zero accepted-exception controls (Decision G) + helper text VI under buttons", async ({ page }) => {
