@@ -113,5 +113,6 @@ test file) — ngoài write-set T02A-C1 (task cấm đụng T02B).
 - Mọi số liệu §3 là output thật từ terminal (không tóm tắt suy diễn).
 
 ---
-**Status: TASK_SUBMITTED / CORRECTION_C1_SUBMITTED** — commit local duy nhất trên
-`codex/s11/t02a-0903w1` (SHA ghi sau khi commit). KO push, KO merge. Chờ Manager verify.
+**Status: TASK_SUBMITTED / CORRECTION_C1_SUBMITTED** — commit local duy nhất
+`3c0e2041f64b65b68cf6c7b9b77284b09f478701` trên `codex/s11/t02a-0903w1`
+(6 files: 4 M + 1 A + sessions evidence). KO push, KO merge. Chờ Manager verify.

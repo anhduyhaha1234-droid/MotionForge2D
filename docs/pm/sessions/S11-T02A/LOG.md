@@ -170,7 +170,9 @@ edge_halo, temporal_flicker) + 2 audio (audio_missing, av_sync_drift).
   Manager cần route correction cho T02B.
 
 ### C1 commit
-- Commit local duy nhất trên codex/s11/t02a-0903w1 — SHA ghi ở REPORT C1.
+- Commit local duy nhất trên codex/s11/t02a-0903w1: `3c0e2041f64b65b68cf6c7b9b77284b09f478701`
+  (`fix(s11): T02A-C1 QC reason/category enum -> binding 10 codes (Decision B + D)`),
+  6 files (4 M + 1 A + sessions evidence). Working tree sạch sau commit.
   KHÔNG push/merge/rebase/reset/clean/stash. Scope diff vs b34d801 = models.py +
   migration fix mới + 2 test files + docs/pm/sessions/S11-T02A/** (__init__.py không
   đổi — symbols không thay đổi).
