@@ -64,4 +64,4 @@ SMOKE:  run_detector('temporal_flicker', child process) -> QC_RUNNER_OK, code TH
 - Không sửa file hiện hữu; không push/merge/rebase/reset/clean/stash.
 
 ## Terminal
-**TASK_SUBMITTED** — commit local `<SHA>` trên codex/s11/t03d-0903w6 (parent c1a6777864c1169435d7b7f263ce5fa7a0014c78), chờ Manager verify W6 + integration.
+**TASK_SUBMITTED** — commit local `529d2a4fee5e3bde5af82b7b02fa8b6f79de4106` trên codex/s11/t03d-0903w6 (parent c1a6777864c1169435d7b7f263ce5fa7a0014c78), chờ Manager verify W6 + integration.

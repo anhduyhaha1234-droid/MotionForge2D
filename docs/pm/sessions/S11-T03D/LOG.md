@@ -57,7 +57,7 @@ Model: ocg/deepseek-v4-flash (custom, reasoning max, fallback OFF, TTFB 900)
 
 ## 8. Commit
 - Stage: đúng allowlist + `docs/pm/sessions/S11-T03D/**`.
-- Commit local trên codex/s11/t03d-0903w6; không push/merge/rebase/reset/clean/stash.
+- Commit local `529d2a4fee5e3bde5af82b7b02fa8b6f79de4106` trên codex/s11/t03d-0903w6 (parent c1a6777864c1169435d7b7f263ce5fa7a0014c78); không push/merge/rebase/reset/clean/stash.
 
 ## 9. Trạng thái
-**TASK_SUBMITTED** — commit `<SHA>` local; chờ Manager verify W6.
+**TASK_SUBMITTED** — commit 529d2a4 local; chờ Manager verify W6.
