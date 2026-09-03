@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "manifest_id": "e2e_01_vertical_review",
+  "scenario": {
+    "id": "e2e-01-vertical-review",
+    "title": "Vertical review — full QC stack walk",
+    "source": "lane-C E2E_SCENARIOS (vertical review) + lane-A GAP-7 scenario matrix freeze",
+    "description": "Walk the complete QC stack on one video: media build -> deterministic seed -> orchestrator run -> every binding reason code surfaces as an expected QCItem with severity and status-at-create, then readiness verdict flips from not_run to ready on a clean completed run."
+  },
+  "policy_ref": {
+    "policy_id": "s11-qc-thresholds-v1",
+    "policy_content_hash": "de215c6243e1c6bf300e2bfa1c8024fbda6d0358ecf3cad1730781e37419ea24",
+    "policy_source": "tests/fixtures/s11_golden/qc_thresholds.json",
+    "binding": "read-only consumption — this manifest carries NO threshold values, only the frozen policy identity"
+  },
+  "consumes": {
+    "media": [
+      {
+        "scenario": "two_scene_source",
+        "builder": "build_two_scene_source",
+        "manifest": "tests/fixtures/s11_qc/media_manifests/two_scene_source.json"
+      }
+    ],
+    "seed": [
+      "seed_workspace_project_video",
+      "seed_all_reason_codes"
+    ],
+    "orchestrator": {
+      "module": "app.services.qc_checks.orchestrator",
+      "entry": "run_full_check_set"
+    },
+    "read_authority": {
+      "module": "app.persistence.qc_check_runs",
+      "entry": "check_run_readiness"
+    }
+  },
+  "creation_path": "T06A1 seed_all_reason_codes on the canonical healthy scenario (two_scene_source) through QCItemRepository natural-key (idempotent, ON CONFLICT DO NOTHING)",
+  "expected_qc_items": [
+    {
+      "reason_code": "trajectory_drift",
+      "severity": "warning",
+      "status_at_create": "open",
+      "expected_count": 1
+    },
+    {
+      "reason_code": "cut_drift",
+      "severity": "warning",
+      "status_at_create": "open",
+      "expected_count": 1
+    },
+    {
+      "reason_code": "contact_break",
+      "severity": "warning",
+      "status_at_create": "open",
+      "expected_count": 1
+    },
+    {
+      "reason_code": "z_order_error",
+      "severity": "warning",
+      "status_at_create": "open",
+      "expected_count": 1
+    },
+    {
+      "reason_code": "silhouette_clipping",
+      "severity": "warning",
+      "status_at_create": "open",
+      "expected_count": 1
+    },
+    {
+      "reason_code": "identity_drift",
+      "severity": "warning",
+      "status_at_create": "open",
+      "expected_count": 1
+    },
+    {
+      "reason_code": "edge_halo",
+      "severity": "warning",
+      "status_at_create": "open",
+      "expected_count": 1
+    },
+    {
+      "reason_code": "temporal_flicker",
+      "severity": "warning",
+      "status_at_create": "open",
+      "expected_count": 1
+    },
+    {
+      "reason_code": "audio_missing",
+      "severity": "warning",
+      "status_at_create": "open",
+      "expected_count": 1
+    },
+    {
+      "reason_code": "av_sync_drift",
+      "severity": "warning",
+      "status_at_create": "open",
+      "expected_count": 1
+    }
+  ],
+  "expected_total_count": 10,
+  "expected_readiness": {
+    "before": {
+      "status": "not_run",
+      "run_state": "never_run",
+      "check_state": "no completed QC check run"
+    },
+    "after": {
+      "status": "ready",
+      "run_state": "completed",
+      "expected_blocker_codes": [],
+      "note": "seed baseline is warning-only; readiness gate blocks only unresolved blockers (Decision F)"
+    }
+  },
+  "queue_path": "Review Queue lists all 10 expected items in open state; first issue frame opens on navigation"
+}

@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "manifest_id": "e2e_04_a11y_mobile",
+  "scenario": {
+    "id": "e2e-04-a11y-mobile",
+    "title": "Accessible mobile review",
+    "source": "lane-C E2E_SCENARIOS (a11y/mobile) + S11 UI preference (dark theme helper text, readable contrast)",
+    "description": "Review Queue and readiness verdict work on a mobile viewport with touch-first interaction: severity/status badges are distinguishable, every button carries short helper text, contrast stays readable on the dark theme, and no horizontal scroll is required to reach the verdict."
+  },
+  "policy_ref": {
+    "policy_id": "s11-qc-thresholds-v1",
+    "policy_content_hash": "de215c6243e1c6bf300e2bfa1c8024fbda6d0358ecf3cad1730781e37419ea24",
+    "policy_source": "tests/fixtures/s11_golden/qc_thresholds.json",
+    "binding": "read-only consumption — this manifest carries NO threshold values, only the frozen policy identity"
+  },
+  "consumes": {
+    "media": [
+      {
+        "scenario": "two_scene_source",
+        "builder": "build_two_scene_source",
+        "manifest": "tests/fixtures/s11_qc/media_manifests/two_scene_source.json"
+      }
+    ],
+    "seed": [
+      "seed_workspace_project_video",
+      "seed_qc_items_for_manifest"
+    ],
+    "orchestrator": {
+      "module": "app.services.qc_checks.orchestrator",
+      "entry": "run_full_check_set"
+    },
+    "read_authority": {
+      "module": "app.persistence.qc_check_runs",
+      "entry": "check_run_readiness"
+    }
+  },
+  "creation_path": "T06A1 seed plan for two_scene_source plus one blocker-severity audio_missing item (severity contrast on a small viewport)",
+  "expected_qc_items": [
+    {
+      "reason_code": "audio_missing",
+      "severity": "blocker",
+      "status_at_create": "open",
+      "expected_count": 1,
+      "creation": "seed_override_blocker"
+    },
+    {
+      "reason_code": "trajectory_drift",
+      "severity": "warning",
+      "status_at_create": "open",
+      "expected_count": 1
+    }
+  ],
+  "expected_readiness": {
+    "before": {
+      "status": "not_run",
+      "run_state": "never_run",
+      "check_state": "no completed QC check run"
+    },
+    "after": {
+      "status": "blocked",
+      "run_state": "completed",
+      "expected_blocker_codes": [
+        "audio_missing"
+      ],
+      "note": "blocked verdict is presented prominently on the mobile review surface"
+    }
+  },
+  "viewport": {
+    "width": 390,
+    "height": 844,
+    "interaction": "touch_first_no_hover"
+  },
+  "expected_rendering": {
+    "touch_first_no_hover": true,
+    "severity_badges": [
+      "blocker",
+      "warning",
+      "info"
+    ],
+    "status_badges": [
+      "open",
+      "acknowledged",
+      "resolved",
+      "dismissed"
+    ],
+    "helper_text_under_buttons": true,
+    "helper_text_min_size_px": 11,
+    "contrast": "readable_on_dark_theme",
+    "no_horizontal_scroll_required": true,
+    "readiness_verdict_visible": true
+  }
+}

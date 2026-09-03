@@ -1,0 +1,24 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\Admin\AppData\Local\Programs\Python\Python311\python.exe
+rootdir: C:\Users\Admin\MotionForge2D-worktrees\s11-t06b-0903w9
+configfile: pyproject.toml
+plugins: anyio-4.14.2, hydra-core-1.3.4, asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 14 items
+
+tests/test_s11_t06b_golden_manifests.py::test_manifest_directory_matches_canonical_list PASSED [  7%]
+tests/test_s11_t06b_golden_manifests.py::test_manifest_id_matches_filename_stem PASSED [ 14%]
+tests/test_s11_t06b_golden_manifests.py::test_every_manifest_passes_schema_validation PASSED [ 21%]
+tests/test_s11_t06b_golden_manifests.py::test_expected_items_use_binding_enums_and_counts PASSED [ 28%]
+tests/test_s11_t06b_golden_manifests.py::test_policy_ref_matches_frozen_policy_for_every_manifest PASSED [ 35%]
+tests/test_s11_t06b_golden_manifests.py::test_no_threshold_boundary_numbers_in_any_manifest PASSED [ 42%]
+tests/test_s11_t06b_golden_manifests.py::test_media_references_by_name_and_resolve_to_builders PASSED [ 50%]
+tests/test_s11_t06b_golden_manifests.py::test_consumed_authorities_resolve PASSED [ 57%]
+tests/test_s11_t06b_golden_manifests.py::test_scenario_d_manifest_carries_targeted_rerun_truth PASSED [ 64%]
+tests/test_s11_t06b_golden_manifests.py::test_e2e_02_manifest_carries_blocker_readiness_truth PASSED [ 71%]
+tests/test_s11_t06b_golden_manifests.py::test_e2e_01_vertical_review_covers_full_envelope PASSED [ 78%]
+tests/test_s11_t06b_golden_manifests.py::test_e2e_04_mobile_a11y_manifest_declares_viewport_and_contrast PASSED [ 85%]
+tests/test_s11_t06b_golden_manifests.py::test_helper_consistency PASSED  [ 92%]
+tests/test_s11_t06b_golden_manifests.py::test_stale_manifest_fails_fast PASSED [100%]
+
+============================= 14 passed in 1.66s ==============================

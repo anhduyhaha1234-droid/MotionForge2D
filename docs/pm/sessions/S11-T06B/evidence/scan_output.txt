@@ -1,0 +1,28 @@
+policy_id=s11-qc-thresholds-v1
+policy_content_hash=de215c6243e1c6bf300e2bfa1c8024fbda6d0358ecf3cad1730781e37419ea24
+boundary_set(16)=[0.0, 0.024895525, 0.099582099, 0.1, 0.166666667, 0.5, 2.0, 2.021267777, 3.0, 4.0, 8.0, 8.737606376, 12.0, 16.0, 31.5, 126.0]
+----------------------------------------------------------------------
+[scenario_d_targeted_rerun]
+  numeric_literals=[1.0, 1.0, 1.0] collisions=[] hash_match=True
+  items=[('trajectory_drift', 'warning', 'open', 1), ('cut_drift', 'warning', 'open', 1)]
+  readiness before=not_run/never_run after=ready/completed blockers=[]
+  rerun_scope=affected_segment_only after_rerun=ready
+[e2e_01_vertical_review]
+  numeric_literals=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 10.0] collisions=[] hash_match=True
+  items=[('trajectory_drift', 'warning', 'open', 1), ('cut_drift', 'warning', 'open', 1), ('contact_break', 'warning', 'open', 1), ('z_order_error', 'warning', 'open', 1), ('silhouette_clipping', 'warning', 'open', 1), ('identity_drift', 'warning', 'open', 1), ('edge_halo', 'warning', 'open', 1), ('temporal_flicker', 'warning', 'open', 1), ('audio_missing', 'warning', 'open', 1), ('av_sync_drift', 'warning', 'open', 1)]
+  readiness before=not_run/never_run after=ready/completed blockers=[]
+[e2e_02_blocker_readiness]
+  numeric_literals=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0] collisions=[] hash_match=True
+  items=[('audio_missing', 'blocker', 'open', 1), ('trajectory_drift', 'warning', 'open', 1), ('cut_drift', 'warning', 'open', 1), ('contact_break', 'warning', 'open', 1), ('z_order_error', 'warning', 'open', 1)]
+  readiness before=not_run/never_run after=blocked/completed blockers=['audio_missing']
+[e2e_03_queue_states]
+  numeric_literals=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 5.0] collisions=[] hash_match=True
+  items=[('trajectory_drift', 'warning', 'open', 1), ('cut_drift', 'warning', 'open', 1), ('contact_break', 'warning', 'open', 1), ('identity_drift', 'warning', 'open', 1), ('audio_missing', 'warning', 'open', 1)]
+  readiness before=not_run/never_run after=ready/completed blockers=[]
+[e2e_04_a11y_mobile]
+  numeric_literals=[1.0, 1.0, 1.0, 390.0, 844.0, 11.0] collisions=[] hash_match=True
+  items=[('audio_missing', 'blocker', 'open', 1), ('trajectory_drift', 'warning', 'open', 1)]
+  readiness before=not_run/never_run after=blocked/completed blockers=['audio_missing']
+----------------------------------------------------------------------
+ZERO_BOUNDARY_SCAN: PASS
+MANIFEST_COUNT: 5

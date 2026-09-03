@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "manifest_id": "scenario_d_targeted_rerun",
+  "scenario": {
+    "id": "scenario_d",
+    "title": "One scene tracks badly",
+    "source": "docs/MASTER_PLAN_V1.md:1240 (Scenario D) + lane-A GAP-7 scenario matrix freeze",
+    "description": "All good scenes remain Ready. Review Queue opens the first bad frame; the user corrects the mask and only the affected track/composite segment reruns."
+  },
+  "policy_ref": {
+    "policy_id": "s11-qc-thresholds-v1",
+    "policy_content_hash": "de215c6243e1c6bf300e2bfa1c8024fbda6d0358ecf3cad1730781e37419ea24",
+    "policy_source": "tests/fixtures/s11_golden/qc_thresholds.json",
+    "binding": "read-only consumption — this manifest carries NO threshold values, only the frozen policy identity"
+  },
+  "consumes": {
+    "media": [
+      {
+        "scenario": "two_scene_source",
+        "builder": "build_two_scene_source",
+        "manifest": "tests/fixtures/s11_qc/media_manifests/two_scene_source.json"
+      }
+    ],
+    "seed": [
+      "seed_workspace_project_video",
+      "seed_qc_items_for_manifest"
+    ],
+    "orchestrator": {
+      "module": "app.services.qc_checks.orchestrator",
+      "entry": "run_full_check_set"
+    },
+    "read_authority": {
+      "module": "app.persistence.qc_check_runs",
+      "entry": "check_run_readiness"
+    }
+  },
+  "creation_path": "T06A1 seed plan for two_scene_source (4 overlay warnings, open) — Scene D manifests detector/segment outcomes via T03F orchestrator run on the affected segment",
+  "expected_qc_items": [
+    {
+      "reason_code": "trajectory_drift",
+      "severity": "warning",
+      "status_at_create": "open",
+      "expected_count": 1,
+      "scope": "affected_segment"
+    },
+    {
+      "reason_code": "cut_drift",
+      "severity": "warning",
+      "status_at_create": "open",
+      "expected_count": 1,
+      "scope": "affected_segment"
+    }
+  ],
+  "expected_readiness": {
+    "before": {
+      "status": "not_run",
+      "run_state": "never_run",
+      "check_state": "no completed QC check run"
+    },
+    "after": {
+      "status": "ready",
+      "run_state": "completed",
+      "expected_blocker_codes": [],
+      "note": "warning-severity items do not block readiness (Decision F gates only on unresolved blockers); good scenes remain Ready"
+    },
+    "after_rerun": {
+      "status": "ready",
+      "run_state": "completed",
+      "expected_blocker_codes": [],
+      "note": "mask corrected on affected segment -> recheck with fresh evidence resolves the segment items; untouched good scenes stay ready"
+    }
+  },
+  "expected_rerun_scope": {
+    "trigger": "user corrects mask on the first bad frame in Review Queue",
+    "rerun_target": "affected_segment_only",
+    "unchanged": "ready_scenes remain Ready — no re-check, no re-review, no re-render",
+    "recheck_flow": "fresh evidence required for resolution; unfixed stays open; terminal statuses never reopen (T03F fail-closed GAP-8)",
+    "evidence_rule": "a terminal resolve attempt WITHOUT fresh evidence is rejected (no_evidence_consequence=fail_closed)"
+  }
+}

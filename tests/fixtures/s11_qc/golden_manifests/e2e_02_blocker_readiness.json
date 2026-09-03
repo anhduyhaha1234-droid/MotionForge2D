@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "manifest_id": "e2e_02_blocker_readiness",
+  "scenario": {
+    "id": "e2e-02-blocker-readiness",
+    "title": "Blocker readiness gate",
+    "source": "lane-C E2E_SCENARIOS (blocker readiness) + Decision F (gate blocks only unresolved blockers)",
+    "description": "A video with a blocker-severity issue is NOT ready while the blocker is unresolved; readiness flips to ready only after the blocker is resolved through the recheck-with-fresh-evidence flow. Unfixed items stay open; terminal resolve without fresh evidence is rejected fail-closed."
+  },
+  "policy_ref": {
+    "policy_id": "s11-qc-thresholds-v1",
+    "policy_content_hash": "de215c6243e1c6bf300e2bfa1c8024fbda6d0358ecf3cad1730781e37419ea24",
+    "policy_source": "tests/fixtures/s11_golden/qc_thresholds.json",
+    "binding": "read-only consumption — this manifest carries NO threshold values, only the frozen policy identity"
+  },
+  "consumes": {
+    "media": [
+      {
+        "scenario": "two_scene_source",
+        "builder": "build_two_scene_source",
+        "manifest": "tests/fixtures/s11_qc/media_manifests/two_scene_source.json"
+      }
+    ],
+    "seed": [
+      "seed_workspace_project_video",
+      "seed_qc_items_for_manifest"
+    ],
+    "orchestrator": {
+      "module": "app.services.qc_checks.orchestrator",
+      "entry": "run_full_check_set"
+    },
+    "read_authority": {
+      "module": "app.persistence.qc_check_runs",
+      "entry": "check_run_readiness"
+    }
+  },
+  "creation_path": "T06A1 seed plan for two_scene_source plus one blocker-severity audio_missing item (seed-time severity override — the blocker gate needs a genuine unresolved blocker)",
+  "expected_qc_items": [
+    {
+      "reason_code": "audio_missing",
+      "severity": "blocker",
+      "status_at_create": "open",
+      "expected_count": 1,
+      "creation": "seed_override_blocker"
+    },
+    {
+      "reason_code": "trajectory_drift",
+      "severity": "warning",
+      "status_at_create": "open",
+      "expected_count": 1
+    },
+    {
+      "reason_code": "cut_drift",
+      "severity": "warning",
+      "status_at_create": "open",
+      "expected_count": 1
+    },
+    {
+      "reason_code": "contact_break",
+      "severity": "warning",
+      "status_at_create": "open",
+      "expected_count": 1
+    },
+    {
+      "reason_code": "z_order_error",
+      "severity": "warning",
+      "status_at_create": "open",
+      "expected_count": 1
+    }
+  ],
+  "expected_readiness": {
+    "before": {
+      "status": "not_run",
+      "run_state": "never_run",
+      "check_state": "no completed QC check run"
+    },
+    "after": {
+      "status": "blocked",
+      "run_state": "completed",
+      "expected_blocker_codes": [
+        "audio_missing"
+      ],
+      "note": "completed run with unresolved blocker(s) is NOT clean — verdict blocked"
+    },
+    "after_resolve": {
+      "status": "ready",
+      "run_state": "completed",
+      "expected_blocker_codes": [],
+      "note": "blocker resolved via recheck with fresh evidence -> readiness gate opens"
+    }
+  },
+  "expected_resolution": {
+    "method": "recheck_fresh_evidence",
+    "unfixed_consequence": "stays open",
+    "no_evidence_consequence": "rejected fail-closed",
+    "terminal_consequence": "resolved/dismissed never reopen (GAP-8)"
+  }
+}
