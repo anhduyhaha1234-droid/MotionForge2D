@@ -52,7 +52,6 @@ from app.persistence.models import (
     JobAttempt,
     JobLease,
     JobStep,
-    VideoItem,
 )
 from app.persistence.qc_items import QCItemRepository
 from app.services.qc_checks import audio_missing, av_sync_drift  # noqa: F401  (self-register)
