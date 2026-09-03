@@ -890,6 +890,74 @@ export interface CorrectionRequestPayload {
   idempotency_key?: string;
 }
 
+// ─── S11 QC Review queue (T02B/T04A/T04B surfaces — T04D wrappers) ────────
+
+export interface QcItemData {
+  id: string;
+  workspace_id: string;
+  project_id: string;
+  video_item_id: string;
+  segment_row_id: string | null;
+  segment_logical_id: string | null;
+  layer_ref_type: string;
+  layer_ref_id: string;
+  reason_code: string;
+  evidence_window_key: string;
+  evidence: Record<string, unknown>;
+  status: string;
+  severity: string;
+  category: string;
+  detector: string;
+  detector_revision: string;
+  confidence: number;
+  confidence_source: string;
+  checkpoint_ref: string;
+  revision: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QcItemListParams {
+  status?: string;
+  severity?: string;
+  category?: string;
+  video_item_id?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface QcItemListResponse {
+  workspace_id: string;
+  project_id: string;
+  limit: number;
+  offset: number;
+  total: number;
+  has_more: boolean;
+  items: QcItemData[];
+}
+
+export interface QcNavigationData {
+  qc_item_id: string;
+  layer_ref_type: string;
+  canonical_location: {
+    scene_id: number | null;
+    frame_index: number | null;
+    timecode_ms: number | null;
+    object_role_id: string | null;
+    segment_row_id: string | null;
+    segment_logical_id: string | null;
+  };
+  action: {
+    kind: "navigate" | "explain";
+    method: "GET";
+    target: string | null;
+    endpoint: string | null;
+    code: string | null;
+    reason: string | null;
+  };
+  renderer_route: string | null;
+}
+
 // ─── S08 Grouping policy (T03-C1 backend-authoritative metadata) ──────────
 
 export interface GroupingPolicyData {
@@ -1763,6 +1831,64 @@ export const api = {
       `/api/v2/object-intelligence/corrections/${correctionId}/recompute/retry`,
       { method: "POST" },
     ),
+
+  // ─── S11 QC Review queue (T02B/T04A/T04B — T04D additive wrappers) ───────
+
+  /** Paged queue list of one project (lane-C G1: filters + deterministic order). */
+  listQcItems: (projectId: string, opts: QcItemListParams = {}) => {
+    const params = new URLSearchParams();
+    if (opts.status) params.set("status", opts.status);
+    if (opts.severity) params.set("severity", opts.severity);
+    if (opts.category) params.set("category", opts.category);
+    if (opts.video_item_id) params.set("video_item_id", opts.video_item_id);
+    params.set("limit", String(opts.limit ?? 50));
+    params.set("offset", String(opts.offset ?? 0));
+    return apiFetch<QcItemListResponse>(
+      `/api/v2/projects/${encodeURIComponent(projectId)}/qc-items?${params.toString()}`,
+    );
+  },
+
+  /** One QCItem + its evidence refs (lane-C G2 detail shape). */
+  getQcItem: (itemId: string) =>
+    apiFetch<QcItemData>(`/api/v2/qc-items/${encodeURIComponent(itemId)}`),
+
+  /** Canonical location + 1-1 navigation target (T04A / G13). */
+  getQcNavigation: (itemId: string) =>
+    apiFetch<QcNavigationData>(`/api/v2/qc-navigation/${encodeURIComponent(itemId)}`),
+
+  /**
+   * corrections-link (T04B consume pattern): map ONE QCItem to the S08-T05
+   * pipeline request payload — candidate_edit on the occurrence anchored by
+   * the item's STRUCTURED evidence (bridge build_correction_request mirror;
+   * occurrence CAS from evidence, generation from the live role).
+   */
+  buildQcCorrectionRequest: (
+    item: QcItemData,
+    role: { source_generation: string } | null,
+  ): CorrectionRequestPayload | null => {
+    const evidence = item.evidence ?? {};
+    const roleId = typeof evidence.object_role_id === "string" ? evidence.object_role_id : null;
+    const occurrenceId =
+      typeof evidence.occurrence_id === "string" ? evidence.occurrence_id : null;
+    if (!roleId || !occurrenceId) return null;
+    const occurrenceRevision =
+      typeof evidence.occurrence_revision === "number" && !Number.isNaN(evidence.occurrence_revision)
+        ? evidence.occurrence_revision
+        : undefined;
+    return {
+      kind: "candidate_edit",
+      project_id: item.project_id,
+      video_item_id: item.video_item_id,
+      generation: role?.source_generation ?? "1",
+      target: "occurrence",
+      role_id: roleId,
+      occurrence_id: occurrenceId,
+      occurrence_revision: occurrenceRevision,
+      review_state: "rejected",
+      reasons: [`qc:${item.reason_code}`],
+      idempotency_key: `qc-item:${item.id}`,
+    };
+  },
 
   // ─── S07 Project Cast (T02 picker + compatibility) ───────────────────────
 
