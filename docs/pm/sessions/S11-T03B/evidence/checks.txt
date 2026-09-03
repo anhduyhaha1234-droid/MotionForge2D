@@ -1,0 +1,21 @@
+== 1. FROZEN POLICY (read-only consumption) ==
+policy_id: s11-qc-thresholds-v1 | content_hash: de215c6243e1c6bf300e2bfa1c8024fbda6d0358ecf3cad1730781e37419ea24
+  trajectory_drift: unit=px warning=31.5 blocker=126.0 kind=increasing sanity={'min': 0.0, 'max': 126.0}
+  cut_drift: unit=frame warning=3 blocker=12 kind=increasing sanity={'min': 0.0, 'max': 12}
+== 2. CLASSIFICATION AT POLICY BOUNDARIES ==
+  trajectory amp=0.2: value=6.3 status=pass severity=None
+  trajectory amp=1.0: value=31.5 status=warning severity=warning
+  trajectory amp=4.0: value=126.0 status=blocker severity=blocker
+  cut render=2030ms: render_frame=61 drift=1 status=pass severity=None
+  cut render=2300ms: render_frame=69 drift=9 status=warning severity=warning
+  cut render=2400ms: render_frame=72 drift=12 status=blocker severity=blocker
+== 3. EVIDENCE BYTE-IDENTICAL ACROSS TWO RUNS ==
+  trajectory canonical_evidence_json equal: True
+  cut canonical_evidence_json equal: True
+== 4. NATURAL-KEY IDEMPOTENT RECHECK (same row, count 1) ==
+  trajectory same id: True | cut same id: True | total qc_item rows: 2
+== 5. THRESHOLD TEST-COPY FLIP (no hard-coded boundary) ==
+  100.8 px under FROZEN policy: ('warning', 'THRESHOLD_WARNING')
+  100.8 px under TEST-COPY (blocker=80): ('blocker', 'THRESHOLD_BLOCKER')
+  detector status/severity under test-copy: blocker blocker
+EVIDENCE_PROBE_OK

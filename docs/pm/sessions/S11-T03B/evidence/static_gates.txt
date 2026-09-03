@@ -1,0 +1,2 @@
+All checks passed!
+PY_COMPILE_OK

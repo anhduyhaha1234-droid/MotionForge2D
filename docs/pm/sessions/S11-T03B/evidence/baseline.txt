@@ -1,0 +1,19 @@
+S11-T03B baseline (resume sau defect-schema fix — real git facts, 2026-09-03):
+branch: codex/s11/t03b-0903w6
+worktree: C:\Users\Admin\MotionForge2D-worktrees\s11-t03b-0903w6
+HEAD:   c1a6777864c1169435d7b7f263ce5fa7a0014c78   (canonical post defect-fix; WAVE_BASE b34d801 da duoc fast-forward)
+porcelain pre-work (chỉ draft cũ + docs, KHÔNG file modified):
+?? app/services/qc_checks/cut_drift.py
+?? app/services/qc_checks/trajectory_drift.py
+?? docs/pm/sessions/S11-T03B/
+?? tests/test_s11_t03b_trajectory_cut_detectors.py
+
+Re-verify sau fix (real outputs):
+- QC_REASON_CODES / QC_ITEM_CATEGORIES = 10 codes: trajectory_drift, cut_drift,
+  contact_break, z_order_error, silhouette_clipping, identity_drift, edge_halo,
+  temporal_flicker, audio_missing, av_sync_drift (grep models.py L3018-3052).
+- Threshold policy UNCHANGED: policy_id s11-qc-thresholds-v1,
+  content_hash de215c6243e1c6bf300e2bfa1c8024fbda6d0358ecf3cad1730781e37419ea24;
+  trajectory_drift warn=31.5/block=126.0 px; cut_drift warn=3/block=12 frame.
+- T02B repository API unchanged (QCItemRepository.create signature giữ nguyên).
+- Old reason-code scan trong write-set (audio_timecode/z_order/clipping/flicker): 0 hits.

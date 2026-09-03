@@ -1,0 +1,6 @@
+    from app.services.qc_checks.cut_drift import (
+E   ModuleNotFoundError: No module named 'app.services.qc_checks.cut_drift'
+=========================== short test summary info ===========================
+ERROR tests/test_s11_t03b_trajectory_cut_detectors.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.46s
