@@ -33,6 +33,7 @@ from app.api.routes import (
     object_intelligence,
     project_cast,
     projects,
+    qc_items,
     reskin_config,
     s09_approval,
     s09_correction,
@@ -148,6 +149,8 @@ app.include_router(project_cast.router)
 # Durable ReskinConfig API (S09-T01) — /api/v2/reskin-configs, disjoint from
 # every legacy route and from /api/v2/project-cast.
 app.include_router(reskin_config.router)
+# Durable QC Item READ-ONLY API (S11-T02B) - GET list/detail/filter only (Decision A).
+app.include_router(qc_items.router)
 
 
 # Durable S09 demo-loop API (S09-T03) — /api/v2/s09-demo-loops, disjoint
