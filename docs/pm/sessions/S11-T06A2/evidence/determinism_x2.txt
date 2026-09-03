@@ -1,0 +1,4 @@
+trajectory_cut: run1=b59b653e27d80c724078bc7b run2=b59b653e27d80c724078bc7b identical=True committed_match=True
+contact_zorder_clipping: run1=d4982aa87401e33c7d586be6 run2=d4982aa87401e33c7d586be6 identical=True committed_match=True
+identity_halo_flicker: run1=460d444923503b875bda00a1 run2=460d444923503b875bda00a1 identical=True committed_match=True
+av_sync: run1=67cbfe0e5caa8370a0747674 run2=67cbfe0e5caa8370a0747674 identical=True committed_match=True

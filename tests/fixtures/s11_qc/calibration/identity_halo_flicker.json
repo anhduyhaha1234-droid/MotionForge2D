@@ -1,0 +1,124 @@
+{
+  "fixture_id": "identity_halo_flicker",
+  "fixture_type": "s11_qc_calibration",
+  "metrics": [
+    {
+      "deterministic_seed": 11006,
+      "measurement_function_revision": "1.0.0",
+      "metric": "identity_drift",
+      "monotonic": "increasing",
+      "perturbation_levels": [
+        {
+          "level": 1,
+          "perturbation": {
+            "noise_amp_px": 1.0
+          },
+          "raw_value": 1.0
+        },
+        {
+          "level": 2,
+          "perturbation": {
+            "noise_amp_px": 2.0
+          },
+          "raw_value": 2.0
+        },
+        {
+          "level": 3,
+          "perturbation": {
+            "noise_amp_px": 4.0
+          },
+          "raw_value": 4.0
+        },
+        {
+          "level": 4,
+          "perturbation": {
+            "noise_amp_px": 8.0
+          },
+          "raw_value": 8.0
+        }
+      ],
+      "result_reference": "s11_qc_calibration_builders.py:measure_identity_drift",
+      "source_reference": "s11_qc_calibration_builders.py:generate_identity_drift_input",
+      "unit": "px"
+    },
+    {
+      "deterministic_seed": 11007,
+      "measurement_function_revision": "1.0.0",
+      "metric": "edge_halo",
+      "monotonic": "increasing",
+      "perturbation_levels": [
+        {
+          "level": 1,
+          "perturbation": {
+            "halo_radius_px": 1.0
+          },
+          "raw_value": 0.939014164
+        },
+        {
+          "level": 2,
+          "perturbation": {
+            "halo_radius_px": 2.0
+          },
+          "raw_value": 2.021267777
+        },
+        {
+          "level": 3,
+          "perturbation": {
+            "halo_radius_px": 4.0
+          },
+          "raw_value": 4.217605992
+        },
+        {
+          "level": 4,
+          "perturbation": {
+            "halo_radius_px": 8.0
+          },
+          "raw_value": 8.737606376
+        }
+      ],
+      "result_reference": "s11_qc_calibration_builders.py:measure_edge_halo",
+      "source_reference": "s11_qc_calibration_builders.py:generate_edge_halo_input",
+      "unit": "px"
+    },
+    {
+      "deterministic_seed": 11008,
+      "measurement_function_revision": "1.0.0",
+      "metric": "temporal_flicker",
+      "monotonic": "increasing",
+      "perturbation_levels": [
+        {
+          "level": 1,
+          "perturbation": {
+            "flicker_amp": 0.05
+          },
+          "raw_value": 0.012447762
+        },
+        {
+          "level": 2,
+          "perturbation": {
+            "flicker_amp": 0.1
+          },
+          "raw_value": 0.024895525
+        },
+        {
+          "level": 3,
+          "perturbation": {
+            "flicker_amp": 0.2
+          },
+          "raw_value": 0.04979105
+        },
+        {
+          "level": 4,
+          "perturbation": {
+            "flicker_amp": 0.4
+          },
+          "raw_value": 0.099582099
+        }
+      ],
+      "result_reference": "s11_qc_calibration_builders.py:measure_temporal_flicker",
+      "source_reference": "s11_qc_calibration_builders.py:generate_temporal_flicker_input",
+      "unit": "level"
+    }
+  ],
+  "schema_version": 1
+}

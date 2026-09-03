@@ -1,0 +1,81 @@
+{
+  "fixture_id": "av_sync",
+  "fixture_type": "s11_qc_calibration",
+  "metrics": [
+    {
+      "deterministic_seed": 11009,
+      "measurement_function_revision": "1.0.0",
+      "metric": "av_sync_drift",
+      "monotonic": "increasing",
+      "perturbation_levels": [
+        {
+          "level": 1,
+          "perturbation": {
+            "offset_sec": 0.05
+          },
+          "raw_value": 0.05
+        },
+        {
+          "level": 2,
+          "perturbation": {
+            "offset_sec": 0.1
+          },
+          "raw_value": 0.1
+        },
+        {
+          "level": 3,
+          "perturbation": {
+            "offset_sec": 0.25
+          },
+          "raw_value": 0.25
+        },
+        {
+          "level": 4,
+          "perturbation": {
+            "offset_sec": 0.5
+          },
+          "raw_value": 0.5
+        }
+      ],
+      "result_reference": "s11_qc_calibration_builders.py:measure_av_sync_drift",
+      "source_reference": "s11_qc_calibration_builders.py:generate_av_sync_input",
+      "unit": "s"
+    },
+    {
+      "deterministic_seed": 11010,
+      "measurement_function_revision": "1.0.0",
+      "metric": "no_audio_source_fact",
+      "monotonic": "constant",
+      "perturbation_levels": [
+        {
+          "level": 1,
+          "measured_duration_sec": 1.0,
+          "perturbation": {
+            "duration_sec": 1.0
+          },
+          "raw_value": 0
+        },
+        {
+          "level": 2,
+          "measured_duration_sec": 2.0,
+          "perturbation": {
+            "duration_sec": 2.0
+          },
+          "raw_value": 0
+        },
+        {
+          "level": 3,
+          "measured_duration_sec": 4.0,
+          "perturbation": {
+            "duration_sec": 4.0
+          },
+          "raw_value": 0
+        }
+      ],
+      "result_reference": "s11_qc_calibration_builders.py:measure_no_audio_source",
+      "source_reference": "s11_qc_calibration_builders.py:generate_no_audio_input",
+      "unit": "count"
+    }
+  ],
+  "schema_version": 1
+}

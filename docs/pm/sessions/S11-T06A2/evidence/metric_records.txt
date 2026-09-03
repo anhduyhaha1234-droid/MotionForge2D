@@ -1,0 +1,14 @@
+trajectory_cut sha256=b59b653e27d80c724078bc7bcac92dc49c08efc338ff5280de3ba7aa37e8e955
+  trajectory_drift: unit=px seed=11001 src=generate_trajectory_drift_input res=measure_trajectory_drift rev=1.0.0 levels=4 mono=increasing raw=[15.75, 31.5, 63.0, 126.0]
+  cut_drift: unit=frame seed=11002 src=generate_cut_drift_input res=measure_cut_drift rev=1.0.0 levels=4 mono=increasing raw=[1, 3, 6, 12]
+contact_zorder_clipping sha256=d4982aa87401e33c7d586be699d1477cc9d8f1b9298fd0c80092bfbed6a53ae0
+  contact_break: unit=px seed=11003 src=generate_contact_break_input res=measure_contact_break rev=1.0.0 levels=4 mono=increasing raw=[2.0, 4.0, 8.0, 16.0]
+  z_order_error: unit=count seed=11004 src=generate_z_order_error_input res=measure_z_order_error rev=1.0.0 levels=4 mono=increasing raw=[2, 4, 6, 8]
+  silhouette_clipping: unit=ratio seed=11005 src=generate_silhouette_clipping_input res=measure_silhouette_clipping rev=1.0.0 levels=4 mono=increasing raw=[0.083333333, 0.166666667, 0.333333333, 0.5]
+identity_halo_flicker sha256=460d444923503b875bda00a193e7c5107626ada5c7f8aa01308d5ca6c6d15077
+  identity_drift: unit=px seed=11006 src=generate_identity_drift_input res=measure_identity_drift rev=1.0.0 levels=4 mono=increasing raw=[1.0, 2.0, 4.0, 8.0]
+  edge_halo: unit=px seed=11007 src=generate_edge_halo_input res=measure_edge_halo rev=1.0.0 levels=4 mono=increasing raw=[0.939014164, 2.021267777, 4.217605992, 8.737606376]
+  temporal_flicker: unit=level seed=11008 src=generate_temporal_flicker_input res=measure_temporal_flicker rev=1.0.0 levels=4 mono=increasing raw=[0.012447762, 0.024895525, 0.04979105, 0.099582099]
+av_sync sha256=67cbfe0e5caa8370a074767450874716df6b7c6fac4398ae50a352664fef421e
+  av_sync_drift: unit=s seed=11009 src=generate_av_sync_input res=measure_av_sync_drift rev=1.0.0 levels=4 mono=increasing raw=[0.05, 0.1, 0.25, 0.5]
+  no_audio_source_fact: unit=count seed=11010 src=generate_no_audio_input res=measure_no_audio_source rev=1.0.0 levels=3 mono=constant raw=[0, 0, 0]

@@ -1,0 +1,85 @@
+{
+  "fixture_id": "trajectory_cut",
+  "fixture_type": "s11_qc_calibration",
+  "metrics": [
+    {
+      "deterministic_seed": 11001,
+      "measurement_function_revision": "1.0.0",
+      "metric": "trajectory_drift",
+      "monotonic": "increasing",
+      "perturbation_levels": [
+        {
+          "level": 1,
+          "perturbation": {
+            "drift_px_per_frame": 0.5
+          },
+          "raw_value": 15.75
+        },
+        {
+          "level": 2,
+          "perturbation": {
+            "drift_px_per_frame": 1.0
+          },
+          "raw_value": 31.5
+        },
+        {
+          "level": 3,
+          "perturbation": {
+            "drift_px_per_frame": 2.0
+          },
+          "raw_value": 63.0
+        },
+        {
+          "level": 4,
+          "perturbation": {
+            "drift_px_per_frame": 4.0
+          },
+          "raw_value": 126.0
+        }
+      ],
+      "result_reference": "s11_qc_calibration_builders.py:measure_trajectory_drift",
+      "source_reference": "s11_qc_calibration_builders.py:generate_trajectory_drift_input",
+      "unit": "px"
+    },
+    {
+      "deterministic_seed": 11002,
+      "measurement_function_revision": "1.0.0",
+      "metric": "cut_drift",
+      "monotonic": "increasing",
+      "perturbation_levels": [
+        {
+          "level": 1,
+          "perturbation": {
+            "offset_frames": 1
+          },
+          "raw_value": 1
+        },
+        {
+          "level": 2,
+          "perturbation": {
+            "offset_frames": 3
+          },
+          "raw_value": 3
+        },
+        {
+          "level": 3,
+          "perturbation": {
+            "offset_frames": 6
+          },
+          "raw_value": 6
+        },
+        {
+          "level": 4,
+          "perturbation": {
+            "offset_frames": 12
+          },
+          "raw_value": 12
+        }
+      ],
+      "result_reference": "s11_qc_calibration_builders.py:measure_cut_drift",
+      "source_reference": "s11_qc_calibration_builders.py:generate_cut_drift_input",
+      "unit": "frame"
+    }
+  ],
+  "schema_version": 1
+}
