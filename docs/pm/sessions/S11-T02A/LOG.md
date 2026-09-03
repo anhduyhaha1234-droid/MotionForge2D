@@ -101,5 +101,7 @@ WAVE_BASE / HEAD lúc dispatch: 7751598214eedb6b72e3783e39a2a408721abe40
   test_upgrade_downgrade_upgrade_empty_graph_byte_identical (schema_sig dict equality).
 - Self-review: `git status --porcelain` chỉ có allowlist (2 M + 3 ?? + sessions dir);
   `git diff 7751598` scope = 5 paths + docs/pm/sessions/S11-T02A/**.
-- Commit local trên codex/s11/t02a-0903w1 (allowlist + sessions evidence) — SHA ghi ở
-  REPORT. KHÔNG push/merge/rebase.
+- Commit local trên codex/s11/t02a-0903w1 (allowlist + sessions evidence) —
+  commit `7365f910e16ff0d9863c6c5e57c07ee92b6b151b` (`feat(s11): T02A QCItem schema +
+  migration e11a02a2026f + schema/migration tests (W1)`), 7 files staged (2 M + 5 A).
+  KHÔNG push/merge/rebase/reset/clean/stash/force. Working tree sạch sau commit.

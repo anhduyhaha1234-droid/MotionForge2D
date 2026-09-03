@@ -152,5 +152,6 @@ KHÔNG push/merge/rebase/reset/clean/stash/force.
 - Raw output của mọi lệnh trong §2 là output thật từ terminal (không tóm tắt suy diễn).
 
 ---
-**Status: TASK_SUBMITTED** — commit local trên `codex/s11/t02a-0903w1` (allowlist + evidence).
+**Status: TASK_SUBMITTED** — commit local `7365f910e16ff0d9863c6c5e57c07ee92b6b151b` trên
+`codex/s11/t02a-0903w1` (allowlist + evidence; 7 files: 2 M + 5 A).
 KO push, KO merge. Chờ Manager verify độc lập.
