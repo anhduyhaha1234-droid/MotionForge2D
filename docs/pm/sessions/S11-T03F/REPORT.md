@@ -65,7 +65,7 @@ Per-test temp SQLite DB (`create_engine_for_path` + ORM `Base.metadata.create_al
 
 ## Commit
 
-- SHA: `__T03F_COMMIT_SHA__` (filled at commit time)
+- SHA: `4be8616e7ede37f18769ce6d1da4c8b288bea529` (docs record commit: see LOG.md)
 - Files: orchestrator.py, test file, docs/pm/sessions/S11-T03F/** — allowlist only.
 - No push/merge/rebase; porcelain 0 after commit.
 
