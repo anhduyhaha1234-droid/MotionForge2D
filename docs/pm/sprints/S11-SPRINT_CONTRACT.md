@@ -2,7 +2,8 @@
 
 **Status:** T01 CODEX_APPROVED; T02..T06 PRODUCTION_AUTHORIZED (19 IDs / 14 waves)
 **Authority:** `S10_C6H_R3_FINAL_PM_REVIEW_2026-09-03.md` + `S11-P02 rev-C6 CODEX_APPROVED`; execution prompt `S11_T02_T06_FULL_SPRINT_MANAGER_2026-09-03.md`
-**Worktree:** C:\Users\Admin\MotionForge2D-worktrees\s08-integration (branch codex/s08-integration @ d3f6f796558aa9c7247da7d51e7d34e65b56cdf7 review snapshot; Manager must rediscover actual HEAD)
+**Canonical integration worktree:** C:\Users\Admin\MotionForge2D-worktrees\s11-integration (branch codex/s11-integration, clean checkpoint `4cec376bd7589bfd5bbd8c2260fdd63b751aca73`; Manager must rediscover actual HEAD)
+**Read-only planning authority:** C:\Users\Admin\MotionForge2D-worktrees\s08-integration\output\s11-post-t01-readiness\r1\synthesis\S11_T02_T06_PRODUCTION_PLAN.md (SHA `342479267086485EF6FD44CB8B3A5F94E6F7B1AFCC4439AFDA2910068FC76F4F`)
 
 ## Task map
 
@@ -45,6 +46,20 @@ Mọi session worker/reviewer MỚI của production T02..T06 dùng:
 
 Không chạy global gate khi có writer đang ghi file hoặc S07 đang chạy global gate.
 Focused tests song song chỉ khi temp DB/basetemp/managed root/port tách biệt.
+
+## Isolated-worktree execution
+
+- Mỗi production Task ID dùng một branch, clean worktree và Hermes session riêng
+  từ exact integration HEAD của đầu wave; correction resume đúng session/branch.
+- W6 chạy tối đa 4 implementation workers thật song song; W9 và W12 tối đa 2;
+  các wave khác tuần tự theo DAG. Một writer duy nhất trong mỗi task worktree.
+- Worker commit đúng exclusive allowlist + task-owned session docs trên local
+  task branch rồi submit/exit. Commit chưa phải approval.
+- Một integration owner `S11-INT01` duy nhất cherry-pick exact commit range đã
+  Manager verify; zero manual conflict resolution, zero code edit. Conflict thì
+  abort và trả exact task owner. Canonical branch được push sau wave gate xanh.
+- Worktree `s08-integration` là read-only archive/evidence; không dispatch S11
+  writer vào đó.
 
 ## Terminal state mục tiêu
 
