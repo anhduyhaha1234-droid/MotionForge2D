@@ -181,5 +181,6 @@ s11-integration canonical worktree. KHÔNG push/merge/rebase/reset/clean/stash/f
 - Raw output của mọi lệnh trong §2 là output thật từ terminal (không tóm tắt suy diễn).
 
 ---
-**Status: TASK_SUBMITTED** — commit local trên `codex/s11/t02b-0903w2` (allowlist +
-evidence). KO push, KO merge. Chờ Manager verify độc lập.
+**Status: TASK_SUBMITTED** — commit local `9c9878a51bf5da7b913593478f04fccc5c798e2a` trên
+`codex/s11/t02b-0903w2` (allowlist + evidence; 10 files: 1 M + 9 A). KO push, KO merge.
+Chờ Manager verify độc lập.

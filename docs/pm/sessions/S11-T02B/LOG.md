@@ -107,3 +107,6 @@ WAVE_BASE: 6861177149e1d12653f045ab2a44933b8d0f6d57 (canonical codex/s11-integra
   `e11a02a2026f (head)` single head (không đụng migrations).
 - Self-review: `git status --porcelain` = 1 M (app.py) + 5 ?? (4 allowlist mới + 2 tests)
   + docs/pm/sessions/S11-T02B/ — không gì ngoài allowlist.
+- Commit local trên codex/s11/t02b-0903w2 (allowlist + evidence + sessions):
+  commit `9c9878a51bf5da7b913593478f04fccc5c798e2a` (`feat(s11): T02B QCItem repository + internal idempotent lifecycle + read-only API (W2)`), 10 files staged (1 M + 9 A). KHÔNG push/merge/rebase/reset/clean/stash/force.
+  Working tree sạch sau commit (porcelain 0). TASK_SUBMITTED — chờ Manager verify.
