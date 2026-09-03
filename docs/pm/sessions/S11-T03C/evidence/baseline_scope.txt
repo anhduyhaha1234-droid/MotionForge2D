@@ -1,0 +1,14 @@
+=== pre-work baseline (recorded at session start) ===
+porcelain at start: 0 (draft test added later)
+HEAD at start: b34d801c60e9bdfdfed2a887b493e7eb8f54a8b9 (WAVE_BASE)
+HEAD after correction cascade (resume): c1a6777864c1169435d7b7f263ce5fa7a0014c78
+
+=== final scope (pre-commit) ===
+?? app/services/qc_checks/contact_break.py
+?? app/services/qc_checks/silhouette_clipping.py
+?? app/services/qc_checks/z_order_error.py
+?? docs/pm/sessions/S11-T03C/
+?? tests/test_s11_t03c_contact_zorder_clipping_detectors.py
+
+=== HEAD ===
+c1a6777864c1169435d7b7f263ce5fa7a0014c78

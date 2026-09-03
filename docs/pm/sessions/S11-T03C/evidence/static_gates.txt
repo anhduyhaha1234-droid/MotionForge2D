@@ -1,0 +1,7 @@
+=== ruff --select F (4 allowlist files) ===
+All checks passed!
+RUFF_EXIT=0
+=== py_compile (4 allowlist files) ===
+PY_COMPILE_OK
+=== git diff --check ===
+DIFF_CHECK_OK
