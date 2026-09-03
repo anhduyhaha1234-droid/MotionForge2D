@@ -133,3 +133,6 @@ WAVE_BASE: 6861177149e1d12653f045ab2a44933b8d0f6d57 (canonical codex/s11-integra
   All checks passed.
 - Diff scope vs WAVE_BASE 88dc372: CHỈ 2 test files (18+/18-) + docs append — không đụng
   models.py/migrations/detectors/thresholds/frontend/MAIN. KHÔNG push/merge/rebase/reset/clean/stash.
+- Commit local trên codex/s11/t02b-0903w2: `77be343e35102102824ae2e7d4ff677e6e92d48a` (`fix(s11): T02B-C1 update test fixtures to
+  binding 10-code QC enum (correction)`, 4 files: 2 M tests + 2 M docs). Working tree sạch sau commit.
+  Status: TASK_SUBMITTED (correction) + CORRECTION_C1_SUBMITTED — chờ Manager verify.

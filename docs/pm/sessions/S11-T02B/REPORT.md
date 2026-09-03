@@ -182,8 +182,8 @@ s11-integration canonical worktree. KHÔNG push/merge/rebase/reset/clean/stash/f
 
 ---
 **Status: TASK_SUBMITTED (correction)** — commits local `9c9878a5` (feat) + `cd4f7925`
-(docs) + `CORRECTION_C1` commit (xem LOG) trên `codex/s11/t02b-0903w2`. KO push, KO merge.
-Chờ Manager verify độc lập.
+(docs) + `77be343e` (CORRECTION_C1: fix + docs) trên `codex/s11/t02b-0903w2`. KO push,
+KO merge. Chờ Manager verify độc lập.
 
 ---
 
@@ -212,5 +212,5 @@ $ git diff --stat 88dc372                        → CHỈ 2 test files (18+/18-
 **Scope:** chỉ 2 test files + docs/pm/sessions/S11-T02B/** append. Không đụng
 models.py/migrations/detectors/thresholds/golden/frontend/MAIN.
 
-**Status: CORRECTION_C1_SUBMITTED** — commit local 1 commit (fix + docs) trên
-`codex/s11/t02b-0903w2`. KO push, KO merge. Chờ Manager verify.
+**Status: CORRECTION_C1_SUBMITTED** — commit local `77be343e35102102824ae2e7d4ff677e6e92d48a`
+(fix + docs, 4 files) trên `codex/s11/t02b-0903w2`. KO push, KO merge. Chờ Manager verify.
