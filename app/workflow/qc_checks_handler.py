@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Sequence
 
@@ -302,10 +303,18 @@ def build_completion_block(
 # ── the durable handler ──────────────────────────────────────────────────────
 
 
-class _CancelFlag:
-    """Adapter: expose the worker's durable cancel flag as ``is_set()``."""
+class _CancelFlag(threading.Event):
+    """Adapter: expose the worker's durable cancel flag as a real ``Event``.
+
+    Subclasses :class:`threading.Event` so the bounded runner/orchestrator
+    type contract (``cancel_event: Event | None``) holds, while the flag
+    stays PULL-based — ``is_set()`` consults the worker's durable cancel
+    state through *is_cancelled* instead of a process-local event; no
+    background thread and no behavior change from the plain-adapter form.
+    """
 
     def __init__(self, is_cancelled: Callable[[], bool]) -> None:
+        super().__init__()
         self._is_cancelled = is_cancelled
 
     def is_set(self) -> bool:
