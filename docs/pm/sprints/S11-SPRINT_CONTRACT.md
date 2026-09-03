@@ -55,9 +55,10 @@ Focused tests song song chỉ khi temp DB/basetemp/managed root/port tách biệ
   các wave khác tuần tự theo DAG. Một writer duy nhất trong mỗi task worktree.
 - Worker commit đúng exclusive allowlist + task-owned session docs trên local
   task branch rồi submit/exit. Commit chưa phải approval.
-- Một integration owner `S11-INT01` duy nhất cherry-pick exact commit range đã
-  Manager verify; zero manual conflict resolution, zero code edit. Conflict thì
-  abort và trả exact task owner. Canonical branch được push sau wave gate xanh.
+- Một integration owner `S11-INT01` duy nhất fast-forward/conflict-free merge
+  exact task branch đã Manager verify; zero manual conflict resolution, zero
+  code edit. Conflict thì abort và trả exact task owner. Canonical branch được
+  push sau wave gate xanh.
 - Worktree `s08-integration` là read-only archive/evidence; không dispatch S11
   writer vào đó.
 
