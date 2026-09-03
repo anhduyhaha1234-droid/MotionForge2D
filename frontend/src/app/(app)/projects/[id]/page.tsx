@@ -28,6 +28,7 @@ import {
   type ProjectData,
   type ProjectVideoItem,
 } from "@/lib/api";
+import { ReadinessPanel } from "@/components/readiness/ReadinessPanel";
 
 type DetailPhase = "loading" | "error" | "not-found" | "ready";
 
@@ -465,6 +466,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           </div>
         )}
       </div>
+
+      {/* S11-T05B additive: readiness block (T05A payload, GET-only). */}
+      <ReadinessPanel projectId={project.id} />
     </div>
   );
 }

@@ -29,6 +29,7 @@ import {
   type QcNavigationData,
 } from "@/lib/api";
 import { ReviewCorrectionPanel } from "@/components/review/ReviewCorrectionPanel";
+import { ReadinessPanel } from "@/components/readiness/ReadinessPanel";
 import { ReviewItemDetail, type CorrectionProgressInfo } from "@/components/review/ReviewItemDetail";
 import { ReviewQueueList } from "@/components/review/ReviewQueueList";
 
@@ -280,6 +281,9 @@ function ReviewRoute({ params }: { params: Promise<{ id: string }> }) {
           </>
         )}
       </div>
+
+      {/* S11-T05B additive: readiness block (T05A payload, GET-only). */}
+      <ReadinessPanel projectId={projectId} />
 
       <p className="mt-6 flex items-center gap-1.5 text-[11px] text-gray-400">
         <ArrowLeft aria-hidden="true" size={12} className="hidden" />

@@ -958,6 +958,65 @@ export interface QcNavigationData {
   renderer_route: string | null;
 }
 
+// ─── S11 Readiness aggregate (T05A payload — T05B additive wrapper) ───────
+
+export type ReadinessStatus = "ready" | "blocked" | "not_run";
+
+/** Canonical structured location of one blocker (mirrors T04A DTO). */
+export interface ReadinessLocationData {
+  scene_id: number | null;
+  frame_index: number | null;
+  timecode_ms: number | null;
+  object_role_id: string | null;
+  segment_row_id: string | null;
+  segment_logical_id: string | null;
+}
+
+/** WS-07 navigation action — navigate (real target) or explain (no dead link). */
+export interface ReadinessActionData {
+  kind: "navigate" | "explain";
+  method: "GET";
+  target: string | null;
+  endpoint: string | null;
+  code: string | null;
+  reason: string | null;
+}
+
+/** One unresolved blocker of a CURRENT check run (WS-07 full detail). */
+export interface ReadinessBlockerData {
+  qc_item_id: string;
+  code: string;
+  video_item_id: string;
+  layer_ref_type: string;
+  layer_ref_id: string;
+  location: ReadinessLocationData;
+  reason_vi: string;
+  action_vi: string;
+  action: ReadinessActionData;
+}
+
+/** Per-video fail-closed verdict (T03G check-run evidence). */
+export interface ReadinessVideoData {
+  video_item_id: string;
+  status: ReadinessStatus;
+  run_state: string;
+  check_state_detail: string;
+  zero_item_completion: boolean | null;
+  latest_job_id: string | null;
+  blockers: number;
+}
+
+/** GET /api/v2/projects/{project_id}/readiness (Decision F, GET-only). */
+export interface ReadinessResponseData {
+  status: ReadinessStatus;
+  blockers: ReadinessBlockerData[];
+  warning_count: number;
+  videos: ReadinessVideoData[];
+  policy_version: string;
+  content_hash: string;
+  computed_at: string;
+}
+
 // ─── S08 Grouping policy (T03-C1 backend-authoritative metadata) ──────────
 
 export interface GroupingPolicyData {
@@ -1890,7 +1949,18 @@ export const api = {
     };
   },
 
-  // ─── S07 Project Cast (T02 picker + compatibility) ───────────────────────
+  /**
+   * Compute-on-the-fly project readiness aggregate (T05A / Decision F —
+   * GET-only).  Returns the fail-closed verdict ready|blocked|not_run plus
+   * the WS-07 blocker list (location/reason/action) and per-video check-run
+   * evidence; the UI never mutates anything here.
+   */
+  getReadiness: (projectId: string) =>
+    apiFetch<ReadinessResponseData>(
+      `/api/v2/projects/${encodeURIComponent(projectId)}/readiness`,
+    ),
+
+// ─── S07 Project Cast (T02 picker + compatibility) ───────────────────────
 
   /** Picker browse: only published/usable Pack Versions, search/filter, deterministic. */
   listPickerPacks: (opts?: { q?: string; limit?: number; offset?: number }) =>
