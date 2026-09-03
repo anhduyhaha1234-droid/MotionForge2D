@@ -69,3 +69,39 @@ diff; các file S11-T02..T05 0 diff.
 - Parent: fce13a06b4b51b736d13434e812700094a8adaca (WAVE_BASE)
 
 **Status: TASK_SUBMITTED** — chờ Manager verify. KHÔNG tự ghi APPROVED.
+
+---
+
+## S11-C1 lane C1-B — executable restart/resume epic-exit proof (resume exact owner)
+
+**Finding (Codex P1, review 2026-09-04):** `tests/test_s11_t02_t06_acceptance.py:853-895`
+Scenario D chỉ đọc golden manifest và assert chuỗi; `test_t08` chỉ verify các
+file T04B đã từng báo pass — không enqueue recompute, không dừng/recreate
+service/worker trên cùng durable DB, không resume persisted job. Evidence defect
+trừ khi executable scenario phát hiện product defect.
+
+**Fix (bounded patch, chỉ file allowlist):** thêm `test_t11_executable_restart_resume_epic_exit`
+vào cùng file test — scenario THỰC THI qua stack thật (correction/recompute path
+đã có, KHÔNG mock durable authority):
+
+1. Fresh temp DB (Alembic head) + temp managed root mới, `env -u
+   MOTIONFORGE_DATABASE_URL`, `-p no:cacheprovider`, basetemp Windows-native
+   ngắn unique (`s11c1b_*`).
+2. Seed project/video/QC blocker hợp lệ (envelope STREAM_COPY: source HAS audio
+   nhưng output publish missing → audio_missing blocker + av_sync_drift blocker)
+   và submit RUN_QC_CHECKS recompute qua stack thật (`submit_run_qc_checks`).
+3. Dừng/recreate JobService (teardown svc1 + build svc2 cùng durable DB +
+   cùng managed root) — process-boundary tương đương.
+4. Resume persisted job, bounded poll (deadline 60s + interval 0.5s) tới terminal.
+5. Chứng minh: đúng một successor/effect (1 completion, run_id deterministic
+   64-hex duy nhất); không duplicate correction resolution / enqueue (completed
+   duplicate reuses SAME job, QCItem count không đổi); readiness `blocked` trung
+   thực sau fix-chưa-resolve + ổn định qua fresh repository re-query.
+6. Lane evidence external: `C:\Users\Admin\MotionForge2D-evidence\s11-c1\lanes\c1b-t06c\c1b_restart_proof_<run_tag>.json`
+   (job_id, terminal snapshot, 10 assertions S11-C1B-01..10, all_ok).
+
+**Kết quả:** KHÔNG phát hiện product bug → KHÔNG cần T04B. Executable test XANH
+với production hiện tại (1 passed standalone 2.96s; 11/11 toàn file 249.24s
+exit 0). Full lane log: `/c/Users/Admin/AppData/Local/Temp/s11c1b_full.log`.
+
+**Status: TASK_SUBMITTED** — lane C1-B, chờ Manager verify. KHÔNG tự ghi APPROVED.

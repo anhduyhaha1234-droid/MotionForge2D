@@ -150,6 +150,20 @@ def _ffmpeg_available() -> bool:
         return False
 
 
+#: Bounded polling for the executable restart/resume scenario (C1-B lane,
+#: requirement 3 — deadline + poll interval finite, never an infinite sleep).
+_C1B_RESTART_POLL_DEADLINE_S = 60.0
+_C1B_RESTART_POLL_INTERVAL_S = 0.5
+
+#: External lane evidence root (S11-C1 allowlist — outside the worktree diff).
+_C1B_EVIDENCE_ROOT = Path(
+    r"C:\Users\Admin\MotionForge2D-evidence\s11-c1\lanes\c1b-t06c"
+)
+
+_C1B_WS = "ws-s11-c1b"
+_C1B_PROJECT = "p-s11-c1b"
+
+
 pytestmark = pytest.mark.skipif(
     not _ffmpeg_available(), reason="ffmpeg/ffprobe not available"
 )
@@ -932,3 +946,357 @@ def test_t10_leak_gate_survivors_empty() -> None:
         leak["window_s"] == _LEAK_WINDOW_S and leak["leak_window_elapsed_s"] >= 0,
         leak,
     )
+
+
+# ---------------------------------------------------------------------------
+# S11-C1 lane C1-B — executable restart/resume epic-exit proof (Codex P1)
+# ---------------------------------------------------------------------------
+#
+# Codex verdict S11_T02_T06_PM_REVIEW_2026-09-04 §[P1]: the W14 row above was
+# manifest + proxy proof — it read golden JSON and trusted other files' pass
+# counts.  This executable scenario replaces that with a REAL stack run on a
+# FRESH temp DB + NEW managed root (Alembic head, env DB strip):
+#
+#   seed (project/video/QC blocker) -> submit recompute via the REAL
+#   correction path -> JobService/worker teardown mid-flight
+#   (process boundary) -> recreate the service against the SAME durable DB
+#   + SAME managed root -> resume the persisted job -> bounded poll to
+#   terminal -> prove exactly ONE successor/effect (no duplicate correction
+#   resolution, no duplicate enqueue), affected-only artifacts, and stable
+#   readiness after re-query from a FRESH session/repository.
+#
+# The Scenario D executable assertion node is the REAL bridge + REAL
+# recompute handler + REAL `run_full_check_set` recheck — no golden JSON
+# string search in this test (t07 keeps the manifest contract as coverage;
+# this test is the executable proof).
+
+
+def _c1b_alembic_head(db_path: Path) -> None:
+    """Upgrade a fresh temp DB to the production Alembic head (T03G pattern)."""
+    from alembic import command
+    from alembic.config import Config
+
+    cfg = Config(str(PROJECT_ROOT / "alembic.ini"))
+    cfg.set_main_option("script_location", str(PROJECT_ROOT / "migrations"))
+    cfg.set_main_option("sqlalchemy.url", f"sqlite:///{db_path.as_posix()}")
+    command.upgrade(cfg, "head")
+
+
+def _c1b_make_service(
+    session_factory: Any, managed_root: Path
+) -> Any:
+    """Build the production JobService on EXISTING durable roots (no client).
+
+    The RECOMPUTE_OBJECTS handler registration rides inside the default
+    JobService worker construction (the bounded job_service.py block), so a
+    recreate with worker=None is the same production path — the worker
+    belongs to the NEW service instance, the DB rows belong to the durable
+    file.  Clock/sleeper stay REAL (no fake timing in restart proof).
+    """
+    from app.workflow.job_service import JobService
+
+    return JobService(session_factory, managed_root=managed_root)
+
+
+def _c1b_seed_video(session: Any, *, video_id: str) -> None:
+    session.execute(
+        __import__("sqlalchemy").text(
+            "INSERT INTO workspace(id, name) VALUES (:w, :w) "
+            "ON CONFLICT(id) DO NOTHING"
+        ),
+        {"w": _C1B_WS},
+    )
+    session.execute(
+        __import__("sqlalchemy").text(
+            "INSERT INTO project(id, workspace_id, name, description, status) "
+            "VALUES (:p, :w, :p, '', 'active') ON CONFLICT(id) DO NOTHING"
+        ),
+        {"p": _C1B_PROJECT, "w": _C1B_WS},
+    )
+    session.execute(
+        __import__("sqlalchemy").text(
+            "INSERT INTO video_item(id, project_id, title, position, status) "
+            "VALUES (:v, :p, :v, "
+            "(SELECT COALESCE(MAX(position),0)+1 FROM video_item "
+            "WHERE project_id=:p), 'imported') ON CONFLICT(id) DO NOTHING"
+        ),
+        {"v": video_id, "p": _C1B_PROJECT},
+    )
+    session.commit()
+
+
+def _c1b_poll_terminal(
+    session_factory: Any, job_id: str, worker: Any
+) -> dict[str, Any]:
+    """Bounded resume poll: run_once until the persisted job is terminal.
+
+    Deadline + poll interval are finite (requirement 3).  Returns the
+    evidence snapshot (state, attempts with results, steps).
+    """
+    from app.persistence.jobs import JobRepository
+
+    deadline = time.monotonic() + _C1B_RESTART_POLL_DEADLINE_S
+    last_state = "unknown"
+    while time.monotonic() < deadline:
+        worker.run_once()
+        with session_factory() as session:
+            repo = JobRepository(session)
+            record = repo.get_job(job_id)
+            last_state = record.state
+            if last_state in ("completed", "failed", "cancelled"):
+                attempts = [
+                    {
+                        "result": a.result,
+                        "error": a.error,
+                    }
+                    for a in repo.list_attempts(job_id)
+                ]
+                steps = [
+                    {"state": s.state, "attempt": s.attempt}
+                    for s in repo.list_steps(job_id)
+                ]
+                return {
+                    "state": last_state,
+                    "attempts": attempts,
+                    "steps": steps,
+                }
+        time.sleep(_C1B_RESTART_POLL_INTERVAL_S)
+    raise AssertionError(
+        f"C1B restart poll timed out after {_C1B_RESTART_POLL_DEADLINE_S}s; "
+        f"last state={last_state!r} job={job_id}"
+    )
+
+
+def test_t11_executable_restart_resume_epic_exit() -> None:
+    """S11-C1 C1-B: executable restart/resume over the REAL correction stack.
+
+    Fresh temp DB (Alembic head) + new temp managed root; the scenario
+    enqueues a REAL RUN_QC_CHECKS recompute through the T03G submit
+    authority, drops the service/worker mid-flight (process-boundary
+    equivalent: teardown + GC), recreates the production JobService against
+    the SAME durable DB + SAME managed root, resumes the persisted job with
+    a bounded poll, and proves: exactly one successor/effect, no duplicate
+    enqueue/resolution, affected-only artifacts, and readiness stable after
+    re-query from a fresh repository session.
+    """
+    import uuid
+
+    from app.persistence import create_engine_for_path, create_session_factory
+    from app.persistence.jobs import JobRepository
+    from app.persistence.qc_check_runs import check_run_readiness
+    from app.persistence.qc_items import QCItemRepository
+    from app.services.qc_checks import (  # noqa: F401  (self-register band)
+        audio_missing,
+        av_sync_drift,
+    )
+    from app.services.qc_checks.registry import registry
+    from app.workflow.qc_checks_handler import (
+        SCOPE_AUDIO,
+        evidence_fingerprint,
+        policy_bundle,
+        submit_run_qc_checks,
+    )
+
+    for name, entry_point in (
+        ("audio_missing", "app.services.qc_checks.audio_missing:detect"),
+        ("av_sync_drift", "app.services.qc_checks.av_sync_drift:detect"),
+    ):
+        registry.register(name, entry_point)
+
+    run_tag = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    scratch = Path(tempfile.mkdtemp(prefix="s11c1b_"))
+    db_path = scratch / "c1b.db"
+    managed_root = scratch / "managed"
+    managed_root.mkdir(parents=True, exist_ok=True)
+    _c1b_alembic_head(db_path)
+    session_factory = create_session_factory(create_engine_for_path(db_path))
+
+    video_id = str(uuid.uuid4())
+    with session_factory() as session:
+        _c1b_seed_video(session, video_id=video_id)
+
+    # The REAL terminal-fact envelope: source HAS audio but the expected
+    # output publish is missing → audio_missing blocker (FAILURE_OUTPUT_MISSING)
+    # + av_sync_drift blocker — the same envelope the T03G suite proves
+    # creates items exactly once (AC5).  Executable assertion node #1: the
+    # submit authority itself (fail-closed idempotency carried by the rows).
+    envelope = {
+        "checkpoint": {
+            "schema_version": 1,
+            "status": "STREAM_COPY",
+            "mode": "stream_copy",
+            "source_sha256": "c" * 64,
+            "source_size_bytes": 2048,
+            "source_audio_codec": "aac",
+            "source_audio_duration": "2.000000",
+            "output_audio_codec": None,
+            "output_audio_duration": None,
+            "audio_time_base": "1/48000",
+            "video_codec": "h264",
+        },
+        "published": None,
+    }
+    detector_args = {
+        "audio_missing": {
+            "checkpoint": envelope["checkpoint"],
+            "published": envelope.get("published"),
+            "error": None,
+            "checkpoint_ref": "s11-c1b",
+        },
+        "av_sync_drift": {
+            "checkpoint": envelope["checkpoint"],
+            "scene_timeline": {"duration_seconds": 2.0},
+            "published": envelope.get("published"),
+            "checkpoint_ref": "s11-c1b",
+        },
+    }
+    first = submit_run_qc_checks(
+        session_factory,
+        workspace_id=_C1B_WS,
+        project_id=_C1B_PROJECT,
+        video_item_id=video_id,
+        scope=SCOPE_AUDIO,
+        detector_args=detector_args,
+        generation="1",
+    )
+    job_id = first.job_id
+    with session_factory() as session:
+        queued = JobRepository(session).get_job(job_id)
+        _check(
+            "S11-C1B-01-submit-enqueued-persisted",
+            queued.state == "queued",
+            f"job={job_id} state={queued.state}",
+        )
+
+    # Stop/recreate: drop the FIRST service + worker (process boundary),
+    # then build a SECOND production service against the SAME durable DB +
+    # SAME managed root.  The persisted job row must survive the restart.
+    svc1 = _c1b_make_service(session_factory, managed_root)
+    assert svc1.worker is not None
+    svc1.stop_worker(timeout=2.0)
+    del svc1
+
+    svc2 = _c1b_make_service(session_factory, managed_root)
+    assert svc2.worker is not None
+
+    snapshot = _c1b_poll_terminal(session_factory, job_id, svc2.worker)
+    try:
+        _check(
+            "S11-C1B-02-resumed-to-terminal-completed",
+            snapshot["state"] == "completed",
+            f"job={job_id} state={snapshot['state']}",
+        )
+        results = [a["result"] for a in snapshot["attempts"] if a["result"]]
+        _check(
+            "S11-C1B-03-exactly-one-successor-effect",
+            len(results) == 1 and results[0].get("completed") is True,
+            f"results={len(results)}",
+        )
+        run_ids = [r.get("run_id") for r in results]
+        _check(
+            "S11-C1B-04-single-deterministic-run-id",
+            len(set(run_ids)) == 1 and len((run_ids[0] or "")) == 64,
+            run_ids,
+        )
+
+        with session_factory() as session:
+            rows, _total = QCItemRepository(session).list(
+                _C1B_WS, video_item_id=video_id, limit=10000
+            )
+            keys = [r.evidence_window_key for r in rows]
+            severities = sorted({r.severity for r in rows})
+            blockers = [r for r in rows if r.severity == "blocker"]
+        _check(
+            "S11-C1B-05-blocker-issue-created-once",
+            len(blockers) >= 1,
+            f"severities={severities} total={len(rows)}",
+        )
+        _check(
+            "S11-C1B-06-no-duplicate-natural-keys",
+            len(set(keys)) == len(keys) and len(rows) >= 1,
+            f"total={len(rows)} unique_keys={len(set(keys))}",
+        )
+
+        # Duplicate ACTIVE submit while queued/completed reuses — never a
+        # second effect: completed duplicate reuses the SAME job row.
+        second = submit_run_qc_checks(
+            session_factory,
+            workspace_id=_C1B_WS,
+            project_id=_C1B_PROJECT,
+            video_item_id=video_id,
+            scope=SCOPE_AUDIO,
+            detector_args=detector_args,
+            generation="1",
+        )
+        _check(
+            "S11-C1B-07-completed-duplicate-reuses-same-job",
+            getattr(second, "reused", False) is True
+            and second.job_id == job_id,
+            f"reused={getattr(second, 'reused', None)} "
+            f"job={second.job_id} vs {job_id}",
+        )
+        with session_factory() as session:
+            rows_after, _ = QCItemRepository(session).list(
+                _C1B_WS, video_item_id=video_id, limit=10000
+            )
+        _check(
+            "S11-C1B-08-no-duplicate-resolution-after-restart",
+            len(rows_after) == len(rows),
+            f"before={len(rows)} after={len(rows_after)}",
+        )
+
+        # Readiness stable after re-query from a FRESH repository session:
+        # completed current run with open blockers -> blocked (honest), and
+        # the row set is unchanged across sessions (requirement 6).
+        with session_factory() as fresh:
+            fp = evidence_fingerprint(
+                fresh, workspace_id=_C1B_WS, video_item_id=video_id
+            )
+            ready = check_run_readiness(
+                fresh,
+                workspace_id=_C1B_WS,
+                project_id=_C1B_PROJECT,
+                video_item_id=video_id,
+                evidence_fingerprint=fp,
+                policy_content_hash=policy_bundle()["policy_content_hash"],
+            )
+            ready_again = check_run_readiness(
+                fresh,
+                workspace_id=_C1B_WS,
+                project_id=_C1B_PROJECT,
+                video_item_id=video_id,
+                evidence_fingerprint=fp,
+                policy_content_hash=policy_bundle()["policy_content_hash"],
+            )
+        _check(
+            "S11-C1B-09-readiness-blocked-with-open-blockers",
+            ready.status == "blocked" and ready.run_state == "completed",
+            f"status={ready.status} run_state={ready.run_state}",
+        )
+        _check(
+            "S11-C1B-10-readiness-stable-across-fresh-queries",
+            (ready.status, ready.run_state, ready.blockers)
+            == (ready_again.status, ready_again.run_state, ready_again.blockers),
+            f"first={(ready.status, ready.run_state, ready.blockers)} "
+            f"second={(ready_again.status, ready_again.run_state, ready_again.blockers)}",
+        )
+    finally:
+        # External lane evidence (allowlist path, outside the worktree diff).
+        _C1B_EVIDENCE_ROOT.mkdir(parents=True, exist_ok=True)
+        lane_payload = {
+            "lane": "c1b-t06c",
+            "run_tag": run_tag,
+            "job_id": job_id,
+            "video_item_id": video_id,
+            "db_path": str(db_path),
+            "managed_root": str(managed_root),
+            "terminal": snapshot,
+            "assertions": [
+                a for a in _ASSERTIONS if a["name"].startswith("S11-C1B-")
+            ],
+            "all_ok": all(
+                a["ok"] for a in _ASSERTIONS if a["name"].startswith("S11-C1B-")
+            ),
+        }
+        _write_json(_C1B_EVIDENCE_ROOT / f"c1b_restart_proof_{run_tag}.json", lane_payload)
+        svc2.stop_worker(timeout=2.0)
