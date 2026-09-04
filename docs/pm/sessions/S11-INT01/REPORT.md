@@ -86,3 +86,10 @@ readiness not_run thay vì blocked/completed. Lane T06C gốc verify GREEN trư�
 - Root cause read-only: M1 T03G-C2A1 đổi authority semantics → T05A seed cũ thành `not_run`.
   Route T03G/T05A — Manager quyết. Raw: `s11-c2/lanes/int01-c2merge/raw-gate.txt`.
 - Commit LOG/REPORT này, không push.
+
+## 11. S11-C2 M3 C2-B caf8dcf — TASK_SUBMITTED
+
+- M3 no-ff T05A `caf8dcf` → HEAD `818d361`, zero conflict.
+- Gate @ `818d361`: diff --check 775..HEAD GREEN; T03G **98/98** (113.65s);
+  T05A **9/9** (13.05s); acceptance **12/12** (325.12s). Raw: `s11-c2/lanes/int01-c2merge/raw-gate.txt`.
+- Status: TASK_SUBMITTED. Commit LOG/REPORT này, KHÔNG push.

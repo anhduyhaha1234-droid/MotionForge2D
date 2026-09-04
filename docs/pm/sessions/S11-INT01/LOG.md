@@ -146,3 +146,17 @@ Owner cần xử lý: T03G (nới gate cho run hợp lệ) hoặc T06C (seed run
   (`S11-T06C-06-per-file-zero-failures` entry passed=2 failed=7; per-file-passed gate).
   T03G module 98/98 GREEN. Route về T03G (tương thích) hoặc T05A (update seed theo authority mới) — Manager quyết.
 - Commit LOG/REPORT này, không push, DỪNG.
+
+## 10. S11-C2 M3 — merge C2-B caf8dcf + gate 4 muc
+
+- Preflight: porcelain 0; tip `91db651`; remote `4d7ad81`.
+- Merge: `git merge --no-ff codex/s11/t05a-0903w12` (tip `caf8dcf`) — exit 0,
+  `Merge made by the 'ort' strategy`, 5 files 111 ins (acceptance fix; 2 T05A evidences; test delta 11±).
+  Zero conflict, porcelain 0. → HEAD `818d361eb6d196d347ab2666683cb20b67c421a7` (merge commit).
+- Gate 4 muc @ `818d361` (fresh SQLite, basetemp `%TEMP%/s11c2_m3/*`, `-p no:cacheprovider`,
+  `unset MOTIONFORGE_DATABASE_URL`, raw append `s11-c2/lanes/int01-c2merge/raw-gate.txt`):
+  [1] `git diff --check 7751598..HEAD` exit 0 — GREEN;
+  [2] T03G modules **98 passed, 113.65s** — GREEN;
+  [3] T05A module **9 passed, 13.05s** — GREEN;
+  [4] FULL acceptance **12 passed, 325.12s** — GREEN.
+- **TASK_SUBMITTED — S11-INT01 C2-B verified, gate GREEN 4/4.** Commit LOG/REPORT này, KHÔNG push.
