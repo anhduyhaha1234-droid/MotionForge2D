@@ -112,3 +112,4 @@ Hai file này NẰM NGOÀI write-set T05A (allowlist chỉ 2 test file mới) n�
 - **Fix**: tests/test_s11_t05a_readiness_api.py +11 lines (bounded patch preimage: summary +3, manifests +4/+4) — cấm whole-file overwrite; readiness.py read-only.
 - **Micro matrix 7 rows**: see evidence/c2b_micro_matrix.txt (derived từ qc_check_runs.py bytes tại canonical, không copy gate).
 - **Gates**: T05A file 9 passed (13.27s) + full T05A 14 passed (14.12s) fresh roots; diff --check 7751598 exit 0; ruff F clean; porcalein allowlist-only; scope staged 1 patched test + docs.
+- **C3-B fix**: tests/test_s11_t05a_readiness_api.py +15/-1 (completion source-id/SHA + server revisions, preimage /tmp/c3b_preimage_seed.py 75f71d7f). Gates: 14/14 (14.22s fresh s11c3b_fix1) + ruff F + diff-check 7751598 exit 0. Status: TASK_SUBMITTED.

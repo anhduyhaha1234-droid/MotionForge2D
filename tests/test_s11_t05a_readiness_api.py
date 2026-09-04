@@ -52,10 +52,12 @@ from app.workflow.qc_checks_handler import (
     JOB_TYPE_RUN_QC_CHECKS,
     RUN_QC_SCHEMA_VERSION,
     SCOPE_FULL,
+    detector_revisions,
     evidence_fingerprint,
     policy_bundle,
     scope_detectors,
     scope_fingerprint,
+    source_artifact_fingerprint,
 )
 from app.services.qc_checks import (  # noqa: F401  (self-register 7-detector band)
     audio_missing,
@@ -137,6 +139,14 @@ def _completion_block(
     # FULL band is the frozen 10-detector band; inside this pre-INT01 tree
     # it resolves through the registry (see LOG for the routing note).
     band = scope_detectors(SCOPE_FULL)
+    # C3A1 item 15: completion source identity = persisted CURRENT source
+    # (same representation the producer writes: None id + empty SHA for
+    # the legitimate no-source case).
+    factory = deps.get_job_service().session_factory  # type: ignore[union-attr]
+    with factory() as _src_session:
+        _current_source = source_artifact_fingerprint(
+            _src_session, video_item_id=vid
+        )
     return {
         "schema_version": RUN_QC_SCHEMA_VERSION,
         "job_type": JOB_TYPE_RUN_QC_CHECKS,
@@ -145,11 +155,15 @@ def _completion_block(
         "policy_id": policy["policy_id"],
         "policy_content_hash": policy["policy_content_hash"],
         "source_generation": "1",
+        "source_artifact_id": _current_source["source_artifact_id"],
+        "source_artifact_fingerprint": _current_source["source_sha256"],
         "scope": SCOPE_FULL,
         "scope_fingerprint": scope_fingerprint(SCOPE_FULL),
         "evidence_fingerprint": fp,
         "detectors": list(band),
-        "detector_revisions": {name: "1.0.0" for name in band},
+        # C3A1 item 6: revisions = server-owned registry values (never a
+        # hard-coded map — a forged map with plausible values fails here).
+        "detector_revisions": detector_revisions(list(band)),
         "summary": {
             "checks_requested": len(band),
             "checks_run": len(band),
