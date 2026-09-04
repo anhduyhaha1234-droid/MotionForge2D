@@ -92,3 +92,15 @@ Owner cần xử lý: T03G (nới gate cho run hợp lệ) hoặc T06C (seed run
   [1/5] diff-check exit 0; [2/5] T03G **44 passed, 56.84s**; [3/5] test_t11 **1 passed, 4.83s — C1B-09 GREEN**;
   [4/5] T05A **9 passed, 13.53s**; [5/5] FULL 11 acceptance **11 passed, 278.50s (0:04:38)**.
 - **KẾT LUẬN: GATE XANH HẾT** — commit LOG/REPORT này, không push, DỪNG.
+
+## 7. Full ladder read-only @ `91adbd3` — XANH HẾT 4/4
+
+- Raw log: `C:/Users/Admin/MotionForge2D-evidence/s11-c1/manager/raw/int01-full-ladder.txt`
+  (env `unset MOTIONFORGE_DATABASE_URL`, `-p no:cacheprovider`, basetemp `%TEMP%/s11c1_ladder/*`).
+- [1/4] OUTER acceptance 11 tests — **11 passed, 275.17s**.
+- [2/4] INNER S11_QC_SUITE 20 files — **326 passed, 264.68s**
+  (superset GREEN so với 314 gốc — suite lớn lên sau C2 + T06C follow-on; 0 failed).
+- [3/4] T01-64 (5 file `test_s11_original_audio_{remux,integration,contract,acceptance}` + `test_s11_attach_original_audio_job`) —
+  **64 passed, 271.83s** (khớp T04C ref 271.77s).
+- [4/4] S10-71 (`tests/test_s10_full_apply_api.py`) — **71 passed, 95.50s**.
+- Tổng ladder ~15 phút, 0 failed toàn bộ. Commit LOG/REPORT này, không push, DỪNG.

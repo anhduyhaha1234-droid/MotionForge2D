@@ -65,3 +65,9 @@ readiness not_run thay vì blocked/completed. Lane T06C gốc verify GREEN trư�
 - Gate 5 mục @ `9d0bc5f`: diff-check GREEN; T03G 44/44 (56.84s); **test_t11 1 passed (4.83s) — C1B-09 GREEN**;
   T05A 9/9 (13.53s); **FULL 11 acceptance 11/11 (278.50s)**.
 - Status: TASK_SUBMITTED. Commit LOG/REPORT này, không push.
+
+## 8. Full ladder @ `91adbd3` — TASK_SUBMITTED
+
+- [1/4] OUTER 11/11 (275.17s); [2/4] INNER **326/326** (264.68s, superset của 314);
+  [3/4] T01 **64/64** (271.83s); [4/4] S10 **71/71** (95.50s). 0 failed.
+- Raw: `C:/Users/Admin/MotionForge2D-evidence/s11-c1/manager/raw/int01-full-ladder.txt`.
