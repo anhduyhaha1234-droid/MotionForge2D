@@ -1791,6 +1791,46 @@ def _c2a2_artifact_snapshot(session: Any, *, role_id: str) -> dict[str, str]:
             )
         )
     }
+
+
+def _c2a2_full_snapshot(
+    session: Any, *, role_id: str, managed_root: Path
+) -> dict[str, dict[str, Any]]:
+    """Full row/assoc/SHA/size/byte snapshot for one role (S11-C3-A2 §1).
+
+    Keyed by ObjectRoleArtifact row id; each entry carries the association
+    row id, artifact id, artifact state, relative path, SHA-256, size and
+    the managed byte content.  T04B recipe extended — originals untouched.
+    """
+    from sqlalchemy import select as _full_select
+
+    from app.persistence.artifacts import ManagedRoot as _FullManaged
+    from app.persistence.models import Artifact as _FullArtifact
+    from app.persistence.models import ObjectRoleArtifact as _FullAssoc
+
+    managed = _FullManaged(managed_root)
+    out: dict[str, dict[str, Any]] = {}
+    for assoc in session.scalars(
+        _full_select(_FullAssoc).where(_FullAssoc.role_id == role_id)
+    ).all():
+        row = session.get(_FullArtifact, assoc.artifact_id)
+        assert row is not None, f"artifact row missing for assoc {assoc.id}"
+        content = managed.resolve(row.relative_path).read_bytes()
+        out[assoc.id] = {
+            "assoc_id": assoc.id,
+            "artifact_id": row.id,
+            "state": row.state,
+            "relative_path": row.relative_path,
+            "purpose": assoc.purpose,
+            "source_generation": assoc.source_generation,
+            "source_job_id": assoc.source_job_id,
+            "superseded_by_id": assoc.superseded_by_id,
+            "sha256": row.sha256,
+            "size_bytes": row.size_bytes,
+            "content_sha256": hashlib.sha256(content).hexdigest(),
+            "content_len": len(content),
+        }
+    return out
 #: External lane evidence root (S11-C2 allowlist — outside the worktree diff).
 _C2A2_EVIDENCE_ROOT = Path(
     r"C:\Users\Admin\MotionForge2D-evidence\s11-c2\lanes\c2a2-t06c"
@@ -1875,8 +1915,31 @@ def test_t12_targeted_correction_recompute_restart() -> None:
             .read_bytes()
             for aid in before_c
         }
+        # S11-C3-A2 §1: full pre-correction snapshots of BOTH roles —
+        # association row IDs, artifact IDs, state, path, SHA-256, size,
+        # managed bytes — so post-restart proofs compare exact rows.
+        before_c_full = _c2a2_full_snapshot(
+            session, role_id=role_c_id, managed_root=managed_root
+        )
+        before_a_full = _c2a2_full_snapshot(
+            session, role_id=role_a_id, managed_root=managed_root
+        )
+        assert len(before_a_full) == 2, "role A must own exactly 2 ready artifacts"
+        assert {v["purpose"] for v in before_a_full.values()} == {
+            "thumbnail",
+            "mask",
+        }, "affected role must carry both expected purposes"
+        assert {v["purpose"] for v in before_c_full.values()} == {
+            "thumbnail",
+            "mask",
+        }, "unaffected role must carry both expected purposes"
+        assert all(
+            v["superseded_by_id"] is None
+            for v in (*before_a_full.values(), *before_c_full.values())
+        ), "seed associations must all be active (no supersession yet)"
         item = _c2a2_create_qc_item(session, ids=ids, role_a=role_a, occ_a=occ_a)
         item_id = item.id
+        item_status_before = item.status
         session.commit()
 
     # Step 2 — REAL correction chain (ONE caller-owned transaction).
@@ -1955,13 +2018,13 @@ def test_t12_targeted_correction_recompute_restart() -> None:
                 f"recompute_jobs={len(recompute_jobs)}",
             )
 
-        # Step 5 — affected recomputed; unaffected rows/assoc/SHA/bytes same.
+        # Step 5 — S11-C3-A2: exact affected + unaffected proofs.
         with session_factory() as session:
             after_c = _c2a2_artifact_snapshot(session, role_id=role_c_id)
             _check(
                 "S11-C2A2-06-unaffected-rows-sha-identical",
                 after_c == before_c,
-                f"before={len(before_c)} after={len(after_c)}",
+                f"actual={sorted(after_c)} expected={sorted(before_c)}",
             )
             managed = ManagedRoot(managed_root)
             bytes_same = all(
@@ -1972,13 +2035,92 @@ def test_t12_targeted_correction_recompute_restart() -> None:
             _check(
                 "S11-C2A2-07-unaffected-managed-bytes-identical",
                 bytes_same,
-                f"artifacts={len(after_c)}",
+                f"actual=all_equal expected=True artifacts={len(after_c)}",
+            )
+            # S11-C3-A2 §3: EVERY unaffected C row/assoc/SHA/byte identical —
+            # full-row comparison incl. association row IDs, state, path,
+            # size and supersession flags.
+            after_c_full = _c2a2_full_snapshot(
+                session, role_id=role_c_id, managed_root=managed_root
+            )
+            _check(
+                "S11-C3A2-01-unaffected-full-rows-identical",
+                after_c_full == before_c_full,
+                f"actual_keys={sorted(after_c_full)} "
+                f"expected_keys={sorted(before_c_full)}",
+            )
+            _check(
+                "S11-C3A2-02-unaffected-assocs-still-active",
+                all(
+                    v["superseded_by_id"] is None
+                    for v in after_c_full.values()
+                ),
+                f"actual={[v['superseded_by_id'] for v in after_c_full.values()]} "
+                "expected=[None, None]",
+            )
+            # S11-C3-A2 §2: recompute-job artifacts bound to role A with the
+            # expected purposes, valid SHA/size/bytes, and artifact IDs that
+            # are NOT pre-existing A artifacts.
+            after_a_full = _c2a2_full_snapshot(
+                session, role_id=role_a_id, managed_root=managed_root
             )
             after_a = _c2a2_artifact_snapshot(session, role_id=role_a_id)
             _check(
                 "S11-C2A2-08-affected-recomputed",
                 len(after_a) >= 1 and set(after_a) != set(),
-                f"role_a_artifacts={len(after_a)}",
+                f"actual={sorted(after_a)}",
+            )
+            pre_a_artifact_ids = {
+                v["artifact_id"] for v in before_a_full.values()
+            }
+            new_a = {
+                aid: entry
+                for aid, entry in after_a_full.items()
+                if entry["source_job_id"] == recompute_job_id
+            }
+            _check(
+                "S11-C3A2-03-new-a-artifacts-bound-to-recompute-job",
+                len(new_a) >= 1
+                and {e["purpose"] for e in new_a.values()} == {
+                    "thumbnail",
+                    "mask",
+                },
+                f"actual_purposes={sorted({e['purpose'] for e in new_a.values()})} "
+                "expected=['mask', 'thumbnail']",
+            )
+            new_a_ids = {e["artifact_id"] for e in new_a.values()}
+            _check(
+                "S11-C3A2-04-new-artifacts-not-preexisting",
+                new_a_ids.isdisjoint(pre_a_artifact_ids),
+                f"actual_new={sorted(new_a_ids)} "
+                f"preexisting={sorted(pre_a_artifact_ids)}",
+            )
+            content_ok = all(
+                e["content_sha256"] == e["sha256"]
+                and e["content_len"] == e["size_bytes"]
+                and e["state"] == "ready"
+                for e in new_a.values()
+            )
+            _check(
+                "S11-C3A2-05-new-artifacts-valid-sha-size-bytes",
+                content_ok,
+                f"actual={content_ok} expected=True entries={len(new_a)}",
+            )
+            # Supersession per production contract (S08-T05-C1): each OLD A
+            # association row stays auditable and points at its replacement
+            # via superseded_by_id; "newest valid" resolves superseded NULL.
+            superseded_targets = {
+                v["superseded_by_id"] for v in after_a_full.values()
+            } - {None}
+            new_assoc_ids = set(new_a)
+            old_a_assoc_ids = set(before_a_full)
+            _check(
+                "S11-C3A2-06-old-a-assocs-superseded-to-replacements",
+                old_a_assoc_ids.isdisjoint(new_assoc_ids)
+                and superseded_targets.issubset(new_assoc_ids)
+                and len(superseded_targets) >= 1,
+                f"actual_targets={sorted(superseded_targets)} "
+                f"new_assocs={sorted(new_assoc_ids)}",
             )
             new_rows = session.scalars(
                 _c2a2_select(Artifact).where(
@@ -1990,7 +2132,7 @@ def test_t12_targeted_correction_recompute_restart() -> None:
             _check(
                 "S11-C2A2-09-recompute-published-under-own-job-dir",
                 len(new_rows) >= 1,
-                f"rows={len(new_rows)}",
+                f"actual={len(new_rows)} expected>=1",
             )
             leaked = [
                 row.id
@@ -2006,14 +2148,27 @@ def test_t12_targeted_correction_recompute_restart() -> None:
             _check(
                 "S11-C2A2-10-no-unaffected-republish",
                 leaked == [],
-                f"leaked={leaked}",
+                f"actual={leaked} expected=[]",
+            )
+            # S11-C3-A2 §3: zero C publication under the recompute job dir.
+            c_published = [
+                row.id
+                for row in new_rows
+                if f"/{role_c_id}/" in (row.relative_path or "")
+                or row.id in {v["artifact_id"] for v in after_c_full.values()}
+            ]
+            _check(
+                "S11-C3A2-07-zero-c-publication-under-recompute-job",
+                c_published == [],
+                f"actual={c_published} expected=[]",
             )
             occ_after = session.get(ObjectOccurrence, occ_a_id)
             _check(
                 "S11-C2A2-11-occurrence-cas-once",
                 occ_after.review_state == "rejected"
                 and occ_after.revision == occ_a_rev_before + 1,
-                f"state={occ_after.review_state} rev={occ_after.revision}",
+                f"actual=({occ_after.review_state}, {occ_after.revision}) "
+                f"expected=('rejected', {occ_a_rev_before + 1})",
             )
 
         # Step 6 — manifest affected-only; no full-project job/publication.
@@ -2055,7 +2210,14 @@ def test_t12_targeted_correction_recompute_restart() -> None:
             )
 
         # Step 7 — fresh reads: stable final correction/recompute/QC state.
+        # S11-C3-A2 §4: exact QCItem status (the chain never moves the item —
+        # recheck is a separate step, so `open` awaiting recheck is the
+        # honest contract; never claim resolved) + exact computed readiness
+        # (no QC run submitted in this lane, so fail-closed not_run).
         with session_factory() as fresh:
+            from app.persistence.qc_items import QCItemRepository
+            from app.persistence.readiness import compute_project_readiness
+
             frepo = JobRepository(fresh)
             fjob = frepo.get_job(recompute_job_id)
             fcorr = fresh.scalar(
@@ -2070,17 +2232,56 @@ def test_t12_targeted_correction_recompute_restart() -> None:
                 and fagain.state == "completed"
                 and fcorr is not None
                 and fcorr.status == "applied",
-                f"state={fjob.state} correction={fcorr.status if fcorr else None}",
+                f"actual=({fjob.state}, {fcorr.status if fcorr else None}) "
+                "expected=('completed', 'applied')",
+            )
+            fitem = QCItemRepository(fresh).get(item_id, _C2A2_WS)
+            _check(
+                "S11-C3A2-08-qcitem-exact-status-open-awaiting-recheck",
+                fitem.status == "open",
+                f"actual={fitem.status} expected='open' "
+                f"(before={item_status_before})",
+            )
+            ready = compute_project_readiness(
+                fresh, workspace_id=_C2A2_WS, project_id=pid
+            )
+            vids = {v.video_item_id: v for v in ready.videos}
+            ours = vids.get(vid)
+            _check(
+                "S11-C3A2-09-readiness-exact-not-run-fail-closed",
+                ready.status == "not_run"
+                and ours is not None
+                and ours.run_state in ("never_run", "not_run", "no_run")
+                and ready.blockers == []
+                and ready.warning_count == 0,
+                f"actual=({ready.status}, {ours.run_state if ours else None}, "
+                f"blockers={len(ready.blockers)} warnings={ready.warning_count}) "
+                "expected=('not_run', never-run, 0, 0)",
             )
     finally:
-        # Step 8 — assertion-indexed evidence to the NEW S11-C2 run-id.
-        _C2A2_EVIDENCE_ROOT.mkdir(parents=True, exist_ok=True)
-        mine = [a for a in _ASSERTIONS if a["name"].startswith("S11-C2A2-")]
+        # Step 8 — S11-C3-A2 §6 hermetic evidence: an explicit S11-C3
+        # evidence-root env var selects durable output; otherwise write
+        # ONLY under this run's fresh temp/scratch root.  Ordinary reruns
+        # never mutate S11-C2/S11-C3 evidence.
+        import os as _c3a2_os
+
+        _c3a2_root = _c3a2_os.environ.get("S11_C3_EVIDENCE_ROOT")
+        _c3a2_outdir = (
+            Path(_c3a2_root) if _c3a2_root else (scratch / "c3a2-evidence")
+        )
+        _c3a2_outdir.mkdir(parents=True, exist_ok=True)
+        mine = [
+            a
+            for a in _ASSERTIONS
+            if a["name"].startswith(("S11-C2A2-", "S11-C3A2-"))
+        ]
         _write_json(
-            _C2A2_EVIDENCE_ROOT / f"c2a2_restart_proof_{run_tag}.json",
+            _c3a2_outdir / f"c3a2_restart_proof_{run_tag}.json",
             {
-                "lane": "c2a2-t06c",
+                "lane": "c3a2-t06c",
                 "run_tag": run_tag,
+                "supersedes_note": "strengthened S11-C2A2 scenario; "
+                "S11-C2A2-* checks retained verbatim",
                 "correction_id": correction_id,
                 "recompute_job_id": recompute_job_id,
                 "video_item_id": vid,
