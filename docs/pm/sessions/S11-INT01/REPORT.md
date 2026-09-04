@@ -93,3 +93,9 @@ readiness not_run thay vì blocked/completed. Lane T06C gốc verify GREEN trư�
 - Gate @ `818d361`: diff --check 775..HEAD GREEN; T03G **98/98** (113.65s);
   T05A **9/9** (13.05s); acceptance **12/12** (325.12s). Raw: `s11-c2/lanes/int01-c2merge/raw-gate.txt`.
 - Status: TASK_SUBMITTED. Commit LOG/REPORT này, KHÔNG push.
+
+## 12. S11-C2 ladder @ `c377b0b` — TASK_SUBMITTED
+
+- [1/4] OUTER **12/12** (328.54s); [2/4] INNER **380/380** (319.98s, >=326);
+  [3/4] T01 **64/64** (272.36s); [4/4] S10 **71/71** (89.44s). 0 failed.
+- Raw: `C:/Users/Admin/MotionForge2D-evidence/s11-c2/manager/raw/int01-full-ladder.txt`.

@@ -160,3 +160,13 @@ Owner cần xử lý: T03G (nới gate cho run hợp lệ) hoặc T06C (seed run
   [3] T05A module **9 passed, 13.05s** — GREEN;
   [4] FULL acceptance **12 passed, 325.12s** — GREEN.
 - **TASK_SUBMITTED — S11-INT01 C2-B verified, gate GREEN 4/4.** Commit LOG/REPORT này, KHÔNG push.
+
+## 11. S11-C2 ladder — full ladder read-only @ `c377b0b` GREEN 4/4
+
+- Raw log: `C:/Users/Admin/MotionForge2D-evidence/s11-c2/manager/raw/int01-full-ladder.txt`
+  (fresh SQLite, basetemp `%TEMP%/s11c2_ladder2/*`, `-p no:cacheprovider`, `unset MOTIONFORGE_DATABASE_URL`).
+- [1/4] OUTER acceptance (12) — **12 passed, 328.54s**.
+- [2/4] INNER S11 QC suite — **380 passed, 319.98s** (superset GREEN, >=326).
+- [3/4] T01 — **64 passed, 272.36s**.
+- [4/4] S10 full-apply — **71 passed, 89.44s**.
+- 4/4 GREEN, 0 failed. Commit LOG/REPORT nay, KHONG push.
