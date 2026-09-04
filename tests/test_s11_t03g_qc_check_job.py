@@ -65,6 +65,7 @@ from app.persistence.qc_check_runs import (
 )
 from app.persistence.qc_items import QCItemRepository
 from app.services.qc_checks import audio_missing, av_sync_drift  # noqa: F401  (self-register)
+from app.services.video_import import VideoImportError
 from app.workflow.durable_worker import DurableWorker, WorkerConfig
 from app.workflow.job_service import JobService
 from app.workflow.qc_checks_handler import (
@@ -527,7 +528,7 @@ def test_submit_cross_owner_fails_closed(session_factory, svc: JobService) -> No
         )
         s.commit()
     video_id = seed_ws_project(session_factory(), video_id=None)
-    with pytest.raises(Exception):
+    with pytest.raises((QcCheckRunSubmitError, VideoImportError)):
         submit_run_qc_checks(
             session_factory,
             workspace_id=other,
@@ -1529,7 +1530,7 @@ def test_c2a1_summary_count_wrong_type_never_defaults_to_zero(
     elif bad == "string":
         kwargs = {"summary_override": {key: "0"}}
     else:
-        kwargs = {"summary_override": {key: True if key != "errors" else False}}
+        kwargs = {"summary_override": {key: key != "errors"}}
         # NOTE: even False (a bool) is rejected — bool is not a JSON
         # number, so the gate cannot be laundered through falsy values.
     _seed_full_job(session_factory, video_id=video_id, **kwargs)  # type: ignore[arg-type]
