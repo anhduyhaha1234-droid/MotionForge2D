@@ -143,4 +143,5 @@ Forbidden verified: `git status --porcelain` chỉ 8 file allowlist + docs; `mod
 - Postimage: `qc_check_runs.py` `9dcbe7c5d13b23a0` 39256B 893L; job
   tests `a96935de51c1ae94` 90817B 2177L; api tests `3c6842a545279c71`
   34385B 836L.
-- Commit local trên `codex/s11/t03g-0903w8`: PENDING (ghi sau commit).
+- Commit local trên `codex/s11/t03g-0903w8`: `b0a334d`
+  (C3-A1, parent `e7e9242`).
