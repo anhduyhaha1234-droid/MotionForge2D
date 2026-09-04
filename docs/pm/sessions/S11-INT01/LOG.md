@@ -35,7 +35,7 @@ LOG/REPORT T06C; evidence `c1b_restart_proof_20260903-185130.json` mới). Zero 
 ## 3. Combined gate (read-only, cây đã merge @ `f0c26fc`)
 
 Env: `unset MOTIONFORGE_DATABASE_URL`, `-p no:cacheprovider`, basetemp riêng `C:/Users/Admin/AppData/Local/Temp/s11int01c1/*`.
-Raw log: `C:/Users/Admin/MotionForge2D-evidence/s11-c1/manager/raw/int01-combined-gate.txt`
+Raw log: `C:/Users/Admin/MotionForge2D-evidence/s11-c1/manager/raw/int01-combined-gate.txt` (append mỗi re-run).
 
 | Gate | Kết quả |
 |---|---|
@@ -77,3 +77,18 @@ Owner cần xử lý: T03G (nới gate cho run hợp lệ) hoặc T06C (seed run
   test_t11 submit với `scope=SCOPE_AUDIO` (`test_s11_t02_t06_acceptance.py:1153,1222`) — AUDIO-scope run KHÔNG BAO GIỜ
   pass gate C1-A (newest FULL-scope run + 6 điều kiện). Mâu thuẫn test-vs-gate này thuộc owner T06C (đổi seed sang
   FULL) hoặc T03G (nới gate) — Manager route. INT01 giữ cây merged + evidence, DỪNG.
+
+## 6. Final re-run T06C follow-on — GATE XANH HẾT
+
+- Follow-on verified: `codex/s11/t06c-0903w14` tip `31fb242412f11ec846343123d63f5e1d97fa8669`
+  (`feat(s11-t06c): C1-B follow-on FULL-scope seed (INT01 RED C1B-09)`, parent lane gốc `bdc1edf`;
+  Manager verify test_t11 1 passed/4.82s trên committed tree + terminal TASK_SUBMITTED).
+- Merge M5 vào `8a8c2d0`: divergent → `git merge --no-ff --no-edit` (exit 0):
+  `Merge made by the 'ort' strategy` — 3 files, 585 ins / 5 del
+  (`tests/test_s11_t02_t06_acceptance.py` 266± FULL-scope seed; LOG T06C 45±;
+  evidence `c1b_restart_proof_20260904-010041.json` mới 279). Zero conflict, porcelain 0.
+  → HEAD `9d0bc5f13eb5ef7d40827af8cfd5fb664dbcb2ac` (merge commit).
+- Full combined gate 5 mục @ `9d0bc5f` (raw append vào `int01-combined-gate.txt`):
+  [1/5] diff-check exit 0; [2/5] T03G **44 passed, 56.84s**; [3/5] test_t11 **1 passed, 4.83s — C1B-09 GREEN**;
+  [4/5] T05A **9 passed, 13.53s**; [5/5] FULL 11 acceptance **11 passed, 278.50s (0:04:38)**.
+- **KẾT LUẬN: GATE XANH HẾT** — commit LOG/REPORT này, không push, DỪNG.

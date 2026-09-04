@@ -58,3 +58,10 @@ readiness not_run thay vì blocked/completed. Lane T06C gốc verify GREEN trư�
   không chạm seed test_t11; test_t11 submit `scope=SCOPE_AUDIO` (:1153,1222) — AUDIO run không pass gate C1-A
   (newest FULL-scope + 6 điều kiện). Route về T06C (seed FULL) hoặc T03G (nới gate) — Manager quyết.
 - Raw log append: `C:/Users/Admin/MotionForge2D-evidence/s11-c1/manager/raw/int01-combined-gate.txt`.
+
+## 7. Final re-run T06C follow-on — GATE XANH HẾT
+
+- Merge M5: T06C `31fb242` no-ff vào `8a8c2d0` → HEAD `9d0bc5f13eb5ef7d40827af8cfd5fb664dbcb2ac`, zero conflict.
+- Gate 5 mục @ `9d0bc5f`: diff-check GREEN; T03G 44/44 (56.84s); **test_t11 1 passed (4.83s) — C1B-09 GREEN**;
+  T05A 9/9 (13.53s); **FULL 11 acceptance 11/11 (278.50s)**.
+- Status: TASK_SUBMITTED. Commit LOG/REPORT này, không push.
