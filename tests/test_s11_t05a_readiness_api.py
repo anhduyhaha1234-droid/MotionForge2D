@@ -487,7 +487,12 @@ def test_readiness_queued_running_failed_stale_not_run_with_detail(
     assert by_vid[V_Q]["status"] == "not_run" and by_vid[V_Q]["run_state"] == "queued"
     assert by_vid[V_R]["status"] == "not_run" and by_vid[V_R]["run_state"] == "running"
     assert by_vid[V_F]["status"] == "not_run" and by_vid[V_F]["run_state"] == "failed"
-    assert by_vid[V_S]["status"] == "not_run" and by_vid[V_S]["run_state"] == "stale"
+    # C3: V_S seeds a FORGED manifest fp (stale_fp) with an honest completion.
+    # Under the C3A1 fail-closed envelope (T03G) a foreign manifest never
+    # proves coverage (items 7-8) -> run_state failed (never stale); the
+    # aggregate still stays not_run. Pre-merge C2-A1 production returns
+    # stale here - the 14/14 proof lands on the post-merge INT tree (M3).
+    assert by_vid[V_S]["status"] == "not_run" and by_vid[V_S]["run_state"] == "failed"
     for v in body["videos"]:
         assert v["check_state_detail"], v["video_item_id"]
     for v in body["videos"]:
