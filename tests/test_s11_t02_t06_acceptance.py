@@ -45,6 +45,7 @@ Acceptance criteria (binary):
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import itertools
 import json
 import msvcrt
@@ -1557,4 +1558,537 @@ def test_t11_executable_restart_resume_epic_exit() -> None:
             ),
         }
         _write_json(_C1B_EVIDENCE_ROOT / f"c1b_restart_proof_{run_tag}.json", lane_payload)
+        svc2.stop_worker(timeout=2.0)
+# ── S11-C2 C2-A2: targeted correction/recompute restart (guarded bounded) ──
+#
+# C1 rereview CHANGES_REQUESTED: test_t11 recreated JobService but restarted a
+# full RUN_QC_CHECKS — NOT a targeted correction/RECOMPUTE_OBJECTS; it never
+# compared affected/unaffected artifact rows, hashes or bytes (misleading
+# proof).  This node replaces/augments it with the REAL targeted path (§5
+# C2-A2, 8 steps): seed real project/video + occurrence/role + affected &
+# unaffected ready artifacts (row IDs, SHA-256, managed bytes) + eligible QC
+# blocker -> real `run_correction_chain` -> 1 durable ObjectCorrection + 1
+# queued RECOMPUTE_OBJECTS -> record queued -> stop/drop service/worker ->
+# recreate new production JobService on same DB + managed root -> resume with
+# bounded polling -> prove exactly-one + affected recomputed + unaffected
+# identical + manifest affected-only -> fresh reads stable -> S11-C2 evidence.
+#
+# Seed helpers below COPY the T04B recipe
+# (tests/test_s11_t04b_correction_rerun.py::_seed_* — originals untouched);
+# only the prefix is renamed (_seed_* -> _c2a2_*) and constants re-scoped.
+
+_C2A2_WS = "ws-s11-c2a2"
+_C2A2_SOURCE_MEDIA_BYTES = b"motionforge-c2a2-source-media"
+_C2A2_SOURCE_SHA = hashlib.sha256(_C2A2_SOURCE_MEDIA_BYTES).hexdigest()
+
+
+def _c2a2_seed_video(session: Any, *, pid: str, vid: str) -> dict[str, str]:
+    """Workspace + project + video + source artifact + scenes (T04B recipe)."""
+    from app.persistence.models import Artifact, Project, Scene, VideoItem, Workspace
+
+    ws = session.get(Workspace, _C2A2_WS)
+    if ws is None:
+        session.add(Workspace(id=_C2A2_WS, name=_C2A2_WS))
+        session.flush()
+    project = Project(id=pid, workspace_id=_C2A2_WS, name=f"C2A2-{pid[:8]}")
+    session.add(project)
+    session.flush()
+    video = VideoItem(
+        id=vid, project_id=pid, title="C2A2", position=0, width=320,
+        height=240, duration_ms=6000, fps_num=30, fps_den=1,
+    )
+    session.add(video)
+    session.flush()
+    source = Artifact(
+        workspace_id=_C2A2_WS,
+        kind="video",
+        relative_path=f"artifacts/{_C2A2_WS}/video/{video.id}/import/c2a2-source.mp4",
+        state="ready",
+        sha256=_C2A2_SOURCE_SHA,
+        size_bytes=len(_C2A2_SOURCE_MEDIA_BYTES),
+        mime_type="video/mp4",
+    )
+    session.add(source)
+    session.flush()
+    video.source_artifact_id = source.id
+    scenes: list[str] = []
+    for index in range(2):
+        scene = Scene(
+            video_item=video,
+            position=index,
+            start_frame=index * 90,
+            end_frame=index * 90 + 89,
+            start_time_ms=index * 3000,
+            end_time_ms=index * 3000 + 2999,
+            status="pending",
+        )
+        session.add(scene)
+        session.flush()
+        scenes.append(scene.id)
+    session.commit()
+    return {"project": project.id, "video": video.id, "scenes": scenes}
+
+
+def _c2a2_seed_source_job(session: Any, ids: dict[str, str]) -> str:
+    """COMPLETED DISCOVER_OBJECTS job — makes generation "1" current."""
+    import uuid as _uuid
+
+    from sqlalchemy import update as sa_update
+
+    from app.persistence.jobs import JobRepository, StepInput
+    from app.persistence.models import Job
+
+    job = JobRepository(session).create_job(
+        workspace_id=_C2A2_WS,
+        job_type="DISCOVER_OBJECTS",
+        owner_type="video_item",
+        owner_id=ids["video"],
+        input_manifest={"schema_version": 1, "source_sha256": _C2A2_SOURCE_SHA},
+        idempotency_key=f"c2a2-discover:{_uuid.uuid4()}",
+        input_generation="1",
+        steps=[StepInput(step_code="extract", position=0, step_type="sync")],
+        actor="system",
+    )
+    session.execute(sa_update(Job).where(Job.id == job.id).values(state="completed"))
+    return job.id
+
+
+def _c2a2_seed_role(session: Any, ids: dict[str, str], name: str) -> Any:
+    from app.persistence.models import ObjectRole
+
+    role = ObjectRole(
+        workspace_id=_C2A2_WS,
+        project_id=ids["project"],
+        video_item_id=ids["video"],
+        source_generation="1",
+        name=name,
+        kind="character",
+        status="suggested",
+    )
+    session.add(role)
+    session.flush()
+    return role
+
+
+def _c2a2_seed_occ(session: Any, role: Any, scene_id: str, frame: int) -> Any:
+    from app.persistence.models import ObjectOccurrence
+
+    occ = ObjectOccurrence(
+        workspace_id=role.workspace_id,
+        project_id=role.project_id,
+        video_item_id=role.video_item_id,
+        role_id=role.id,
+        scene_id=scene_id,
+        frame_index=frame,
+        time_ms=frame * 33,
+        bbox_x=10,
+        bbox_y=10,
+        bbox_w=40,
+        bbox_h=40,
+        confidence=0.6,
+        confidence_source="detector",
+        algorithm="deterministic-layout",
+        algorithm_version="1.0.0",
+        reasons_json="[]",
+        review_state="unreviewed",
+    )
+    session.add(occ)
+    session.flush()
+    return occ
+
+
+def _c2a2_seed_media(
+    session: Any, role: Any, source_job_id: str, tag: str, managed_root: Path
+) -> dict[str, Any]:
+    """OLD active DISCOVER media (thumbnail + mask) for a role."""
+    from app.persistence.artifacts import ManagedRoot
+    from app.persistence.models import Artifact, ObjectRoleArtifact
+
+    associations: dict[str, Any] = {}
+    managed = ManagedRoot(managed_root)
+    for purpose in ("thumbnail", "mask"):
+        relative_path = (
+            f"artifacts/{role.workspace_id}/image/{source_job_id}/"
+            f"extract/{tag}-{purpose}.png"
+        )
+        raw = (b"\x89PNG" + f"{tag}-{purpose}".encode("utf-8")).ljust(128, b"\x00")
+        managed.atomic_write_bytes(relative_path, raw)
+        artifact = Artifact(
+            workspace_id=role.workspace_id,
+            kind="image",
+            relative_path=relative_path,
+            state="ready",
+            sha256=hashlib.sha256(raw).hexdigest(),
+            size_bytes=len(raw),
+            mime_type="image/png",
+            width=64,
+            height=64,
+        )
+        session.add(artifact)
+        session.flush()
+        assoc = ObjectRoleArtifact(
+            workspace_id=role.workspace_id,
+            role_id=role.id,
+            artifact_id=artifact.id,
+            purpose=purpose,
+            source_generation="1",
+            source_job_id=source_job_id,
+        )
+        session.add(assoc)
+        associations[purpose] = assoc
+    session.flush()
+    return associations
+
+
+def _c2a2_create_qc_item(
+    session: Any, *, ids: dict[str, str], role_a: Any, occ_a: Any
+) -> Any:
+    import uuid as _uuid
+
+    from app.persistence.qc_items import QCItemRepository
+
+    return QCItemRepository(session).create(
+        workspace_id=_C2A2_WS,
+        project_id=ids["project"],
+        video_item_id=ids["video"],
+        layer_ref_type="object",
+        layer_ref_id=f"obj-{_uuid.uuid4().hex[:8]}",
+        reason_code="trajectory_drift",
+        evidence_window_key=f"c2a2-window-{_uuid.uuid4()}",
+        evidence={
+            "schema_version": 1,
+            "object_id": f"obj-{role_a.id[:8]}",
+            "object_role_id": role_a.id,
+            "occurrence_id": occ_a.id,
+            "role_revision": role_a.revision,
+            "occurrence_revision": occ_a.revision,
+        },
+        severity="warning",
+        category="trajectory_drift",
+        detector="trajectory_drift",
+        detector_revision="1.0.0",
+        confidence=0.85,
+        confidence_source="derived",
+        checkpoint_ref="c2a2-checkpoint",
+    )
+
+
+def _c2a2_artifact_snapshot(session: Any, *, role_id: str) -> dict[str, str]:
+    """{artifact_id: sha256} of ready images for one role."""
+    from sqlalchemy import select
+
+    from app.persistence.models import Artifact, ObjectRoleArtifact
+
+    return {
+        row.id: row.sha256
+        for row in session.scalars(
+            select(Artifact).where(Artifact.workspace_id == _C2A2_WS)
+        ).all()
+        if session.scalar(
+            select(ObjectRoleArtifact.id).where(
+                ObjectRoleArtifact.artifact_id == row.id,
+                ObjectRoleArtifact.role_id == role_id,
+            )
+        )
+    }
+#: External lane evidence root (S11-C2 allowlist — outside the worktree diff).
+_C2A2_EVIDENCE_ROOT = Path(
+    r"C:\Users\Admin\MotionForge2D-evidence\s11-c2\lanes\c2a2-t06c"
+)
+
+
+def test_t12_targeted_correction_recompute_restart() -> None:
+    """S11-C2 C2-A2: restart the ACTUAL targeted correction/recompute path.
+
+    §5 C2-A2, 8 steps, REAL stack on a fresh temp DB (Alembic head) + new
+    temp managed root (env DB strip):
+
+    1. Seed real project/video + occurrence/role A (affected) + role C
+       (unaffected), ready artifacts with row IDs / SHA-256 / managed bytes,
+       plus an eligible QC blocker (occurrence-backed trajectory_drift).
+    2. Call the REAL `run_correction_chain` -> 1 durable ObjectCorrection +
+       1 queued RECOMPUTE_OBJECTS job (NOT a RUN_QC_CHECKS row).
+    3. Record queued state, stop/drop service/worker, recreate a NEW
+       production JobService on the SAME DB + SAME managed root, resume the
+       persisted recompute with bounded polling.
+    4. Prove exactly one correction, one successor/effect, one terminal
+       resolution, no duplicate enqueue/attempt from restart/replay.
+    5. Prove affected role artifacts recomputed while EVERY unaffected ready
+       artifact row, association, SHA-256 and byte content is identical.
+    6. Prove manifest scope affected-only; no full-project/full-timeline job
+       or publication.
+    7. Fresh repository/service reads prove stable final correction,
+       recompute, QCItem and readiness state.
+    8. Assertion-indexed evidence to the new S11-C2 run-id (never C1 files).
+    """
+    import json as _c2a2_json
+    import uuid as _c2a2_uuid
+
+    from sqlalchemy import func as _c2a2_func
+    from sqlalchemy import select as _c2a2_select
+
+    from app.persistence import create_engine_for_path, create_session_factory
+    from app.persistence.artifacts import ManagedRoot
+    from app.persistence.jobs import JobRepository
+    from app.persistence.models import (
+        Artifact,
+        Job,
+        ObjectCorrection,
+        ObjectOccurrence,
+        ObjectRoleArtifact,
+    )
+    from app.services import qc_correction_bridge as _c2a2_bridge
+
+    run_tag = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    scratch = Path(tempfile.mkdtemp(prefix="s11c2a2_"))
+    db_path = scratch / "c2a2.db"
+    managed_root = scratch / "managed"
+    managed_root.mkdir(parents=True, exist_ok=True)
+    _c1b_alembic_head(db_path)
+    session_factory = create_session_factory(create_engine_for_path(db_path))
+
+    pid = str(_c2a2_uuid.uuid4())
+    vid = str(_c2a2_uuid.uuid4())
+    svc1 = _c1b_make_service(session_factory, managed_root)
+    assert svc1.worker is not None
+
+    # Step 1 — seed: role A affected (with media), role C unaffected media.
+    with session_factory() as session:
+        ids = _c2a2_seed_video(session, pid=pid, vid=vid)
+        discover_id = _c2a2_seed_source_job(session, ids)
+        role_a = _c2a2_seed_role(session, ids, "A")
+        role_a.source_job_id = discover_id
+        role_c = _c2a2_seed_role(session, ids, "C")
+        role_c.source_job_id = discover_id
+        occ_a = _c2a2_seed_occ(session, role_a, ids["scenes"][0], 5)
+        occ_a_id = occ_a.id
+        occ_a_rev_before = occ_a.revision
+        role_a_id = role_a.id
+        role_c_id = role_c.id
+        _c2a2_seed_media(session, role_a, discover_id, "role-a", managed_root)
+        _c2a2_seed_media(session, role_c, discover_id, "role-c", managed_root)
+        before_c = _c2a2_artifact_snapshot(session, role_id=role_c_id)
+        assert len(before_c) == 2, "role C must own exactly 2 ready artifacts"
+        before_c_bytes = {
+            aid: ManagedRoot(managed_root)
+            .resolve(session.get(Artifact, aid).relative_path)
+            .read_bytes()
+            for aid in before_c
+        }
+        item = _c2a2_create_qc_item(session, ids=ids, role_a=role_a, occ_a=occ_a)
+        item_id = item.id
+        session.commit()
+
+    # Step 2 — REAL correction chain (ONE caller-owned transaction).
+    # QCItemRecord is a repository DTO (not a mapped entity): read via the
+    # production QCItemRepository exactly like T04B (foreign-owned recipe).
+    with session_factory() as session:
+        from app.persistence.qc_items import QCItemRepository
+
+        current = QCItemRepository(session).get(item_id, _C2A2_WS)
+        assert current is not None, "seeded QC item must be readable"
+        result = _c2a2_bridge.run_correction_chain(
+            session,
+            current,
+            workspace_id=_C2A2_WS,
+            managed_root=str(managed_root),
+        )
+        assert result.status == "applied", f"chain status={result.status}"
+        assert result.created is True
+        assert result.recompute_job_id is not None, "no RECOMPUTE_OBJECTS row"
+        correction_id = result.correction_id
+        recompute_job_id = result.recompute_job_id
+        assert result.impact.affected_role_ids == [role_a_id]
+        session.commit()
+
+    with session_factory() as session:
+        job = JobRepository(session).get_job(recompute_job_id)
+        assert job.job_type == "RECOMPUTE_OBJECTS", f"type={job.job_type}"
+        assert job.state == "queued", f"state={job.state}"
+        _check(
+            "S11-C2A2-01-correction-plus-queued-recompute",
+            True,
+            f"correction={correction_id} job={recompute_job_id} state=queued",
+        )
+
+    # Step 3 — stop/drop service/worker, recreate NEW production service on
+    # the SAME DB + SAME managed root, resume persisted recompute (bounded).
+    svc1.stop_worker(timeout=2.0)
+    del svc1
+    svc2 = _c1b_make_service(session_factory, managed_root)
+    assert svc2.worker is not None
+    snapshot = _c1b_poll_terminal(session_factory, recompute_job_id, svc2.worker)
+    try:
+        _check(
+            "S11-C2A2-02-resumed-to-terminal-completed",
+            snapshot["state"] == "completed",
+            f"job={recompute_job_id} state={snapshot['state']}",
+        )
+
+        # Step 4 — exactly one correction / successor / terminal, no dup.
+        with session_factory() as session:
+            n_corr = session.scalar(
+                _c2a2_select(_c2a2_func.count()).select_from(ObjectCorrection)
+            )
+            _check(
+                "S11-C2A2-03-exactly-one-correction",
+                n_corr == 1,
+                f"corrections={n_corr}",
+            )
+            repo = JobRepository(session)
+            attempts = repo.list_attempts(recompute_job_id)
+            _check(
+                "S11-C2A2-04-single-successor-no-duplicate-attempts",
+                len(attempts) == 1 and attempts[0].result is not None,
+                f"attempts={len(attempts)}",
+            )
+            recompute_jobs = session.scalars(
+                _c2a2_select(Job).where(
+                    Job.job_type == "RECOMPUTE_OBJECTS",
+                    Job.workspace_id == _C2A2_WS,
+                )
+            ).all()
+            _check(
+                "S11-C2A2-05-no-duplicate-recompute-enqueue",
+                len(recompute_jobs) == 1
+                and recompute_jobs[0].id == recompute_job_id,
+                f"recompute_jobs={len(recompute_jobs)}",
+            )
+
+        # Step 5 — affected recomputed; unaffected rows/assoc/SHA/bytes same.
+        with session_factory() as session:
+            after_c = _c2a2_artifact_snapshot(session, role_id=role_c_id)
+            _check(
+                "S11-C2A2-06-unaffected-rows-sha-identical",
+                after_c == before_c,
+                f"before={len(before_c)} after={len(after_c)}",
+            )
+            managed = ManagedRoot(managed_root)
+            bytes_same = all(
+                managed.resolve(session.get(Artifact, aid).relative_path).read_bytes()
+                == before_c_bytes[aid]
+                for aid in after_c
+            )
+            _check(
+                "S11-C2A2-07-unaffected-managed-bytes-identical",
+                bytes_same,
+                f"artifacts={len(after_c)}",
+            )
+            after_a = _c2a2_artifact_snapshot(session, role_id=role_a_id)
+            _check(
+                "S11-C2A2-08-affected-recomputed",
+                len(after_a) >= 1 and set(after_a) != set(),
+                f"role_a_artifacts={len(after_a)}",
+            )
+            new_rows = session.scalars(
+                _c2a2_select(Artifact).where(
+                    Artifact.relative_path.like(
+                        f"artifacts/{_C2A2_WS}/image/{recompute_job_id}/%"
+                    )
+                )
+            ).all()
+            _check(
+                "S11-C2A2-09-recompute-published-under-own-job-dir",
+                len(new_rows) >= 1,
+                f"rows={len(new_rows)}",
+            )
+            leaked = [
+                row.id
+                for row in new_rows
+                if session.scalar(
+                    _c2a2_select(ObjectRoleArtifact.id).where(
+                        ObjectRoleArtifact.artifact_id == row.id,
+                        ObjectRoleArtifact.role_id == role_c_id,
+                    )
+                )
+                is not None
+            ]
+            _check(
+                "S11-C2A2-10-no-unaffected-republish",
+                leaked == [],
+                f"leaked={leaked}",
+            )
+            occ_after = session.get(ObjectOccurrence, occ_a_id)
+            _check(
+                "S11-C2A2-11-occurrence-cas-once",
+                occ_after.review_state == "rejected"
+                and occ_after.revision == occ_a_rev_before + 1,
+                f"state={occ_after.review_state} rev={occ_after.revision}",
+            )
+
+        # Step 6 — manifest affected-only; no full-project job/publication.
+        with session_factory() as session:
+            correction = session.scalar(
+                _c2a2_select(ObjectCorrection).where(
+                    ObjectCorrection.id == correction_id
+                )
+            )
+            assert correction is not None
+            impact = _c2a2_json.loads(correction.impact_json)
+            _check(
+                "S11-C2A2-12-manifest-affected-only",
+                impact["affected_role_ids"] == [role_a_id],
+                f"affected={impact['affected_role_ids']}",
+            )
+            full_jobs = session.scalars(
+                _c2a2_select(Job).where(
+                    Job.workspace_id == _C2A2_WS,
+                    Job.job_type.in_(
+                        ["RUN_QC_CHECKS", "DISCOVER_OBJECTS", "FULL_RERUN"]
+                    ),
+                )
+            ).all()
+            lane_full = [
+                j.id for j in full_jobs if j.owner_id in (pid, vid)
+            ]
+            correction_jobs = session.scalars(
+                _c2a2_select(Job).where(
+                    Job.workspace_id == _C2A2_WS,
+                    Job.job_type == "RECOMPUTE_OBJECTS",
+                )
+            ).all()
+            _check(
+                "S11-C2A2-13-no-full-project-job",
+                lane_full == [d for d in lane_full if d == discover_id]
+                and len(correction_jobs) == 1,
+                f"full_lane={lane_full} recompute={len(correction_jobs)}",
+            )
+
+        # Step 7 — fresh reads: stable final correction/recompute/QC state.
+        with session_factory() as fresh:
+            frepo = JobRepository(fresh)
+            fjob = frepo.get_job(recompute_job_id)
+            fcorr = fresh.scalar(
+                _c2a2_select(ObjectCorrection).where(
+                    ObjectCorrection.id == correction_id
+                )
+            )
+            fagain = frepo.get_job(recompute_job_id)
+            _check(
+                "S11-C2A2-14-stable-across-fresh-reads",
+                fjob.state == "completed"
+                and fagain.state == "completed"
+                and fcorr is not None
+                and fcorr.status == "applied",
+                f"state={fjob.state} correction={fcorr.status if fcorr else None}",
+            )
+    finally:
+        # Step 8 — assertion-indexed evidence to the NEW S11-C2 run-id.
+        _C2A2_EVIDENCE_ROOT.mkdir(parents=True, exist_ok=True)
+        mine = [a for a in _ASSERTIONS if a["name"].startswith("S11-C2A2-")]
+        _write_json(
+            _C2A2_EVIDENCE_ROOT / f"c2a2_restart_proof_{run_tag}.json",
+            {
+                "lane": "c2a2-t06c",
+                "run_tag": run_tag,
+                "correction_id": correction_id,
+                "recompute_job_id": recompute_job_id,
+                "video_item_id": vid,
+                "db_path": str(db_path),
+                "managed_root": str(managed_root),
+                "terminal": snapshot,
+                "assertions": mine,
+                "all_ok": all(a["ok"] for a in mine),
+            },
+        )
         svc2.stop_worker(timeout=2.0)

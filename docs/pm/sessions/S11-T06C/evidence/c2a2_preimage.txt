@@ -1,0 +1,5 @@
+S11-C2 C2-A2 preimage (post-FF c9d5453, before new node patch)
+file: tests/test_s11_t02_t06_acceptance.py
+sha256: 0e5eda60e01985450c8cd9799f9a86dddb2c58a92f98f3fe38b131e16b8f6642
+lines: 1559
+bytes: 59333
