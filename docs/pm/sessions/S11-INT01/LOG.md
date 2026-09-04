@@ -262,3 +262,19 @@ Owner cần xử lý: T03G (nới gate cho run hợp lệ) hoặc T06C (seed run
   [6] RUFF F **All checks passed** — GREEN;
   [7] MYPY 2 files **Success: no issues found** — GREEN.
 - **TASK_SUBMITTED — S11-INT01 C3-M3 verified, gate GREEN het.** Commit docs nay, KHONG push, exit.
+
+## 15. S11-C4 MERGE — recovery tip 5449d13 + micro/static gates GREEN
+
+- Preflight: pwd s11-integration, HEAD `28a2207`, remote `28a2207` (local==remote), porcelain 0.
+- Tip verified: `5449d13` (parent 5663484, T03G codex/s11/t03g-0903w8) — NUDGE5 B017 blind-Exception + SIM210 fix.
+- Merge: `git merge --no-ff codex/s11/t03g-0903w8 -m "Merge T03G-C4 recovery 5449d13"` (exit 0) —
+  7 files 320 ins / 46 del (qc_checks_handler +181, qc_check_runs 46±, job_service +10, 2 T03G tests, T03G LOG/REPORT).
+  Zero conflict, porcelain 0. → HEAD `80bd36a9a73ed846813223598bb8e35ae3e6810b`.
+- Ancestor: 5449d13 ancestor cua candidate HEAD — ok.
+- Gate @ `80bd36a` (raw: `s11-c4/manager/raw/int01-c4-gate.txt`, fresh root, DB unset):
+  [1] diff --check 7751598..HEAD exit 0 — GREEN;
+  [2] T03G 2 modules **143 passed, 159.70s** — GREEN;
+  [3] RUFF 5 changed py **All checks passed** — GREEN;
+  [4] MYPY 3 files **Success: no issues found** — GREEN.
+- Git-only, KHONG sua implementation/test bytes. KHONG push.
+- **TASK_SUBMITTED — S11-INT01 C4 MERGE verified, candidate 80bd36a gate GREEN het.** exit.

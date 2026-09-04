@@ -130,3 +130,10 @@ readiness not_run thay vì blocked/completed. Lane T06C gốc verify GREEN trư�
 - Gate: diff GREEN; T03G **143/143**; T12 **1/1**; T06 **12/12**; T05A **14/14**;
   ruff GREEN; mypy Success. Raw: `s11-c3/manager/raw/int01-c3m3-gate.txt`.
 - Status: TASK_SUBMITTED. KHONG push.
+
+## 16. S11-C4 MERGE recovery 5449d13 — TASK_SUBMITTED
+
+- Merge no-ff T03G `5449d13` → candidate `80bd36a`, zero conflict. Ancestor ok.
+- Gates: diff-check GREEN; T03G **143/143**; ruff GREEN; mypy 3 files Success.
+- Raw: `s11-c4/manager/raw/int01-c4-gate.txt`. KHONG push.
+- Status: TASK_SUBMITTED.
