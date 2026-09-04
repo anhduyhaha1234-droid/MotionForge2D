@@ -99,3 +99,13 @@ readiness not_run thay vì blocked/completed. Lane T06C gốc verify GREEN trư�
 - [1/4] OUTER **12/12** (328.54s); [2/4] INNER **380/380** (319.98s, >=326);
   [3/4] T01 **64/64** (272.36s); [4/4] S10 **71/71** (89.44s). 0 failed.
 - Raw: `C:/Users/Admin/MotionForge2D-evidence/s11-c2/manager/raw/int01-full-ladder.txt`.
+
+## 13. S11-C3 merge + gate — BLOCKED_GATE_RED
+
+- M1 T03G `1135499` no-ff → `d7a84f3`; M2 T06C `f37c55e` no-ff → `03bc02a`, zero conflict ca 2.
+- Ancestor proof @ `03bc02a`: 5/5 (1135499, f37c55e, caf8dcf, 6e7eedf, 0ba0a7b) — khong stranded.
+- Gate: diff-check GREEN; T03G **143/143**; T12 **1/1**; ruff F GREEN; mypy 2 files Success;
+  T05A **7 failed/7 passed**; acceptance **2 failed/10 passed** (ca 2 tu T05A).
+- Root cause read-only: T03G-C3A1 doi authority sau C2-B → T05A seed cu thanh `not_run`.
+  Route T05A (update seed, owner `20260903_203404_4a4548` khi real regression) hoac T03G — Manager quyet.
+- Raw: `s11-c2/manager/raw/int01-c3-gate.txt`. Commit LOG/REPORT nay, KHONG push.

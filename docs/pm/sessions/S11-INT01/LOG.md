@@ -170,3 +170,32 @@ Owner cần xử lý: T03G (nới gate cho run hợp lệ) hoặc T06C (seed run
 - [3/4] T01 — **64 passed, 272.36s**.
 - [4/4] S10 full-apply — **71 passed, 89.44s**.
 - 4/4 GREEN, 0 failed. Commit LOG/REPORT nay, KHONG push.
+
+## 12. S11-C3 merge + gate — BLOCKED_GATE_RED (T05A regression duoi authority moi)
+
+- Preflight: HEAD `7474eb7` == remote (`git ls-remote`), porcelain 0 — KHONG drift.
+- Tips verified: T03G `1135499` (chain e7e9242 + b0a334d + 1135499) + T06C `f37c55e` — objects co local day du.
+- M1: `git merge --no-ff codex/s11/t03g-0903w8 -m "Merge T03G-C3A1 exact authority identity"` (exit 0) —
+  6 files 899 ins (qc_check_runs.py 249±; 2 test files T03G 625±; LOG/REPORT + preimage). Zero conflict.
+  → HEAD `d7a84f3`.
+- M2: `git merge --no-ff codex/s11/t06c-0903w14 -m "Merge T06C-C3A2 strengthened restart proof"` (exit 0) —
+  2 files 220 ins (acceptance 227±; model_usage moi). Zero conflict.
+  → HEAD `03bc02a0afc6f6e2fe7752ac0de0e47c2dcecfef`, porcelain 0.
+- Ancestor proof @ final HEAD: 1135499 + f37c55e + caf8dcf (C2-B) + 6e7eedf (C2A2) + 0ba0a7b (C2A1) — 5/5 ok, khong stranded.
+- Gate @ `03bc02a` (raw: `C:/Users/Admin/MotionForge2D-evidence/s11-c2/manager/raw/int01-c3-gate.txt`):
+  [1/5] diff --check 7751598..HEAD exit 0 — GREEN;
+  [2/5] MICRO T03G 2 modules **143 passed, 162.89s** — GREEN; T12 **1 passed** — GREEN;
+  [3/5] FOCUSED T06 full 12 **2 failed, 10 passed, 378.50s** — RED;
+  [4/5] FOCUSED T05A 14 (readiness_api + next_action_flip) **7 failed, 7 passed, 14.25s** — RED;
+  [5/5] RUFF F `qc_check_runs.py` + `readiness.py` **All checks passed** — GREEN;
+  [5b/5] MYPY 2 files **Success: no issues found** — GREEN.
+- **BLOCKED_GATE_RED — phan tich read-only (KHONG sua code lane):**
+  T05A failures dong loat `assert 'not_run' == blocked/ready` (7/7 trong readiness_api).
+  C2-B (caf8dcf) van nguyen trong HEAD (ancestor-ok, diff rong) — nhung T03G-C3A1 (`b0a334d`:
+  exact authority identity manifest+completion envelope, `qc_check_runs.py` 249±) doi semantics authority
+  SAU C2-B → seed C2-B khong con duoc cong nhan. Pattern y het C2 (C2A1 → C2-B fix).
+  Inner suite trong acceptance: 418 passed / dung 7 failed T05A; ca 2 acceptance FAILED deu bat nguon T05A
+  (per-file-zero-failures + per-file-passed gates). T03G 143/143 + T12 + ruff + mypy GREEN.
+  Route: T05A owner update seed theo authority C3A1 (pattern C2-B), hoac T03G tuong thich nguoc — Manager quyet.
+  T05A KHONG dispatch truoc (dung lenh) — chi real regression moi resume exact owner `20260903_203404_4a4548`.
+- Commit LOG/REPORT nay, KHONG push, DUNG.
