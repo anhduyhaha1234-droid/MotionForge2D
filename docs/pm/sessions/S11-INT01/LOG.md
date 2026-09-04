@@ -104,3 +104,21 @@ Owner cần xử lý: T03G (nới gate cho run hợp lệ) hoặc T06C (seed run
   **64 passed, 271.83s** (khớp T04C ref 271.77s).
 - [4/4] S10-71 (`tests/test_s10_full_apply_api.py`) — **71 passed, 95.50s**.
 - Tổng ladder ~15 phút, 0 failed toàn bộ. Commit LOG/REPORT này, không push, DỪNG.
+
+## 8. S11-C2 merge A1+A2 — NEEDS_MANAGER (M2 NOT ff-able, DỪNG đúng binding)
+
+- Lệnh Manager: `git fetch origin`; ff-only `origin/codex/s11/t03g-0903w8` (tip `0ba0a7b`);
+  ff-only `origin/codex/s11/t06c-0903w14` (tip `6e7eedf`); NOT ff-able → DỪNG + NEEDS_MANAGER.
+- `git fetch origin` chạm ref hỏng pre-existing (`refs/codex/turn-diffs/.../base`, đã biết từ trước) —
+  remote-tracking refs không update, nhưng cả 2 tip objects đã có local đầy đủ:
+  lane local `codex/s11/t03g-0903w8` = `0ba0a7b`, lane local `codex/s11/t06c-0903w14` = `6e7eedf`.
+- M1: `git merge --ff-only codex/s11/t03g-0903w8` (exit 0) — `c9d5453..0ba0a7b` Fast-forward,
+  6 files 788 ins (qc_check_runs.py 307± + 2 test files T03G 495± + LOG/REPORT + preimage mới).
+  → HEAD `0ba0a7b7f2138020ef13df6e5ef1eddcef9707f9`, porcelain 0.
+- M2: `git merge --ff-only codex/s11/t06c-0903w14` → exit 128 `fatal: Not possible to fast-forward`.
+  T06C-C2A2 parent = `c9d5453` (KHÔNG chứa M1 `0ba0a7b`); merge-base 2 chiều đều NOT contain → divergent.
+  Diff `0ba0a7b..6e7eedf` chạm cùng 2 file M1 vừa mang vào bản mới
+  (`test_s11_t03g_qc_check_api.py` 40±, `test_s11_t03g_qc_check_job.py` 455±) — T06C viết trên bản cũ.
+- **NEEDS_MANAGER — DỪNG, không tự merge, không gate nửa vời** (cây hiện tại thiếu T06C-C2A2,
+  full acceptance vẫn bản cũ chưa có test_t12; gate 4 mục chỉ có nghĩa sau khi Manager route rebase/điều phối).
+  Commit LOG/REPORT này, không push.

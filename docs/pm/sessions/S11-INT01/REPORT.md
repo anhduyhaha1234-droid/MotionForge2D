@@ -71,3 +71,9 @@ readiness not_run thay vì blocked/completed. Lane T06C gốc verify GREEN trư�
 - [1/4] OUTER 11/11 (275.17s); [2/4] INNER **326/326** (264.68s, superset của 314);
   [3/4] T01 **64/64** (271.83s); [4/4] S10 **71/71** (95.50s). 0 failed.
 - Raw: `C:/Users/Admin/MotionForge2D-evidence/s11-c1/manager/raw/int01-full-ladder.txt`.
+
+## 9. S11-C2 merge A1+A2 — NEEDS_MANAGER
+
+- M1 T03G `0ba0a7b` ff-only OK → HEAD `0ba0a7b`.
+- M2 T06C `6e7eedf` NOT ff-able (exit 128, divergent — parent `c9d5453`, chạm cùng 2 file T03G tests bản mới).
+- DỪNG đúng binding: không tự merge, không gate nửa vời. Commit LOG/REPORT này, không push.
