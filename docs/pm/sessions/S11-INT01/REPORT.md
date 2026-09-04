@@ -49,3 +49,12 @@ readiness not_run thay vì blocked/completed. Lane T06C gốc verify GREEN trư�
 ## 5. Commit local
 
 `docs(s11-int01): C1 merge 3 lanes + combined gate evidence (BLOCKED_GATE_RED)` — 2 file LOG/REPORT INT01, không push.
+
+## 6. Follow-on C2 T05A — vẫn BLOCKED_GATE_RED
+
+- Merge M4: C2 `3beee0d` no-ff vào `6630aff` → HEAD `2da848126432bd4fd7ebc6bf5d77308ee2a0f506`, zero conflict.
+- Gate 4 mục @ `2da8481`: diff-check GREEN; T03G 44/44 (54.52s); **test_t11 vẫn RED** (C1B-09, :626, 3.02s); T05A 9/9 (13.18s).
+- Nguyên nhân read-only: C2 seed FULL nằm trong file T05A riêng (`test_s11_t05a_readiness_api.py:139`),
+  không chạm seed test_t11; test_t11 submit `scope=SCOPE_AUDIO` (:1153,1222) — AUDIO run không pass gate C1-A
+  (newest FULL-scope + 6 điều kiện). Route về T06C (seed FULL) hoặc T03G (nới gate) — Manager quyết.
+- Raw log append: `C:/Users/Admin/MotionForge2D-evidence/s11-c1/manager/raw/int01-combined-gate.txt`.

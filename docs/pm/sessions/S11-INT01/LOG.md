@@ -60,3 +60,20 @@ Owner cần xử lý: T03G (nới gate cho run hợp lệ) hoặc T06C (seed run
 
 - Commit `docs(s11-int01): C1 merge 3 lanes + combined gate evidence (BLOCKED_GATE_RED)` trên `codex/s11-integration`, KHÔNG push.
 - Porcelain 0 sau commit. Remote vẫn `4d7ad81` (local ahead — Manager xử lý sau route).
+
+## 5. Follow-on C2 T05A (Manager lệnh sau BLOCKED_GATE_RED)
+
+- C2 lane verified: `codex/s11/t05a-0903w12` tip `3beee0d1843662bfb69765f0032c9a496f4880af`
+  (`test(s11-t05a): C2 seed FULL completion via scope_detectors(SCOPE_FULL) 10-detector band` —
+  chỉ chạm `tests/test_s11_t05a_readiness_api.py` 41± + LOG T05A, KHÔNG production).
+- Merge M4 vào `6630aff`: ff-only THẤT BẠI (exit 128, divergent) → `git merge --no-ff --no-edit` (exit 0):
+  `Merge made by the 'ort' strategy` — 2 files, 56 ins / 11 del. Zero conflict, porcelain 0.
+  → HEAD `2da848126432bd4fd7ebc6bf5d77308ee2a0f506` (merge commit, parents `6630aff` + `3beee0d`).
+- Combined gate re-run đầy đủ 4 mục @ `2da8481` (raw append vào `int01-combined-gate.txt`):
+  [1/4] diff-check exit 0; [2/4] T03G **44 passed, 54.52s**; [3/4] test_t11 **vẫn 1 FAILED (3.02s)** —
+  cùng assertion C1B-09 `status=not_run run_state=never_run` (:626); [4/4] T05A suite **9 passed, 13.18s**.
+- **Vì sao C2 không làm C1B-09 GREEN (read-only, KHÔNG sửa):** C2 seed FULL completion nằm trong file T05A riêng
+  (`test_s11_t05a_readiness_api.py:139` `band = scope_detectors(SCOPE_FULL)`), không chạm seed của test_t11.
+  test_t11 submit với `scope=SCOPE_AUDIO` (`test_s11_t02_t06_acceptance.py:1153,1222`) — AUDIO-scope run KHÔNG BAO GIỜ
+  pass gate C1-A (newest FULL-scope run + 6 điều kiện). Mâu thuẫn test-vs-gate này thuộc owner T06C (đổi seed sang
+  FULL) hoặc T03G (nới gate) — Manager route. INT01 giữ cây merged + evidence, DỪNG.
