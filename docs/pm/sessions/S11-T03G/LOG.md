@@ -104,3 +104,59 @@ Forbidden không đụng: models.py, migrations/**, detector modules, thresholds
   diff-check clean. Evidence: `C:/Users/Admin/MotionForge2D-evidence/s11-c1/lanes/c1a-t03g/`
   (`gate_full_run.txt`, `node_list.txt` 44 nodes, `gate_summary.txt`).
 - Commit (local only): xem `REPORT.md` §8.
+
+## 9. S11-C2 lane C2-A1 — completion envelope + unbounded matching-full authority
+
+- Trigger: C1 rereview CHANGES_REQUESTED (3 probe RED mới trên fresh
+  Alembic-head DB mà C1-A không cover):
+  1. `errors`/`checks_skipped` missing/null/string/bool được default về
+     zero → completion rỗng được chấp nhận.
+  2. Không so completion identity với manifest/current (schema, job
+     type, scope, scope fp, evidence fp, policy id/hash, source
+     generation) → tamper được chấp nhận.
+  3. Không prove counts/revisions → requested/run thiếu, detector
+     duplicate/missing/extra, revision missing/extra/empty vẫn pass.
+  4. Query mixed job list có limit (50) rồi filter trong memory → 51+
+     audio jobs mới che mất full authority hợp lệ.
+- FF: `git merge --ff-only c9d5453` (merged canonical local) OK; porcelain
+  rỗng trước khi sửa; preimage ghi tại
+  `docs/pm/sessions/S11-T03G/evidence/c2a1_preimage.txt`.
+- Fix (allowlist hẹp, `qc_checks_handler.py` READ-ONLY — producer đã ghi
+  đủ field đúng type, KHÔNG mở scope):
+  - `_newest_full_job()`: query SQL trực tiếp (job_type + owner, không
+    limit-then-filter), walk newest-first UNBOUNDED theo page 500 tới
+    FULL-scope đầu tiên — 51/101 audio mới hơn không bao giờ che full.
+  - `_completion_from_attempts()`: read-back verbatim, KHÔNG normalize/
+    default/coerce — missing stays None, wrong-type stays wrong-type.
+  - `_completion_proves_full_coverage()` nhận `manifest + current
+    evidence_fingerprint + policy_id + policy_content_hash`, gate 8 mục
+    fail-closed kèm reason: identity (schema/job-type/manifest
+    scope+fp/completion scope+fp/completion evidence-fp==current/
+    policy-id+hash==current ×2 /generation+artifacts), required summary
+    PRESENT đúng JSON type (bool/int/str KHÔNG phải number), errors==0
+    && skipped==0 && !cancelled && !deadline (PRESENT + đúng type),
+    counts requested/run == 10 == nhau, detectors multiset == band
+    exact, revisions keys == band exact + non-empty, zero-item block
+    PRESENT đúng type khi zero-item claim.
+  - `latest_check_run_state()`/`check_run_readiness()`: stale branch giữ
+    sau envelope (manifest-staleness cho changed-policy/current khi
+    completion còn khớp manifest của chính nó); envelope fail → failed/
+    not_run kèm reason.
+- Tests (fresh real DB, `env -u MOTIONFORGE_DATABASE_URL`,
+  `-p no:cacheprovider`): job 83 (29 cũ + 54 C2-A1:
+  counts×16 + skipped×4 + identity-tamper×5 + identity-missing×4 +
+  counts×5 + interrupt×2 + missing-flag×2 + duplicate/extra/named×3 +
+  revisions×4 + pressure-51/101×2 + no-full-101 + nonterminal×3 +
+  corrupt×3) + api 15 (V3 manifest bổ sung identity keys + 51-audio
+  pressure assert exact full job_id, evidence-moved ⇒ envelope fail).
+  6 tests cũ encode hành vi C1-A (stale expectations) cập nhật đúng
+  ngữ nghĩa C2-A1 (envelope fire trước manifest-staleness khi completion
+  non-current — fail-closed giữ nguyên, chỉ reason/state thành `failed`).
+- Gate: job+api **98 passed** (basetemp `%TEMP%/s11c2a1_g2`, 115.61s);
+  micro C2-A1 54 passed; `ruff check --select F` clean; mypy
+  `--follow-imports=silent` Success; `git diff --check` clean;
+  forbidden-scan clean (chỉ 3 file allowlist + evidence preimage mới).
+- Postimage: `qc_check_runs.py` `8ec905d07d876097` 29020B 688L;
+  `test_s11_t03g_qc_check_job.py` `635f27cc05d83559` 73598B 1765L;
+  `test_s11_t03g_qc_check_api.py` `d5d97d7f9ff9f1e4` 28376B 683L.
+- Commit (local only): xem `REPORT.md` §9.

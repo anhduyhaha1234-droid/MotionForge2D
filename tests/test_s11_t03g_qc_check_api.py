@@ -537,7 +537,11 @@ def test_read_authority_stale_after_evidence_fingerprint_change(
             "project_id": P1,
             "video_item_id": V3,
             "evidence_fingerprint": fp3,
+            "policy_id": bundle.get("policy_id") or "s11-qc-thresholds-v1",
             "policy_content_hash": bundle["policy_content_hash"],
+            "source_generation": "1",
+            "source_artifact_id": None,
+            "source_artifact_fingerprint": "",
             "scope": SCOPE_FULL,
             "scope_fingerprint": _sfp(SCOPE_FULL),
         }
@@ -627,12 +631,46 @@ def test_read_authority_stale_after_evidence_fingerprint_change(
             policy_content_hash=bundle["policy_content_hash"],
         )
         assert cur.run_state == "completed"  # current FULL ⇒ authority
+        # 51 newer audio jobs cannot hide the full authority (C2-A1
+        # history pressure: unbounded matching-full query, not
+        # limit-then-filter).
+        audio_idem = f"{JOB_TYPE_RUN_QC_CHECKS}:video_item:{V3}:c1a:audio"
+        for i in range(51):
+            repo.create_job(
+                workspace_id=WS,
+                job_type=JOB_TYPE_RUN_QC_CHECKS,
+                owner_type="video_item",
+                owner_id=V3,
+                input_manifest={
+                    **manifest,
+                    "scope": SCOPE_AUDIO,
+                    "scope_fingerprint": _sfp(SCOPE_AUDIO),
+                    "evidence_fingerprint": fp3,
+                },
+                idempotency_key=f"{audio_idem}:{i}",
+                input_generation="1",
+                steps=[_StepInput(step_code="run_qc_checks", position=0, step_type="sync")],
+                actor="api",
+            )
+        s.commit()
+        pressured = _latest(
+            s, workspace_id=WS, project_id=P1, video_item_id=V3,
+            evidence_fingerprint=fp3,
+            policy_content_hash=bundle["policy_content_hash"],
+        )
+        assert pressured.run_state == "completed"
+        assert pressured.job_id == record.id  # exact full, not any audio
         stale = _latest(
             s, workspace_id=WS, project_id=P1, video_item_id=V3,
             evidence_fingerprint="7" * 64,
             policy_content_hash=bundle["policy_content_hash"],
         )
-        assert stale.run_state == "stale"  # evidence moved ⇒ stale
+        assert stale.run_state == "failed"  # evidence moved ⇒ no authority
+        # (caller-supplied non-current evidence: the envelope gate fires
+        # with the evidence-identity reason — same fail-closed surface as
+        # the job-level matrix case; the manifest-staleness branch stays
+        # covered by the policy-hash sibling probe in the job module).
+        assert "evidence fingerprint" in stale.check_state_detail
 
 
 def test_read_authority_unknown_video_404(client: TestClient, qc_session: Any) -> None:

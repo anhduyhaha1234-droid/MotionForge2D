@@ -102,3 +102,23 @@ Forbidden verified: `git status --porcelain` chỉ 8 file allowlist + docs; `mod
   Parent chain: canonical `4d7ad8196c3f7a21af744906ef4174690159d889`
   (FF-only merge) ← C1 `c00060afaafca6b35d640d501e8c127d5cee8c7a`.
 - Trạng thái: TASK_SUBMITTED (chi tiết LOG.md §8).
+
+## 9. S11-C2 lane C2-A1 correction (completion envelope, unbounded authority)
+
+- Trigger: C1 rereview CHANGES_REQUESTED — 4 gap C1-A (zero-default,
+  identity, counts/revisions, limit-then-filter).
+- Fix: `_newest_full_job()` query SQL trực tiếp unbounded (page-500
+  walk tới FULL-scope đầu tiên); `_completion_from_attempts()` verbatim
+  read-back (no default/coerce); `_completion_proves_full_coverage()`
+  gate 8 mục (identity ×7 / summary types / errors+skipped+interrupts /
+  counts / multiset / revisions / zero-item block).
+- Gate: job 83 + api 15 = **98 passed** (basetemp `%TEMP%/s11c2a1_g2`,
+  115.61s, `env -u MOTIONFORGE_DATABASE_URL`, `-p no:cacheprovider`);
+  micro C2-A1 54 passed 62.97s; ruff F clean; mypy retained-scope
+  Success; diff-check clean; forbidden-scan clean.
+- Evidence: `docs/pm/sessions/S11-T03G/evidence/c2a1_preimage.txt`
+  (+ external S11-C2 evidence khi Manager yêu cầu).
+- Postimage: `qc_check_runs.py` `8ec905d07d876097` 29020B 688L;
+  job tests `635f27cc05d83559` 73598B 1765L; api tests
+  `d5d97d7f9ff9f1e4` 28376B 683L.
+- Commit local trên `codex/s11/t03g-0903w8`: PENDING (ghi sau khi commit).

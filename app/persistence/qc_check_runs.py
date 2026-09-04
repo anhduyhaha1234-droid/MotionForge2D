@@ -31,9 +31,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.persistence.jobs import JobRepository
+from app.persistence.jobs import JobRepository, _job_record, parse_json
+from app.persistence.models import Job
 from app.persistence.qc_items import QCItemRepository
 from app.services.qc_checks.thresholds import POLICY_ID, load_policy
 from app.workflow.qc_checks_handler import (
@@ -95,6 +97,7 @@ def full_scope_fingerprint() -> str:
     """Content-derived identity the FULL scope fingerprint must equal."""
     return scope_fingerprint(SCOPE_FULL)
 
+
 #: Durable run states the authority can report (closed set).
 RUN_STATE_NEVER_RUN = "never_run"
 RUN_STATE_QUEUED = "queued"
@@ -107,6 +110,50 @@ RUN_STATE_COMPLETED = "completed"
 READINESS_NOT_RUN = "not_run"
 READINESS_BLOCKED = "blocked"
 READINESS_READY = "ready"
+
+
+def _newest_full_job(
+    repo: JobRepository,
+    workspace_id: str,
+    video_item_id: str,
+) -> Any | None:
+    """Newest SCOPE_FULL RUN_QC_CHECKS Job queried DIRECTLY (no row cap).
+
+    C2-A1 history-pressure fix: the query filters ``job_type`` +
+    ``owner`` in SQL and walks newest-first WITHOUT a page limit, so
+    any number of newer audio-only/partial Jobs can never hide a valid
+    full-run authority behind a row window.  Scope is a Python-side
+    match on the parsed manifest (JSON text is not SQL-filterable), but
+    the walk is UNBOUNDED: it stops at the first FULL-scope row and
+    only reports never-run when the stream is exhausted.
+    """
+    session = repo._session
+    offset = 0
+    page = 500
+    while True:
+        query = (
+            select(Job)
+            .where(Job.workspace_id == workspace_id)
+            .where(Job.job_type == JOB_TYPE_RUN_QC_CHECKS)
+            .where(Job.owner_type == "video_item")
+            .where(Job.owner_id == video_item_id)
+            .order_by(Job.created_at.desc())
+            .offset(offset)
+            .limit(page)
+        )
+        rows = session.scalars(query).all()
+        if not rows:
+            return None
+        for row in rows:
+            manifest = parse_json(row.input_manifest_json, {})
+            if (
+                isinstance(manifest, dict)
+                and manifest.get("scope") == SCOPE_FULL
+            ):
+                return _job_record(row)
+        if len(rows) < page:
+            return None
+        offset += page
 
 
 @dataclass(frozen=True)
@@ -159,6 +206,14 @@ def _completion_from_attempts(
     carries completion evidence.  Only blocks with the RUN_QC_CHECKS
     schema version are trusted (a foreign or corrupt payload is ignored
     fail-closed — never misread as completion).
+
+    C2-A1: the completion identity fields are read back verbatim from the
+    attempt row — NO normalization, NO defaults, NO coercion.  A missing
+    key stays ``None`` (it is NOT filled with ``\"\"``, ``0`` or
+    ``False``); a wrong-typed value stays wrong-typed.  The envelope
+    gate below rejects anything but PRESENT, correctly-typed, exactly
+    matching values.  Any defaulting here would launder a corrupt or
+    tampered completion into authority.
     """
     for attempt in attempts:  # newest first
         if attempt.error is not None:
@@ -185,83 +240,202 @@ def _manifest_scope_fingerprint(manifest: Any) -> str:
 def _completion_proves_full_coverage(
     completion: dict[str, Any],
     *,
-    manifest_scope: str,
-    manifest_scope_fp: str,
+    manifest: dict[str, Any],
+    evidence_fingerprint: str,
+    policy_id: str,
+    policy_content_hash: str,
 ) -> tuple[bool, str]:
     """Whether a completion block proves the binding FULL-scope coverage.
 
-    ALL of these must hold (fail-closed, with the reason named):
-      1. manifest scope is ``full`` (the server-owned full band);
-      2. manifest scope fingerprint equals the content-derived FULL
-         fingerprint (the submit-time band was the full band);
-      3. completion scope + scope fingerprint agree with the manifest
-         (the envelope the handler wrote matches the submitted band);
-      4. completion detectors equal the binding full band (order-insensitive;
-         audio-only / visual-only / partial runs never substitute, and
-         partial runs are never summed into coverage);
-      5. completion revisions cover every full-band detector;
-      6. summary errors == 0 AND checks_skipped == 0 (an errored or
-         partially-skipped run is never authority).
+    C2-A1 envelope (ALL must hold, fail-closed, reason named):
+
+    IDENTITY — the completion is the manifest's own write-back, for the
+    CURRENT video evidence and policy (no tamper, no replay, no drift):
+      1. completion ``schema_version`` PRESENT and == the RUN_QC_CHECKS
+         schema version (exact; no coercion);
+      2. completion ``job_type`` PRESENT and == RUN_QC_CHECKS (exact);
+      3. manifest scope PRESENT and == ``full`` (the server-owned band);
+      4. manifest scope fingerprint PRESENT and == the content-derived
+         FULL fingerprint (the submitted band was the full band);
+      5. completion scope + scope fingerprint PRESENT and equal to the
+         manifest's values (the envelope the handler wrote matches the
+         submitted band — verbatim, not re-derived);
+      6. completion evidence fingerprint PRESENT and == the CURRENT
+         video evidence fingerprint (tamper/stale fails);
+      7. completion policy id + content hash PRESENT and == the CURRENT
+         policy identity (tamper/drift fails);
+      8. completion source generation PRESENT (non-empty string) and ==
+         the manifest's source generation.
+
+    COUNTS — the run really executed the whole band, cleanly:
+      9. summary is a dict AND ``checks_requested`` / ``checks_run`` /
+         ``checks_skipped`` / ``errors`` are ALL PRESENT with exact JSON
+         number type (``bool`` is NOT a number — ``isinstance(x, bool)``
+         is rejected first; missing / null / string / bool NEVER default
+         to zero);
+     10. counts are exactly the binding band size N for requested AND
+         run AND (requested == run); skipped == 0; errors == 0;
+     11. ``cancelled`` and ``deadline_exceeded`` are PRESENT exact bools
+         and both False;
+     12. completion detectors is a list of N strings, no duplicates, and
+         as a MULTISET equals the binding full band (order-insensitive
+         but duplicate-/missing-/extra-sensitive: duplicates can only
+         displace a missing member, so multiset equality catches them);
+     13. detector revisions is a dict whose KEY SET is exactly the band
+         (no missing / extra keys) and every value is a PRESENT non-empty
+         string.
     """
+    band = full_coverage_detectors()
+    expected_n = len(band)
+    expected_fp = full_scope_fingerprint()
+
+    # — identity: verbatim, no defaults, no coercion —
+    if completion.get("schema_version") != RUN_QC_SCHEMA_VERSION:
+        return False, (
+            "completion schema_version is not the RUN_QC_CHECKS schema "
+            "version (missing/foreign/corrupt envelope)"
+        )
+    if completion.get("job_type") != JOB_TYPE_RUN_QC_CHECKS:
+        return False, (
+            "completion job_type is not RUN_QC_CHECKS "
+            "(missing/foreign/corrupt envelope)"
+        )
+    manifest_scope = manifest.get("scope")
     if manifest_scope != SCOPE_FULL:
         return False, (
             f"manifest scope {manifest_scope!r} is not the full band "
             "(audio-only/partial runs never substitute for full authority)"
         )
-    expected_fp = full_scope_fingerprint()
+    manifest_scope_fp = manifest.get("scope_fingerprint")
     if manifest_scope_fp != expected_fp:
         return False, (
             "manifest scope fingerprint does not match the content-derived "
             "full-band identity (the submitted band was not the full band)"
         )
     completion_scope = completion.get("scope")
-    if completion_scope != SCOPE_FULL:
+    if completion_scope != manifest_scope:
         return False, (
-            f"completion scope {completion_scope!r} does not match the full "
-            "band (completion/manifest scope mismatch)"
+            f"completion scope {completion_scope!r} does not match the "
+            f"manifest scope {manifest_scope!r} "
+            "(completion/manifest scope mismatch)"
         )
-    if str(completion.get("scope_fingerprint") or "") != expected_fp:
+    completion_scope_fp = completion.get("scope_fingerprint")
+    if completion_scope_fp != manifest_scope_fp:
         return False, (
-            "completion scope fingerprint does not match the content-derived "
-            "full-band identity"
+            "completion scope fingerprint does not match the manifest's "
+            "scope fingerprint (completion/manifest fingerprint mismatch)"
         )
-    expected_detectors = full_coverage_detectors()
-    completion_detectors = completion.get("detectors")
+    completion_evidence_fp = completion.get("evidence_fingerprint")
+    if completion_evidence_fp != evidence_fingerprint:
+        return False, (
+            "completion evidence fingerprint does not match the current "
+            "video evidence fingerprint (tamper/stale envelope)"
+        )
+    if completion.get("policy_id") != policy_id:
+        return False, (
+            "completion policy id does not match the current policy "
+            "identity (tamper/drift envelope)"
+        )
+    if completion.get("policy_content_hash") != policy_content_hash:
+        return False, (
+            "completion policy content hash does not match the current "
+            "policy identity (tamper/drift envelope)"
+        )
+    completion_generation = completion.get("source_generation")
+    manifest_generation = manifest.get("source_generation")
     if (
-        not isinstance(completion_detectors, list)
-        or sorted(str(name) for name in completion_detectors)
-        != sorted(expected_detectors)
+        not isinstance(completion_generation, str)
+        or not completion_generation
+        or completion_generation != manifest_generation
     ):
         return False, (
-            "completion detectors do not equal the binding full band "
-            f"(expected {sorted(expected_detectors)}; "
-            "audio-only/partial runs never substitute, and partial runs "
-            "are never summed into coverage)"
+            "completion source generation does not match the manifest's "
+            "source generation (missing/empty/mismatched envelope)"
         )
-    revisions = completion.get("detector_revisions")
-    if not isinstance(revisions, dict) or any(
-        name not in revisions for name in expected_detectors
-    ):
-        return False, (
-            "completion detector revisions do not cover the full band"
-        )
+
+    # — counts: PRESENT exact JSON numbers, then exact band arithmetic —
     summary = completion.get("summary")
     if not isinstance(summary, dict):
         return False, "completion summary is missing (cannot prove coverage)"
-    try:
-        errors = int(summary.get("errors") or 0)
-        skipped = int(summary.get("checks_skipped") or 0)
-    except (TypeError, ValueError):
-        return False, "completion summary counts are unreadable"
-    if errors != 0:
+    for key in ("checks_requested", "checks_run", "checks_skipped", "errors"):
+        value = summary.get(key)
+        if isinstance(value, bool) or not isinstance(value, int):
+            return False, (
+                f"completion summary {key!r} is not a JSON number "
+                f"(got {value!r}; missing/null/string/bool never default "
+                "to zero)"
+            )
+    requested = summary["checks_requested"]
+    ran = summary["checks_run"]
+    skipped = summary["checks_skipped"]
+    errors = summary["errors"]
+    if requested != expected_n or ran != expected_n or requested != ran:
         return False, (
-            f"completion summary reports {errors} error(s); an errored run "
-            "is never the readiness authority"
+            f"completion summary counts do not prove a full {expected_n}-check "
+            f"run (requested={requested}, run={ran}; partial runs are never "
+            "the readiness authority)"
         )
     if skipped != 0:
         return False, (
             f"completion summary reports {skipped} skipped check(s); a "
             "partially-skipped run is never the readiness authority"
+        )
+    if errors != 0:
+        return False, (
+            f"completion summary reports {errors} error(s); an errored run "
+            "is never the readiness authority"
+        )
+    for key in ("cancelled", "deadline_exceeded"):
+        value = summary.get(key)
+        if not isinstance(value, bool):
+            return False, (
+                f"completion summary {key!r} is not a JSON boolean "
+                f"(got {value!r}; the producer always writes it)"
+            )
+        if value:
+            return False, (
+                f"completion summary reports {key}=true; an interrupted run "
+                "is never the readiness authority"
+            )
+
+    # — detectors: exact multiset + exact revision envelope —
+    completion_detectors = completion.get("detectors")
+    if not isinstance(completion_detectors, list) or any(
+        not isinstance(name, str) for name in completion_detectors
+    ):
+        return False, (
+            "completion detectors is not a list of detector names "
+            "(cannot prove coverage)"
+        )
+    if len(completion_detectors) != expected_n or sorted(
+        completion_detectors
+    ) != sorted(band):
+        return False, (
+            "completion detectors do not equal the binding full band "
+            f"(expected {sorted(band)}; got {sorted(completion_detectors)}; "
+            "audio-only/partial runs never substitute, duplicates only "
+            "displace a missing member, and partial runs are never summed "
+            "into coverage)"
+        )
+    revisions = completion.get("detector_revisions")
+    if not isinstance(revisions, dict):
+        return False, (
+            "completion detector revisions is missing (cannot prove coverage)"
+        )
+    if set(revisions) != set(band):
+        return False, (
+            "completion detector revision keys do not equal the binding "
+            f"full band (missing/extra revision entries: "
+            f"{sorted(set(band) ^ set(revisions))})"
+        )
+    empty_revisions = sorted(
+        name for name, value in revisions.items()
+        if not isinstance(value, str) or not value
+    )
+    if empty_revisions:
+        return False, (
+            "completion detector revisions are empty for "
+            f"{empty_revisions} (cannot prove coverage)"
         )
     return True, ""
 
@@ -301,20 +475,8 @@ def latest_check_run_state(
     """
     del project_id  # ownership is validated by the caller / submit authority
     repo = JobRepository(session)
-    jobs = repo.list_jobs(
-        workspace_id,
-        owner_type="video_item",
-        owner_id=video_item_id,
-        limit=50,
-    )
-    full_jobs = [
-        j
-        for j in jobs
-        if j.job_type == JOB_TYPE_RUN_QC_CHECKS
-        and isinstance(j.input_manifest, dict)
-        and str(j.input_manifest.get("scope") or "") == SCOPE_FULL
-    ]
-    if not full_jobs:
+    job = _newest_full_job(repo, workspace_id, video_item_id)
+    if job is None:
         return CheckRunState(
             video_item_id=video_item_id,
             run_state=RUN_STATE_NEVER_RUN,
@@ -323,24 +485,31 @@ def latest_check_run_state(
             "authority; never-run vs completed-zero-item is decided by "
             "durable run evidence, never by QCItem-table emptiness)",
         )
-
-    job = full_jobs[0]  # newest FULL-scope run first (list_jobs ordering)
     attempts = repo.list_attempts(job.id, limit=50)
     completion = _completion_from_attempts(attempts)
 
     manifest = job.input_manifest
-    run_fp = str(manifest.get("evidence_fingerprint") or "")
-    run_policy = str(manifest.get("policy_content_hash") or "")
+    if not isinstance(manifest, dict):
+        manifest = {}
+    policy = load_policy()
+    current_policy_id = str(policy.get("policy_id") or POLICY_ID)
+    current_policy_hash = str(policy.get("content_hash") or "")
+    run_fp = manifest.get("evidence_fingerprint")
+    run_policy_hash = manifest.get("policy_content_hash")
     evidence_matches = run_fp == evidence_fingerprint
-    policy_matches = run_policy == policy_content_hash
+    policy_matches = run_policy_hash == policy_content_hash
 
     base: dict[str, Any] = {
         "video_item_id": video_item_id,
         "job_id": job.id,
         "job_state": job.state,
         "idempotency_key": job.idempotency_key,
-        "evidence_fingerprint": run_fp,
-        "policy_content_hash": run_policy,
+        "evidence_fingerprint": (
+            run_fp if isinstance(run_fp, str) else None
+        ),
+        "policy_content_hash": (
+            run_policy_hash if isinstance(run_policy_hash, str) else None
+        ),
         "scope": manifest.get("scope"),
         "scope_fingerprint": manifest.get("scope_fingerprint"),
         "evidence_matches": evidence_matches,
@@ -365,8 +534,10 @@ def latest_check_run_state(
             )
         coverage_ok, coverage_reason = _completion_proves_full_coverage(
             completion,
-            manifest_scope=str(manifest.get("scope") or ""),
-            manifest_scope_fp=_manifest_scope_fingerprint(manifest),
+            manifest=manifest,
+            evidence_fingerprint=evidence_fingerprint,
+            policy_id=current_policy_id,
+            policy_content_hash=current_policy_hash,
         )
         if not coverage_ok:
             return CheckRunState(

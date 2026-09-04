@@ -895,10 +895,17 @@ def test_read_authority_stale_when_evidence_fingerprint_changes(
     assert _readiness(session_factory, video_id).status == "ready"
 
     # the video's evidence changed (generation bump simulates re-import /
-    # source replacement) → the completed run is now STALE → not_run
+    # source replacement) → not_run.  (The generation knob is folded into
+    # the completion's evidence fingerprint at submit time, so a bumped
+    # generation makes the completion's evidence fingerprint NON-current:
+    # the envelope gate fires first with the evidence-identity reason.
+    # The policy-hash sibling below exercises the manifest-staleness
+    # branch instead — the two staleness surfaces are covered between
+    # them.)
     r = _readiness(session_factory, video_id, generation="2")
     assert r.status == "not_run"
-    assert r.run_state == "stale"
+    assert r.run_state == "failed"
+    assert "evidence fingerprint" in r.check_state_detail
     assert r.check_state_detail
     with session_factory() as s:
         state = latest_check_run_state(
@@ -911,8 +918,9 @@ def test_read_authority_stale_when_evidence_fingerprint_changes(
             ),
             policy_content_hash=policy_bundle()["policy_content_hash"],
         )
-    assert state.run_state == "stale"
+    assert state.run_state == "failed"
     assert state.job_id == full_job_id
+    assert "evidence fingerprint" in state.check_state_detail
 
 
 def test_read_authority_stale_when_policy_hash_changes(
@@ -923,7 +931,10 @@ def test_read_authority_stale_when_policy_hash_changes(
     _seed_full_job(session_factory, video_id=video_id)
 
     # a different (newer) policy hash — the run was computed against the old
-    # policy → the completed run is STALE for the new policy → not_run
+    # policy → STALE for the new policy → not_run.  (Staleness via the
+    # caller-supplied CURRENT policy is the manifest-staleness branch: the
+    # seeded completion still matches its OWN manifest identity, so the
+    # envelope gate passes and the manifest-vs-current comparison fires.)
     other_hash = "f" * 64
     assert other_hash != policy_bundle()["policy_content_hash"]
     with session_factory() as s:
@@ -965,8 +976,21 @@ def _seed_full_job(
     summary_skipped: int = 0,
     stale_fp: bool = False,
     policy_hash: str | None = None,
+    policy_id: str | None = None,
     tamper_manifest_fp: bool = False,
     tamper_completion_scope: bool = False,
+    tamper_evidence_fp: bool = False,
+    tamper_policy_id: bool = False,
+    tamper_generation: bool = False,
+    drop_summary_key: str | None = None,
+    summary_override: dict[str, Any] | None = None,
+    drop_completion_key: str | None = None,
+    extra_revision: bool = False,
+    drop_revision: str | None = None,
+    empty_revision: str | None = None,
+    duplicate_detector: bool = False,
+    requested_count: int | None = None,
+    run_count: int | None = None,
 ) -> str:
     """Seed ONE durable RUN_QC_CHECKS job with a controlled envelope.
 
@@ -976,12 +1000,27 @@ def _seed_full_job(
     completed/run_id + policy identity + fingerprints + measured summary +
     zero-item evidence), so the read authority trusts it exactly as it
     trusts a real worker run.
+
+    C2-A1 tamper knobs (each produces EXACTLY one envelope defect so the
+    matrix proves the fail-closed gate names it): manifest tamper
+    (``tamper_manifest_fp``), completion identity tamper
+    (``tamper_completion_scope`` / ``tamper_evidence_fp`` /
+    ``tamper_policy_id`` / ``tamper_generation`` / ``policy_hash`` /
+    ``policy_id``), dropped completion keys (``drop_completion_key``),
+    dropped/overridden summary fields (``drop_summary_key`` /
+    ``summary_override`` — wrong-typed values included), revision
+    envelope defects (``extra_revision`` / ``drop_revision`` /
+    ``empty_revision``), detector multiset defects
+    (``duplicate_detector`` / ``detectors=``), and count defects
+    (``requested_count`` / ``run_count``).
     """
     from app.persistence.jobs import StepInput
     from app.persistence.jobs import JobRepository as _Repo
 
     band = full_coverage_detectors()
     names = list(detectors) if detectors is not None else list(band)
+    if duplicate_detector and names:
+        names = names + [names[0]]
     with session_factory() as s:
         fp = evidence_fingerprint(s, workspace_id=WS, video_item_id=video_id)
         if stale_fp:
@@ -999,7 +1038,11 @@ def _seed_full_job(
             "project_id": P1,
             "video_item_id": video_id,
             "evidence_fingerprint": fp,
+            "policy_id": bundle["policy_id"],
             "policy_content_hash": bundle["policy_content_hash"],
+            "source_generation": "1",
+            "source_artifact_id": None,
+            "source_sha256": "",
             "scope": scope,
             "scope_fingerprint": manifest_fp,
         }
@@ -1030,21 +1073,66 @@ def _seed_full_job(
         )
         step3 = repo.list_steps(record.id)[0]
         if state == "completed":
+            revisions = {name: "1.0.0" for name in names}
+            if extra_revision:
+                revisions["ghost_detector"] = "9.9.9"
+            if drop_revision is not None:
+                revisions.pop(drop_revision, None)
+            if empty_revision is not None and empty_revision in revisions:
+                revisions[empty_revision] = ""
+            summary: dict[str, Any] = {
+                "run_id": "c" * 64,
+                "checks_requested": (
+                    requested_count
+                    if requested_count is not None
+                    else len(names)
+                ),
+                "checks_run": (
+                    run_count if run_count is not None else len(names)
+                ),
+                "checks_skipped": summary_skipped,
+                "created": 0,
+                "reused": 0,
+                "resolved_after_recheck": 0,
+                "reopened_stale": 0,
+                "not_applicable": len(names),
+                "errors": summary_errors,
+                "cancelled": False,
+                "deadline_exceeded": False,
+                "run_sec": 0.001,
+                "per_detector": {},
+            }
+            if drop_summary_key is not None:
+                summary.pop(drop_summary_key, None)
+            if summary_override:
+                summary.update(summary_override)
             completion = {
                 "schema_version": RUN_QC_SCHEMA_VERSION,
                 "job_type": JOB_TYPE_RUN_QC_CHECKS,
                 "completed": True,
                 "run_id": "c" * 64,
-                "policy_id": bundle["policy_id"],
+                "policy_id": (
+                    "tampered-policy"
+                    if tamper_policy_id
+                    else (
+                        policy_id
+                        if policy_id is not None
+                        else bundle["policy_id"]
+                    )
+                ),
                 "policy_content_hash": (
                     policy_hash
                     if policy_hash is not None
                     else bundle["policy_content_hash"]
                 ),
-                "source_generation": "1",
+                "source_generation": (
+                    "999" if tamper_generation else "1"
+                ),
                 "source_artifact_id": None,
                 "source_artifact_fingerprint": "",
-                "evidence_fingerprint": fp,
+                "evidence_fingerprint": (
+                    "7" * 64 if tamper_evidence_fp else fp
+                ),
                 "scope": (
                     SCOPE_AUDIO if tamper_completion_scope else scope
                 ),
@@ -1052,23 +1140,8 @@ def _seed_full_job(
                     SCOPE_AUDIO if tamper_completion_scope else scope
                 ),
                 "detectors": names,
-                "detector_revisions": {name: "1.0.0" for name in names},
-                "summary": {
-                    "run_id": "c" * 64,
-                    "checks_requested": len(names),
-                    "checks_run": len(names),
-                    "checks_skipped": summary_skipped,
-                    "created": 0,
-                    "reused": 0,
-                    "resolved_after_recheck": 0,
-                    "reopened_stale": 0,
-                    "not_applicable": len(names),
-                    "errors": summary_errors,
-                    "cancelled": False,
-                    "deadline_exceeded": False,
-                    "run_sec": 0.001,
-                    "per_detector": {},
-                },
+                "detector_revisions": revisions,
+                "summary": summary,
                 "zero_item_completion": {
                     "evidence": (
                         summary_errors == 0
@@ -1081,6 +1154,8 @@ def _seed_full_job(
                     "not_applicable": len(names),
                 },
             }
+            if drop_completion_key is not None:
+                completion.pop(drop_completion_key, None)
             repo.record_attempt(
                 job_id=record.id,
                 step_id=step3.id,
@@ -1202,10 +1277,15 @@ def test_c1a_audio_over_stale_full_stays_not_run(
         detectors=["audio_missing", "av_sync_drift"],
     )
     state = _full_state(session_factory, video_id)
-    assert state.run_state == "stale"
+    # stale_fp seeds BOTH manifest and completion with the non-current
+    # fingerprint, so the C2-A1 envelope gate fires first: the verdict is
+    # coverage-unproven (failed), and the newer audio run stays invisible.
+    # The invariant — audio never backfills full authority — holds either
+    # way; readiness stays not_run.
+    assert state.run_state == "failed"
     r = _readiness(session_factory, video_id)
     assert r.status == "not_run"
-    assert r.run_state == "stale"
+    assert r.run_state == "failed"
 
 
 def test_c1a_newest_full_queued_running_failed_never_falls_back(
@@ -1244,7 +1324,12 @@ def test_c1a_newest_full_stale_never_falls_back(
     assert old_id != new_id
     state = _full_state(session_factory, video_id)
     assert state.job_id == new_id
-    assert state.run_state == "stale"
+    # stale_fp seeds BOTH manifest and completion with the non-current
+    # fingerprint: the C2-A1 envelope gate (completion vs CURRENT) fires
+    # first, so the verdict is coverage-unproven (failed), not stale.
+    # The invariant under test — no fallback to the older valid full —
+    # holds either way; readiness stays not_run.
+    assert state.run_state == "failed"
     r = _readiness(session_factory, video_id)
     assert r.status == "not_run"
 
@@ -1362,4 +1447,320 @@ def test_c1a_partial_runs_never_sum_into_coverage(
     # the visual-only FULL-manifest run is newest-full ⇒ failed (coverage);
     # the audio run is invisible.  Either way: never ready.
     assert state.run_state == "failed"
+    assert _readiness(session_factory, video_id).status == "not_run"
+
+
+# ── C2-A1 matrix: completion envelope + unbounded matching-full authority ──
+
+
+def _band(session_factory=None) -> list[str]:
+    from app.persistence.qc_check_runs import full_coverage_detectors
+
+    return full_coverage_detectors()
+
+
+@pytest.mark.parametrize(
+    "key", ["errors", "checks_requested", "checks_run", "checks_skipped"]
+)
+@pytest.mark.parametrize("bad", ["missing", "null", "string", "bool"])
+def test_c2a1_summary_count_wrong_type_never_defaults_to_zero(
+    session_factory, svc: JobService, key: str, bad: str
+) -> None:
+    """C2-A1 probe 1: a count that is missing/null/string/bool is NEVER
+    defaulted to zero — the envelope fails closed (failed / not_run)."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    if bad == "missing":
+        kwargs: dict[str, Any] = {"drop_summary_key": key}
+    elif bad == "null":
+        kwargs = {"summary_override": {key: None}}
+    elif bad == "string":
+        kwargs = {"summary_override": {key: "0"}}
+    else:
+        kwargs = {"summary_override": {key: True if key != "errors" else False}}
+        # NOTE: even False (a bool) is rejected — bool is not a JSON
+        # number, so the gate cannot be laundered through falsy values.
+    _seed_full_job(session_factory, video_id=video_id, **kwargs)  # type: ignore[arg-type]
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "failed", f"{key}={bad} was accepted as zero"
+    assert "not a JSON number" in state.check_state_detail
+    assert _readiness(session_factory, video_id).status == "not_run"
+
+
+@pytest.mark.parametrize("key", ["checks_skipped"])
+@pytest.mark.parametrize("bad", ["missing", "null", "string", "bool"])
+def test_c2a1_summary_skipped_wrong_type_never_defaults_to_zero(
+    session_factory, svc: JobService, key: str, bad: str
+) -> None:
+    """C2-A1 probe 1 (skipped leg): same fail-closed rule for
+    ``checks_skipped`` — separated so the matrix names the field."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    if bad == "missing":
+        kwargs = {"drop_summary_key": key}
+    elif bad == "null":
+        kwargs = {"summary_override": {key: None}}
+    elif bad == "string":
+        kwargs = {"summary_override": {key: "0"}}
+    else:
+        kwargs = {"summary_override": {key: False}}
+    _seed_full_job(session_factory, video_id=video_id, **kwargs)  # type: ignore[arg-type]
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "failed", f"{key}={bad} was accepted as zero"
+    assert _readiness(session_factory, video_id).status == "not_run"
+
+
+@pytest.mark.parametrize(
+    "tamper",
+    [
+        "evidence_fp",
+        "policy_hash",
+        "policy_id",
+        "generation",
+        "completion_scope",
+    ],
+)
+def test_c2a1_completion_identity_tamper_fails_closed(
+    session_factory, svc: JobService, tamper: str
+) -> None:
+    """C2-A1 probe 2: the completion identity must match the manifest /
+    current video evidence + policy — any tamper fails closed."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    kwargs = {
+        "evidence_fp": {"tamper_evidence_fp": True},
+        "policy_hash": {"policy_hash": "0" * 64},
+        "policy_id": {"policy_id": "other-policy"},
+        "generation": {"tamper_generation": True},
+        "completion_scope": {"tamper_completion_scope": True},
+    }[tamper]
+    _seed_full_job(session_factory, video_id=video_id, **kwargs)  # type: ignore[arg-type]
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "failed", f"tamper {tamper} was accepted"
+    assert _readiness(session_factory, video_id).status == "not_run"
+
+
+@pytest.mark.parametrize(
+    "tamper",
+    ["drop_schema", "drop_job_type", "drop_evidence_fp", "drop_policy_hash"],
+)
+def test_c2a1_completion_identity_missing_fails_closed(
+    session_factory, svc: JobService, tamper: str
+) -> None:
+    """C2-A1 probe 2 (missing leg): a dropped identity key is not filled
+    with a default — the envelope fails closed."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    key = {
+        "drop_schema": "schema_version",
+        "drop_job_type": "job_type",
+        "drop_evidence_fp": "evidence_fingerprint",
+        "drop_policy_hash": "policy_content_hash",
+    }[tamper]
+    _seed_full_job(
+        session_factory, video_id=video_id, drop_completion_key=key
+    )
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "failed", f"dropped {key} was accepted"
+    assert _readiness(session_factory, video_id).status == "not_run"
+
+
+@pytest.mark.parametrize(
+    "counts", ["missing_counts", "zero", "nine", "eleven", "unequal"]
+)
+def test_c2a1_summary_counts_must_be_exact_band_size(
+    session_factory, svc: JobService, counts: str
+) -> None:
+    """C2-A1 probe 3: requested/run must each equal the binding band size
+    (10) and each other — missing/0/9/11/unequal all fail closed."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    band = _band()
+    assert len(band) == 10
+    if counts == "missing_counts":
+        kwargs: dict[str, Any] = {"drop_summary_key": "checks_requested"}
+    elif counts == "zero":
+        kwargs = {"requested_count": 0, "run_count": 0}
+    elif counts == "nine":
+        kwargs = {"requested_count": 9, "run_count": 9}
+    elif counts == "eleven":
+        kwargs = {"requested_count": 11, "run_count": 11}
+    else:
+        kwargs = {"requested_count": 10, "run_count": 9}
+    _seed_full_job(session_factory, video_id=video_id, **kwargs)  # type: ignore[arg-type]
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "failed", f"counts {counts} were accepted"
+    assert _readiness(session_factory, video_id).status == "not_run"
+
+
+@pytest.mark.parametrize("flag", ["cancelled", "deadline"])
+def test_c2a1_cancelled_or_deadline_true_fails_closed(
+    session_factory, svc: JobService, flag: str
+) -> None:
+    """C2-A1 probe 3 (interrupt leg): cancelled/deadline_exceeded true ⇒
+    the run is never authority, even with perfect counts/coverage."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    override = (
+        {"cancelled": True} if flag == "cancelled"
+        else {"deadline_exceeded": True}
+    )
+    _seed_full_job(
+        session_factory, video_id=video_id, summary_override=override
+    )
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "failed", f"{flag}=true was accepted"
+    assert _readiness(session_factory, video_id).status == "not_run"
+
+
+@pytest.mark.parametrize("flag", ["cancelled", "deadline_exceeded"])
+def test_c2a1_interrupt_flag_missing_fails_closed(
+    session_factory, svc: JobService, flag: str
+) -> None:
+    """C2-A1 probe 3 (missing-producer-field leg): a dropped interrupt
+    flag is not defaulted to False — the envelope fails closed."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    _seed_full_job(
+        session_factory, video_id=video_id, drop_summary_key=flag
+    )
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "failed", f"dropped {flag} was accepted"
+    assert _readiness(session_factory, video_id).status == "not_run"
+
+
+def test_c2a1_duplicate_detector_displacing_a_member_fails_closed(
+    session_factory, svc: JobService
+) -> None:
+    """C2-A1 probe 3 (duplicate leg): N names with one duplicated member
+    (hence another member missing) fail the multiset gate."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    _seed_full_job(session_factory, video_id=video_id, duplicate_detector=True)
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "failed"
+    assert _readiness(session_factory, video_id).status == "not_run"
+
+
+def test_c2a1_extra_detector_name_fails_closed(
+    session_factory, svc: JobService
+) -> None:
+    """C2-A1 probe 3 (extra leg): N+1 names (band + intruder) fail the
+    exact-length multiset gate."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    band = _band()
+    _seed_full_job(
+        session_factory, video_id=video_id,
+        detectors=list(band) + ["ghost_detector"],
+    )
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "failed"
+    assert _readiness(session_factory, video_id).status == "not_run"
+
+
+def test_c2a1_wrong_type_guard_names_the_field(
+    session_factory, svc: JobService
+) -> None:
+    """The wrong-type gate names the offending summary field (fail-closed
+    with a reason, not a silent default)."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    _seed_full_job(
+        session_factory, video_id=video_id,
+        summary_override={"checks_run": "10"},
+    )
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "failed"
+    assert "'checks_run'" in state.check_state_detail
+    assert _readiness(session_factory, video_id).status == "not_run"
+
+
+@pytest.mark.parametrize(
+    "rev_tamper", ["extra", "missing", "empty", "dropped"]
+)
+def test_c2a1_revision_envelope_must_match_band_exactly(
+    session_factory, svc: JobService, rev_tamper: str
+) -> None:
+    """C2-A1 probe 3 (revision leg): revision keys must equal the band
+    exactly with non-empty values — extra/missing/empty/dropped fail."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    band = _band()
+    if rev_tamper == "extra":
+        kwargs: dict[str, Any] = {"extra_revision": True}
+    elif rev_tamper == "missing":
+        kwargs = {"drop_revision": band[0]}
+    elif rev_tamper == "empty":
+        kwargs = {"empty_revision": band[0]}
+    else:
+        kwargs = {"drop_completion_key": "detector_revisions"}
+    _seed_full_job(session_factory, video_id=video_id, **kwargs)  # type: ignore[arg-type]
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "failed", f"revision {rev_tamper} accepted"
+    assert _readiness(session_factory, video_id).status == "not_run"
+
+
+@pytest.mark.parametrize("n_audio", [51, 101])
+def test_c2a1_valid_full_survives_many_newer_audio_runs(
+    session_factory, svc: JobService, n_audio: int
+) -> None:
+    """C2-A1 probe 4: a valid completed CURRENT full run keeps exact
+    authority even with 51 / 101 NEWER audio-only jobs (history
+    pressure past the old 50-row window)."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    full_job_id = _seed_full_job(session_factory, video_id=video_id)
+    for _ in range(n_audio):
+        _seed_full_job(
+            session_factory, video_id=video_id, scope=SCOPE_AUDIO,
+            detectors=["audio_missing", "av_sync_drift"],
+        )
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "completed", (
+        f"full authority hidden behind {n_audio} newer audio jobs"
+    )
+    assert state.job_id == full_job_id
+    assert _readiness(session_factory, video_id).status == "ready"
+
+
+def test_c2a1_no_full_with_many_audio_is_never_run(
+    session_factory, svc: JobService
+) -> None:
+    """C2-A1 probe 4 (negative leg): 101 audio-only jobs and NO full job
+    ⇒ never_run (audio never creates full authority)."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    for _ in range(101):
+        _seed_full_job(
+            session_factory, video_id=video_id, scope=SCOPE_AUDIO,
+            detectors=["audio_missing", "av_sync_drift"],
+        )
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "never_run"
+    assert _readiness(session_factory, video_id).status == "not_run"
+
+
+@pytest.mark.parametrize("terminal", ["queued", "running", "failed"])
+def test_c2a1_newest_full_nonterminal_never_falls_back(
+    session_factory, svc: JobService, terminal: str
+) -> None:
+    """Newest FULL non-completed (queued/running/failed) ⇒ its own state,
+    never an older completed full (no fallback)."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    _seed_full_job(session_factory, video_id=video_id)  # older valid full
+    _seed_full_job(session_factory, video_id=video_id, state=terminal)
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == terminal
+    assert _readiness(session_factory, video_id).status == "not_run"
+
+
+@pytest.mark.parametrize("corrupt", ["stale", "tampered_scope", "bad_counts"])
+def test_c2a1_newest_full_corrupt_never_falls_back(
+    session_factory, svc: JobService, corrupt: str
+) -> None:
+    """Newest FULL completed-but-c corrupt (stale/tampered/bad counts) ⇒
+    failed, never an older completed full (no fallback)."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    _seed_full_job(session_factory, video_id=video_id)  # older valid full
+    if corrupt == "stale":
+        _seed_full_job(session_factory, video_id=video_id, stale_fp=True)
+    elif corrupt == "tampered_scope":
+        _seed_full_job(
+            session_factory, video_id=video_id, tamper_completion_scope=True
+        )
+    else:
+        _seed_full_job(
+            session_factory, video_id=video_id,
+            requested_count=5, run_count=5,
+        )
+    state = _full_state(session_factory, video_id)
+    assert state.run_state in ("failed", "stale"), corrupt
     assert _readiness(session_factory, video_id).status == "not_run"
