@@ -1,0 +1,158 @@
+{
+  "all_ok": true,
+  "assertions": [
+    {
+      "detail": "correction=36ceb32a-67f2-4338-8315-e6a5a1e3f4ac job=e5d4c05a-812b-44a8-8c5e-90539d99ef9b state=queued",
+      "name": "S11-C2A2-01-correction-plus-queued-recompute",
+      "ok": true
+    },
+    {
+      "detail": "job=e5d4c05a-812b-44a8-8c5e-90539d99ef9b state=completed",
+      "name": "S11-C2A2-02-resumed-to-terminal-completed",
+      "ok": true
+    },
+    {
+      "detail": "corrections=1",
+      "name": "S11-C2A2-03-exactly-one-correction",
+      "ok": true
+    },
+    {
+      "detail": "attempts=1",
+      "name": "S11-C2A2-04-single-successor-no-duplicate-attempts",
+      "ok": true
+    },
+    {
+      "detail": "recompute_jobs=1",
+      "name": "S11-C2A2-05-no-duplicate-recompute-enqueue",
+      "ok": true
+    },
+    {
+      "detail": "before=2 after=2",
+      "name": "S11-C2A2-06-unaffected-rows-sha-identical",
+      "ok": true
+    },
+    {
+      "detail": "artifacts=2",
+      "name": "S11-C2A2-07-unaffected-managed-bytes-identical",
+      "ok": true
+    },
+    {
+      "detail": "role_a_artifacts=4",
+      "name": "S11-C2A2-08-affected-recomputed",
+      "ok": true
+    },
+    {
+      "detail": "rows=3",
+      "name": "S11-C2A2-09-recompute-published-under-own-job-dir",
+      "ok": true
+    },
+    {
+      "detail": "leaked=[]",
+      "name": "S11-C2A2-10-no-unaffected-republish",
+      "ok": true
+    },
+    {
+      "detail": "state=rejected rev=2",
+      "name": "S11-C2A2-11-occurrence-cas-once",
+      "ok": true
+    },
+    {
+      "detail": "affected=['2573442c-6a6a-49a4-80bd-6a06be438d11']",
+      "name": "S11-C2A2-12-manifest-affected-only",
+      "ok": true
+    },
+    {
+      "detail": "full_lane=['406e6642-eb47-4e41-8aa0-b214944d54f0'] recompute=1",
+      "name": "S11-C2A2-13-no-full-project-job",
+      "ok": true
+    },
+    {
+      "detail": "state=completed correction=applied",
+      "name": "S11-C2A2-14-stable-across-fresh-reads",
+      "ok": true
+    }
+  ],
+  "correction_id": "36ceb32a-67f2-4338-8315-e6a5a1e3f4ac",
+  "db_path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\s11c2a2_zdhflb8g\\c2a2.db",
+  "lane": "c2a2-t06c",
+  "managed_root": "C:\\Users\\Admin\\AppData\\Local\\Temp\\s11c2a2_zdhflb8g\\managed",
+  "recompute_job_id": "e5d4c05a-812b-44a8-8c5e-90539d99ef9b",
+  "run_tag": "20260904-055238",
+  "terminal": {
+    "attempts": [
+      {
+        "error": null,
+        "result": {
+          "input": {
+            "correction_id": "36ceb32a-67f2-4338-8315-e6a5a1e3f4ac",
+            "fingerprint": "adc9e8dc7f171cd8321354a28f4214035e133dca9768cbd8881ea12cc0061113",
+            "generation": "1",
+            "project_id": "f3d6d551-b0ff-4d7b-a6ef-79140021b147",
+            "resolved": true,
+            "roles": [
+              {
+                "name": "A",
+                "occurrences": [
+                  {
+                    "bbox_h": 40,
+                    "bbox_w": 40,
+                    "bbox_x": 10,
+                    "bbox_y": 10,
+                    "confidence": 0.6,
+                    "frame_index": 5,
+                    "scene_id": "a6bd2f49-a63f-457a-bf1e-b32f1a7eaf54"
+                  }
+                ],
+                "revision": 1,
+                "role_id": "2573442c-6a6a-49a4-80bd-6a06be438d11",
+                "source_job_id": "406e6642-eb47-4e41-8aa0-b214944d54f0"
+              }
+            ],
+            "video_height": 240,
+            "video_item_id": "5aa7f5fc-d625-4b70-b83a-80bf475094eb",
+            "video_width": 320,
+            "workspace_id": "ws-s11-c2a2"
+          },
+          "published": {
+            "files": [
+              {
+                "final_rel": "artifacts/ws-s11-c2a2/image/e5d4c05a-812b-44a8-8c5e-90539d99ef9b/recompute/2573442c-6a6_thumbnail.png",
+                "height": 5,
+                "name": "2573442c-6a6_thumbnail.png",
+                "purpose": "thumbnail",
+                "role_id": "2573442c-6a6a-49a4-80bd-6a06be438d11",
+                "sha256": "5d5e8692535dd78dd5ed695907083611f7b951cc2958432d85b829ce1ec7940d",
+                "size_bytes": 170,
+                "staged_rel": "staging/e5d4c05a-812b-44a8-8c5e-90539d99ef9b/recompute/2573442c-6a6_thumbnail.png",
+                "width": 5
+              },
+              {
+                "final_rel": "artifacts/ws-s11-c2a2/image/e5d4c05a-812b-44a8-8c5e-90539d99ef9b/recompute/2573442c-6a6_mask.png",
+                "height": 240,
+                "name": "2573442c-6a6_mask.png",
+                "purpose": "mask",
+                "role_id": "2573442c-6a6a-49a4-80bd-6a06be438d11",
+                "sha256": "5ff2046123e4d9ddd5df5a026fad6bd3cc52954de4d6f7c5fad92a39b0dbe228",
+                "size_bytes": 458,
+                "staged_rel": "staging/e5d4c05a-812b-44a8-8c5e-90539d99ef9b/recompute/2573442c-6a6_mask.png",
+                "width": 320
+              }
+            ],
+            "fingerprint": "adc9e8dc7f171cd8321354a28f4214035e133dca9768cbd8881ea12cc0061113",
+            "manifest_artifact_id": "e7cdb730-ab83-58c5-bd61-e0fc547af9c4",
+            "manifest_rel": "artifacts/ws-s11-c2a2/image/e5d4c05a-812b-44a8-8c5e-90539d99ef9b/recompute/result.json",
+            "suggestion_ids": []
+          }
+        }
+      }
+    ],
+    "state": "completed",
+    "steps": [
+      {
+        "attempt": 0,
+        "state": "completed"
+      }
+    ]
+  },
+  "video_item_id": "5aa7f5fc-d625-4b70-b83a-80bf475094eb"
+}

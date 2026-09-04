@@ -1,0 +1,158 @@
+{
+  "all_ok": true,
+  "assertions": [
+    {
+      "detail": "correction=65a2b664-df8f-4ef7-a3bf-ebf4282ae7e4 job=71ad6a08-8f77-4231-94bb-6c2ee3a95e10 state=queued",
+      "name": "S11-C2A2-01-correction-plus-queued-recompute",
+      "ok": true
+    },
+    {
+      "detail": "job=71ad6a08-8f77-4231-94bb-6c2ee3a95e10 state=completed",
+      "name": "S11-C2A2-02-resumed-to-terminal-completed",
+      "ok": true
+    },
+    {
+      "detail": "corrections=1",
+      "name": "S11-C2A2-03-exactly-one-correction",
+      "ok": true
+    },
+    {
+      "detail": "attempts=1",
+      "name": "S11-C2A2-04-single-successor-no-duplicate-attempts",
+      "ok": true
+    },
+    {
+      "detail": "recompute_jobs=1",
+      "name": "S11-C2A2-05-no-duplicate-recompute-enqueue",
+      "ok": true
+    },
+    {
+      "detail": "before=2 after=2",
+      "name": "S11-C2A2-06-unaffected-rows-sha-identical",
+      "ok": true
+    },
+    {
+      "detail": "artifacts=2",
+      "name": "S11-C2A2-07-unaffected-managed-bytes-identical",
+      "ok": true
+    },
+    {
+      "detail": "role_a_artifacts=4",
+      "name": "S11-C2A2-08-affected-recomputed",
+      "ok": true
+    },
+    {
+      "detail": "rows=3",
+      "name": "S11-C2A2-09-recompute-published-under-own-job-dir",
+      "ok": true
+    },
+    {
+      "detail": "leaked=[]",
+      "name": "S11-C2A2-10-no-unaffected-republish",
+      "ok": true
+    },
+    {
+      "detail": "state=rejected rev=2",
+      "name": "S11-C2A2-11-occurrence-cas-once",
+      "ok": true
+    },
+    {
+      "detail": "affected=['a927c22d-ee66-4c7c-8b95-8afe2318a853']",
+      "name": "S11-C2A2-12-manifest-affected-only",
+      "ok": true
+    },
+    {
+      "detail": "full_lane=['b098e43b-0def-4629-b581-064941eb561d'] recompute=1",
+      "name": "S11-C2A2-13-no-full-project-job",
+      "ok": true
+    },
+    {
+      "detail": "state=completed correction=applied",
+      "name": "S11-C2A2-14-stable-across-fresh-reads",
+      "ok": true
+    }
+  ],
+  "correction_id": "65a2b664-df8f-4ef7-a3bf-ebf4282ae7e4",
+  "db_path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\s11c2a2_74byog4o\\c2a2.db",
+  "lane": "c2a2-t06c",
+  "managed_root": "C:\\Users\\Admin\\AppData\\Local\\Temp\\s11c2a2_74byog4o\\managed",
+  "recompute_job_id": "71ad6a08-8f77-4231-94bb-6c2ee3a95e10",
+  "run_tag": "20260904-055226",
+  "terminal": {
+    "attempts": [
+      {
+        "error": null,
+        "result": {
+          "input": {
+            "correction_id": "65a2b664-df8f-4ef7-a3bf-ebf4282ae7e4",
+            "fingerprint": "c312f6bc6ec89e9b2b34e15ccdb81cfe5c9dff04b6d08b6c50f38d6e3cac05ed",
+            "generation": "1",
+            "project_id": "84ab4e6e-d2e4-4b21-a964-0c3a6741f8fe",
+            "resolved": true,
+            "roles": [
+              {
+                "name": "A",
+                "occurrences": [
+                  {
+                    "bbox_h": 40,
+                    "bbox_w": 40,
+                    "bbox_x": 10,
+                    "bbox_y": 10,
+                    "confidence": 0.6,
+                    "frame_index": 5,
+                    "scene_id": "c1aa345f-d7db-420f-a714-b98f9680a2ec"
+                  }
+                ],
+                "revision": 1,
+                "role_id": "a927c22d-ee66-4c7c-8b95-8afe2318a853",
+                "source_job_id": "b098e43b-0def-4629-b581-064941eb561d"
+              }
+            ],
+            "video_height": 240,
+            "video_item_id": "44d16427-968d-41aa-94b3-b09d5b108e86",
+            "video_width": 320,
+            "workspace_id": "ws-s11-c2a2"
+          },
+          "published": {
+            "files": [
+              {
+                "final_rel": "artifacts/ws-s11-c2a2/image/71ad6a08-8f77-4231-94bb-6c2ee3a95e10/recompute/a927c22d-ee6_thumbnail.png",
+                "height": 5,
+                "name": "a927c22d-ee6_thumbnail.png",
+                "purpose": "thumbnail",
+                "role_id": "a927c22d-ee66-4c7c-8b95-8afe2318a853",
+                "sha256": "5d5e8692535dd78dd5ed695907083611f7b951cc2958432d85b829ce1ec7940d",
+                "size_bytes": 170,
+                "staged_rel": "staging/71ad6a08-8f77-4231-94bb-6c2ee3a95e10/recompute/a927c22d-ee6_thumbnail.png",
+                "width": 5
+              },
+              {
+                "final_rel": "artifacts/ws-s11-c2a2/image/71ad6a08-8f77-4231-94bb-6c2ee3a95e10/recompute/a927c22d-ee6_mask.png",
+                "height": 240,
+                "name": "a927c22d-ee6_mask.png",
+                "purpose": "mask",
+                "role_id": "a927c22d-ee66-4c7c-8b95-8afe2318a853",
+                "sha256": "5ff2046123e4d9ddd5df5a026fad6bd3cc52954de4d6f7c5fad92a39b0dbe228",
+                "size_bytes": 458,
+                "staged_rel": "staging/71ad6a08-8f77-4231-94bb-6c2ee3a95e10/recompute/a927c22d-ee6_mask.png",
+                "width": 320
+              }
+            ],
+            "fingerprint": "c312f6bc6ec89e9b2b34e15ccdb81cfe5c9dff04b6d08b6c50f38d6e3cac05ed",
+            "manifest_artifact_id": "431dc965-dc1e-59ec-9324-7b84fe09ae41",
+            "manifest_rel": "artifacts/ws-s11-c2a2/image/71ad6a08-8f77-4231-94bb-6c2ee3a95e10/recompute/result.json",
+            "suggestion_ids": []
+          }
+        }
+      }
+    ],
+    "state": "completed",
+    "steps": [
+      {
+        "attempt": 0,
+        "state": "completed"
+      }
+    ]
+  },
+  "video_item_id": "44d16427-968d-41aa-94b3-b09d5b108e86"
+}
