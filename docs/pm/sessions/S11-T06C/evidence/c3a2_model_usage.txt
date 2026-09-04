@@ -1,0 +1,6 @@
+S11-C3-A2 session_model_usage (durable)
+session: 20260903_223530_b90853
+model (turn nay): custom 9Router cmc/muse-spark-1.3-contributor
+reasoning: max, fallback OFF, TTFB 900s
+before: tip 6e7eedf, porcelain empty, S11_C3_EVIDENCE_ROOT unset (hermetic), base 7751598 present
+after: node x2 23/23 all_ok (pass1 3.02s, pass2 3.08s); full module 12 passed 309.82s EXIT=0; ruff F clean; diff-check 0
