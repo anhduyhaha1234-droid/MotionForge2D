@@ -105,3 +105,46 @@ với production hiện tại (1 passed standalone 2.96s; 11/11 toàn file 249.2
 exit 0). Full lane log: `/c/Users/Admin/AppData/Local/Temp/s11c1b_full.log`.
 
 **Status: TASK_SUBMITTED** — lane C1-B, chờ Manager verify. KHÔNG tự ghi APPROVED.
+---
+
+## S11-C1 lane C1-B follow-on — FULL-scope seed (INT01 RED C1B-09)
+
+**Chẩn đoán (Manager/INT01, read-only):** INT01 re-run sau merge C2 vẫn RED tại
+C1B-09 `readiness-blocked-with-open-blockers` (:626): `status=not_run`
+`run_state=never_run`. Nguyên nhân: test_t11 submit `scope=SCOPE_AUDIO`
+(:1153,1222) — AUDIO run không bao giờ pass gate C1-A mới (newest FULL-scope +
+6 DK trong `qc_check_runs.py`). C2 T05A đã làm mẫu: seed FULL via
+`scope_detectors(SCOPE_FULL)` 10-detector band (commit 3beee0d). Gate T03G
+đúng — seed sai.
+
+**Fix (chỉ file allowlist, không sửa production/gate):** submit FULL-scope
+completion đủ band — `scope_detectors(SCOPE_FULL)` (không hard-code) thay vì
+AUDIO, để run pass gate C1-A và readiness ra `blocked` như test mong đợi:
+- imports: full 10-detector self-register band (`audio_missing`,
+  `av_sync_drift`, `cut_drift`, `edge_halo`, `identity_drift`,
+  `temporal_flicker`, `trajectory_drift` + `.register()` cho trio
+  `contact_break`/`silhouette_clipping`/`z_order_error`), `SCOPE_FULL`,
+  `scope_detectors`, `CanonicalTimebase`,
+  `s11_qc_calibration_builders.generate_trajectory_drift_input`;
+- registry loop đủ 10 entry point binding (trio dùng `:detect_contact_break` /
+  `:detect_z_order_error` / `:detect_silhouette_clipping` — entry thật, copy
+  từ `_REGISTRATION` T03F, không đoán);
+- detector_args FULL: 8 visual pass-band (T03F helpers, pure computation,
+  không media) + audio envelope STREAM_COPY terminal-fact issue giữ nguyên
+  (audio_missing blocker); `assert set(band) == set(args)` chống drift;
+- cả 2 submit (`first` + duplicate `second`) dùng `scope=SCOPE_FULL`.
+
+**Pitfall đã fix:** entry point trio đoán `:detect` sai → `QcRegistryError`
+CONFLICT; sửa theo `_REGISTRATION` T03F.
+
+**Gate (không chạy lại theo lệnh Manager — dùng kết quả đã có):** py_compile OK,
+`ruff check --select F` clean, test_t11 `1 passed` (4.74s/4.71s), full suite
+`11 passed in 262.29s FULL_EXIT=0` (basetemp s11c1b_full3), lane JSON
+`c1b_restart_proof_20260904-010041.json` 10/10 all_ok, terminal completed.
+
+**Evidence:** external
+`MotionForge2D-evidence/s11-c1/lanes/c1b-t06c/c1b_restart_proof_20260904-010041.json`
+(FULL seed) + copy `docs/pm/sessions/S11-T06C/evidence/`.
+
+**Status: TASK_SUBMITTED** — lane C1-B follow-on (FULL seed), chờ Manager/INT01
+verify. KHÔNG tự ghi APPROVED.

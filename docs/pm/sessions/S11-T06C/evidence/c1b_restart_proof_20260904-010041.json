@@ -1,0 +1,279 @@
+{
+  "all_ok": true,
+  "assertions": [
+    {
+      "detail": "job=c0ce4ee8-0721-4c74-9c8f-c3b981006d3f state=queued",
+      "name": "S11-C1B-01-submit-enqueued-persisted",
+      "ok": true
+    },
+    {
+      "detail": "job=c0ce4ee8-0721-4c74-9c8f-c3b981006d3f state=completed",
+      "name": "S11-C1B-02-resumed-to-terminal-completed",
+      "ok": true
+    },
+    {
+      "detail": "results=1",
+      "name": "S11-C1B-03-exactly-one-successor-effect",
+      "ok": true
+    },
+    {
+      "detail": [
+        "1da63d8a00816b15a3c6ff8f2fdcd2ff2a82745d7ffa8a080781b50178bbd21e"
+      ],
+      "name": "S11-C1B-04-single-deterministic-run-id",
+      "ok": true
+    },
+    {
+      "detail": "severities=['blocker'] total=2",
+      "name": "S11-C1B-05-blocker-issue-created-once",
+      "ok": true
+    },
+    {
+      "detail": "total=2 unique_keys=2",
+      "name": "S11-C1B-06-no-duplicate-natural-keys",
+      "ok": true
+    },
+    {
+      "detail": "reused=True job=c0ce4ee8-0721-4c74-9c8f-c3b981006d3f vs c0ce4ee8-0721-4c74-9c8f-c3b981006d3f",
+      "name": "S11-C1B-07-completed-duplicate-reuses-same-job",
+      "ok": true
+    },
+    {
+      "detail": "before=2 after=2",
+      "name": "S11-C1B-08-no-duplicate-resolution-after-restart",
+      "ok": true
+    },
+    {
+      "detail": "status=blocked run_state=completed",
+      "name": "S11-C1B-09-readiness-blocked-with-open-blockers",
+      "ok": true
+    },
+    {
+      "detail": "first=('blocked', 'completed', 2) second=('blocked', 'completed', 2)",
+      "name": "S11-C1B-10-readiness-stable-across-fresh-queries",
+      "ok": true
+    }
+  ],
+  "db_path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\s11c1b_tok4opea\\c1b.db",
+  "job_id": "c0ce4ee8-0721-4c74-9c8f-c3b981006d3f",
+  "lane": "c1b-t06c",
+  "managed_root": "C:\\Users\\Admin\\AppData\\Local\\Temp\\s11c1b_tok4opea\\managed",
+  "run_tag": "20260904-010041",
+  "terminal": {
+    "attempts": [
+      {
+        "error": null,
+        "result": {
+          "completed": true,
+          "detector_revisions": {
+            "audio_missing": "1.0.0",
+            "av_sync_drift": "1.0.0",
+            "contact_break": "1.0.0",
+            "cut_drift": "1.0.0",
+            "edge_halo": "1.0.0",
+            "identity_drift": "1.0.0",
+            "silhouette_clipping": "1.0.0",
+            "temporal_flicker": "1.0.0",
+            "trajectory_drift": "1.0.0",
+            "z_order_error": "1.0.0"
+          },
+          "detectors": [
+            "audio_missing",
+            "av_sync_drift",
+            "cut_drift",
+            "edge_halo",
+            "identity_drift",
+            "temporal_flicker",
+            "trajectory_drift",
+            "contact_break",
+            "silhouette_clipping",
+            "z_order_error"
+          ],
+          "evidence_fingerprint": "b9b7f6f809f9b0fe9c2f68db8b3ed58f7483c03f9d0c7f41e716a3bb36fdb384",
+          "job_type": "RUN_QC_CHECKS",
+          "policy_content_hash": "de215c6243e1c6bf300e2bfa1c8024fbda6d0358ecf3cad1730781e37419ea24",
+          "policy_id": "s11-qc-thresholds-v1",
+          "run_id": "1da63d8a00816b15a3c6ff8f2fdcd2ff2a82745d7ffa8a080781b50178bbd21e",
+          "schema_version": 1,
+          "scope": "full",
+          "scope_fingerprint": "1c852619c52f61808d3604f481c417b68b8e8bd3047ef4bf1ffe9f907770520e",
+          "source_artifact_fingerprint": "",
+          "source_artifact_id": null,
+          "source_generation": "1",
+          "summary": {
+            "cancelled": false,
+            "checks_requested": 10,
+            "checks_run": 10,
+            "checks_skipped": 0,
+            "created": 2,
+            "deadline_exceeded": false,
+            "errors": 0,
+            "not_applicable": 0,
+            "per_detector": {
+              "audio_missing": {
+                "applicability": "applicable",
+                "created": 1,
+                "detector": "audio_missing",
+                "error": null,
+                "error_code": null,
+                "items_found": 1,
+                "ran": true,
+                "resolved_after_recheck": 0,
+                "reused": 0,
+                "run_sec": 0.06299999996554106,
+                "skipped": false,
+                "status": "blocker"
+              },
+              "av_sync_drift": {
+                "applicability": "applicable",
+                "created": 1,
+                "detector": "av_sync_drift",
+                "error": null,
+                "error_code": null,
+                "items_found": 1,
+                "ran": true,
+                "resolved_after_recheck": 0,
+                "reused": 0,
+                "run_sec": 0.06299999996554106,
+                "skipped": false,
+                "status": "blocker"
+              },
+              "contact_break": {
+                "applicability": null,
+                "created": 0,
+                "detector": "contact_break",
+                "error": null,
+                "error_code": null,
+                "items_found": 0,
+                "ran": true,
+                "resolved_after_recheck": 0,
+                "reused": 0,
+                "run_sec": 0.062000000034458935,
+                "skipped": false,
+                "status": null
+              },
+              "cut_drift": {
+                "applicability": null,
+                "created": 0,
+                "detector": "cut_drift",
+                "error": null,
+                "error_code": null,
+                "items_found": 0,
+                "ran": true,
+                "resolved_after_recheck": 0,
+                "reused": 0,
+                "run_sec": 0.4529999999795109,
+                "skipped": false,
+                "status": "pass"
+              },
+              "edge_halo": {
+                "applicability": null,
+                "created": 0,
+                "detector": "edge_halo",
+                "error": null,
+                "error_code": null,
+                "items_found": 0,
+                "ran": true,
+                "resolved_after_recheck": 0,
+                "reused": 0,
+                "run_sec": 0.07800000009592623,
+                "skipped": false,
+                "status": "pass"
+              },
+              "identity_drift": {
+                "applicability": null,
+                "created": 0,
+                "detector": "identity_drift",
+                "error": null,
+                "error_code": null,
+                "items_found": 0,
+                "ran": true,
+                "resolved_after_recheck": 0,
+                "reused": 0,
+                "run_sec": 0.06199999991804361,
+                "skipped": false,
+                "status": "pass"
+              },
+              "silhouette_clipping": {
+                "applicability": null,
+                "created": 0,
+                "detector": "silhouette_clipping",
+                "error": null,
+                "error_code": null,
+                "items_found": 0,
+                "ran": true,
+                "resolved_after_recheck": 0,
+                "reused": 0,
+                "run_sec": 0.0779999999795109,
+                "skipped": false,
+                "status": null
+              },
+              "temporal_flicker": {
+                "applicability": null,
+                "created": 0,
+                "detector": "temporal_flicker",
+                "error": null,
+                "error_code": null,
+                "items_found": 0,
+                "ran": true,
+                "resolved_after_recheck": 0,
+                "reused": 0,
+                "run_sec": 0.07900000002700835,
+                "skipped": false,
+                "status": "pass"
+              },
+              "trajectory_drift": {
+                "applicability": null,
+                "created": 0,
+                "detector": "trajectory_drift",
+                "error": null,
+                "error_code": null,
+                "items_found": 0,
+                "ran": true,
+                "resolved_after_recheck": 0,
+                "reused": 0,
+                "run_sec": 0.4529999999795109,
+                "skipped": false,
+                "status": "pass"
+              },
+              "z_order_error": {
+                "applicability": null,
+                "created": 0,
+                "detector": "z_order_error",
+                "error": null,
+                "error_code": null,
+                "items_found": 0,
+                "ran": true,
+                "resolved_after_recheck": 0,
+                "reused": 0,
+                "run_sec": 0.43799999996554106,
+                "skipped": false,
+                "status": null
+              }
+            },
+            "reopened_stale": 0,
+            "resolved_after_recheck": 0,
+            "reused": 0,
+            "run_id": "1da63d8a00816b15a3c6ff8f2fdcd2ff2a82745d7ffa8a080781b50178bbd21e",
+            "run_sec": 1.86
+          },
+          "zero_item_completion": {
+            "checks_run": 10,
+            "evidence": false,
+            "issues_found": 2,
+            "not_applicable": 0,
+            "qc_items_created": 2
+          }
+        }
+      }
+    ],
+    "state": "completed",
+    "steps": [
+      {
+        "attempt": 0,
+        "state": "completed"
+      }
+    ]
+  },
+  "video_item_id": "0b0f4655-ca2f-4ed7-b288-a63b21569a90"
+}
