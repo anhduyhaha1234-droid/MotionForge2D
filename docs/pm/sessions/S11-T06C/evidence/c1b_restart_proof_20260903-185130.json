@@ -1,0 +1,151 @@
+{
+  "all_ok": true,
+  "assertions": [
+    {
+      "detail": "job=d731d1f5-7049-4580-9cb5-288836d43532 state=queued",
+      "name": "S11-C1B-01-submit-enqueued-persisted",
+      "ok": true
+    },
+    {
+      "detail": "job=d731d1f5-7049-4580-9cb5-288836d43532 state=completed",
+      "name": "S11-C1B-02-resumed-to-terminal-completed",
+      "ok": true
+    },
+    {
+      "detail": "results=1",
+      "name": "S11-C1B-03-exactly-one-successor-effect",
+      "ok": true
+    },
+    {
+      "detail": [
+        "7a4992c93e8b63469eb72957bdd809168d37321fc6e6f5df88b2d0894de7ea17"
+      ],
+      "name": "S11-C1B-04-single-deterministic-run-id",
+      "ok": true
+    },
+    {
+      "detail": "severities=['blocker'] total=2",
+      "name": "S11-C1B-05-blocker-issue-created-once",
+      "ok": true
+    },
+    {
+      "detail": "total=2 unique_keys=2",
+      "name": "S11-C1B-06-no-duplicate-natural-keys",
+      "ok": true
+    },
+    {
+      "detail": "reused=True job=d731d1f5-7049-4580-9cb5-288836d43532 vs d731d1f5-7049-4580-9cb5-288836d43532",
+      "name": "S11-C1B-07-completed-duplicate-reuses-same-job",
+      "ok": true
+    },
+    {
+      "detail": "before=2 after=2",
+      "name": "S11-C1B-08-no-duplicate-resolution-after-restart",
+      "ok": true
+    },
+    {
+      "detail": "status=blocked run_state=completed",
+      "name": "S11-C1B-09-readiness-blocked-with-open-blockers",
+      "ok": true
+    },
+    {
+      "detail": "first=('blocked', 'completed', 2) second=('blocked', 'completed', 2)",
+      "name": "S11-C1B-10-readiness-stable-across-fresh-queries",
+      "ok": true
+    }
+  ],
+  "db_path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\s11c1b__wovt642\\c1b.db",
+  "job_id": "d731d1f5-7049-4580-9cb5-288836d43532",
+  "lane": "c1b-t06c",
+  "managed_root": "C:\\Users\\Admin\\AppData\\Local\\Temp\\s11c1b__wovt642\\managed",
+  "run_tag": "20260903-185130",
+  "terminal": {
+    "attempts": [
+      {
+        "error": null,
+        "result": {
+          "completed": true,
+          "detector_revisions": {
+            "audio_missing": "1.0.0",
+            "av_sync_drift": "1.0.0"
+          },
+          "detectors": [
+            "audio_missing",
+            "av_sync_drift"
+          ],
+          "evidence_fingerprint": "b9b7f6f809f9b0fe9c2f68db8b3ed58f7483c03f9d0c7f41e716a3bb36fdb384",
+          "job_type": "RUN_QC_CHECKS",
+          "policy_content_hash": "de215c6243e1c6bf300e2bfa1c8024fbda6d0358ecf3cad1730781e37419ea24",
+          "policy_id": "s11-qc-thresholds-v1",
+          "run_id": "7a4992c93e8b63469eb72957bdd809168d37321fc6e6f5df88b2d0894de7ea17",
+          "schema_version": 1,
+          "scope": "audio",
+          "scope_fingerprint": "ce8770800e0b3da2dc761019890f698cebaf96291bb7d5ca0e300539fbde7bdf",
+          "source_artifact_fingerprint": "",
+          "source_artifact_id": null,
+          "source_generation": "1",
+          "summary": {
+            "cancelled": false,
+            "checks_requested": 2,
+            "checks_run": 2,
+            "checks_skipped": 0,
+            "created": 2,
+            "deadline_exceeded": false,
+            "errors": 0,
+            "not_applicable": 0,
+            "per_detector": {
+              "audio_missing": {
+                "applicability": "applicable",
+                "created": 1,
+                "detector": "audio_missing",
+                "error": null,
+                "error_code": null,
+                "items_found": 1,
+                "ran": true,
+                "resolved_after_recheck": 0,
+                "reused": 0,
+                "run_sec": 0.06299999996554106,
+                "skipped": false,
+                "status": "blocker"
+              },
+              "av_sync_drift": {
+                "applicability": "applicable",
+                "created": 1,
+                "detector": "av_sync_drift",
+                "error": null,
+                "error_code": null,
+                "items_found": 1,
+                "ran": true,
+                "resolved_after_recheck": 0,
+                "reused": 0,
+                "run_sec": 0.06300000008195639,
+                "skipped": false,
+                "status": "blocker"
+              }
+            },
+            "reopened_stale": 0,
+            "resolved_after_recheck": 0,
+            "reused": 0,
+            "run_id": "7a4992c93e8b63469eb72957bdd809168d37321fc6e6f5df88b2d0894de7ea17",
+            "run_sec": 0.141
+          },
+          "zero_item_completion": {
+            "checks_run": 2,
+            "evidence": false,
+            "issues_found": 2,
+            "not_applicable": 0,
+            "qc_items_created": 2
+          }
+        }
+      }
+    ],
+    "state": "completed",
+    "steps": [
+      {
+        "attempt": 0,
+        "state": "completed"
+      }
+    ]
+  },
+  "video_item_id": "3d13c41f-a2b9-4f5a-bd08-7d8e34b18e8b"
+}

@@ -111,19 +111,66 @@ mọi manifest `policy_ref.policy_content_hash` KHỚP (động qua `policy_ref_
 74/74 OK (`assertions.json` all_ok=true) — bao gồm S11-T06C-00..25 (+21a),
 leak-gate survivors rỗng trong cửa sổ 15s.
 
+## S11-C1 lane C1-B — executable restart/resume epic-exit proof (Codex P1)
+
+Thay manifest/proxy proof bằng scenario THỰC THI (fresh DB + managed root mới):
+
+```text
+seed (project/video/QC blocker) → submit RUN_QC_CHECKS recompute qua stack thật
+→ dừng/recreate JobService trên cùng durable DB + managed root
+→ resume persisted job (bounded poll 60s/0.5s) → terminal completed
+```
+
+**Test mới:** `test_t11_executable_restart_resume_epic_exit` trong cùng file
+allowlist (không chạm production — lane này KHÔNG sửa production code).
+
+| Assertion | Nội dung | Kết quả |
+|---|---|---|
+| S11-C1B-01 | Submit enqueue persisted (queued) | ✓ |
+| S11-C1B-02 | Resume tới terminal completed | ✓ |
+| S11-C1B-03 | Đúng một successor/effect (1 completion) | ✓ |
+| S11-C1B-04 | Run-id deterministic duy nhất (64-hex) | ✓ |
+| S11-C1B-05 | Blocker issue tạo đúng một lần | ✓ |
+| S11-C1B-06 | Không duplicate natural keys | ✓ |
+| S11-C1B-07 | Completed duplicate reuses SAME job | ✓ |
+| S11-C1B-08 | Không duplicate resolution sau restart | ✓ |
+| S11-C1B-09 | Readiness blocked trung thực (có blocker mở) | ✓ |
+| S11-C1B-10 | Readiness ổn định qua fresh re-query | ✓ |
+
+**Kết luận:** KHÔNG phát hiện product bug → KHÔNG cần T04B (`NEEDS_T04B_PRODUCT_FIX`
+không kích hoạt). Executable assertion node là REAL submit authority + REAL
+recompute handler + REAL `run_full_check_set` — không đọc golden JSON.
+
+**Lane evidence (external, allowlist):**
+`C:\Users\Admin\MotionForge2D-evidence\s11-c1\lanes\c1b-t06c\c1b_restart_proof_20260903-185130.json`
+(all_ok=true, terminal completed, 1 attempt, steps completed)
++ copy `docs/pm/sessions/S11-T06C/evidence/c1b_restart_proof_20260903-185130.json`.
+
 ## Static gates
 
 ```
 python -m py_compile tests/test_s11_t02_t06_acceptance.py   → OK
 ruff check --select F tests/test_s11_t02_t06_acceptance.py  → All checks passed (ruff 0.16.0)
-pytest --collect-only tests/test_s11_t02_t06_acceptance.py  → 10 tests collected
+pytest --collect-only tests/test_s11_t02_t06_acceptance.py  → 11 tests collected
+```
+
+**Lane command (một lệnh — §6):**
+
+```
+env -u MOTIONFORGE_DATABASE_URL python -m pytest tests/test_s11_t02_t06_acceptance.py \
+  -p no:cacheprovider --basetemp=C:/Users/Admin/AppData/Local/Temp/s11c1b_2 -q
+→ 11 passed in 249.24s (0:04:09), exit 0
 ```
 
 ## File đã thay đổi
 
-- `tests/test_s11_t02_t06_acceptance.py` (NEW, 10 tests, ~950 lines)
+- `tests/test_s11_t02_t06_acceptance.py` (10 → 11 tests, 933 → 1301 lines,
+  +368: helpers C1-B + `test_t11`; sha pre b3862d86 — xem SHA cuối khi commit)
 - `docs/pm/sessions/S11-T06C/{LOG,REPORT}.md` + `evidence/` (report.json,
-  assertions.json, suite_stdout.txt, suite_stderr.txt — copy run-id)
-- `output/s11-t06-e2e/20260903-155419-31900/**` (runtime namespace, gitignored)
+  assertions.json, suite_stdout.txt, suite_stderr.txt — copy run-id wave cũ +
+  `c1b_restart_proof_20260903-185130.json` mới)
+- `output/s11-t06-e2e/20260903-155419-31900/**` (runtime namespace wave cũ, gitignored)
+- External lane evidence (ngoài worktree diff, allowlist):
+  `MotionForge2D-evidence/s11-c1/lanes/c1b-t06c/c1b_restart_proof_*.json`
 
-**Status: TASK_SUBMITTED** — chờ Manager/Codex verify. KHÔNG tự ghi APPROVED.
+**Status: TASK_SUBMITTED** — lane C1-B, chờ Manager/Codex verify. KHÔNG tự ghi APPROVED.
