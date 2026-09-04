@@ -145,3 +145,38 @@ Forbidden verified: `git status --porcelain` chỉ 8 file allowlist + docs; `mod
   34385B 836L.
 - Commit local trên `codex/s11/t03g-0903w8`: `b0a334d`
   (C3-A1, parent `e7e9242`).
+## 10. S11-C4 recovery (2026-09-05, 2 P1 + 1 P2 → ALL GREEN)
+
+- Defects: clean process registry rỗng → full RUN_QC_CHECKS chết
+  QC_ORCHESTRATOR_MISSING_ARGS (P1-1); `qc_check_runs.py:554-579` catch-all
+  → `{}` + fallback `"1.0.0"` chấp nhận forged 10-detector completion khi chỉ
+  2/10 registered (P1-2); import-order + EOF-newline trên changed files (P2).
+- Fixes (bounded preimage, exact allowlist 3 prod + 2 test):
+  (1) `qc_checks_handler.py::ensure_full_band_registered` — production
+  bootstrap duy nhất: snapshot PRE-IMPORT, import 7 self-register modules +
+  `register()` 3 explicit modules với entry/revision từ constants của chính
+  modules, pre-check conflict → QC_RUN_BOOTSTRAP_CONFLICT fail-closed,
+  re-seat band order, post-verify set/order/revisions; idempotent.
+  (2) `job_service.py::JobService.__init__` gọi bootstrap ngay sau
+  `register_qc_checks_handler`. (3) `qc_check_runs.py` xóa mọi guessed
+  fallback — resolver raise / map thiếu-thừa-rỗng / value lệch → failed +
+  not_run + truthful detail. (4) fixtures 2 test modules dùng production
+  bootstrap thay audio-only shim. (5) ruff configured 12 auto-fix trên
+  changed files (2 findings còn lại pre-existing ngoài phạm vi C4).
+- Proofs: RED pre-fix `red-prefix.log` (registry=[] → MISSING_ARGS);
+  GREEN post-fix `green-probe.log` (10/10 band order, idempotent,
+  full execute hết MISSING_ARGS, conflict 9.9.9 → BOOTSTRAP_CONFLICT).
+  Lane: `C:/Users/Admin/MotionForge2D-evidence/s11-c4/20260905-034450/lanes/c4-recovery/`.
+- Gate (đúng thứ tự): micro green-probe xanh → job 127 passed (143.64s) +
+  api 16 passed (21.53s) fresh roots → ruff configured (2 pre-existing giữ
+  nguyên) → mypy retained scope (handler+runs Success; 2 job_service lỗi
+  pre-existing giữ nguyên) → `git diff --check` clean + guard allowlist →
+  self-review mọi catch/default (không còn fallback 1.0.0/{}, except còn lại
+  đều fail-closed có detail).
+- Postimage: `qc_check_runs.py` `8768aa7f94263ee565447aa78b0d8a702f379033`
+  39976B 910L; `qc_checks_handler.py` `6b9b0de13245037f27fae0112a7984da1b7ef9c8`
+  37311B 922L; `job_service.py` `f61eb08d1da7a1550f4a41c8427a05e3ac97fbff`
+  32507B 727L; job tests `735ee4fa3d48ba4d78da176f4cbf85508f580fc0` 90626B
+  2174L; api tests `75ae5c391c509e4e612a64d2ee0b3463b0ac4cb4` 34455B 841L.
+- Commit local trên `codex/s11/t03g-0903w8`: xem SHA bên dưới (C4, parent
+  `28a22072c27a9cd5d1e5eacca82bf9740ce3558c`).

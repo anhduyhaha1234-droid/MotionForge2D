@@ -53,11 +53,6 @@ from app.persistence.models import (
     JobLease,
     JobStep,
 )
-from app.persistence.qc_items import QCItemRepository
-from app.services.qc_checks import audio_missing, av_sync_drift  # noqa: F401  (self-register)
-from app.services.qc_checks.registry import registry
-from app.workflow.durable_worker import DurableWorker, WorkerConfig
-from app.workflow.job_service import JobService
 
 # RED gate: these modules do NOT exist at WAVE_BASE — importing them here
 # is the RED proof (ModuleNotFoundError before implementation).
@@ -68,12 +63,18 @@ from app.persistence.qc_check_runs import (
     full_scope_fingerprint,
     latest_check_run_state,
 )
+from app.persistence.qc_items import QCItemRepository
+from app.services.qc_checks import audio_missing, av_sync_drift  # noqa: F401  (self-register)
+from app.services.video_import import VideoImportError
+from app.workflow.durable_worker import DurableWorker, WorkerConfig
+from app.workflow.job_service import JobService
 from app.workflow.qc_checks_handler import (
     JOB_TYPE_RUN_QC_CHECKS,
     RUN_QC_SCHEMA_VERSION,
     SCOPE_AUDIO,
     SCOPE_FULL,
     QcCheckRunSubmitError,
+    ensure_full_band_registered,
     evidence_fingerprint,
     policy_bundle,
     scope_detectors,
@@ -81,20 +82,16 @@ from app.workflow.qc_checks_handler import (
     submit_run_qc_checks,
 )
 
-#: Frozen audio-band registration identities (T03A registry contract) — the
-#: orchestrator consumes the registry read-only; a previous suite may have
-#: unregistered members, so this fixture re-registers the binding band
+#: S11-C4: module bootstrap uses the PRODUCTION full-band registration
+#: (``ensure_full_band_registered``) — the registry is production-owned
+#: state, never a test-only shim.  A previous suite may have unregistered
+#: members, so this fixture re-registers the binding FULL band
 #: deterministically for THIS module (T03F convention, no teardown harm).
-_AUDIO_REGISTRATION = [
-    ("audio_missing", "app.services.qc_checks.audio_missing:detect"),
-    ("av_sync_drift", "app.services.qc_checks.av_sync_drift:detect"),
-]
 
 
 @pytest.fixture(scope="module", autouse=True)
 def _ensure_audio_band_registered() -> None:
-    for name, entry_point in _AUDIO_REGISTRATION:
-        registry.register(name, entry_point)
+    ensure_full_band_registered()
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ALEMBIC_INI = PROJECT_ROOT / "alembic.ini"
@@ -531,7 +528,7 @@ def test_submit_cross_owner_fails_closed(session_factory, svc: JobService) -> No
         )
         s.commit()
     video_id = seed_ws_project(session_factory(), video_id=None)
-    with pytest.raises(Exception):
+    with pytest.raises((QcCheckRunSubmitError, VideoImportError)):
         submit_run_qc_checks(
             session_factory,
             workspace_id=other,
@@ -1026,8 +1023,8 @@ def _seed_full_job(
     (``duplicate_detector`` / ``detectors=``), and count defects
     (``requested_count`` / ``run_count``).
     """
-    from app.persistence.jobs import StepInput
     from app.persistence.jobs import JobRepository as _Repo
+    from app.persistence.jobs import StepInput
 
     band = full_coverage_detectors()
     names = list(detectors) if detectors is not None else list(band)
@@ -1533,7 +1530,7 @@ def test_c2a1_summary_count_wrong_type_never_defaults_to_zero(
     elif bad == "string":
         kwargs = {"summary_override": {key: "0"}}
     else:
-        kwargs = {"summary_override": {key: True if key != "errors" else False}}
+        kwargs = {"summary_override": {key: key != "errors"}}
         # NOTE: even False (a bool) is rejected — bool is not a JSON
         # number, so the gate cannot be laundered through falsy values.
     _seed_full_job(session_factory, video_id=video_id, **kwargs)  # type: ignore[arg-type]
