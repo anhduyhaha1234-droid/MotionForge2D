@@ -95,7 +95,9 @@ def full_coverage_detectors() -> list[str]:
 
 def full_scope_fingerprint() -> str:
     """Content-derived identity the FULL scope fingerprint must equal."""
-    return scope_fingerprint(SCOPE_FULL)
+    fp = scope_fingerprint(SCOPE_FULL)
+    assert isinstance(fp, str)
+    return fp
 
 
 #: Durable run states the authority can report (closed set).
