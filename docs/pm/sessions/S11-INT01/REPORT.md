@@ -116,3 +116,10 @@ readiness not_run thay vì blocked/completed. Lane T06C gốc verify GREEN trư�
 - Gate: diff GREEN; T03G **143/143**; T12 **1/1**; ruff GREEN; mypy Success;
   T05A **1 failed/13 passed** (stale-vs-failed:490); acceptance **2 failed/10 passed**.
 - Route T05A owner 4a4548 — Manager quyet. Raw: `s11-c2/manager/raw/int01-c3m2-gate.txt`.
+
+## 14. S11-C3-M2 gate @ `778a1ce` — BLOCKED_GATE_RED
+
+- Xanh: diff-check; T03G **143/143**; T12 **1/1**; ruff F; mypy 2 files Success.
+- Đỏ: T05A **1 failed/13 passed** (`..._stale_not_run_with_detail`, :490, stale→failed);
+  T06 **2 failed/10 passed** (per-file gates từ T05A).
+- Trả exact owner T05A `20260903_203404_4a4548`. Raw: `s11-c3/manager/raw/int01-c3m2-gate.txt`.

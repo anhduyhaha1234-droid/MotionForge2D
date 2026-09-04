@@ -222,3 +222,23 @@ Owner cần xử lý: T03G (nới gate cho run hợp lệ) hoặc T06C (seed run
   Semantics production C3A1 fail-closed (run stale → never_run → failed) vs test expect cu.
   [4] 2 failed gom test_t03 per-file gate (he qua T05A) + 1 acceptance nua (can xac minh ten).
   Route T05A owner (real owner 4a4548) — Manager quyet. Commit LOG/REPORT nay, KHONG push, DUNG.
+
+## 13. S11-C3-M2 gate @ `778a1ce` — BLOCKED_GATE_RED (T05A 1 failed, T06 2 failed)
+
+- Raw: `C:/Users/Admin/MotionForge2D-evidence/s11-c3/manager/raw/int01-c3m2-gate.txt`
+  (fresh roots `%TEMP%/s11c3m2/*`, `-p no:cacheprovider`, `unset MOTIONFORGE_DATABASE_URL`, per-command exit).
+- [1] diff --check 7751598..HEAD exit 0 — GREEN.
+- [2] T03G 2 modules **143 passed, 164.76s** — GREEN.
+- [3] T12 **1 passed, 3.00s** — GREEN.
+- [4] T06 full 12 **2 failed, 10 passed, 387.35s** — RED
+  (`test_t03_measured_report_per_file_counts` + 1 node nữa — per-file gates bắt nguồn T05A).
+- [5] T05A 14 **1 failed, 13 passed, 14.37s** — RED:
+  `test_readiness_queued_running_failed_stale_not_run_with_detail`
+  `assert ('not_run' == 'not_run' and 'failed' == 'stale')` (:490) —
+  video V_S stale-classification trả `failed` thay vì `stale`.
+- [6] RUFF F 5 files **All checks passed** — GREEN.
+- [7] MYPY 2 files **Success: no issues found** — GREEN.
+- **BLOCKED_GATE_RED — root cause (read-only):** T05A-C3B (db14de3) seed-sync C3A1 envelope đúng hướng
+  (13/14 GREEN, cải thiện từ C2 7 failed) nhưng còn 1 node stale-classification sai trong consumer/prod path —
+  regression thuộc owner T05A exact session `20260903_203404_4a4548`. INT01 KHÔNG sửa, trả exact owner, DỪNG.
+- Commit docs gate này, KHÔNG push.
