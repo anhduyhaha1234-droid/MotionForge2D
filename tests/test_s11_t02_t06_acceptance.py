@@ -1088,18 +1088,46 @@ def test_t11_executable_restart_resume_epic_exit() -> None:
     from app.services.qc_checks import (  # noqa: F401  (self-register band)
         audio_missing,
         av_sync_drift,
+        cut_drift,
+        edge_halo,
+        identity_drift,
+        temporal_flicker,
+        trajectory_drift,
     )
+    from app.services.qc_checks import contact_break as _c1b_cb
+    from app.services.qc_checks import silhouette_clipping as _c1b_sc
+    from app.services.qc_checks import z_order_error as _c1b_zo
     from app.services.qc_checks.registry import registry
+    from app.services.timebase import CanonicalTimebase
     from app.workflow.qc_checks_handler import (
-        SCOPE_AUDIO,
+        SCOPE_FULL,
         evidence_fingerprint,
         policy_bundle,
+        scope_detectors,
         submit_run_qc_checks,
     )
+    from s11_qc_calibration_builders import generate_trajectory_drift_input
 
+    _c1b_cb.register()
+    _c1b_sc.register()
+    _c1b_zo.register()
     for name, entry_point in (
         ("audio_missing", "app.services.qc_checks.audio_missing:detect"),
         ("av_sync_drift", "app.services.qc_checks.av_sync_drift:detect"),
+        ("trajectory_drift", "app.services.qc_checks.trajectory_drift:detect"),
+        ("cut_drift", "app.services.qc_checks.cut_drift:detect"),
+        ("contact_break", "app.services.qc_checks.contact_break:detect_contact_break"),
+        (
+            "z_order_error",
+            "app.services.qc_checks.z_order_error:detect_z_order_error",
+        ),
+        (
+            "silhouette_clipping",
+            "app.services.qc_checks.silhouette_clipping:detect_silhouette_clipping",
+        ),
+        ("identity_drift", "app.services.qc_checks.identity_drift:detect"),
+        ("edge_halo", "app.services.qc_checks.edge_halo:detect"),
+        ("temporal_flicker", "app.services.qc_checks.temporal_flicker:detect"),
     ):
         registry.register(name, entry_point)
 
@@ -1136,7 +1164,231 @@ def test_t11_executable_restart_resume_epic_exit() -> None:
         },
         "published": None,
     }
-    detector_args = {
+    # S11-C1 follow-on (INT01/C2 pattern, commit 3beee0d): the seed must
+    # be FULL-scope — an AUDIO run never passes the C1-A full-run authority
+    # gate (newest FULL-scope + 6 DK in qc_check_runs.py), so readiness
+    # would stay not_run/never_run instead of blocked.  Visual args use the
+    # T03F pass-band helpers (pure computation, no media needed); the audio
+    # envelope keeps the REAL terminal-fact issue (source HAS audio, output
+    # publish missing -> audio_missing blocker).  The band is derived via
+    # scope_detectors(SCOPE_FULL) — NEVER a hard-coded detector list.
+    import hashlib as _c1b_hashlib
+    import json as _c1b_json
+    import math as _c1b_math
+
+    _c1b_tb = CanonicalTimebase.from_rational(30, 1, nb_frames=120)
+    _c1b_traj_inp = generate_trajectory_drift_input(
+        seed=11001, drift_px_per_frame=0.2, frames=64
+    )
+    _c1b_win = {"start_frame": 0, "end_frame": 47}
+    _c1b_w = _c1b_win["end_frame"] - _c1b_win["start_frame"] + 1
+    _c1b_seg_a = {
+        "id": "seg-a",
+        "logical_id": "L-seg-a",
+        "z_order": 10,
+        "start_frame": 0,
+        "end_frame": 47,
+        "bbox_per_frame": [[10.0, 10.0, 40.0, 20.0]] * _c1b_w,
+        "bbox": None,
+    }
+    _c1b_seg_b = {
+        "id": "seg-b",
+        "logical_id": "L-seg-b",
+        "z_order": 20,
+        "start_frame": 0,
+        "end_frame": 47,
+        "bbox_per_frame": [[10.0, 10.0, 40.0, 20.0]] * _c1b_w,
+        "bbox": None,
+    }
+    _c1b_ref_px = [[100] * 8 for _ in range(8)]
+    _c1b_ref_raw = _c1b_json.dumps(
+        _c1b_ref_px, separators=(",", ":")
+    ).encode("utf-8")
+    _c1b_ref_sha = _c1b_hashlib.sha256(_c1b_ref_raw).hexdigest()
+    _c1b_grid = 64
+    _c1b_inner = 20.0
+    _c1b_ctr = _c1b_grid / 2.0
+    _c1b_disc = [
+        [
+            1
+            if _c1b_math.sqrt((x - _c1b_ctr) ** 2 + (y - _c1b_ctr) ** 2)
+            < _c1b_inner
+            else 0
+            for x in range(_c1b_grid)
+        ]
+        for y in range(_c1b_grid)
+    ]
+    _c1b_disc_raw = _c1b_json.dumps(
+        _c1b_disc, separators=(",", ":")
+    ).encode("utf-8")
+    _c1b_disc_sha = _c1b_hashlib.sha256(_c1b_disc_raw).hexdigest()
+    _c1b_full_args = {
+        "trajectory_drift": {
+            "workspace_id": _C1B_WS,
+            "project_id": _C1B_PROJECT,
+            "video_item_id": video_id,
+            "layer_ref_type": "video_item",
+            "layer_ref_id": video_id,
+            "reference_x": [float(v) for v in _c1b_traj_inp["reference_x"]],
+            "observed_x": [float(v) for v in _c1b_traj_inp["drifted_x"]],
+            "frame_start": 0,
+            "checkpoint_ref": "s11-c1b-traj",
+        },
+        "cut_drift": {
+            "workspace_id": _C1B_WS,
+            "project_id": _C1B_PROJECT,
+            "video_item_id": video_id,
+            "layer_ref_type": "video_item",
+            "layer_ref_id": video_id,
+            "timebase": _c1b_tb.to_json(),
+            "scene_boundaries": [{"position": 1, "start_frame": 60}],
+            "render_cuts_ms": [2000],
+            "checkpoint_ref": "s11-c1b-cut",
+        },
+        "contact_break": {
+            "contacts": [
+                {
+                    "id": "contact-seg-a-seg-b",
+                    "source_segment_id": "seg-a",
+                    "target_segment_id": "seg-b",
+                    "contact_kind": "touch",
+                    "start_frame": 0,
+                    "end_frame": 47,
+                    "confidence": 0.98,
+                    "confidence_source": "derived",
+                }
+            ],
+            "segments": [_c1b_seg_a, _c1b_seg_b],
+            "analysis_window": dict(_c1b_win),
+            "checkpoint_ref": "s11-c1b-contact",
+        },
+        "z_order_error": {
+            "segments": [
+                {
+                    "id": f"s{i}",
+                    "logical_id": f"L-s{i}",
+                    "z_order": 3 - i,
+                    "start_frame": 0,
+                    "end_frame": 47,
+                    "bbox_per_frame": None,
+                    "bbox": None,
+                }
+                for i in range(3)
+            ],
+            "occlusion_edges": [
+                {
+                    "id": f"occ-s{i}-s{i + 1}",
+                    "occluder_segment_id": f"s{i}",
+                    "occludee_segment_id": f"s{i + 1}",
+                    "start_frame": 0,
+                    "end_frame": 47,
+                    "confidence": 0.99,
+                    "confidence_source": "derived",
+                }
+                for i in range(2)
+            ],
+            "analysis_window": dict(_c1b_win),
+            "render_order": None,
+            "lock_manifest": None,
+            "checkpoint_ref": "s11-c1b-zorder",
+        },
+        "silhouette_clipping": {
+            "segments": [
+                {
+                    "id": "seg-a",
+                    "logical_id": "L-seg-a",
+                    "z_order": 10,
+                    "start_frame": 0,
+                    "end_frame": 47,
+                    "bbox_per_frame": None,
+                    "bbox": [5.0, 5.0, 95.0, 95.0],
+                }
+            ],
+            "frame": {"width": 100.0, "height": 100.0},
+            "analysis_window": dict(_c1b_win),
+            "checkpoint_ref": "s11-c1b-clip",
+        },
+        "identity_drift": {
+            "workspace_id": _C1B_WS,
+            "project_id": _C1B_PROJECT,
+            "video_item_id": video_id,
+            "layer_ref_type": "video_item",
+            "layer_ref_id": video_id,
+            "checkpoint_ref": "s11-c1b-identity",
+            "segment_row_id": None,
+            "segment_logical_id": None,
+            "pinned_reference": {
+                "artifact_id": "art-ref",
+                "sha256": _c1b_ref_sha,
+                "crop_revision": "1.0.0",
+                "crop": {"width": 8, "height": 8, "pixels": _c1b_ref_px},
+            },
+            "cast_pin": {
+                "object_role_id": "role-pinned",
+                "character_id": "char-1",
+                "pack_version_id": "pack-1",
+                "revision": 1,
+                "expected_metadata": {
+                    "role_id": "role-pinned",
+                    "instance_id": "inst-pinned",
+                    "cast_pin_ref": "cast-pin-1",
+                },
+                "compatible": True,
+                "compatibility_reasons": [],
+            },
+            "frames": [
+                {
+                    "frame_index": 0,
+                    "artifact_id": "art-id-0",
+                    "sha256": _c1b_ref_sha,
+                    "crop": {"width": 8, "height": 8, "pixels": _c1b_ref_px},
+                    "metadata": {
+                        "role_id": "role-pinned",
+                        "instance_id": "inst-pinned",
+                        "cast_pin_ref": "cast-pin-1",
+                    },
+                }
+            ],
+        },
+        "edge_halo": {
+            "workspace_id": _C1B_WS,
+            "project_id": _C1B_PROJECT,
+            "video_item_id": video_id,
+            "layer_ref_type": "video_item",
+            "layer_ref_id": video_id,
+            "checkpoint_ref": "s11-c1b-halo",
+            "frame_index": 10,
+            "mask_revision": "2.1.0",
+            "inner_radius_px": _c1b_inner,
+            "rendered": {
+                "artifact_id": "art-rendered-halo",
+                "sha256": _c1b_disc_sha,
+                "mask": {
+                    "width": _c1b_grid,
+                    "height": _c1b_grid,
+                    "pixels": _c1b_disc,
+                },
+            },
+            "expected": {
+                "artifact_id": "art-expected-mask",
+                "sha256": _c1b_disc_sha,
+                "mask": {
+                    "width": _c1b_grid,
+                    "height": _c1b_grid,
+                    "pixels": _c1b_disc,
+                },
+            },
+        },
+        "temporal_flicker": {
+            "workspace_id": _C1B_WS,
+            "project_id": _C1B_PROJECT,
+            "video_item_id": video_id,
+            "layer_ref_type": "video_item",
+            "layer_ref_id": video_id,
+            "checkpoint_ref": "s11-c1b-flicker",
+            "window": {"start_frame": 0, "end_frame": 127},
+            "luminance": [100.0] * 128,
+        },
         "audio_missing": {
             "checkpoint": envelope["checkpoint"],
             "published": envelope.get("published"),
@@ -1150,12 +1402,18 @@ def test_t11_executable_restart_resume_epic_exit() -> None:
             "checkpoint_ref": "s11-c1b",
         },
     }
+    _c1b_band = scope_detectors(SCOPE_FULL)
+    assert set(_c1b_band) == set(_c1b_full_args), (
+        f"FULL band drift: band={sorted(_c1b_band)} "
+        f"args={sorted(_c1b_full_args)}"
+    )
+    detector_args = {name: _c1b_full_args[name] for name in _c1b_band}
     first = submit_run_qc_checks(
         session_factory,
         workspace_id=_C1B_WS,
         project_id=_C1B_PROJECT,
         video_item_id=video_id,
-        scope=SCOPE_AUDIO,
+        scope=SCOPE_FULL,
         detector_args=detector_args,
         generation="1",
     )
@@ -1224,7 +1482,7 @@ def test_t11_executable_restart_resume_epic_exit() -> None:
             workspace_id=_C1B_WS,
             project_id=_C1B_PROJECT,
             video_item_id=video_id,
-            scope=SCOPE_AUDIO,
+            scope=SCOPE_FULL,
             detector_args=detector_args,
             generation="1",
         )
