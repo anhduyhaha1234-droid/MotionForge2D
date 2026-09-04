@@ -1,0 +1,51 @@
+S11-C2 C2-B — T05A micro matrix (7 rows, derived from T03G-C2A1 authority bytes, not gate copy)
+Date: 2026-09-04 C2-B (real owner 4a4548)
+Canonical authority: app/persistence/qc_check_runs.py @ 91db651 (C2-A1: _completion_proves_full_coverage 13-point envelope)
+Frozen FULL band: SCOPE_BANDS[SCOPE_FULL] via scope_detectors(SCOPE_FULL) — 10 detectors + scope_fingerprint(SCOPE_FULL)
+Policy identity: thresholds.build_policy / load_policy — POLICY_ID=s11-qc-thresholds-v1, content_hash=sha256(canonical policy JSON)
+
+Row 1 — completion missing required zero field (envelope violates counts gate)
+  seed: valid FULL manifest + completion.summary with checks_skipped/ cancelled/ deadline_exceeded DROPPED (never defaults to 0/False)
+  actual: check_run_readiness → not_run (run_state failed/stale, check_state_detail names missing key; never "missing/null never default to zero")
+  expected: not_run, never ready (any dropped summary field ⇒ envelope _completion_proves_full_coverage returns (False, <reason>); newest FULL wins fail-closed)
+  raw: see tests/test_s11_t03g_qc_check_job.py C2-A1 tamper knobs (drop_summary_key / summary_override for checks_skipped, cancelled, deadline_exceeded)
+
+Row 2 — completion identity mismatch (scope/evidence/policy/generation envelope diverges)
+  seed: valid FULL manifest + completion with scope/ scope_fingerprint/ evidence_fingerprint/ policy_id/ policy_content_hash/ source_generation TAMPERED vs manifest+current video+current policy
+  actual: not_run (coverage_ok False, reason names the mismatched identity field; stale vs completed-zero-item decided on durable completion, not QCItem table)
+  expected: not_run
+  raw: _seed_full_job tamper_completion_scope / tamper_evidence_fp / tamper_policy_id / tamper_generation / policy_hash knobs; tests/test_s11_t03g_qc_check_job.py § C1A identity block
+
+Row 3 — valid FULL + 51 audio jobs afterwards → still exact FULL authority (history-pressure)
+  seed: 1 valid FULL completed job, then 51 newer RUN_QC_CHECKS jobs with SCOPE_AUDIO completed (newer but audio-only)
+  actual: latest_check_run_state walks newest-first UNBOUNDED past audio rows to first FULL row; readiness still ready/blocked per current FULL completion
+  expected: exact FULL authority preserved (newest FULL row wins, audio rows never substitute; _newest_full_job paginated walk with page=500, offset+=page, no row cap)
+  raw: test_c2a_history_pressure_unbounded_walk / test_c2a_audio_only_never_substitutes (T03G C2-A1)
+
+Row 4 — no FULL + 51 audio jobs → not_run (audio cannot fabricate FULL authority)
+  seed: 0 FULL jobs, 51 SCOPE_AUDIO jobs completed
+  actual: _newest_full_job exhausts stream returning None → never_run; check_run_readiness not_run with detail "no SCOPE_FULL RUN_QC_CHECKS job has ever been submitted … audio-only/partial runs never create full-run authority"
+  expected: not_run, latest_job_id is None/ absent FULL id (not an audio Job id)
+  raw: T03G C2-A1 never-run branch (job is None ⇒ CheckRunState(run_state=never_run))
+
+Row 5 — multi-video project, 1 video corrupt/missing FULL authority → project not_run (not_run wins)
+  seed: project with videos V_ok (valid FULL completed evidence) + V_bad (FULL completion missing scope_fingerprint / tampered detectors / dropped revision / still queued/running/failed)
+  actual: compute_project_readiness calls check_run_readiness per video with current fingerprint+policy hash → V_bad is not_run; aggregate not_run even though V_ok is ready/blocked
+  expected: project not_run, per-video check_state_detail describes the exact envelope defect for V_bad
+  raw: readiness.py compute loop over list_videos(active_only=True) → verdict driven by T03G authority per video; project not_run wins (lane-C §4.2 capability honesty)
+
+Row 6 — valid FULL complete zero-item → ready candidate (zero-item evidence distinguishes from never-run)
+  seed: valid FULL completed with summary errors=0, skipped=0, cancelled=False, deadline_exceeded=False, detectors==full band, revisions complete, zero_item_completion.evidence==True (measured issues_found==0, never defaulted from row-creation count)
+  actual: check_run_readiness → ready (blockers==0, zero_item_completion True, coverage_ok True + evidence_matches/policy_matches True)
+  expected: ready (or ready-aggregate when the video is alone in a project)
+  raw: _completion_from_attempts + _completion_proves_full_coverage + zero_item_completion block in build_completion_block (reuse-safe: issues_found from per_detector report)
+
+Row 7 — valid FULL + blocker → blocked (current run's open blocker is the blocker; warnings never block)
+  seed: valid FULL completed (envelope as row 6) + QCItem severity=blocker/reason=… for same video with status open (current generation)
+  actual: check_run_readiness → blocked (blockers>0); warning_count absent from blockers aggregation; acknowledged/ resolved_after_recheck do not count as blockers in readiness gate
+  expected: blocked
+  raw: QCItem lifecycle (T03G+T05A E2E-02): blocker persists until terminal resolve; warnings never escalate to blocked
+
+Notes:
+- All rows use production JobRepository path (Decision A) and build_completion_block-shaped completion (schema_version/job_type/completed/run_id + policy identity + scope_fingerprint + detector_revisions + measured summary + zero_item_completion).
+- The T05A consumer fix for C2-B is ONLY the completion manifest+completion envelope shape (summary checks_skipped/cancelled/deadline_exceeded + manifest policy_id/source_generation/source_artifact_*); the production readiness.py logic is unchanged (T03G authority is the gate, T05A consumes it).

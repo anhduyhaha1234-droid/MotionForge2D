@@ -153,7 +153,10 @@ def _completion_block(
         "summary": {
             "checks_requested": len(band),
             "checks_run": len(band),
+            "checks_skipped": 0,
             "errors": 0,
+            "cancelled": False,
+            "deadline_exceeded": False,
             "created": 0,
             "not_applicable": len(band),
         },
@@ -184,7 +187,11 @@ def _seed_completed_check_run(
             ("z" * 64) if stale_fp
             else evidence_fingerprint(session, workspace_id=ws, video_item_id=vid)
         ),
+        "policy_id": policy_bundle()["policy_id"],
         "policy_content_hash": policy_bundle()["policy_content_hash"],
+        "source_generation": "1",
+        "source_artifact_id": None,
+        "source_sha256": "",
         "scope": SCOPE_FULL,
         "scope_fingerprint": scope_fingerprint(SCOPE_FULL),
     }
@@ -236,7 +243,11 @@ def _seed_active_check_run(session: Any, *, ws: str, pid: str, vid: str, state: 
         "evidence_fingerprint": evidence_fingerprint(
             session, workspace_id=ws, video_item_id=vid
         ),
+        "policy_id": policy_bundle()["policy_id"],
         "policy_content_hash": policy_bundle()["policy_content_hash"],
+        "source_generation": "1",
+        "source_artifact_id": None,
+        "source_sha256": "",
         "scope": SCOPE_FULL,
         "scope_fingerprint": scope_fingerprint(SCOPE_FULL),
     }

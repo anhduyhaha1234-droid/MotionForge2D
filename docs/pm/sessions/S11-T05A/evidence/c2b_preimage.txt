@@ -1,0 +1,32 @@
+=== tests/test_s11_t05a_readiness_api.py ===
+9ca56ec66cd962d01535b1f477704ec74c66be86675b02f057d434ac3270e015 *tests/test_s11_t05a_readiness_api.py
+23813 tests/test_s11_t05a_readiness_api.py
+571 tests/test_s11_t05a_readiness_api.py
+=== app/persistence/readiness.py ===
+93bd3aa44f5e838662d2d1f421f5730b9a3099177931851d3c0b0e33f2214fad *app/persistence/readiness.py
+10551 app/persistence/readiness.py
+293 app/persistence/readiness.py
+=== app/schemas/readiness.py ===
+d5e04f5a36e4231321d00bcb37d2e93efa976e99cc71f9412607ba758670bf07 *app/schemas/readiness.py
+2117 app/schemas/readiness.py
+68 app/schemas/readiness.py
+=== app/api/routes/readiness.py ===
+8696a24fb03a7c43a01488cc742132adae2bcdae16d5b0dc8942a461dd40a164 *app/api/routes/readiness.py
+3318 app/api/routes/readiness.py
+93 app/api/routes/readiness.py
+=== app/persistence/summaries.py ===
+f0bc6cbb4797c62c148ca2cf1e8027454f93406d18793cd0299651281e049301 *app/persistence/summaries.py
+39621 app/persistence/summaries.py
+966 app/persistence/summaries.py
+=== app/api/app.py ===
+ef4c0651d474c07b30bc7ef7d694263d4e036cbc9f06997a9e8737aabee6215e *app/api/app.py
+9261 app/api/app.py
+219 app/api/app.py
+=== docs/pm/sessions/S11-T05A/LOG.md ===
+7942351b4b3ebb73ab4ef140dd126c32696328dc9b772cf37775d5cd7f8e082b *docs/pm/sessions/S11-T05A/LOG.md
+6184 docs/pm/sessions/S11-T05A/LOG.md
+81 docs/pm/sessions/S11-T05A/LOG.md
+=== docs/pm/sessions/S11-T05A/REPORT.md ===
+1d10348b5aeb252413a6ac86935bef995b337cddb73044901c77530138c62660 *docs/pm/sessions/S11-T05A/REPORT.md
+9222 docs/pm/sessions/S11-T05A/REPORT.md
+105 docs/pm/sessions/S11-T05A/REPORT.md
