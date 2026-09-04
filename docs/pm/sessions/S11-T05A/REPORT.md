@@ -8,7 +8,7 @@
 | Wave | W12 (song song T04D — BACKEND thuần, không đụng frontend/api.ts) |
 | Worktree | `C:\Users\Admin\MotionForge2D-worktrees\s11-t05a-0903w12` |
 | Branch | `codex/s11/t05a-0903w12` (local, không push/merge/rebase/reset/clean/stash/force) |
-| WAVE_BASE | `a146034d2282d2857fb9aee6d0ca4af3c178efb5` (porcelain 0 tại start) |
+| WAVE_BASE | `a146034d2282d2857fb9aee6d0ca4af3c178efb5` → 91db651 (C2 M1+M2 merge) — C2-B tip (porcelain 0 tại start) |
 | Model | `custom` / `ocg/deepseek-v4-flash`, reasoning max, fallback off |
 | Status | TASK_SUBMITTED |
 
@@ -104,3 +104,11 @@ Hai file này NẰM NGOÀI write-set T05A (allowlist chỉ 2 test file mới) n�
 - Commit local trên `codex/s11/t05a-0903w12`: `85de5c1b9eb3489f148805b9f805300e040b7d67`
 - Parent: WAVE_BASE `a146034d2282d2857fb9aee6d0ca4af3c178efb5`
 - Scope staged: 7 file allowlist + `docs/pm/sessions/S11-T05A/**`
+## 10. C2-B correction (INT01 BLOCKED_GATE_RED — real owner 4a4548)
+
+- **INT01 incident (trung thực)**: canonical 91db651 (M1 ff 0ba0a7b completion envelope + unbounded matching-full authority) làm T05A 7/9 failed (T05A file 7 failed/2 passed → acceptance 2 failed lan truyền). Raw: C:/Users/Admin/MotionForge2D-evidence/s11-c2/lanes/int01-c2merge/raw-gate.txt. Commit misroute 3beee0d do session 5b3841 (T04D owner) tạo — kept as-is, không rewrite history; owner thật 4a4548 re-derive độc lập.
+- **Preflight**: status v1 rỗng, tip 3beee0d, FF lên 91db651 OK; preimage c2b_preimage.txt (bytes+hash+lines 8 allowlist paths); MOTIONFORGE_DATABASE_URL unset; basetemp ngắn %TEMP%/s11c2b*.
+- **Root cause**: envelope mới yêu cầu manifest/source_generation+policy_id+source_artifact_* + summary checks_skipped/cancelled/deadline_exceeded (13-point gate); seed cũ thiếu 8 fields → coverage_ok False → readiness not_run everywhere. Readiness production consumer không lỗi (check_run_readiness import-only).
+- **Fix**: tests/test_s11_t05a_readiness_api.py +11 lines (bounded patch preimage: summary +3, manifests +4/+4) — cấm whole-file overwrite; readiness.py read-only.
+- **Micro matrix 7 rows**: see evidence/c2b_micro_matrix.txt (derived từ qc_check_runs.py bytes tại canonical, không copy gate).
+- **Gates**: T05A file 9 passed (13.27s) + full T05A 14 passed (14.12s) fresh roots; diff --check 7751598 exit 0; ruff F clean; porcalein allowlist-only; scope staged 1 patched test + docs.

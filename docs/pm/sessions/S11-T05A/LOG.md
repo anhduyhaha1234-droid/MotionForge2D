@@ -55,27 +55,11 @@
 - [x] Regression 121 passed
 - [x] Self-review diff scope: chỉ allowlist + docs
 - [x] Commit local (SHA ghi trong REPORT)
-## C2 section (S11-C1 serial, post-INT01 routing note)
+## C2-B section (INT01 BLOCKED_GATE_RED, real owner 4a4548 — C2-A1 envelope)
 
-1. **Routing**: Seed cũ `_completion_block` seed FULL completion 2-audio
-   detectors → dưới gate C1-A của T03G thành coverage-unproven (xác nhận
-   qua stash A/B của T03G: 9 passed stash / 7 failed pop). Blast radius
-   thuộc T05A → sửa seed trong write-set T05A.
-2. **Scope-correct (Manager)**: gate files `app/persistence/qc_check_runs.py`
-   + `app/workflow/qc_checks_handler.py` là GATE C1-A của T03G — KHÔNG copy
-   vào branch T05A (revert ngay sau khi port nhầm; INT01 re-merge sẽ mang
-   gate lên canonical, T05A FF sau). Branch T05A chỉ sửa đúng 1 file:
-   `tests/test_s11_t05a_readiness_api.py` (seed/fixture).
-3. **Seed fix**: `_completion_block` derive band qua
-   `scope_detectors(SCOPE_FULL)` + `scope_fingerprint(SCOPE_FULL)` — KHÔNG
-   hard-code list detector. Import self-register 7 detector modules +
-   `.register()` 3 module T03C (contact_break/z_order_error/
-   silhouette_clipping expose `register()`, không tự đăng ký ở import) →
-   band trong tree hiện tại = 10 detectors. Dưới INT01 (gate T03G trên
-   canonical) band là frozen 10-detector band — seed tương thích cả hai
-   (detectors + revisions + scope fp đều từ cùng authority).
-4. **GREEN C2**: 14 passed x2 fresh roots (18.98s/18.29s, basetemp
-   `%TEMP%/s11t05a_c2r1|r2`); regression T03G job+api 32 passed (57.52s,
-   basetemp `%TEMP%/s11t05a_c2reg`); ruff F clean; diff-check clean.
-5. **Evidence**: `C:/Users/Admin/MotionForge2D-evidence/s11-c1/lanes/c2-t05a/`
-   (runs raw + gate summary).
+1. **INT01 incident**: combined gate 789d303 T05A 7/9 failed (T05A 7 failed, 2 passed → acceptance 2 failed propagation). Route: M1 T03G-C2A1 (0ba0a7b) đổi authority semantics — T05A seed cũ (session T04D misroute tạo ở 3beee0d) thành not_run. Misroute commit 3beee0d kept as-is (không rewrite history); owner thật re-derive độc lập.
+2. **Preflight**: status v1 rỗng, tip 3beee0d, FF lên canonical 91db651 (M1 ff 0ba0a7b + M2 no-ff 789d303) OK; preimage c2b_preimage.txt (8 paths SHA/size/lines); MOTIONFORGE_DATABASE_URL unset, SQLite + basetemp ngắn %TEMP%/s11c2b*.
+3. **Root cause**: T03G-C2A1 completion envelope 13-point (manifest scope/scope_fp + completion scope/scope_fp + evidence_fp + policy_id/hash + source_generation; summary checks_skipped/cancelled/deadline_exceeded PRESENT exact bool/int; detectors multiset==full band; revisions keyset==band) — T05A seed cũ missing summary checks_skipped/cancelled/deadline_exceeded + manifest policy_id/source_generation → coverage_ok False → not_run.
+4. **Fix (allowlist, bounded patch with preimage)**: tests/test_s11_t05a_readiness_api.py — summary +3 fields (checks_skipped 0, cancelled False, deadline_exceeded False) + cả 2 manifest +5 fields (policy_id, source_generation, source_artifact_id, source_sha256, schema_version); read-only: readiness.py không đụng (consumer defect là envelope, không phải logic).
+5. **Micro matrix 7 rows**: 1) missing summary field → not_run 2) identity mismatch → not_run 3) valid FULL + 51 audio → exact FULL authority 4) no FULL + 51 audio → not_run 5) multi-video 1 corrupt FULL → project not_run 6) valid FULL zero-item → ready candidate 7) valid FULL + blocker → blocked — evidence: c2b_micro_matrix.txt.
+6. **GREEN**: 9/9 (s11c2b_fix2, 13.27s) + 14/14 full T05A (s11c2b_full, 14.12s) ×2 fresh; diff-check 7751598..HEAD exit 0; ruff F clean; allowlist-only commit.
