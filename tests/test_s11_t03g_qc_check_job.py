@@ -895,17 +895,16 @@ def test_read_authority_stale_when_evidence_fingerprint_changes(
     assert _readiness(session_factory, video_id).status == "ready"
 
     # the video's evidence changed (generation bump simulates re-import /
-    # source replacement) → not_run.  (The generation knob is folded into
-    # the completion's evidence fingerprint at submit time, so a bumped
-    # generation makes the completion's evidence fingerprint NON-current:
-    # the envelope gate fires first with the evidence-identity reason.
-    # The policy-hash sibling below exercises the manifest-staleness
-    # branch instead — the two staleness surfaces are covered between
-    # them.)
+    # source replacement) → STALE / not_run.  (The run was submitted under
+    # generation "1" with a valid envelope; the caller now asks against
+    # generation-"2" current evidence.  The envelope gate passes — the
+    # manifest/completion pair still agrees with each other — and the
+    # manifest-vs-current comparison fires the stale branch, exactly as
+    # the C1-A contract requires.  The policy-hash sibling below covers
+    # the same branch for policy drift.)
     r = _readiness(session_factory, video_id, generation="2")
     assert r.status == "not_run"
-    assert r.run_state == "failed"
-    assert "evidence fingerprint" in r.check_state_detail
+    assert r.run_state == "stale"
     assert r.check_state_detail
     with session_factory() as s:
         state = latest_check_run_state(
@@ -918,9 +917,8 @@ def test_read_authority_stale_when_evidence_fingerprint_changes(
             ),
             policy_content_hash=policy_bundle()["policy_content_hash"],
         )
-    assert state.run_state == "failed"
+    assert state.run_state == "stale"
     assert state.job_id == full_job_id
-    assert "evidence fingerprint" in state.check_state_detail
 
 
 def test_read_authority_stale_when_policy_hash_changes(
@@ -965,6 +963,9 @@ def test_read_authority_stale_when_policy_hash_changes(
 # ═══════════════════════════════════════════════════════════════════════════
 
 
+_SENTINEL: Any = object()
+
+
 def _seed_full_job(
     session_factory,
     *,
@@ -982,6 +983,17 @@ def _seed_full_job(
     tamper_evidence_fp: bool = False,
     tamper_policy_id: bool = False,
     tamper_generation: bool = False,
+    manifest_schema: Any = _SENTINEL,
+    manifest_policy_id: Any = _SENTINEL,
+    manifest_policy_hash: Any = _SENTINEL,
+    manifest_evidence_fp: Any = _SENTINEL,
+    manifest_generation: Any = _SENTINEL,
+    manifest_source_id: Any = _SENTINEL,
+    manifest_source_sha: Any = _SENTINEL,
+    drop_manifest_key: str | None = None,
+    tamper_completion_source_id: bool = False,
+    tamper_completion_source_sha: bool = False,
+    wrong_revision_value: str | None = None,
     drop_summary_key: str | None = None,
     summary_override: dict[str, Any] | None = None,
     drop_completion_key: str | None = None,
@@ -1032,20 +1044,48 @@ def _seed_full_job(
         manifest_fp = (
             "8" * 64 if tamper_manifest_fp else scope_fingerprint(scope)
         )
+        manifest_policy_id_value = (
+            bundle["policy_id"]
+            if manifest_policy_id is _SENTINEL
+            else manifest_policy_id
+        )
+        manifest_policy_hash_value = (
+            bundle["policy_content_hash"]
+            if manifest_policy_hash is _SENTINEL
+            else manifest_policy_hash
+        )
+        manifest_evidence_fp_value = (
+            fp if manifest_evidence_fp is _SENTINEL else manifest_evidence_fp
+        )
+        manifest_generation_value = (
+            "1" if manifest_generation is _SENTINEL else manifest_generation
+        )
+        manifest_source_id_value = (
+            None if manifest_source_id is _SENTINEL else manifest_source_id
+        )
+        manifest_source_sha_value = (
+            "" if manifest_source_sha is _SENTINEL else manifest_source_sha
+        )
         manifest = {
-            "schema_version": RUN_QC_SCHEMA_VERSION,
+            "schema_version": (
+                RUN_QC_SCHEMA_VERSION
+                if manifest_schema is _SENTINEL
+                else manifest_schema
+            ),
             "workspace_id": WS,
             "project_id": P1,
             "video_item_id": video_id,
-            "evidence_fingerprint": fp,
-            "policy_id": bundle["policy_id"],
-            "policy_content_hash": bundle["policy_content_hash"],
-            "source_generation": "1",
-            "source_artifact_id": None,
-            "source_sha256": "",
+            "evidence_fingerprint": manifest_evidence_fp_value,
+            "policy_id": manifest_policy_id_value,
+            "policy_content_hash": manifest_policy_hash_value,
+            "source_generation": manifest_generation_value,
+            "source_artifact_id": manifest_source_id_value,
+            "source_sha256": manifest_source_sha_value,
             "scope": scope,
             "scope_fingerprint": manifest_fp,
         }
+        if drop_manifest_key is not None:
+            manifest.pop(drop_manifest_key, None)
         repo = _Repo(s)
         key_suffix = uuid.uuid4().hex[:8]
         record = repo.create_job(
@@ -1057,7 +1097,12 @@ def _seed_full_job(
             idempotency_key=(
                 f"{JOB_TYPE_RUN_QC_CHECKS}:video_item:{video_id}:{key_suffix}:1"
             ),
-            input_generation="1",
+            input_generation=(
+                manifest_generation_value
+                if isinstance(manifest_generation_value, str)
+                and manifest_generation_value
+                else "1"
+            ),
             steps=[StepInput(step_code="run_qc_checks", position=0, step_type="sync")],
             actor="api",
         )
@@ -1080,6 +1125,8 @@ def _seed_full_job(
                 revisions.pop(drop_revision, None)
             if empty_revision is not None and empty_revision in revisions:
                 revisions[empty_revision] = ""
+            if wrong_revision_value is not None and names:
+                revisions[names[0]] = wrong_revision_value
             summary: dict[str, Any] = {
                 "run_id": "c" * 64,
                 "checks_requested": (
@@ -1126,10 +1173,20 @@ def _seed_full_job(
                     else bundle["policy_content_hash"]
                 ),
                 "source_generation": (
-                    "999" if tamper_generation else "1"
+                    "999"
+                    if tamper_generation
+                    else manifest_generation_value
                 ),
-                "source_artifact_id": None,
-                "source_artifact_fingerprint": "",
+                "source_artifact_id": (
+                    "ghost-artifact"
+                    if tamper_completion_source_id
+                    else manifest_source_id_value
+                ),
+                "source_artifact_fingerprint": (
+                    "f" * 64
+                    if tamper_completion_source_sha
+                    else manifest_source_sha_value
+                ),
                 "evidence_fingerprint": (
                     "7" * 64 if tamper_evidence_fp else fp
                 ),
@@ -1764,3 +1821,358 @@ def test_c2a1_newest_full_corrupt_never_falls_back(
     state = _full_state(session_factory, video_id)
     assert state.run_state in ("failed", "stale"), corrupt
     assert _readiness(session_factory, video_id).status == "not_run"
+
+
+def _seed_real_source(
+    session_factory, *, video_id: str
+) -> tuple[str, str]:
+    """Attach a REAL source artifact to the video and return (id, sha).
+
+    Mirrors what a re-import writes: an ``Artifact`` row with a recorded
+    64-hex SHA-256, referenced by ``VideoItem.source_artifact_id``.  The
+    producer reads exactly this persisted identity at submit time, so a
+    seeded full run can prove the real-source envelope end to end.
+    """
+    from app.persistence.models import Artifact, VideoItem
+
+    artifact_id = _new_id()
+    sha = "ab" * 32
+    with session_factory() as s:
+        item = s.get(VideoItem, video_id)
+        assert item is not None
+        artifact = Artifact(
+            id=artifact_id,
+            workspace_id=WS,
+            kind="video",
+            relative_path=f"s11-c3a1/{artifact_id}.mp4",
+            state="ready",
+            sha256=sha,
+            size_bytes=1024,
+        )
+        s.add(artifact)
+        item.source_artifact_id = artifact_id
+        s.commit()
+    return artifact_id, sha
+
+
+@pytest.mark.parametrize("bad", ["missing", "null", "bool", "string"])
+def test_c3a1_manifest_schema_wrong_type_fails_closed(
+    session_factory, svc: JobService, bad: str
+) -> None:
+    """C3-A1 item 1: manifest ``schema_version`` missing/null/bool/string
+    is NEVER accepted — the envelope fails closed (failed / not_run).
+
+    (A JSON bool is an ``int`` subclass — only the exact-integer gate
+    rejects ``True``; a naive ``!=`` comparison would launder it.)"""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    if bad == "missing":
+        kwargs: dict[str, Any] = {"drop_manifest_key": "schema_version"}
+    elif bad == "null":
+        kwargs = {"manifest_schema": None}
+    elif bad == "bool":
+        kwargs = {"manifest_schema": True}
+    else:
+        kwargs = {"manifest_schema": "1"}
+    _seed_full_job(session_factory, video_id=video_id, **kwargs)  # type: ignore[arg-type]
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "failed", f"manifest schema {bad} accepted"
+    assert "schema" in state.check_state_detail
+    assert _readiness(session_factory, video_id).status == "not_run"
+
+
+def test_c3a1_manifest_schema_wrong_integer_fails_closed(
+    session_factory, svc: JobService
+) -> None:
+    """C3-A1 item 1 (wrong-integer leg): an exact int that is NOT the
+    RUN_QC_CHECKS schema version fails closed."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    _seed_full_job(
+        session_factory, video_id=video_id,
+        manifest_schema=RUN_QC_SCHEMA_VERSION + 1,
+    )
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "failed"
+    assert "schema" in state.check_state_detail
+    assert _readiness(session_factory, video_id).status == "not_run"
+
+
+def test_c3a1_manifest_policy_id_mismatch_fails_closed(
+    session_factory, svc: JobService
+) -> None:
+    """C3-A1 item 2 (manifest leg): a manifest pinned to a FOREIGN
+    policy id is never current — even when the completion faithfully
+    copies the manifest (the completion alone cannot vouch for it)."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    _seed_full_job(
+        session_factory, video_id=video_id,
+        manifest_policy_id="foreign-policy",
+    )
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "failed"
+    assert "policy" in state.check_state_detail
+    assert _readiness(session_factory, video_id).status == "not_run"
+
+
+def test_c3a1_manifest_policy_hash_mismatch_fails_closed(
+    session_factory, svc: JobService
+) -> None:
+    """C3-A1 item 2 (manifest hash leg): foreign policy hash in the
+    manifest fails closed."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    _seed_full_job(
+        session_factory, video_id=video_id,
+        manifest_policy_hash="0" * 64,
+    )
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "failed"
+    assert _readiness(session_factory, video_id).status == "not_run"
+
+
+def test_c3a1_manifest_evidence_foreign_fails_closed(
+    session_factory, svc: JobService
+) -> None:
+    """C3-A1 item 3 (manifest leg): a manifest pinned to a FOREIGN
+    evidence snapshot is never current — even with a faithfully-copied
+    completion."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    _seed_full_job(
+        session_factory, video_id=video_id,
+        manifest_evidence_fp="5" * 64,
+    )
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "failed"
+    assert "evidence" in state.check_state_detail
+    assert _readiness(session_factory, video_id).status == "not_run"
+
+
+def test_c3a1_generation_pair_agreeing_on_wrong_generation_fails_closed(
+    session_factory, svc: JobService
+) -> None:
+    """C3-A1 items 4/13: manifest + completion AGREE on generation "99"
+    (and the job row carries it) — but the recomputed current evidence
+    for "99" differs from the pair's pinned "generation-1" fingerprint,
+    so the envelope fails (no replay across generations)."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    _seed_full_job(
+        session_factory, video_id=video_id, manifest_generation="99"
+    )
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "failed", "wrong-generation pair accepted"
+    assert _readiness(session_factory, video_id).status == "not_run"
+
+
+@pytest.mark.parametrize("bad", ["missing", "empty", "int"])
+def test_c3a1_manifest_generation_wrong_type_fails_closed(
+    session_factory, svc: JobService, bad: str
+) -> None:
+    """C3-A1 item 4 (manifest generation legs): missing/empty/non-string
+    generation fails — and a manifest disagreeing with its own job row
+    is corrupt."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    if bad == "missing":
+        kwargs: dict[str, Any] = {"drop_manifest_key": "source_generation"}
+    elif bad == "empty":
+        kwargs = {"manifest_generation": ""}
+    else:
+        kwargs = {"manifest_generation": 1}
+    _seed_full_job(session_factory, video_id=video_id, **kwargs)  # type: ignore[arg-type]
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "failed", f"generation {bad} accepted"
+    assert _readiness(session_factory, video_id).status == "not_run"
+
+
+@pytest.mark.parametrize(
+    "field", ["policy_id", "policy_content_hash", "evidence_fingerprint",
+              "source_generation", "source_artifact_id", "schema_version"]
+)
+@pytest.mark.parametrize("bad", ["missing", "null", "bool", "string"])
+def test_c3a1_manifest_required_field_wrong_type_fails_closed(
+    session_factory, svc: JobService, field: str, bad: str
+) -> None:
+    """C3-A1 required-manifest-field matrix: every newly-required
+    manifest field rejects missing/null/bool/string (where the shape
+    applies — the seed helper maps each leg to a wrong-typed value)."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    sentinels: dict[str, dict[str, Any]] = {
+        "policy_id": {
+            "missing": {"drop_manifest_key": "policy_id"},
+            "null": {"manifest_policy_id": None},
+            "bool": {"manifest_policy_id": True},
+            "string": {"manifest_policy_id": 123},
+        },
+        "policy_content_hash": {
+            "missing": {"drop_manifest_key": "policy_content_hash"},
+            "null": {"manifest_policy_hash": None},
+            "bool": {"manifest_policy_hash": True},
+            "string": {"manifest_policy_hash": 123},
+        },
+        "evidence_fingerprint": {
+            "missing": {"drop_manifest_key": "evidence_fingerprint"},
+            "null": {"manifest_evidence_fp": None},
+            "bool": {"manifest_evidence_fp": True},
+            "string": {"manifest_evidence_fp": 123},
+        },
+        "source_generation": {
+            "missing": {"drop_manifest_key": "source_generation"},
+            "null": {"manifest_generation": None},
+            "bool": {"manifest_generation": True},
+            "string": {"manifest_generation": 123},
+        },
+        "source_artifact_id": {
+            "missing": {"drop_manifest_key": "source_artifact_id"},
+            "null": {"manifest_source_id": None,
+                     "manifest_source_sha": "f" * 64},
+            "bool": {"manifest_source_id": True},
+            "string": {"manifest_source_id": 123},
+        },
+        "schema_version": {
+            "missing": {"drop_manifest_key": "schema_version"},
+            "null": {"manifest_schema": None},
+            "bool": {"manifest_schema": True},
+            "string": {"manifest_schema": "1"},
+        },
+    }
+    kwargs = sentinels[field][bad]
+    # NOTE: the "null"/corrupt source_id legs pair a None id with a
+    # non-empty SHA — a corrupt shape the producer never writes.
+    _seed_full_job(session_factory, video_id=video_id, **kwargs)  # type: ignore[arg-type]
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "failed", f"{field}={bad} accepted"
+    assert _readiness(session_factory, video_id).status == "not_run"
+
+
+def test_c3a1_completion_source_id_only_tamper_fails_closed(
+    session_factory, svc: JobService
+) -> None:
+    """C3-A1 item 5 (id-only leg): completion source id forged while the
+    SHA still matches the manifest ⇒ fails (id-only tamper)."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    _seed_full_job(
+        session_factory, video_id=video_id,
+        tamper_completion_source_id=True,
+    )
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "failed"
+    assert "source" in state.check_state_detail
+    assert _readiness(session_factory, video_id).status == "not_run"
+
+
+def test_c3a1_completion_source_sha_only_tamper_fails_closed(
+    session_factory, svc: JobService
+) -> None:
+    """C3-A1 item 5 (SHA-only leg): completion SHA forged while the id
+    still matches ⇒ fails (SHA-only tamper)."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    _seed_full_job(
+        session_factory, video_id=video_id,
+        tamper_completion_source_sha=True,
+    )
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "failed"
+    assert "source" in state.check_state_detail
+    assert _readiness(session_factory, video_id).status == "not_run"
+
+
+def test_c3a1_completion_source_mismatch_both_fails_closed(
+    session_factory, svc: JobService
+) -> None:
+    """C3-A1 item 5 (both leg): both id and SHA forged ⇒ fails."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    _seed_full_job(
+        session_factory, video_id=video_id,
+        tamper_completion_source_id=True,
+        tamper_completion_source_sha=True,
+    )
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "failed"
+    assert _readiness(session_factory, video_id).status == "not_run"
+
+
+def test_c3a1_manifest_source_foreign_fails_closed(
+    session_factory, svc: JobService
+) -> None:
+    """C3-A1 item 5 (manifest leg): manifest pinned to a FOREIGN source
+    (real id + foreign SHA shape, but not the persisted current source)
+    ⇒ fails even with a faithful completion copy."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    artifact_id, _sha = _seed_real_source(
+        session_factory, video_id=video_id
+    )
+    _seed_full_job(
+        session_factory, video_id=video_id,
+        manifest_source_id=artifact_id,
+        manifest_source_sha="e" * 64,
+    )
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "failed"
+    assert _readiness(session_factory, video_id).status == "not_run"
+
+
+def test_c3a1_detector_revision_wrong_value_fails_closed(
+    session_factory, svc: JobService
+) -> None:
+    """C3-A1 item 6: revision map keys exact + non-empty, but ONE value
+    forged (a plausible non-empty string) ⇒ fails against the
+    server-owned revisions."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    _seed_full_job(
+        session_factory, video_id=video_id,
+        wrong_revision_value="9.9.9-forged",
+    )
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "failed"
+    assert "revision" in state.check_state_detail
+    assert _readiness(session_factory, video_id).status == "not_run"
+
+
+def test_c3a1_valid_no_source_full_is_completed(
+    session_factory, svc: JobService
+) -> None:
+    """C3-A1 valid control (no-source): the legitimate no-source
+    representation (``None`` id + empty SHA, exactly as the producer
+    writes) is ACCEPTED — completed + ready."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    job_id = _seed_full_job(session_factory, video_id=video_id)
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "completed"
+    assert state.job_id == job_id
+    assert _readiness(session_factory, video_id).status == "ready"
+
+
+def test_c3a1_valid_real_source_full_is_completed(
+    session_factory, svc: JobService
+) -> None:
+    """C3-A1 valid control (real-source): manifest + completion carry
+    the REAL persisted (id, SHA) pair ⇒ completed + ready."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    artifact_id, sha = _seed_real_source(
+        session_factory, video_id=video_id
+    )
+    job_id = _seed_full_job(
+        session_factory, video_id=video_id,
+        manifest_source_id=artifact_id,
+        manifest_source_sha=sha,
+    )
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "completed", state.check_state_detail
+    assert state.job_id == job_id
+    assert _readiness(session_factory, video_id).status == "ready"
+
+
+def test_c3a1_valid_full_behind_101_audio_keeps_exact_authority(
+    session_factory, svc: JobService
+) -> None:
+    """C3-A1 history pressure: a valid full run behind 101 NEWER audio
+    jobs keeps its EXACT authority (unbounded matching-full query —
+    the 101-audio window that broke the old limit-then-filter)."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    full_job_id = _seed_full_job(session_factory, video_id=video_id)
+    for _ in range(101):
+        _seed_full_job(
+            session_factory, video_id=video_id, scope=SCOPE_AUDIO,
+            detectors=["audio_missing", "av_sync_drift"],
+        )
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "completed"
+    assert state.job_id == full_job_id
+    assert _readiness(session_factory, video_id).status == "ready"
