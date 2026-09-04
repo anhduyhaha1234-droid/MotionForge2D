@@ -123,3 +123,10 @@ readiness not_run thay vì blocked/completed. Lane T06C gốc verify GREEN trư�
 - Đỏ: T05A **1 failed/13 passed** (`..._stale_not_run_with_detail`, :490, stale→failed);
   T06 **2 failed/10 passed** (per-file gates từ T05A).
 - Trả exact owner T05A `20260903_203404_4a4548`. Raw: `s11-c3/manager/raw/int01-c3m2-gate.txt`.
+
+## 15. S11-C3-M3 T05A e2770f9 — TASK_SUBMITTED
+
+- Merge no-ff T05A `e2770f9` → `444e93e`, zero conflict. Ancestor 7/7.
+- Gate: diff GREEN; T03G **143/143**; T12 **1/1**; T06 **12/12**; T05A **14/14**;
+  ruff GREEN; mypy Success. Raw: `s11-c3/manager/raw/int01-c3m3-gate.txt`.
+- Status: TASK_SUBMITTED. KHONG push.

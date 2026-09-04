@@ -242,3 +242,23 @@ Owner cần xử lý: T03G (nới gate cho run hợp lệ) hoặc T06C (seed run
   (13/14 GREEN, cải thiện từ C2 7 failed) nhưng còn 1 node stale-classification sai trong consumer/prod path —
   regression thuộc owner T05A exact session `20260903_203404_4a4548`. INT01 KHÔNG sửa, trả exact owner, DỪNG.
 - Commit docs gate này, KHÔNG push.
+
+## 14. S11-C3-M3 — merge T05A e2770f9 + gate GREEN HET 7/7
+
+- Preflight: pwd s11-integration, HEAD `2db7fe3`, porcelain 0, branch codex/s11-integration.
+- Tip verified: `e2770f9` (parent db14de3, V_S expect failed + comment C3, real owner 4a4548) —
+  chi merge tip nay, KHONG branch/commit khac, KHONG worktree khac.
+- Merge: `git merge --no-ff codex/s11/t05a-0903w12 -m "Merge T05A-C3B e2770f9 V_S failed expect"` (exit 0) —
+  1 file 6 ins / 1 del (test only). Zero conflict, porcelain 0.
+  → HEAD `444e93e39e2216fd40e9d50b2288d33b1d420827`.
+- Ancestor check 7/7 @ final HEAD: e2770f9 + db14de3 + 1135499 + f37c55e + caf8dcf + 6e7eedf + 0ba0a7b — ok.
+- Gate @ `444e93e` (raw: `s11-c3/manager/raw/int01-c3m3-gate.txt`,
+  fresh roots `%TEMP%/s11c3m3/*`, `-p no:cacheprovider`, `unset MOTIONFORGE_DATABASE_URL`):
+  [1] diff --check 7751598..HEAD exit 0 — GREEN;
+  [2] T03G 2 modules **143 passed, 165.09s** — GREEN;
+  [3] T12 **1 passed, 2.97s** — GREEN;
+  [4] T06 full 12 **12 passed, 376.45s** — GREEN;
+  [5] T05A 14 **14 passed, 14.04s** — GREEN (V_S failed tren production C3A1);
+  [6] RUFF F **All checks passed** — GREEN;
+  [7] MYPY 2 files **Success: no issues found** — GREEN.
+- **TASK_SUBMITTED — S11-INT01 C3-M3 verified, gate GREEN het.** Commit docs nay, KHONG push, exit.
