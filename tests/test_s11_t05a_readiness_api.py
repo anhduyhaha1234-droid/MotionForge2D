@@ -54,8 +54,25 @@ from app.workflow.qc_checks_handler import (
     SCOPE_FULL,
     evidence_fingerprint,
     policy_bundle,
+    scope_detectors,
     scope_fingerprint,
 )
+from app.services.qc_checks import (  # noqa: F401  (self-register 7-detector band)
+    audio_missing,
+    av_sync_drift,
+    cut_drift,
+    edge_halo,
+    identity_drift,
+    temporal_flicker,
+    trajectory_drift,
+)
+from app.services.qc_checks import contact_break as _cb
+from app.services.qc_checks import silhouette_clipping as _sc
+from app.services.qc_checks import z_order_error as _zo
+
+_cb.register()
+_sc.register()
+_zo.register()
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -113,6 +130,13 @@ def _completion_block(
         video_item_id=vid,
     )
     policy = policy_bundle()
+    # S11-C1 C2: the seeded FULL completion must carry the binding FULL
+    # band — derived via ``scope_detectors(SCOPE_FULL)`` (NEVER a hard-coded
+    # list) — with the content-derived FULL fingerprint
+    # (``scope_fingerprint(SCOPE_FULL)``).  Under INT01 the server-owned
+    # FULL band is the frozen 10-detector band; inside this pre-INT01 tree
+    # it resolves through the registry (see LOG for the routing note).
+    band = scope_detectors(SCOPE_FULL)
     return {
         "schema_version": RUN_QC_SCHEMA_VERSION,
         "job_type": JOB_TYPE_RUN_QC_CHECKS,
@@ -124,24 +148,21 @@ def _completion_block(
         "scope": SCOPE_FULL,
         "scope_fingerprint": scope_fingerprint(SCOPE_FULL),
         "evidence_fingerprint": fp,
-        "detectors": ["audio_missing", "av_sync_drift"],
-        "detector_revisions": {
-            "audio_missing": "1.0.0",
-            "av_sync_drift": "1.0.0",
-        },
+        "detectors": list(band),
+        "detector_revisions": {name: "1.0.0" for name in band},
         "summary": {
-            "checks_requested": 2,
-            "checks_run": 2,
+            "checks_requested": len(band),
+            "checks_run": len(band),
             "errors": 0,
             "created": 0,
-            "not_applicable": 2,
+            "not_applicable": len(band),
         },
         "zero_item_completion": {
             "evidence": zero_evidence,
             "qc_items_created": 0,
             "issues_found": 0,
-            "checks_run": 2,
-            "not_applicable": 2,
+            "checks_run": len(band),
+            "not_applicable": len(band),
         },
     }
 

@@ -55,3 +55,27 @@
 - [x] Regression 121 passed
 - [x] Self-review diff scope: chỉ allowlist + docs
 - [x] Commit local (SHA ghi trong REPORT)
+## C2 section (S11-C1 serial, post-INT01 routing note)
+
+1. **Routing**: Seed cũ `_completion_block` seed FULL completion 2-audio
+   detectors → dưới gate C1-A của T03G thành coverage-unproven (xác nhận
+   qua stash A/B của T03G: 9 passed stash / 7 failed pop). Blast radius
+   thuộc T05A → sửa seed trong write-set T05A.
+2. **Scope-correct (Manager)**: gate files `app/persistence/qc_check_runs.py`
+   + `app/workflow/qc_checks_handler.py` là GATE C1-A của T03G — KHÔNG copy
+   vào branch T05A (revert ngay sau khi port nhầm; INT01 re-merge sẽ mang
+   gate lên canonical, T05A FF sau). Branch T05A chỉ sửa đúng 1 file:
+   `tests/test_s11_t05a_readiness_api.py` (seed/fixture).
+3. **Seed fix**: `_completion_block` derive band qua
+   `scope_detectors(SCOPE_FULL)` + `scope_fingerprint(SCOPE_FULL)` — KHÔNG
+   hard-code list detector. Import self-register 7 detector modules +
+   `.register()` 3 module T03C (contact_break/z_order_error/
+   silhouette_clipping expose `register()`, không tự đăng ký ở import) →
+   band trong tree hiện tại = 10 detectors. Dưới INT01 (gate T03G trên
+   canonical) band là frozen 10-detector band — seed tương thích cả hai
+   (detectors + revisions + scope fp đều từ cùng authority).
+4. **GREEN C2**: 14 passed x2 fresh roots (18.98s/18.29s, basetemp
+   `%TEMP%/s11t05a_c2r1|r2`); regression T03G job+api 32 passed (57.52s,
+   basetemp `%TEMP%/s11t05a_c2reg`); ruff F clean; diff-check clean.
+5. **Evidence**: `C:/Users/Admin/MotionForge2D-evidence/s11-c1/lanes/c2-t05a/`
+   (runs raw + gate summary).
