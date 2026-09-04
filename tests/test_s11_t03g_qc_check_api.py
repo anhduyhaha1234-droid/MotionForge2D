@@ -34,12 +34,12 @@ from app.api import deps
 from app.persistence.jobs import JobRepository
 from app.persistence.models import Artifact, VideoItem
 from app.services.qc_checks import audio_missing, av_sync_drift  # noqa: F401  (self-register)
-from app.services.qc_checks.registry import registry
 from app.workflow.qc_checks_handler import (
     JOB_TYPE_RUN_QC_CHECKS,
     RUN_QC_SCHEMA_VERSION,
     SCOPE_AUDIO,
     SCOPE_FULL,
+    ensure_full_band_registered,
     evidence_fingerprint,
     policy_bundle,
 )
@@ -56,11 +56,9 @@ V3 = str(uuid.uuid4())
 
 @pytest.fixture(scope="module", autouse=True)
 def _ensure_audio_band_registered() -> None:
-    for name, entry_point in (
-        ("audio_missing", "app.services.qc_checks.audio_missing:detect"),
-        ("av_sync_drift", "app.services.qc_checks.av_sync_drift:detect"),
-    ):
-        registry.register(name, entry_point)
+    # S11-C4: production full-band registration (registry is
+    # production-owned state, never a test-only shim).
+    ensure_full_band_registered()
 
 
 def _seed_project_video(
@@ -93,9 +91,9 @@ def _seed_attach_evidence(session: Any, *, ws: str, pid: str, vid: str) -> None:
     result carries the terminal NO_AUDIO_PRESENT envelope (T03E contract).
     The server-owned POST derives its check args from THIS row — nothing is
     accepted from the client and nothing is fabricated."""
+    from app.persistence.jobs import StepInput as _StepInput
     from app.persistence.models import JobStep as _JobStep
     from app.persistence.models import Workspace as _Workspace
-    from app.persistence.jobs import StepInput as _StepInput
 
     ws_row = session.get(_Workspace, ws)
     assert ws_row is not None
@@ -440,6 +438,8 @@ def test_read_authority_stale_after_evidence_fingerprint_change(
     """
     from app.workflow.qc_checks_handler import (
         evidence_fingerprint as _fp,
+    )
+    from app.workflow.qc_checks_handler import (
         policy_bundle as _bundle,
     )
 
@@ -692,7 +692,11 @@ def test_c3a1_api_source_identity_tamper_is_not_run(
     )
     from app.workflow.qc_checks_handler import (
         evidence_fingerprint as _fp2,
+    )
+    from app.workflow.qc_checks_handler import (
         policy_bundle as _bundle2,
+    )
+    from app.workflow.qc_checks_handler import (
         scope_fingerprint as _sfp2,
     )
 

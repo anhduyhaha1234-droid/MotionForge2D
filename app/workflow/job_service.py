@@ -231,6 +231,16 @@ class JobService:
             from app.workflow.qc_checks_handler import register_qc_checks_handler
 
             register_qc_checks_handler(self._worker)
+            # S11-C4-A: the QC detector band is production-owned state, not
+            # test-fixture state — a clean process starts with an EMPTY
+            # detector registry, so constructing the production JobService
+            # deterministically registers the binding FULL band (idempotent,
+            # conflict fail-closed) before any RUN_QC_CHECKS handler runs.
+            from app.workflow.qc_checks_handler import (
+                ensure_full_band_registered,
+            )
+
+            ensure_full_band_registered()
             from app.workflow.s10_full_apply_jobs import register_s10_full_apply_handler
 
             register_s10_full_apply_handler(self._worker)

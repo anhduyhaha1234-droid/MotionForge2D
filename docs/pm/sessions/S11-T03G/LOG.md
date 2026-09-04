@@ -210,3 +210,40 @@ Forbidden không đụng: models.py, migrations/**, detector modules, thresholds
   tests `a96935de51c1ae94` 90817B 2177L; api tests `3c6842a545279c71`
   34385B 836L.
 - Commit (local only): xem `REPORT.md` §10.
+## 2026-09-05 — S11-C4 recovery (P1-1 C4-A + P1-2 C4-B + P2 C4-C)
+- RED pre-fix (current bytes 28a2207): clean-subprocess probe
+  `lanes/c4-recovery/red_probe_c4.py` → `red-prefix.log`: registry=[] (0/10),
+  full RUN_QC_CHECKS submit+execute → job failed
+  `QC_ORCHESTRATOR_MISSING_ARGS` (all 10 unregistered). 12 RED-PROBE lines.
+- C4-A (`app/workflow/qc_checks_handler.py::ensure_full_band_registered` +
+  hook `app/workflow/job_service.py::JobService.__init__` sau
+  `register_qc_checks_handler`): snapshot registry PRE-IMPORT (chống launder
+  qua import side-effect), import 7 self-register modules + `register()` 3
+  explicit modules (entry/revision từ constants của chính modules, không
+  hard-code), pre-check conflict trên snapshot → QC_RUN_BOOTSTRAP_CONFLICT
+  fail-closed trước mọi state change, re-seat registry về đúng band order,
+  post-verify set/order/revision map. Idempotent (construct lần 2 no-op).
+  Green probe `lanes/c4-recovery/green_probe_c4.py` → `green-probe.log`:
+  pre=[] → post=10 đúng band order, revisions 10×1.0.0 từ modules,
+  idempotent=True, full RUN_QC_CHECKS execute hết MISSING_ARGS
+  (QC_RUN_DETECTOR_ERRORS trên minimal args — detectors RAN),
+  conflicting version 9.9.9 → QC_RUN_BOOTSTRAP_CONFLICT fail-closed.
+- C4-B (`app/persistence/qc_check_runs.py::_completion_proves_full_coverage`):
+  XÓA `except Exception → {}` + `.get(name, "1.0.0")`; resolver raise →
+  (False, truthful detail); expected map thiếu/thừa/rỗng → (False, detail);
+  so sánh exact `revisions.get(name) != expected_revisions[name]`.
+  Tests dùng production `ensure_full_band_registered()` thay audio-only shim.
+- C4-C: `ruff check` (configured, E/F/I/N/W/UP/B/SIM/TCH) trên 5 changed
+  files — 12 auto-fix (import order + EOF newline, kể cả pre-existing do
+  C4/C3 để lại trên chính files này); còn lại 2 pre-existing
+  (B017:530, SIM210:1532 trong job tests — ngoài phạm vi C4, giữ nguyên).
+- Gate: job 127 passed (143.64s) + api 16 passed (21.53s) fresh roots,
+  `env MOTIONFORGE_DATABASE_URL= trống`, `-p no:cacheprovider`;
+  mypy retained scope: qc_checks_handler + qc_check_runs Success, 2 lỗi
+  job_service pre-existing (532/717, giữ nguyên); `git diff --check` clean.
+- Postimage: `qc_check_runs.py` `8768aa7f94263ee565447aa78b0d8a702f379033`
+  39976B 910L; `qc_checks_handler.py` `6b9b0de13245037f27fae0112a7984da1b7ef9c8`
+  37311B 922L; `job_service.py` `f61eb08d1da7a1550f4a41c8427a05e3ac97fbff`
+  32507B 727L; job tests `735ee4fa3d48ba4d78da176f4cbf85508f580fc0` 90626B
+  2174L; api tests `75ae5c391c509e4e612a64d2ee0b3463b0ac4cb4` 34455B 841L.
+- Commit (local only): xem `REPORT.md` §10.

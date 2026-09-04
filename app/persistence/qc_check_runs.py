@@ -42,9 +42,15 @@ from app.workflow.qc_checks_handler import (
     JOB_TYPE_RUN_QC_CHECKS,
     RUN_QC_SCHEMA_VERSION,
     SCOPE_FULL,
-    detector_revisions as _server_detector_revisions,
-    evidence_fingerprint as _current_evidence_fingerprint,
     scope_fingerprint,
+)
+from app.workflow.qc_checks_handler import (
+    detector_revisions as _server_detector_revisions,
+)
+from app.workflow.qc_checks_handler import (
+    evidence_fingerprint as _current_evidence_fingerprint,
+)
+from app.workflow.qc_checks_handler import (
     source_artifact_fingerprint as _current_source_fingerprint,
 )
 
@@ -551,26 +557,36 @@ def _completion_proves_full_coverage(
             "completion detector revisions are empty for "
             f"{empty_revisions} (cannot prove coverage)"
         )
-    # C3-A1 item 6: the revision VALUES must equal the server-owned
+    # C4-B: the revision VALUES must equal the CURRENT server-owned
     # detector revisions for the binding band — non-empty alone is not
     # enough (a forged map with plausible non-empty values fails here).
-    # Server-known members are compared against the live registry; for
-    # members ABSENT from the registry (other lanes own their
-    # registrations), the seed/producer convention "1.0.0" is the
-    # authoritative expectation — anything else is a forged value.
-    # (The two audio members ARE registered in this module's fixture, so
-    # forged audio values still hit the live-registry leg.)
+    # NO guessed fallback exists on ANY path: the resolver raising (any
+    # member unregistered), an incomplete map, an extra member, an empty
+    # revision, or a conflicting registration all fail closed with a
+    # truthful authority detail — never a substituted "1.0.0", never an
+    # empty expected-map comparison, never manifest/completion values.
     try:
         expected_revisions = _server_detector_revisions(list(band))
-    except Exception:
-        expected_revisions = {}
+    except Exception as exc:
+        return False, (
+            "server detector revisions are unresolvable "
+            f"({type(exc).__name__}: {exc}; a revision authority that "
+            "cannot enumerate the binding band cannot prove coverage)"
+        )
+    if set(expected_revisions) != set(band) or any(
+        not isinstance(value, str) or not value
+        for value in expected_revisions.values()
+    ):
+        return False, (
+            "server detector revisions are incomplete for the binding "
+            f"full band (expected exactly {sorted(band)} with non-empty "
+            "revisions; the authority cannot prove coverage from a "
+            "partial registry view)"
+        )
     wrong_revisions = sorted(
         name
         for name in band
-        if (
-            revisions.get(name)
-            != expected_revisions.get(name, "1.0.0")
-        )
+        if revisions.get(name) != expected_revisions[name]
     )
     if wrong_revisions:
         return False, (
