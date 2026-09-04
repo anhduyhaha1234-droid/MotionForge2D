@@ -77,3 +77,12 @@ readiness not_run thay vì blocked/completed. Lane T06C gốc verify GREEN trư�
 - M1 T03G `0ba0a7b` ff-only OK → HEAD `0ba0a7b`.
 - M2 T06C `6e7eedf` NOT ff-able (exit 128, divergent — parent `c9d5453`, chạm cùng 2 file T03G tests bản mới).
 - DỪNG đúng binding: không tự merge, không gate nửa vời. Commit LOG/REPORT này, không push.
+
+## 10. S11-C2 follow-on M2 — BLOCKED_GATE_RED
+
+- M2 T06C `6e7eedf` no-ff authorized → HEAD `789d3032487d6734f702eb7bd1666ed8a4ca8288`, zero conflict.
+- Gate @ `789d303`: diff-check GREEN; T03G **98/98** (112.07s); T05A **7 failed/2 passed** (13.25s);
+  acceptance **2 failed/10 passed** (322.15s, cả 2 bắt nguồn T05A).
+- Root cause read-only: M1 T03G-C2A1 đổi authority semantics → T05A seed cũ thành `not_run`.
+  Route T03G/T05A — Manager quyết. Raw: `s11-c2/lanes/int01-c2merge/raw-gate.txt`.
+- Commit LOG/REPORT này, không push.

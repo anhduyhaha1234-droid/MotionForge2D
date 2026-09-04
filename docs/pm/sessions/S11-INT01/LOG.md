@@ -122,3 +122,27 @@ Owner cần xử lý: T03G (nới gate cho run hợp lệ) hoặc T06C (seed run
 - **NEEDS_MANAGER — DỪNG, không tự merge, không gate nửa vời** (cây hiện tại thiếu T06C-C2A2,
   full acceptance vẫn bản cũ chưa có test_t12; gate 4 mục chỉ có nghĩa sau khi Manager route rebase/điều phối).
   Commit LOG/REPORT này, không push.
+
+## 9. S11-C2 follow-on M2 (Manager authorized no-ff) — GATE 4/4
+
+- Manager xác minh: T06C `6e7eedf` fork từ `c9d5453`, ZERO file overlap với M1 mang vào (chỉ 2 file LOG/REPORT INT01
+  của commit `570eacf` — file của INT01, không phải của lane) → cho phép `git merge --no-ff`, KHÔNG rebase.
+- `git fetch origin` vẫn chạm ref hỏng pre-existing; tip objects đã có local đầy đủ.
+- M2: `git merge --no-ff codex/s11/t06c-0903w14 -m "Merge T06C-C2A2 test_t12"` (exit 0) —
+  `Merge made by the 'ort' strategy`, 4 files 856 ins / 1 del
+  (acceptance 536± test_t12; 2 restart proofs 158+158; preimage mới). Zero conflict, porcelain 0.
+  → HEAD `789d3032487d6734f702eb7bd1666ed8a4ca8288` (merge commit, parents `570eacf` + `6e7eedf`).
+- Combined gate thật 4 mục @ `789d303` (raw: `C:/Users/Admin/MotionForge2D-evidence/s11-c2/lanes/int01-c2merge/raw-gate.txt`):
+  [1/4] diff-check exit 0 — GREEN;
+  [2/4] T03G module **98 passed, 112.07s** — GREEN;
+  [3/4] T05A file **7 failed, 2 passed, 13.25s** — RED;
+  [4/4] full acceptance **2 failed, 10 passed, 322.15s** — RED.
+- **BLOCKED_GATE_RED — phân tích read-only (KHÔNG sửa code lane):**
+  T05A failures đồng loạt `assert 'not_run' == blocked/ready` — readiness pipeline trả `not_run` khắp nơi.
+  Root cause: M1 T03G-C2A1 (`a7f75b7`: completion envelope + unbounded matching-full authority,
+  `app/persistence/qc_check_runs.py` 307±) đổi semantics authority → T05A tests seed theo semantics cũ
+  không còn được công nhận. Inner suite trong acceptance: 373 passed / 7 failed — đúng 7 T05A;
+  cả 2 acceptance FAILED đều bắt nguồn từ T05A file
+  (`S11-T06C-06-per-file-zero-failures` entry passed=2 failed=7; per-file-passed gate).
+  T03G module 98/98 GREEN. Route về T03G (tương thích) hoặc T05A (update seed theo authority mới) — Manager quyết.
+- Commit LOG/REPORT này, không push, DỪNG.
