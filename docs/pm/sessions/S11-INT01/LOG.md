@@ -199,3 +199,26 @@ Owner cần xử lý: T03G (nới gate cho run hợp lệ) hoặc T06C (seed run
   Route: T05A owner update seed theo authority C3A1 (pattern C2-B), hoac T03G tuong thich nguoc — Manager quyet.
   T05A KHONG dispatch truoc (dung lenh) — chi real regression moi resume exact owner `20260903_203404_4a4548`.
 - Commit LOG/REPORT nay, KHONG push, DUNG.
+
+## 13. S11-C3-M2 — merge T05A db14de3 + gate (worktree DUY NHAT s11-integration)
+
+- Preflight: pwd s11-integration, HEAD `c761000`, porcelain 0, branch codex/s11-integration.
+- Tip verified: `db14de3` (parent caf8dcf, real owner 4a4548) — chi merge tip nay, KHONG branch/commit khac.
+- Merge: `git merge --no-ff codex/s11/t05a-0903w12 -m "Merge T05A-C3B db14de3 seed sync to C3A1"` (exit 0) —
+  3 files 17 ins (test 16±; LOG/REPORT 1+1). Zero conflict, porcelain 0.
+  → HEAD `778a1ce9723960b0e1516809147c88267ce0347e`.
+- Ancestor check 6/6 @ final HEAD: db14de3 + caf8dcf + 1135499 + f37c55e + 6e7eedf + 0ba0a7b — ok, khong stranded.
+- Gate @ `778a1ce` (raw: `s11-c2/manager/raw/int01-c3m2-gate.txt`):
+  [1] diff --check 7751598..HEAD exit 0 — GREEN;
+  [2] T03G 2 modules **143 passed, 163.11s** — GREEN;
+  [3] T12 **1 passed** — GREEN;
+  [4] T06 full 12 **2 failed, 10 passed, 376.98s** — RED;
+  [5] T05A 14 **1 failed, 13 passed, 14.53s** — RED (tien bo 7→1 failed);
+  [6] RUFF F **All checks passed** — GREEN;
+  [7] MYPY 2 files **Success: no issues found** — GREEN.
+- **BLOCKED_GATE_RED — phan tich read-only:** T05A con duy nhat
+  `test_readiness_queued_running_failed_stale_not_run_with_detail:490` —
+  stale case tra `failed` thay vi `stale` (`failed == stale` mismatch).
+  Semantics production C3A1 fail-closed (run stale → never_run → failed) vs test expect cu.
+  [4] 2 failed gom test_t03 per-file gate (he qua T05A) + 1 acceptance nua (can xac minh ten).
+  Route T05A owner (real owner 4a4548) — Manager quyet. Commit LOG/REPORT nay, KHONG push, DUNG.

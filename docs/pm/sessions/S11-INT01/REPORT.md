@@ -109,3 +109,10 @@ readiness not_run thay vì blocked/completed. Lane T06C gốc verify GREEN trư�
 - Root cause read-only: T03G-C3A1 doi authority sau C2-B → T05A seed cu thanh `not_run`.
   Route T05A (update seed, owner `20260903_203404_4a4548` khi real regression) hoac T03G — Manager quyet.
 - Raw: `s11-c2/manager/raw/int01-c3-gate.txt`. Commit LOG/REPORT nay, KHONG push.
+
+## 14. S11-C3-M2 T05A db14de3 — BLOCKED_GATE_RED (con 1 T05A)
+
+- Merge no-ff T05A `db14de3` → `778a1ce`, zero conflict. Ancestor 6/6.
+- Gate: diff GREEN; T03G **143/143**; T12 **1/1**; ruff GREEN; mypy Success;
+  T05A **1 failed/13 passed** (stale-vs-failed:490); acceptance **2 failed/10 passed**.
+- Route T05A owner 4a4548 — Manager quyet. Raw: `s11-c2/manager/raw/int01-c3m2-gate.txt`.
