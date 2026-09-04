@@ -84,3 +84,21 @@ Forbidden verified: `git status --porcelain` chỉ 8 file allowlist + docs; `mod
 - Commit local trên `codex/s11/t03g-0903w8`: `c3c088f79091d680b95985617f000c622d367f82` (production) + `ccee77b72f57211084209427f38f9394d3d533c7` (docs/evidence)
 - Parent: WAVE_BASE `f6942593304742501ba88f671160b83addbb980b`
 - Scope staged: 8 file allowlist + `docs/pm/sessions/S11-T03G/**`
+
+## 8. S11-C1 lane C1-A correction
+
+- Finding Codex P1: audio-only newest run thành readiness authority →
+  `ready` trong khi 8 visual checks chưa chạy.
+- Fix: FULL-run authority + 6-điều-kiện coverage gate (band 10 detector
+  derive từ frozen T03A policy, không đoán).
+- Gate: 44 passed (29 job + 15 api, basetemp `%TEMP%/s11c1a_gate1`);
+  ruff F clean; diff-check clean; scope allowlist-only.
+- Evidence external: `C:/Users/Admin/MotionForge2D-evidence/s11-c1/lanes/c1a-t03g/`
+  (`gate_full_run.txt`, `node_list.txt`, `gate_summary.txt`).
+- Blast radius: T05A seed FULL 2-audio → coverage-unproven (7 failed,
+  pre-existing; stash A/B đã chứng minh). Thuộc owner khác — báo Manager.
+- Commit local trên `codex/s11/t03g-0903w8`: `2712a5e9d5367a1fa99177f4b6e84a3b02f978a5`
+  (C1-A correction: full-run authority + coverage gate + tests + docs).
+  Parent chain: canonical `4d7ad8196c3f7a21af744906ef4174690159d889`
+  (FF-only merge) ← C1 `c00060afaafca6b35d640d501e8c127d5cee8c7a`.
+- Trạng thái: TASK_SUBMITTED (chi tiết LOG.md §8).

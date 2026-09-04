@@ -64,15 +64,19 @@ from app.workflow.job_service import JobService
 from app.persistence.qc_check_runs import (
     CheckRunReadiness,
     check_run_readiness,
+    full_coverage_detectors,
+    full_scope_fingerprint,
     latest_check_run_state,
 )
 from app.workflow.qc_checks_handler import (
     JOB_TYPE_RUN_QC_CHECKS,
     RUN_QC_SCHEMA_VERSION,
     SCOPE_AUDIO,
+    SCOPE_FULL,
     QcCheckRunSubmitError,
     evidence_fingerprint,
     policy_bundle,
+    scope_detectors,
     scope_fingerprint,
     submit_run_qc_checks,
 )
@@ -596,9 +600,9 @@ def test_zero_item_completed_run_distinguishable_from_never_run(
     ran_id = seed_ws_project(session_factory(), video_id=None)
     never_id = seed_ws_project(session_factory(), video_id=None)
 
-    result = _submit(session_factory, video_id=ran_id)
-    worker.run_once()
-    assert _job_state(session_factory, result.job_id) == "completed"
+    # C1-A: the authority is the FULL band — drive a real completed FULL
+    # run (zero-item: the seeded envelope creates no blockers).
+    _seed_full_job(session_factory, video_id=ran_id)
 
     # both videos have ZERO QCItems — only the durable run evidence can
     # tell "ran clean" apart from "never checked"
@@ -648,15 +652,16 @@ def test_readiness_never_run_and_running_not_run_fail_closed(
     assert r.check_state_detail  # check-state detail present (fail-closed)
 
     queued_id = seed_ws_project(session_factory(), video_id=None)
-    result = _submit(session_factory, video_id=queued_id)
+    _seed_full_job(session_factory, video_id=queued_id, state="queued")
     r = _readiness(session_factory, queued_id)
     assert r.status == "not_run"
     assert r.run_state == "queued"
     assert r.check_state_detail
 
-    worker.run_once()
-    assert _job_state(session_factory, result.job_id) == "completed"
-    r = _readiness(session_factory, queued_id)
+    # C1-A: a completed CURRENT FULL run (zero-item) is the ready candidate.
+    ready_id = seed_ws_project(session_factory(), video_id=None)
+    _seed_full_job(session_factory, video_id=ready_id)
+    r = _readiness(session_factory, ready_id)
     assert r.status == "ready"  # AC3: completed current run zero blocker
     assert r.run_state == "completed"
     assert r.blockers == 0
@@ -667,48 +672,68 @@ def test_readiness_failed_run_not_run_with_detail(
     session_factory, svc: JobService, worker: DurableWorker
 ) -> None:
     video_id = seed_ws_project(session_factory(), video_id=None)
-    result = _submit(session_factory, video_id=video_id)
-
-    # A permanently failing run: deadline far below any spawn budget.
-    from app.workflow import qc_checks_handler as h
-
-    real_runner = h.run_full_check_set
-
-    def failing_runner(*args, **kwargs):
-        raise RuntimeError("simulated detector infrastructure failure")
-
-    try:
-        h.run_full_check_set = failing_runner  # type: ignore[assignment]
-        worker.run_once()
-    finally:
-        h.run_full_check_set = real_runner
-
-    assert _job_state(session_factory, result.job_id) == "failed"
+    # C1-A: the failed run must be a FULL-scope run row (audio-only runs
+    # are invisible to the FULL authority and would report never_run
+    # instead).  Seeded directly through the repo (no worker execution —
+    # the FULL band has no server-side evidence composition path).
+    failed_id = _seed_full_job(
+        session_factory, video_id=video_id, state="failed"
+    )
     r = _readiness(session_factory, video_id)
     assert r.status == "not_run"
     assert r.run_state == "failed"
+    assert r.latest_job_id == failed_id
     assert "failed" in r.check_state_detail
 
 
 def test_readiness_blocked_when_completed_run_has_blockers(
     session_factory, svc: JobService, worker: DurableWorker
 ) -> None:
-    """A completed run that FOUND blockers is not clean (AC3 inverse)."""
+    """A completed run that FOUND blockers is not clean (AC3 inverse).
+
+    C1-A: blockers must ride on a completed CURRENT FULL run — a seeded
+    FULL completion proves the binding 10-detector coverage, and the
+    blocker comes from a real QCItem row (invariant 5: later audio-only
+    activity never clears a blocker the FULL authority found).
+    """
     video_id = seed_ws_project(session_factory(), video_id=None)
-    result = _submit(
-        session_factory,
-        video_id=video_id,
-        detector_args=audio_scope_args(
-            source_has_audio_missing_output_envelope(video_id=video_id)
-        ),
-    )
-    worker.run_once()
-    assert _job_state(session_factory, result.job_id) == "completed"
+    full_job_id = _seed_full_job(session_factory, video_id=video_id)
+    with session_factory() as s:
+        repo = QCItemRepository(s)
+        repo.create(
+            workspace_id=WS,
+            project_id=P1,
+            video_item_id=video_id,
+            layer_ref_type="video_item",
+            layer_ref_id=video_id,
+            reason_code="audio_missing",
+            evidence_window_key=f"c1a-blocker:{video_id}",
+            evidence={"source": "seed-c1a", "job_id": full_job_id},
+            severity="blocker",
+            category="audio_missing",
+            detector="audio_missing",
+            detector_revision="1.0.0",
+            confidence=1.0,
+            confidence_source="derived",
+            checkpoint_ref="seed-c1a",
+        )
+        s.commit()
     assert _count_qc_items(session_factory, video_id) >= 1
     r = _readiness(session_factory, video_id)
     assert r.status == "blocked"
     assert r.run_state == "completed"
     assert r.blockers >= 1
+
+    # A NEWER completed audio-only run does not clear the FULL authority's
+    # blocker verdict (invariant 5 — the blocker query still blocks).
+    _seed_full_job(
+        session_factory, video_id=video_id, scope=SCOPE_AUDIO,
+        detectors=["audio_missing", "av_sync_drift"],
+    )
+    r2 = _readiness(session_factory, video_id)
+    assert r2.status == "blocked"
+    assert r2.run_state == "completed"
+    assert r2.latest_job_id == full_job_id
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -864,10 +889,10 @@ def test_read_authority_stale_when_evidence_fingerprint_changes(
     session_factory, svc: JobService, worker: DurableWorker
 ) -> None:
     video_id = seed_ws_project(session_factory(), video_id=None)
-    result = _submit(session_factory, video_id=video_id, generation="1")
-    worker.run_once()
-    assert _job_state(session_factory, result.job_id) == "completed"
-    assert _readiness(session_factory, video_id, generation="1").status == "ready"
+    # C1-A: staleness attaches to the FULL authority (the seeded FULL run
+    # is current for generation "1" — helpers must pass generation through).
+    full_job_id = _seed_full_job(session_factory, video_id=video_id)
+    assert _readiness(session_factory, video_id).status == "ready"
 
     # the video's evidence changed (generation bump simulates re-import /
     # source replacement) → the completed run is now STALE → not_run
@@ -887,16 +912,15 @@ def test_read_authority_stale_when_evidence_fingerprint_changes(
             policy_content_hash=policy_bundle()["policy_content_hash"],
         )
     assert state.run_state == "stale"
-    assert state.job_id == result.job_id
+    assert state.job_id == full_job_id
 
 
 def test_read_authority_stale_when_policy_hash_changes(
     session_factory, svc: JobService, worker: DurableWorker
 ) -> None:
     video_id = seed_ws_project(session_factory(), video_id=None)
-    result = _submit(session_factory, video_id=video_id)
-    worker.run_once()
-    assert _job_state(session_factory, result.job_id) == "completed"
+    # C1-A: policy-hash staleness attaches to the FULL authority.
+    _seed_full_job(session_factory, video_id=video_id)
 
     # a different (newer) policy hash — the run was computed against the old
     # policy → the completed run is STALE for the new policy → not_run
@@ -923,3 +947,419 @@ def test_read_authority_stale_when_policy_hash_changes(
     assert state.run_state == "stale"
     assert readiness.status == "not_run"
     assert readiness.policy_matches is False
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 7. C1-A: FULL-run authority — the binding 10-detector coverage gate
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def _seed_full_job(
+    session_factory,
+    *,
+    video_id: str,
+    state: str = "completed",
+    scope: str = SCOPE_FULL,
+    detectors: list[str] | None = None,
+    summary_errors: int = 0,
+    summary_skipped: int = 0,
+    stale_fp: bool = False,
+    policy_hash: str | None = None,
+    tamper_manifest_fp: bool = False,
+    tamper_completion_scope: bool = False,
+) -> str:
+    """Seed ONE durable RUN_QC_CHECKS job with a controlled envelope.
+
+    Fresh real DB through the production ``JobRepository`` path (Decision
+    A — seeding through the repo, never HTTP): the completion block is
+    shaped EXACTLY like ``build_completion_block`` (schema/job_type/
+    completed/run_id + policy identity + fingerprints + measured summary +
+    zero-item evidence), so the read authority trusts it exactly as it
+    trusts a real worker run.
+    """
+    from app.persistence.jobs import StepInput
+    from app.persistence.jobs import JobRepository as _Repo
+
+    band = full_coverage_detectors()
+    names = list(detectors) if detectors is not None else list(band)
+    with session_factory() as s:
+        fp = evidence_fingerprint(s, workspace_id=WS, video_item_id=video_id)
+        if stale_fp:
+            fp = "9" * 64
+            assert fp != evidence_fingerprint(
+                s, workspace_id=WS, video_item_id=video_id
+            )
+        bundle = policy_bundle()
+        manifest_fp = (
+            "8" * 64 if tamper_manifest_fp else scope_fingerprint(scope)
+        )
+        manifest = {
+            "schema_version": RUN_QC_SCHEMA_VERSION,
+            "workspace_id": WS,
+            "project_id": P1,
+            "video_item_id": video_id,
+            "evidence_fingerprint": fp,
+            "policy_content_hash": bundle["policy_content_hash"],
+            "scope": scope,
+            "scope_fingerprint": manifest_fp,
+        }
+        repo = _Repo(s)
+        key_suffix = uuid.uuid4().hex[:8]
+        record = repo.create_job(
+            workspace_id=WS,
+            job_type=JOB_TYPE_RUN_QC_CHECKS,
+            owner_type="video_item",
+            owner_id=video_id,
+            input_manifest=manifest,
+            idempotency_key=(
+                f"{JOB_TYPE_RUN_QC_CHECKS}:video_item:{video_id}:{key_suffix}:1"
+            ),
+            input_generation="1",
+            steps=[StepInput(step_code="run_qc_checks", position=0, step_type="sync")],
+            actor="api",
+        )
+        step = repo.list_steps(record.id)[0]
+        repo.transition_step(
+            step.id, "ready", actor="system",
+            expected_revision=step.revision, fence_token="seed-c1a",
+        )
+        step2 = repo.list_steps(record.id)[0]
+        repo.transition_step(
+            step2.id, "running", actor="system",
+            expected_revision=step2.revision, fence_token="seed-c1a",
+        )
+        step3 = repo.list_steps(record.id)[0]
+        if state == "completed":
+            completion = {
+                "schema_version": RUN_QC_SCHEMA_VERSION,
+                "job_type": JOB_TYPE_RUN_QC_CHECKS,
+                "completed": True,
+                "run_id": "c" * 64,
+                "policy_id": bundle["policy_id"],
+                "policy_content_hash": (
+                    policy_hash
+                    if policy_hash is not None
+                    else bundle["policy_content_hash"]
+                ),
+                "source_generation": "1",
+                "source_artifact_id": None,
+                "source_artifact_fingerprint": "",
+                "evidence_fingerprint": fp,
+                "scope": (
+                    SCOPE_AUDIO if tamper_completion_scope else scope
+                ),
+                "scope_fingerprint": scope_fingerprint(
+                    SCOPE_AUDIO if tamper_completion_scope else scope
+                ),
+                "detectors": names,
+                "detector_revisions": {name: "1.0.0" for name in names},
+                "summary": {
+                    "run_id": "c" * 64,
+                    "checks_requested": len(names),
+                    "checks_run": len(names),
+                    "checks_skipped": summary_skipped,
+                    "created": 0,
+                    "reused": 0,
+                    "resolved_after_recheck": 0,
+                    "reopened_stale": 0,
+                    "not_applicable": len(names),
+                    "errors": summary_errors,
+                    "cancelled": False,
+                    "deadline_exceeded": False,
+                    "run_sec": 0.001,
+                    "per_detector": {},
+                },
+                "zero_item_completion": {
+                    "evidence": (
+                        summary_errors == 0
+                        and summary_skipped == 0
+                        and True
+                    ),
+                    "qc_items_created": 0,
+                    "issues_found": 0,
+                    "checks_run": len(names),
+                    "not_applicable": len(names),
+                },
+            }
+            repo.record_attempt(
+                job_id=record.id,
+                step_id=step3.id,
+                step_code="run_qc_checks",
+                attempt=1,
+                worker_id="seed-c1a",
+                fence_token="seed-c1a",
+                result=completion,
+            )
+            repo.transition_step(
+                step3.id, "completed", actor="system",
+                expected_revision=step3.revision, fence_token="seed-c1a",
+            )
+            r1 = repo.transition_job(
+                record.id, "running", actor="system",
+                expected_revision=record.revision,
+            )
+            repo.transition_job(
+                record.id, "completed", actor="system",
+                expected_revision=r1.revision,
+            )
+        elif state == "running":
+            repo.transition_job(
+                record.id, "running", actor="system",
+                expected_revision=record.revision,
+            )
+        elif state == "failed":
+            r1 = repo.transition_job(
+                record.id, "running", actor="system",
+                expected_revision=record.revision,
+            )
+            repo.transition_job(
+                record.id, "failed", actor="system",
+                expected_revision=r1.revision,
+                error={"code": "QC_RUN_INFRA_FAILURE", "message": "seed-c1a"},
+            )
+        # "queued" needs no transition (create_job leaves the job queued).
+        s.commit()
+        return record.id
+
+
+def _full_state(session_factory, video_id: str):
+    with session_factory() as s:
+        fp = evidence_fingerprint(s, workspace_id=WS, video_item_id=video_id)
+        return latest_check_run_state(
+            s,
+            workspace_id=WS,
+            project_id=P1,
+            video_item_id=video_id,
+            evidence_fingerprint=fp,
+            policy_content_hash=policy_bundle()["policy_content_hash"],
+        )
+
+
+def test_c1a_binding_band_is_ten_detectors_from_frozen_policy(
+    session_factory,
+) -> None:
+    """The authority's FULL band is DERIVED (frozen policy metrics), not
+    guessed: 8 visual + 2 audio, equal to scope_detectors(SCOPE_FULL)."""
+    band = full_coverage_detectors()
+    assert sorted(band) == sorted(scope_detectors(SCOPE_FULL))
+    assert len(band) == 10
+    visual = set(band) - set(scope_detectors(SCOPE_AUDIO))
+    assert len(visual) == 8
+    assert set(scope_detectors(SCOPE_AUDIO)) == {"audio_missing", "av_sync_drift"}
+    assert full_scope_fingerprint() == scope_fingerprint(SCOPE_FULL)
+
+
+def test_c1a_audio_only_completed_is_not_full_authority(
+    session_factory, svc: JobService, worker: DurableWorker
+) -> None:
+    """Codex probe: 1 video + exactly 1 completed SCOPE_AUDIO run (the 2
+    audio detectors) ⇒ readiness not_run, never ready."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    result = _submit(session_factory, video_id=video_id)  # SCOPE_AUDIO band
+    worker.run_once()
+    assert _job_state(session_factory, result.job_id) == "completed"
+
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "never_run"
+    assert state.job_id is None  # the audio job is invisible to the authority
+    r = _readiness(session_factory, video_id)
+    assert r.status == "not_run"
+    assert r.run_state == "never_run"
+    assert r.check_state_detail
+
+
+def test_c1a_newer_audio_run_does_not_displace_full_authority(
+    session_factory, svc: JobService
+) -> None:
+    """Completed FULL run, then a NEWER completed audio-only run ⇒ the
+    authority still reports the FULL job (latest_job_id) and readiness."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    full_id = _seed_full_job(session_factory, video_id=video_id)
+    audio_id = _seed_full_job(
+        session_factory, video_id=video_id, scope=SCOPE_AUDIO,
+        detectors=["audio_missing", "av_sync_drift"],
+    )
+    assert full_id != audio_id
+
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "completed"
+    assert state.job_id == full_id  # never the newer audio job id
+    assert state.scope == SCOPE_FULL
+    r = _readiness(session_factory, video_id)
+    assert r.status == "ready"
+    assert r.latest_job_id == full_id
+
+
+def test_c1a_audio_over_stale_full_stays_not_run(
+    session_factory, svc: JobService
+) -> None:
+    """Stale FULL run + newer completed audio run ⇒ still not_run (the
+    audio run can never backfill full authority)."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    _seed_full_job(session_factory, video_id=video_id, stale_fp=True)
+    _seed_full_job(
+        session_factory, video_id=video_id, scope=SCOPE_AUDIO,
+        detectors=["audio_missing", "av_sync_drift"],
+    )
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "stale"
+    r = _readiness(session_factory, video_id)
+    assert r.status == "not_run"
+    assert r.run_state == "stale"
+
+
+def test_c1a_newest_full_queued_running_failed_never_falls_back(
+    session_factory, svc: JobService
+) -> None:
+    """A completed FULL run followed by a NEWER non-completed FULL run
+    (queued / running / failed) ⇒ not_run with the NEWER job id — the
+    authority never falls back to the older completed full run."""
+    for nonterminal in ("queued", "running", "failed"):
+        video_id = seed_ws_project(session_factory(), video_id=None)
+        old_id = _seed_full_job(session_factory, video_id=video_id)
+        new_id = _seed_full_job(
+            session_factory, video_id=video_id, state=nonterminal
+        )
+        assert old_id != new_id
+        state = _full_state(session_factory, video_id)
+        assert state.job_id == new_id
+        assert state.run_state == (
+            "queued" if nonterminal == "queued"
+            else "running" if nonterminal == "running"
+            else "failed"
+        )
+        r = _readiness(session_factory, video_id)
+        assert r.status == "not_run"
+        assert r.latest_job_id == new_id
+
+
+def test_c1a_newest_full_stale_never_falls_back(
+    session_factory, svc: JobService
+) -> None:
+    """Completed current FULL run, then a NEWER stale FULL run ⇒ stale /
+    not_run (no fallback to the older completed full run)."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    old_id = _seed_full_job(session_factory, video_id=video_id)
+    new_id = _seed_full_job(session_factory, video_id=video_id, stale_fp=True)
+    assert old_id != new_id
+    state = _full_state(session_factory, video_id)
+    assert state.job_id == new_id
+    assert state.run_state == "stale"
+    r = _readiness(session_factory, video_id)
+    assert r.status == "not_run"
+
+
+def test_c1a_manifest_completion_scope_mismatch_fails_closed(
+    session_factory, svc: JobService
+) -> None:
+    """Manifest scope full but completion scope audio (and the reverse) ⇒
+    coverage-unproven ⇒ failed / not_run, never ready."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    _seed_full_job(session_factory, video_id=video_id, tamper_completion_scope=True)
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "failed"
+    assert "coverage" in state.check_state_detail
+    r = _readiness(session_factory, video_id)
+    assert r.status == "not_run"
+
+    video_id2 = seed_ws_project(session_factory(), video_id=None)
+    _seed_full_job(
+        session_factory, video_id=video_id2, scope=SCOPE_AUDIO,
+        detectors=["audio_missing", "av_sync_drift"],
+        tamper_completion_scope=False,
+    )
+    # audio manifest ⇒ invisible: never_run (not even failed)
+    state2 = _full_state(session_factory, video_id2)
+    assert state2.run_state == "never_run"
+
+
+def test_c1a_manifest_scope_fingerprint_mismatch_fails_closed(
+    session_factory, svc: JobService
+) -> None:
+    """Manifest scope full but scope fingerprint tampered ⇒ the submit-time
+    band was not the full band ⇒ failed / not_run."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    _seed_full_job(session_factory, video_id=video_id, tamper_manifest_fp=True)
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "failed"
+    assert "fingerprint" in state.check_state_detail
+    r = _readiness(session_factory, video_id)
+    assert r.status == "not_run"
+
+
+def test_c1a_full_missing_any_detector_fails_closed(
+    session_factory, svc: JobService
+) -> None:
+    """A completion missing ANY binding detector (here: one visual check
+    dropped) ⇒ coverage-unproven ⇒ failed / not_run.  Partial runs are
+    never summed into coverage."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    band = full_coverage_detectors()
+    partial = [name for name in band if name != "edge_halo"]
+    assert len(partial) == 9
+    _seed_full_job(session_factory, video_id=video_id, detectors=partial)
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "failed"
+    assert "coverage" in state.check_state_detail
+    r = _readiness(session_factory, video_id)
+    assert r.status == "not_run"
+
+
+def test_c1a_full_with_errors_or_skipped_fails_closed(
+    session_factory, svc: JobService
+) -> None:
+    """errors > 0 or checks_skipped > 0 in the summary ⇒ the run is never
+    the readiness authority (failed / not_run)."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    _seed_full_job(session_factory, video_id=video_id, summary_errors=1)
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "failed"
+    assert "error" in state.check_state_detail
+    assert _readiness(session_factory, video_id).status == "not_run"
+
+    video_id2 = seed_ws_project(session_factory(), video_id=None)
+    _seed_full_job(session_factory, video_id=video_id2, summary_skipped=2)
+    state2 = _full_state(session_factory, video_id2)
+    assert state2.run_state == "failed"
+    assert "skipped" in state2.check_state_detail
+    assert _readiness(session_factory, video_id2).status == "not_run"
+
+
+def test_c1a_full_current_complete_zero_item_is_ready_candidate(
+    session_factory, svc: JobService
+) -> None:
+    """Completed CURRENT full run, binding coverage, zero errors/skipped,
+    zero blockers ⇒ completed + ready candidate (zero-item evidence)."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    job_id = _seed_full_job(session_factory, video_id=video_id)
+    state = _full_state(session_factory, video_id)
+    assert state.run_state == "completed"
+    assert state.job_id == job_id
+    assert state.scope == SCOPE_FULL
+    assert state.zero_item_completion is True
+    assert state.summary is not None
+    r = _readiness(session_factory, video_id)
+    assert r.status == "ready"
+    assert r.run_state == "completed"
+    assert r.latest_job_id == job_id
+
+
+def test_c1a_partial_runs_never_sum_into_coverage(
+    session_factory, svc: JobService
+) -> None:
+    """Two partial runs (visual-only shaped + audio-only) side by side ⇒
+    still never_run: coverage is per-run, never summed across runs."""
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    band = full_coverage_detectors()
+    visual_only = [name for name in band if name not in ("audio_missing", "av_sync_drift")]
+    assert len(visual_only) == 8
+    _seed_full_job(session_factory, video_id=video_id, detectors=visual_only)
+    _seed_full_job(
+        session_factory, video_id=video_id, scope=SCOPE_AUDIO,
+        detectors=["audio_missing", "av_sync_drift"],
+    )
+    state = _full_state(session_factory, video_id)
+    # the visual-only FULL-manifest run is newest-full ⇒ failed (coverage);
+    # the audio run is invisible.  Either way: never ready.
+    assert state.run_state == "failed"
+    assert _readiness(session_factory, video_id).status == "not_run"

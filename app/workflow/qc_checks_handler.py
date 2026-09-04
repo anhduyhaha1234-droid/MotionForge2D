@@ -9,7 +9,7 @@ Completion evidence (JobAttempt ``result`` + step checkpoint):
 
 - ``policy_id`` / ``policy_content_hash``  — frozen T03A thresholds policy,
   read-only (``app.services.qc_checks.thresholds``);
-- ``source_generation`` / ``source_artifact_fingerprint`` / 
+- ``source_generation`` / ``source_artifact_fingerprint`` /
   ``evidence_fingerprint`` — the video's current evidence identity the run
   is valid for;
 - ``scope`` / ``scope_fingerprint`` — the server-owned band requested;
@@ -84,10 +84,25 @@ SCOPE_FULL = "full"
 SCOPE_AUDIO = "audio"
 VALID_SCOPES: frozenset[str] = frozenset({SCOPE_FULL, SCOPE_AUDIO})
 
-#: Audio band (server-owned; checked in registry registration order by the
-#: orchestrator's canonical ordering).
+#: Audio band (server-owned; frozen list).  The FULL band is the binding
+#: 10-detector band derived from the frozen T03A policy calibration
+#: metrics — NOT the live registry order (the registry is a runtime
+#: discovery view tests may populate partially, so the submission
+#: authority pins the binding band to the frozen policy contract).
 SCOPE_BANDS: Mapping[str, Sequence[str]] = {
     SCOPE_AUDIO: ("audio_missing", "av_sync_drift"),
+    SCOPE_FULL: (
+        "trajectory_drift",
+        "cut_drift",
+        "contact_break",
+        "z_order_error",
+        "silhouette_clipping",
+        "identity_drift",
+        "edge_halo",
+        "temporal_flicker",
+        "audio_missing",
+        "av_sync_drift",
+    ),
 }
 
 #: Server-side default execution bounds (bounded runner contract).
@@ -147,11 +162,11 @@ def _sha256(value: Any) -> str:
 def scope_detectors(scope: str) -> list[str]:
     """Resolve a server-owned scope to its ordered detector band.
 
-    "full" always reflects the CURRENT registry registration order;
-    named bands are frozen server-owned lists.  Unknown scopes fail closed.
+    Both bands are frozen server-owned lists (the FULL band is pinned to
+    the frozen T03A policy contract — the registry is a runtime discovery
+    view the orchestrator consumes read-only, never the authority for
+    what "full" means).  Unknown scopes fail closed.
     """
-    if scope == SCOPE_FULL:
-        return list(registry.names())
     band = SCOPE_BANDS.get(scope)
     if band is None:
         raise RunQcChecksError(
