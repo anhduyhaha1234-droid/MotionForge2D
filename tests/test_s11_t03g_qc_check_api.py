@@ -541,7 +541,7 @@ def test_read_authority_stale_after_evidence_fingerprint_change(
             "policy_content_hash": bundle["policy_content_hash"],
             "source_generation": "1",
             "source_artifact_id": None,
-            "source_artifact_fingerprint": "",
+            "source_sha256": "",
             "scope": SCOPE_FULL,
             "scope_fingerprint": _sfp(SCOPE_FULL),
         }
@@ -665,17 +665,170 @@ def test_read_authority_stale_after_evidence_fingerprint_change(
             evidence_fingerprint="7" * 64,
             policy_content_hash=bundle["policy_content_hash"],
         )
-        assert stale.run_state == "failed"  # evidence moved ⇒ no authority
-        # (caller-supplied non-current evidence: the envelope gate fires
-        # with the evidence-identity reason — same fail-closed surface as
-        # the job-level matrix case; the manifest-staleness branch stays
-        # covered by the policy-hash sibling probe in the job module).
-        assert "evidence fingerprint" in stale.check_state_detail
+        assert stale.run_state == "stale"  # evidence moved ⇒ stale/not_run
+        # (caller-supplied non-current evidence: the envelope passes — the
+        # manifest/completion pair still agrees with each other — and the
+        # manifest-vs-current comparison fires the stale branch, exactly
+        # as the C1-A contract requires; not_run either way).
 
 
 def test_read_authority_unknown_video_404(client: TestClient, qc_session: Any) -> None:
     resp = client.get(f"/api/v2/projects/{P1}/qc-check-runs/{uuid.uuid4()}")
     assert resp.status_code == 404
+
+
+def test_c3a1_api_source_identity_tamper_is_not_run(
+    client: TestClient, qc_session: Any
+) -> None:
+    """C3-A1 item 5 over real HTTP: a completed CURRENT FULL run whose
+    completion source identity is forged (id-only) ⇒ the project
+    readiness row reports not_run (never ready on tampered source)."""
+    import uuid as _uuid2
+
+    from app.persistence.jobs import JobRepository as _Repo2
+    from app.persistence.jobs import StepInput as _StepInput2
+    from app.persistence.qc_check_runs import (
+        full_coverage_detectors as _band2,
+    )
+    from app.workflow.qc_checks_handler import (
+        evidence_fingerprint as _fp2,
+        policy_bundle as _bundle2,
+        scope_fingerprint as _sfp2,
+    )
+
+    v4 = f"v-s11-t03g-src-{_uuid2.uuid4().hex[:8]}"
+    with deps.get_job_service().session_factory() as s:  # type: ignore[union-attr]
+        from sqlalchemy import text as _t2
+
+        s.execute(
+            _t2("INSERT INTO workspace(id, name) VALUES (:w, :w) ON CONFLICT(id) DO NOTHING"),
+            {"w": WS},
+        )
+        s.execute(
+            _t2(
+                "INSERT INTO project(id, workspace_id, name, description, status) "
+                "VALUES (:p, :w, :p, '', 'active') ON CONFLICT(id) DO NOTHING"
+            ),
+            {"p": P1, "w": WS},
+        )
+        s.execute(
+            _t2(
+                "INSERT INTO video_item(id, project_id, title, position, status) "
+                "VALUES (:v, :p, :v, "
+                "(SELECT COALESCE(MAX(position),0)+1 FROM video_item WHERE project_id=:p), "
+                "'imported') ON CONFLICT(id) DO NOTHING"
+            ),
+            {"v": v4, "p": P1},
+        )
+        s.commit()
+        bundle = _bundle2()
+        band = _band2()
+        fp4 = _fp2(s, workspace_id=WS, video_item_id=v4)
+        manifest = {
+            "schema_version": RUN_QC_SCHEMA_VERSION,
+            "workspace_id": WS,
+            "project_id": P1,
+            "video_item_id": v4,
+            "evidence_fingerprint": fp4,
+            "policy_id": bundle.get("policy_id") or "s11-qc-thresholds-v1",
+            "policy_content_hash": bundle["policy_content_hash"],
+            "source_generation": "1",
+            "source_artifact_id": None,
+            "source_sha256": "",
+            "scope": SCOPE_FULL,
+            "scope_fingerprint": _sfp2(SCOPE_FULL),
+        }
+        repo = _Repo2(s)
+        record = repo.create_job(
+            workspace_id=WS,
+            job_type=JOB_TYPE_RUN_QC_CHECKS,
+            owner_type="video_item",
+            owner_id=v4,
+            input_manifest=manifest,
+            idempotency_key=f"{JOB_TYPE_RUN_QC_CHECKS}:video_item:{v4}:c3a1:1",
+            input_generation="1",
+            steps=[_StepInput2(step_code="run_qc_checks", position=0, step_type="sync")],
+            actor="api",
+        )
+        step = repo.list_steps(record.id)[0]
+        repo.transition_step(
+            step.id, "ready", actor="system",
+            expected_revision=step.revision, fence_token="c3a1",
+        )
+        step = repo.list_steps(record.id)[0]
+        repo.transition_step(
+            step.id, "running", actor="system",
+            expected_revision=step.revision, fence_token="c3a1",
+        )
+        step = repo.list_steps(record.id)[0]
+        completion = {
+            "schema_version": RUN_QC_SCHEMA_VERSION,
+            "job_type": JOB_TYPE_RUN_QC_CHECKS,
+            "completed": True,
+            "run_id": "e" * 64,
+            "policy_id": bundle["policy_id"],
+            "policy_content_hash": bundle["policy_content_hash"],
+            "source_generation": "1",
+            # id-only tamper: manifest/current say no-source, the
+            # completion claims a ghost source.
+            "source_artifact_id": "ghost-artifact",
+            "source_artifact_fingerprint": "",
+            "evidence_fingerprint": fp4,
+            "scope": SCOPE_FULL,
+            "scope_fingerprint": _sfp2(SCOPE_FULL),
+            "detectors": list(band),
+            "detector_revisions": {name: "1.0.0" for name in band},
+            "summary": {
+                "run_id": "e" * 64,
+                "checks_requested": len(band),
+                "checks_run": len(band),
+                "checks_skipped": 0,
+                "created": 0,
+                "reused": 0,
+                "resolved_after_recheck": 0,
+                "reopened_stale": 0,
+                "not_applicable": len(band),
+                "errors": 0,
+                "cancelled": False,
+                "deadline_exceeded": False,
+                "run_sec": 0.001,
+                "per_detector": {},
+            },
+            "zero_item_completion": {
+                "evidence": True,
+                "qc_items_created": 0,
+                "issues_found": 0,
+                "checks_run": len(band),
+                "not_applicable": len(band),
+            },
+        }
+        repo.record_attempt(
+            job_id=record.id, step_id=step.id, step_code="run_qc_checks",
+            attempt=1, worker_id="seed-c3a1", fence_token="c3a1",
+            result=completion,
+        )
+        repo.transition_step(
+            step.id, "completed", actor="system",
+            expected_revision=step.revision, fence_token="c3a1",
+        )
+        r1 = repo.transition_job(
+            record.id, "running", actor="system",
+            expected_revision=record.revision,
+        )
+        repo.transition_job(
+            record.id, "completed", actor="system",
+            expected_revision=r1.revision,
+        )
+        s.commit()
+    get = client.get(f"/api/v2/projects/{P1}/qc-check-runs/{v4}")
+    assert get.status_code == 200
+    assert get.json()["run_state"] == "failed"
+    ready = client.get(f"/api/v2/projects/{P1}/qc-check-runs/{v4}/readiness")
+    assert ready.status_code == 200
+    rr = ready.json()
+    assert rr["status"] == "not_run"
+    assert rr["run_state"] == "failed"
+    assert "source" in rr["check_state_detail"]
 
 
 def test_read_authority_cross_project_rejected(client: TestClient, qc_session: Any) -> None:

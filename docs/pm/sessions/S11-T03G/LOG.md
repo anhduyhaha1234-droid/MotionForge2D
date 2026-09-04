@@ -160,3 +160,53 @@ Forbidden không đụng: models.py, migrations/**, detector modules, thresholds
   `test_s11_t03g_qc_check_job.py` `635f27cc05d83559` 73598B 1765L;
   `test_s11_t03g_qc_check_api.py` `d5d97d7f9ff9f1e4` 28376B 683L.
 - Commit (local only): xem `REPORT.md` §9.
+
+## 10. S11-C3-A1 — exact authority identity (bounded guarded correction)
+
+- Trigger: C3 yêu cầu đóng 8 mục identity chính xác trên authority
+  (manifest schema/policy/evidence/generation/source + completion
+  revisions exact + giữ C2 invariants + giữ mypy fix `e7e9242`).
+- Preflight: tip `e7e9242` porcelain rỗng; preimage
+  `docs/pm/sessions/S11-T03G/evidence/c3a1_preimage.txt`
+  (`qc_check_runs.py` `505fc92bdf56ca09` 29065B 690L; job tests
+  `635f27cc05d83559` 73598B 1765L; api tests `d5d97d7f9ff9f1e4`
+  28376B 683L). Model turn: custom 9Router
+  `cmc/muse-spark-1.3-contributor`, reasoning max, fallback OFF.
+- Fix (allowlist hẹp, `qc_checks_handler.py` READ-ONLY — producer đã
+  ghi đủ field đúng type; chỉ đọc qua import, không sửa):
+  - Import read-only `detector_revisions as _server_…`,
+    `evidence_fingerprint as _current_…`, `source_artifact_fingerprint
+    as _current_source_…` (không đụng handler).
+  - `_completion_proves_full_coverage()` thêm `job_generation` +
+    `current_source_precomputed`; gate mở rộng: manifest schema exact
+    integer == RUN_QC (bool KHÔNG phải int); manifest policy id/hash
+    == current + completion == manifest; manifest evidence == current
+    (caller recompute bằng manifest generation) + completion ==
+    manifest; manifest generation non-empty str == job row generation +
+    completion == cả hai; CURRENT evidence RECOMPUTE bằng manifest
+    generation (pair đồng thuận generation sai vẫn fail); manifest
+    source (id/SHA) == persisted current source (None+empty cho
+    no-source hợp lệ, shape khác là corrupt) + completion == manifest;
+    revision VALUES == server-owned (live registry cho member known,
+    convention "1.0.0" cho member absent — forged value fail).
+  - `latest_check_run_state()`: recompute current evidence bằng manifest
+    generation cho envelope gate, nhưng stale/ready split giữ trên
+    caller-supplied current evidence (run cũ generation ⇒ STALE đúng
+    C1-A contract).
+  - `_source_identity_from_manifest()`: shape check đúng representation
+    producer (None+empty / real id+non-empty SHA), missing key ⇒ None.
+- Tests: job 127 (83 cũ + 44 C3-A1: schema×4+int, policy×2,
+  evidence×1, generation-pair×1, gen-type×3, field-matrix×24,
+  source×3+manifest×1, revision-value×1, valid no-source/real-source×2,
+  101-audio pressure×1) + api 16 (15 cũ + source-tamper HTTP
+  readiness not_run). 3 expectations cũ cập nhật đúng ngữ nghĩa C3
+  (evidence-moved pair-intact ⇒ stale — fail-closed giữ nguyên).
+- Gate: job+api **143 passed** (basetemp `%TEMP%/s11c3a1_gate`,
+  163.02s, `env -u MOTIONFORGE_DATABASE_URL`, `-p no:cacheprovider`);
+  micro C3-A1 44 passed; `ruff check --select F` clean; mypy retained
+  scope (`qc_check_runs.py --follow-imports=skip`) Success; `git diff
+  --check` clean; forbidden-scan clean.
+- Postimage: `qc_check_runs.py` `9dcbe7c5d13b23a0` 39256B 893L; job
+  tests `a96935de51c1ae94` 90817B 2177L; api tests `3c6842a545279c71`
+  34385B 836L.
+- Commit (local only): xem `REPORT.md` §10.

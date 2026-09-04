@@ -42,7 +42,10 @@ from app.workflow.qc_checks_handler import (
     JOB_TYPE_RUN_QC_CHECKS,
     RUN_QC_SCHEMA_VERSION,
     SCOPE_FULL,
+    detector_revisions as _server_detector_revisions,
+    evidence_fingerprint as _current_evidence_fingerprint,
     scope_fingerprint,
+    source_artifact_fingerprint as _current_source_fingerprint,
 )
 
 #: The binding FULL-scope detector band (server-owned): 8 visual checks +
@@ -95,7 +98,9 @@ def full_coverage_detectors() -> list[str]:
 
 def full_scope_fingerprint() -> str:
     """Content-derived identity the FULL scope fingerprint must equal."""
-    return scope_fingerprint(SCOPE_FULL)
+    fp = scope_fingerprint(SCOPE_FULL)
+    assert isinstance(fp, str)
+    return fp
 
 
 #: Durable run states the authority can report (closed set).
@@ -237,6 +242,34 @@ def _manifest_scope_fingerprint(manifest: Any) -> str:
     return ""
 
 
+def _source_identity_from_manifest(
+    manifest: dict[str, Any],
+) -> tuple[Any, Any] | None:
+    """The manifest's recorded source identity, or ``None`` when corrupt.
+
+    The producer (``submit_run_qc_checks``) writes ``source_artifact_id``
+    (``None`` for the legitimate no-source case, else the artifact id)
+    paired with ``source_sha256`` (empty for no-source, else the recorded
+    SHA).  A manifest whose fields disagree with that representation —
+    ``None`` id with non-empty SHA, or a real id with an empty/non-string
+    SHA — is corrupt, NOT defaulted.  A missing id key stays missing
+    (``None`` is returned, never a filled default).
+    """
+    if "source_artifact_id" not in manifest:
+        return None
+    artifact_id = manifest.get("source_artifact_id")
+    sha = manifest.get("source_sha256")
+    if artifact_id is None:
+        if sha != "":
+            return None
+        return (None, "")
+    if not isinstance(artifact_id, str) or not artifact_id:
+        return None
+    if not isinstance(sha, str) or not sha:
+        return None
+    return (artifact_id, sha)
+
+
 def _completion_proves_full_coverage(
     completion: dict[str, Any],
     *,
@@ -244,6 +277,8 @@ def _completion_proves_full_coverage(
     evidence_fingerprint: str,
     policy_id: str,
     policy_content_hash: str,
+    job_generation: str,
+    current_source_precomputed: tuple[Any, Any],
 ) -> tuple[bool, str]:
     """Whether a completion block proves the binding FULL-scope coverage.
 
@@ -254,18 +289,44 @@ def _completion_proves_full_coverage(
       1. completion ``schema_version`` PRESENT and == the RUN_QC_CHECKS
          schema version (exact; no coercion);
       2. completion ``job_type`` PRESENT and == RUN_QC_CHECKS (exact);
-      3. manifest scope PRESENT and == ``full`` (the server-owned band);
-      4. manifest scope fingerprint PRESENT and == the content-derived
+      3. MANIFEST ``schema_version`` PRESENT, exact JSON integer (bool is
+         NOT an integer), and == the RUN_QC_CHECKS schema version;
+      4. manifest scope PRESENT and == ``full`` (the server-owned band);
+      5. manifest scope fingerprint PRESENT and == the content-derived
          FULL fingerprint (the submitted band was the full band);
-      5. completion scope + scope fingerprint PRESENT and equal to the
+      6. completion scope + scope fingerprint PRESENT and equal to the
          manifest's values (the envelope the handler wrote matches the
          submitted band — verbatim, not re-derived);
-      6. completion evidence fingerprint PRESENT and == the CURRENT
-         video evidence fingerprint (tamper/stale fails);
-      7. completion policy id + content hash PRESENT and == the CURRENT
-         policy identity (tamper/drift fails);
-      8. completion source generation PRESENT (non-empty string) and ==
-         the manifest's source generation.
+      7. MANIFEST evidence fingerprint PRESENT and == the CURRENT video
+         evidence fingerprint (recomputed with the manifest's OWN
+         generation — a manifest pinned to a foreign/stale evidence
+         snapshot is not current);
+      8. completion evidence fingerprint PRESENT and == the manifest's
+         evidence fingerprint AND == the CURRENT video evidence
+         fingerprint (tamper/stale fails);
+      9. MANIFEST policy id + content hash PRESENT and == the CURRENT
+         policy identity (a manifest pinned to a foreign policy is not
+         current);
+     10. completion policy id + content hash PRESENT and == the
+         manifest's values AND == the CURRENT policy identity
+         (tamper/drift fails);
+     11. MANIFEST source generation PRESENT non-empty string and == the
+         Job's input_generation (the generation the row was submitted
+         under — a manifest that disagrees with its own row is corrupt);
+     12. completion source generation PRESENT (non-empty string) and ==
+         the manifest's source generation AND == the Job row generation;
+     13. the CURRENT evidence fingerprint is RECOMPUTED with the
+         manifest's own generation before comparison, so a manifest +
+         completion pair that agree with each other on a WRONG generation
+         still fail against the recomputed current evidence;
+     14. MANIFEST source artifact id/SHA match the persisted CURRENT
+         source identity (same representation the producer writes: a
+         ``None`` id pairs with an empty SHA for the legitimate no-source
+         case; a non-None id requires a non-empty SHA — no default
+         launders a missing/corrupt source);
+     15. completion source artifact id + fingerprint PRESENT and ==
+         the manifest's values AND == the CURRENT source identity (id-only
+         or SHA-only tamper fails);
 
     COUNTS — the run really executed the whole band, cleanly:
       9. summary is a dict AND ``checks_requested`` / ``checks_run`` /
@@ -300,6 +361,21 @@ def _completion_proves_full_coverage(
             "completion job_type is not RUN_QC_CHECKS "
             "(missing/foreign/corrupt envelope)"
         )
+    # C3-A1 item 1: the MANIFEST's schema_version must be PRESENT, an
+    # exact JSON integer (``bool`` is not an integer — ``isinstance(True,
+    # int)`` would otherwise launder a bool into authority), and exactly
+    # the RUN_QC_CHECKS schema version.
+    manifest_schema = manifest.get("schema_version")
+    if (
+        isinstance(manifest_schema, bool)
+        or not isinstance(manifest_schema, int)
+        or manifest_schema != RUN_QC_SCHEMA_VERSION
+    ):
+        return False, (
+            f"manifest schema_version {manifest_schema!r} is not the exact "
+            "RUN_QC_CHECKS schema integer (missing/null/bool/string/wrong "
+            "integer envelope)"
+        )
     manifest_scope = manifest.get("scope")
     if manifest_scope != SCOPE_FULL:
         return False, (
@@ -325,24 +401,47 @@ def _completion_proves_full_coverage(
             "completion scope fingerprint does not match the manifest's "
             "scope fingerprint (completion/manifest fingerprint mismatch)"
         )
-    completion_evidence_fp = completion.get("evidence_fingerprint")
-    if completion_evidence_fp != evidence_fingerprint:
+    # C3-A1 items 9–10: the MANIFEST's policy identity must be PRESENT
+    # and == the CURRENT server policy (a manifest pinned to a foreign
+    # policy is never current — the completion alone cannot vouch for it).
+    manifest_policy_id = manifest.get("policy_id")
+    if manifest_policy_id != policy_id:
         return False, (
-            "completion evidence fingerprint does not match the current "
-            "video evidence fingerprint (tamper/stale envelope)"
+            f"manifest policy id {manifest_policy_id!r} does not match the "
+            "current policy identity (foreign/stale manifest envelope)"
         )
-    if completion.get("policy_id") != policy_id:
+    manifest_policy_hash = manifest.get("policy_content_hash")
+    if manifest_policy_hash != policy_content_hash:
         return False, (
-            "completion policy id does not match the current policy "
-            "identity (tamper/drift envelope)"
+            "manifest policy content hash does not match the current "
+            "policy identity (foreign/stale manifest envelope)"
         )
-    if completion.get("policy_content_hash") != policy_content_hash:
+    if completion.get("policy_id") != manifest_policy_id:
         return False, (
-            "completion policy content hash does not match the current "
-            "policy identity (tamper/drift envelope)"
+            "completion policy id does not match the manifest's policy id "
+            "(tamper/drift envelope)"
+        )
+    if completion.get("policy_content_hash") != manifest_policy_hash:
+        return False, (
+            "completion policy content hash does not match the manifest's "
+            "policy hash (tamper/drift envelope)"
+        )
+    # C3-A1 items 11–12: the MANIFEST's generation must be a PRESENT
+    # non-empty string == the Job row's input_generation; the completion
+    # generation must equal BOTH (a pair agreeing on a wrong generation
+    # is caught by the recomputed-current-evidence check below).
+    manifest_generation = manifest.get("source_generation")
+    if (
+        not isinstance(manifest_generation, str)
+        or not manifest_generation
+        or manifest_generation != job_generation
+    ):
+        return False, (
+            f"manifest source generation {manifest_generation!r} does not "
+            f"match the job row generation {job_generation!r} "
+            "(missing/empty/corrupt manifest envelope)"
         )
     completion_generation = completion.get("source_generation")
-    manifest_generation = manifest.get("source_generation")
     if (
         not isinstance(completion_generation, str)
         or not completion_generation
@@ -351,6 +450,21 @@ def _completion_proves_full_coverage(
         return False, (
             "completion source generation does not match the manifest's "
             "source generation (missing/empty/mismatched envelope)"
+        )
+    # C3-A1 items 7–8: the MANIFEST's evidence fingerprint must be
+    # PRESENT and == the CURRENT evidence (the caller recomputes it with
+    # the manifest's OWN generation — see latest_check_run_state).
+    manifest_evidence_fp = manifest.get("evidence_fingerprint")
+    if manifest_evidence_fp != evidence_fingerprint:
+        return False, (
+            "manifest evidence fingerprint does not match the current "
+            "video evidence fingerprint (foreign/stale manifest envelope)"
+        )
+    completion_evidence_fp = completion.get("evidence_fingerprint")
+    if completion_evidence_fp != manifest_evidence_fp:
+        return False, (
+            "completion evidence fingerprint does not match the manifest's "
+            "evidence fingerprint (tamper/stale envelope)"
         )
 
     # — counts: PRESENT exact JSON numbers, then exact band arithmetic —
@@ -437,6 +551,63 @@ def _completion_proves_full_coverage(
             "completion detector revisions are empty for "
             f"{empty_revisions} (cannot prove coverage)"
         )
+    # C3-A1 item 6: the revision VALUES must equal the server-owned
+    # detector revisions for the binding band — non-empty alone is not
+    # enough (a forged map with plausible non-empty values fails here).
+    # Server-known members are compared against the live registry; for
+    # members ABSENT from the registry (other lanes own their
+    # registrations), the seed/producer convention "1.0.0" is the
+    # authoritative expectation — anything else is a forged value.
+    # (The two audio members ARE registered in this module's fixture, so
+    # forged audio values still hit the live-registry leg.)
+    try:
+        expected_revisions = _server_detector_revisions(list(band))
+    except Exception:
+        expected_revisions = {}
+    wrong_revisions = sorted(
+        name
+        for name in band
+        if (
+            revisions.get(name)
+            != expected_revisions.get(name, "1.0.0")
+        )
+    )
+    if wrong_revisions:
+        return False, (
+            "completion detector revisions do not match the server-owned "
+            f"detector revisions for {wrong_revisions} (forged revision "
+            "values cannot prove coverage)"
+        )
+    # C3-A1 items 14–15: source artifact identity — manifest vs persisted
+    # CURRENT source, then completion vs manifest+current.  The producer
+    # writes ``None`` id + empty SHA for the legitimate no-source case
+    # and a real id + non-empty SHA when a source artifact exists; any
+    # missing/corrupt shape (present-but-None id with non-empty SHA, or
+    # vice versa) fails.  No default ever fills these fields.
+    current_source = current_source_precomputed
+    manifest_source = _source_identity_from_manifest(manifest)
+    if manifest_source is None:
+        return False, (
+            "manifest source artifact identity is missing/corrupt "
+            "(source_artifact_id must pair with source SHA exactly as the "
+            "producer writes: None id + empty SHA for no-source, real id "
+            "+ non-empty SHA otherwise)"
+        )
+    if manifest_source != current_source:
+        return False, (
+            f"manifest source artifact identity {manifest_source!r} does "
+            f"not match the current persisted source {current_source!r} "
+            "(foreign/stale source envelope)"
+        )
+    completion_source_id = completion.get("source_artifact_id")
+    completion_source_sha = completion.get("source_artifact_fingerprint")
+    completion_source = (completion_source_id, completion_source_sha)
+    if completion_source != manifest_source:
+        return False, (
+            f"completion source artifact identity {completion_source!r} "
+            f"does not match the manifest's source {manifest_source!r} "
+            "(id-only or SHA-only tamper fails)"
+        )
     return True, ""
 
 
@@ -494,6 +665,38 @@ def latest_check_run_state(
     policy = load_policy()
     current_policy_id = str(policy.get("policy_id") or POLICY_ID)
     current_policy_hash = str(policy.get("content_hash") or "")
+    # C3-A1 item 4/13: the CURRENT evidence is recomputed with the
+    # MANIFEST's OWN generation — a manifest+completion pair agreeing on
+    # a WRONG generation still fails against the recomputed current
+    # evidence (the pair only matches each other, never current).
+    #
+    # The envelope gate receives the recomputed-with-manifest-generation
+    # current evidence, but the stale/ready split below (evidence_matches)
+    # is evaluated against the CALLER-supplied current evidence: a run
+    # whose manifest pins an older generation is STALE for the caller,
+    # never ready.
+    manifest_generation_raw = manifest.get("source_generation")
+    manifest_generation_for_fp = (
+        manifest_generation_raw
+        if isinstance(manifest_generation_raw, str)
+        and manifest_generation_raw
+        else "1"
+    )
+    evidence_fingerprint_envelope = _current_evidence_fingerprint(
+        session,
+        workspace_id=workspace_id,
+        video_item_id=video_item_id,
+        generation=manifest_generation_for_fp,
+    )
+    # C3-A1 item 5/14: the persisted CURRENT source identity (same shape
+    # the producer writes — ``None`` id + empty SHA for no-source).
+    current_source = _current_source_fingerprint(
+        session, video_item_id=video_item_id
+    )
+    current_source_pair = (
+        current_source.get("source_artifact_id"),
+        current_source.get("source_sha256"),
+    )
     run_fp = manifest.get("evidence_fingerprint")
     run_policy_hash = manifest.get("policy_content_hash")
     evidence_matches = run_fp == evidence_fingerprint
@@ -535,9 +738,11 @@ def latest_check_run_state(
         coverage_ok, coverage_reason = _completion_proves_full_coverage(
             completion,
             manifest=manifest,
-            evidence_fingerprint=evidence_fingerprint,
+            evidence_fingerprint=evidence_fingerprint_envelope,
             policy_id=current_policy_id,
             policy_content_hash=current_policy_hash,
+            job_generation=str(job.input_generation or ""),
+            current_source_precomputed=current_source_pair,
         )
         if not coverage_ok:
             return CheckRunState(

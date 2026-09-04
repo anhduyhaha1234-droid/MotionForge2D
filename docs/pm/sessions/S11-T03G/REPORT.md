@@ -123,3 +123,25 @@ Forbidden verified: `git status --porcelain` chỉ 8 file allowlist + docs; `mod
   `d5d97d7f9ff9f1e4` 28376B 683L.
 - Commit local trên `codex/s11/t03g-0903w8`:
   `a7f75b7` (C2-A1, parent `c9d5453` merged canonical).
+
+## 10. S11-C3-A1 correction (exact authority identity)
+
+- Trigger: C3 đóng 8 mục identity chính xác (manifest schema/policy/
+  evidence/generation/source + completion revisions exact + giữ C2 +
+  giữ mypy fix `e7e9242`).
+- Fix: envelope gate mở rộng (manifest schema exact-int; manifest
+  policy/evidence/generation/source vs current + completion vs
+  manifest; recompute current evidence bằng manifest generation;
+  revision values vs server-owned); stale/ready split giữ
+  caller-supplied current (C1-A contract).
+- Gate: job 127 + api 16 = **143 passed** (basetemp
+  `%TEMP%/s11c3a1_gate`, 163.02s, `env -u
+  MOTIONFORGE_DATABASE_URL`, `-p no:cacheprovider`); micro C3-A1 44
+  passed; ruff F clean; mypy retained scope Success; diff-check
+  clean; forbidden-scan clean.
+- Evidence: `docs/pm/sessions/S11-T03G/evidence/c3a1_preimage.txt`.
+- Postimage: `qc_check_runs.py` `9dcbe7c5d13b23a0` 39256B 893L; job
+  tests `a96935de51c1ae94` 90817B 2177L; api tests `3c6842a545279c71`
+  34385B 836L.
+- Commit local trên `codex/s11/t03g-0903w8`: `b0a334d`
+  (C3-A1, parent `e7e9242`).
