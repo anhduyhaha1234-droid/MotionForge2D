@@ -278,3 +278,14 @@ Owner cần xử lý: T03G (nới gate cho run hợp lệ) hoặc T06C (seed run
   [4] MYPY 3 files **Success: no issues found** — GREEN.
 - Git-only, KHONG sua implementation/test bytes. KHONG push.
 - **TASK_SUBMITTED — S11-INT01 C4 MERGE verified, candidate 80bd36a gate GREEN het.** exit.
+
+## 16. S11-C4-R1 FF-only recovery 8c42a32 — BLOCKED_MERGE (divergent)
+
+- Preflight: pwd s11-integration, HEAD `8f5af06`, remote `8f5af06` (local==remote), porcelain 0.
+- Tip verified: `8c42a32` (parent 5449d13, C4-R1 recovery T03G) — chi merge tip nay.
+- Fetch: 1 ref pre-existing hong (turn-diffs captures base, ngoai scope) nhung objects du local.
+- FF check: HEAD NOT ancestor cua 8c42a32; 8c42a32 NOT in HEAD → divergent.
+- `git merge --ff-only 8c42a32` → fatal exit 128 "Not possible to fast-forward, aborting".
+  Cay giu sach: HEAD van `8f5af06`, porcelain 0. KHONG rebase / KHONG resolve tay / KHONG no-ff tu y.
+- **BLOCKED_MERGE — can Manager quyet (no-ff authorized hoac recovery owner rebase).**
+  Commit docs nay, KHONG push.

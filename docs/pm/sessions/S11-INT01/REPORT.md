@@ -137,3 +137,9 @@ readiness not_run thay vì blocked/completed. Lane T06C gốc verify GREEN trư�
 - Gates: diff-check GREEN; T03G **143/143**; ruff GREEN; mypy 3 files Success.
 - Raw: `s11-c4/manager/raw/int01-c4-gate.txt`. KHONG push.
 - Status: TASK_SUBMITTED.
+
+## 17. S11-C4-R1 FF-only 8c42a32 — BLOCKED_MERGE
+
+- FF-only exit 128 (divergent, abort sach). Cay giu `8f5af06`, porcelain 0.
+- Can Manager authorize no-ff hoac recovery owner xu ly. KHONG push.
+- Status: BLOCKED_MERGE.
