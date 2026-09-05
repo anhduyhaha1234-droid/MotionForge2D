@@ -143,3 +143,8 @@ readiness not_run thay vì blocked/completed. Lane T06C gốc verify GREEN trư�
 - FF-only exit 128 (divergent, abort sach). Cay giu `8f5af06`, porcelain 0.
 - Can Manager authorize no-ff hoac recovery owner xu ly. KHONG push.
 - Status: BLOCKED_MERGE.
+
+## 18. S11-C4-R1 no-ff 8c42a32 — TASK_SUBMITTED
+
+- Merge no-ff T03G `8c42a32` → `b5306a3`, zero conflict. Gates: ruff GREEN; diff-check GREEN.
+- Status: TASK_SUBMITTED. KHONG push.

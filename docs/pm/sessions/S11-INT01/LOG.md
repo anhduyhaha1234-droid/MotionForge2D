@@ -289,3 +289,14 @@ Owner cần xử lý: T03G (nới gate cho run hợp lệ) hoặc T06C (seed run
   Cay giu sach: HEAD van `8f5af06`, porcelain 0. KHONG rebase / KHONG resolve tay / KHONG no-ff tu y.
 - **BLOCKED_MERGE — can Manager quyet (no-ff authorized hoac recovery owner rebase).**
   Commit docs nay, KHONG push.
+
+## 17. S11-C4-R1 no-ff 8c42a32 (authorized) — TASK_SUBMITTED
+
+- Preflight: pwd s11-integration, HEAD `c7c6aaa`, remote `8f5af06` (local ahead 1 docs commit INT01, KHONG drift), porcelain 0.
+- Tip verified: `8c42a32` (parent 5449d13, C4-R1 bootstrap snapshot+rollback + authority matrix +3 legs).
+- FF-only da BLOCKED_MERGE exit 128 (divergent) — Manager authorize no-ff (KHONG rebase/force/resolve tay).
+- Merge: `git merge --no-ff 8c42a32 -m "Merge T03G-C4-R1 8c42a32 ..."` (exit 0) —
+  5 files 366 ins / 36 del (qc_checks_handler +136, new test_s11_t03g_qc_check_c4r1.py 173, job tests +80, T03G LOG/REPORT).
+  Zero conflict, porcelain 0. → HEAD `b5306a320f81a38824afcf9ea394944688643868`.
+- Gates: ruff --select F 3 files **All checks passed**; diff --check 7751598..HEAD exit 0 — GREEN.
+- Git-only. Commit docs nay, local only KHONG push. exit.
