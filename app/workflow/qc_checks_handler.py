@@ -247,8 +247,18 @@ def detector_revisions(detectors: Sequence[str]) -> dict[str, str]:
 
 # ── C4-A: deterministic production detector bootstrap ───────────────────────
 
+#: C4-R2: process-wide re-entrant lock serializing the WHOLE bootstrap
+#: transaction (snapshot→imports→pre-existing checks→explicit
+#: registrations→post-verify→rollback).  Per-dict-op locking is
+#: insufficient: detector imports self-register at module level, so two
+#: live threads racing bootstrap could interleave import side effects
+#: with explicit registrations / post-verify / rollback and leave a
+#: partial registry.  ``threading.RLock`` (re-entrant) so nested or
+#: repeated bootstrap calls from the same thread never deadlock.
+_BOOTSTRAP_LOCK = threading.RLock()
 
-def ensure_full_band_registered() -> dict[str, str]:
+
+def _ensure_full_band_registered_locked() -> dict[str, str]:
     """Register the binding FULL band in the process registry (idempotent).
 
     A clean production process starts with an EMPTY detector registry (no
@@ -480,6 +490,66 @@ def ensure_full_band_registered() -> dict[str, str]:
             },
         )
     return revisions
+
+
+def _bootstrap_snapshot() -> list[tuple[str, str, str, str]]:
+    """Module-level FULL snapshot helper (mirrors the inner snapshot)."""
+    snap: list[tuple[str, str, str, str]] = []
+    for _name in registry.names():
+        _spec = registry.get(_name)
+        snap.append(
+            (_name, _spec.entry_point, _spec.version, _spec.description)
+        )
+    return snap
+
+
+def _bootstrap_restore(
+    snap: list[tuple[str, str, str, str]],
+) -> None:
+    """Module-level exact restore helper (mirrors the inner restore)."""
+    for _name in registry.names():
+        registry.unregister(_name)
+    for _name, _entry, _version, _desc in snap:
+        registry.register(
+            _name, _entry, version=_version, description=_desc
+        )
+
+
+def ensure_full_band_registered() -> dict[str, str]:
+    """Public bootstrap entry: whole transaction under the process lock.
+
+    C4-R2 rows 1-3: serializes the ENTIRE bootstrap transaction
+    (snapshot→imports→pre-existing checks→explicit registrations→
+    post-verify→rollback) on ``_BOOTSTRAP_LOCK``; ANY ordinary Python
+    exception escaping the inner bootstrap restores the COMPLETE
+    pre-call snapshot before a stable
+    ``RunQcChecksError(QC_RUN_BOOTSTRAP_CONFLICT)`` escapes (original
+    exception kept as ``__cause__`` with truthful details);
+    ``KeyboardInterrupt``/``SystemExit`` policy: rollback STILL runs,
+    then the original is re-raised unwrapped (never converted, never
+    swallowed) so cancellation semantics are preserved.
+    """
+    with _BOOTSTRAP_LOCK:
+        pre_call = _bootstrap_snapshot()
+        try:
+            return _ensure_full_band_registered_locked()
+        except (KeyboardInterrupt, SystemExit):
+            _bootstrap_restore(pre_call)
+            raise
+        except RunQcChecksError:
+            _bootstrap_restore(pre_call)
+            raise
+        except Exception as exc:
+            _bootstrap_restore(pre_call)
+            raise RunQcChecksError(
+                QC_RUN_BOOTSTRAP_CONFLICT,
+                "detector bootstrap hit an unexpected failure "
+                f"({type(exc).__name__}: {exc})",
+                details={
+                    "error_type": type(exc).__name__,
+                    "error_message": str(exc),
+                },
+            ) from exc
 
 
 # ── completion block ─────────────────────────────────────────────────────────
