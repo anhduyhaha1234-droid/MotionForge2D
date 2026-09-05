@@ -194,3 +194,14 @@ Forbidden verified: `git status --porcelain` chỉ 8 file allowlist + docs; `mod
 - Durable: 3 new subprocess tests (import-fail, explicit-fail, two-live-thread contested) in `tests/test_s11_t03g_qc_check_c4r1.py`.
 - Gate: c4r1 5 passed + job 130 + api 16 = **151 passed**; ruff F clean; mypy handler Success; diff-check clean; guard VERIFIED.
 - Commit (local only): xem SHA sau commit.
+
+## §13 — S11-C4-R3 true-contention correction (2026-09-06, sole owner, test-only)
+- Production FROZEN (no handler/registry/job-service bytes changed).
+- Two-thread payload rewritten: A inside production lock (entered/release
+  events), B observed blocked pre-release, one-shot poison, immediate
+  final four-field snapshot, no repair call.
+- New durable BaseException row: KI + SystemExit, exact restore, unwrapped
+  propagate, reconverge after asserts.
+- Gate: c4r1 6 passed + full matrix **152 passed** (168.87s); ruff F clean;
+  mypy handler Success; diff-check clean; guard VERIFIED.
+- Commit (local only): xem SHA sau commit.
