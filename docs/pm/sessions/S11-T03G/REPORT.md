@@ -187,3 +187,10 @@ Forbidden verified: `git status --porcelain` chỉ 8 file allowlist + docs; `mod
 - Authority: +3 legs (resolver-raises / two-audio-claiming-ten / revision-drift); order-dependence fixed.
 - Gate: 148 passed + ruff F clean + mypy scope Success + diff-check CLEAN.
 - Commit (local only): xem SHA sau commit.
+
+## §12 — S11-C4-R2 recovery (2026-09-05, single owner, §4 rows 1-8)
+- Mechanism: `_BOOTSTRAP_LOCK` (process-wide RLock) serializes the whole bootstrap transaction; ANY ordinary exception → FULL snapshot restore + stable `RunQcChecksError(QC_RUN_BOOTSTRAP_CONFLICT)` with `__cause__` preserved; KI/SystemExit → rollback then propagate unwrapped (documented + live-probed).
+- R1 preserved: ghost/entry-conflict/version-conflict/exact-ten/clean-process/idempotence unchanged; R1 test docstring narrowed to actual rows.
+- Durable: 3 new subprocess tests (import-fail, explicit-fail, two-live-thread contested) in `tests/test_s11_t03g_qc_check_c4r1.py`.
+- Gate: c4r1 5 passed + job 130 + api 16 = **151 passed**; ruff F clean; mypy handler Success; diff-check clean; guard VERIFIED.
+- Commit (local only): xem SHA sau commit.
