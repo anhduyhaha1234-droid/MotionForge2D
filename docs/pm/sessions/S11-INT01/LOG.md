@@ -300,3 +300,16 @@ Owner cần xử lý: T03G (nới gate cho run hợp lệ) hoặc T06C (seed run
   Zero conflict, porcelain 0. → HEAD `b5306a320f81a38824afcf9ea394944688643868`.
 - Gates: ruff --select F 3 files **All checks passed**; diff --check 7751598..HEAD exit 0 — GREEN.
 - Git-only. Commit docs nay, local only KHONG push. exit.
+
+## 18. S11-C4-R2 no-ff 938d759 — TASK_SUBMITTED
+
+- Preflight: pwd s11-integration, HEAD `e98ccd9`, porcelain 0, branch codex/s11-integration.
+- Tip verified: `938d759` (C4-R2: bootstrap lock + rollback + KI propagate + 3 durable tests),
+  ancestry YES (e98ccd9 ancestor), 4 files allowlist (handler +74, c4r1 test +261, T03G LOG/REPORT).
+- Fetch origin codex/s11/c4-r2: missing (local only, OK per Manager).
+- Merge: `git merge --no-ff 938d759 -m "Merge T03G-C4-R2 938d759 (bootstrap lock + rollback + KI propagate)"`
+  (exit 0) — 4 files 349 ins / 3 del. Zero conflict, porcelain 0.
+  → HEAD `8918f4a7cc2128990176c76f9bf6fc15dbad2709`.
+- Gates: `git log -2` ok; diff --check 7751598..HEAD exit 0 — GREEN;
+  ruff --select F handler+c4r1 test **All checks passed** — GREEN.
+- Local only KHONG push (Manager push sau). Commit docs nay, exit.

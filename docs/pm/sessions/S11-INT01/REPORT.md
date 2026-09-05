@@ -148,3 +148,8 @@ readiness not_run thay vì blocked/completed. Lane T06C gốc verify GREEN trư�
 
 - Merge no-ff T03G `8c42a32` → `b5306a3`, zero conflict. Gates: ruff GREEN; diff-check GREEN.
 - Status: TASK_SUBMITTED. KHONG push.
+
+## 19. S11-C4-R2 no-ff 938d759 — TASK_SUBMITTED
+
+- Merge no-ff T03G `938d759` → `8918f4a`, zero conflict. Gates: ruff GREEN; diff-check GREEN.
+- Local only KHONG push (Manager push sau). Status: TASK_SUBMITTED.
