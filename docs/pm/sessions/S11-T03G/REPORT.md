@@ -180,3 +180,10 @@ Forbidden verified: `git status --porcelain` chỉ 8 file allowlist + docs; `mod
   2174L; api tests `75ae5c391c509e4e612a64d2ee0b3463b0ac4cb4` 34455B 841L.
 - Commit local trên `codex/s11/t03g-0903w8`: xem SHA bên dưới (C4, parent
   `28a22072c27a9cd5d1e5eacca82bf9740ce3558c`).
+
+## §11 — S11-C4-R1 recovery (2026-09-05, writer exact lineage)
+- Bootstrap: FULL snapshot + restore mọi failure path + reject foreign + post-verify exact (set/order/revisions). Repros: ghost→reject+restore; entry-conflict→raise+restore; fixed→success 10 đúng order + idempotent.
+- Durable: `tests/test_s11_t03g_qc_check_c4r1.py` (2 subprocess tests, clean interpreter).
+- Authority: +3 legs (resolver-raises / two-audio-claiming-ten / revision-drift); order-dependence fixed.
+- Gate: 148 passed + ruff F clean + mypy scope Success + diff-check CLEAN.
+- Commit (local only): xem SHA sau commit.
