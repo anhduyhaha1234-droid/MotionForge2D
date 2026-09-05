@@ -276,7 +276,7 @@ print("C4R1-JSON:" + json.dumps(report))
 """
 
 _PAYLOAD_R2_TWO_THREAD = """\
-import json, sys, threading
+import json, sys, threading, time
 from pathlib import Path
 ROOT = Path(%(root)r)
 sys.path.insert(0, str(ROOT))
@@ -285,6 +285,7 @@ from app.workflow import qc_checks_handler as handler
 from app.workflow.qc_checks_handler import (
     SCOPE_FULL, ensure_full_band_registered, scope_detectors,
 )
+import app.services.qc_checks.contact_break as contact_break_mod
 
 
 def snap4():
@@ -298,65 +299,145 @@ def snap4():
 band = scope_detectors(SCOPE_FULL)
 for n in list(registry.names()):
     registry.unregister(n)
-# Contested bootstrap: the main thread seeds a foreign ghost, then two live
-# threads race at the barrier.  The failer must lose with a stable
-# BOOTSTRAP_CONFLICT (its stale rollback restores ONLY its pre-call
-# snapshot); the succeeder waits for the failure event, removes the ghost,
-# and converges to the exact ordered ten-band.  Joins are bounded and raw
-# outcomes are captured.
-registry.register(
-    "r2_ghost",
-    "app.services.qc_checks.audio_missing:detect",
-    version="9.9.9",
-    description="r2-race-ghost",
-)
+# R3 true contention: caller A enters the REAL production
+# explicit-registration operation while holding _BOOTSTRAP_LOCK, signals
+# `entered`, then pauses on a bounded release event.  The pause is injected
+# by monkeypatching contact_break.register -- the patched function runs
+# INSIDE the production critical section (unregister+register leg), not
+# before the bootstrap call.
+entered = threading.Event()
+release = threading.Event()
+real_cb_register = contact_break_mod.register
 report = {}
-barrier = threading.Barrier(2)
-f_failed = threading.Event()
+pre = snap4()
 outcomes = {}
 
-def failer():
-    barrier.wait(timeout=10)
+def paused_cb(**kwargs):
+    entered.set()
+    got_release = release.wait(timeout=30)
+    outcomes["a_release_wait"] = bool(got_release)
+    spec = real_cb_register(**kwargs)
+    # One-shot poison: restore the real register so caller B (which the
+    # lock serializes AFTER A's full exit) bootstraps cleanly.
+    contact_break_mod.register = real_cb_register
+    raise RuntimeError("r3-true-contention-boom")
+
+def caller_a():
     try:
         ensure_full_band_registered()
-        outcomes["failer"] = {"ok": True}
+        outcomes["a"] = {"ok": True}
     except Exception as exc:
-        outcomes["failer"] = {"ok": False, "type": type(exc).__name__,
-                              "code": getattr(exc, "code", None),
-                              "restored_ghost": (
-                                  list(registry.names()) == ["r2_ghost"])}
+        outcomes["a"] = {"ok": False, "type": type(exc).__name__,
+                         "code": getattr(exc, "code", None)}
+        cause = exc.__cause__
+        outcomes["a"]["cause"] = (
+            type(cause).__name__ if cause is not None else None)
+        outcomes["a"]["cause_msg"] = (
+            str(cause) if cause is not None else None)
 
-def succeeder():
-    barrier.wait(timeout=10)
-    f_failed.wait(timeout=30)
-    registry.unregister("r2_ghost")
+def caller_b():
     try:
         revs = ensure_full_band_registered()
-        outcomes["succeeder"] = {"ok": True, "revs": len(revs)}
+        outcomes["b"] = {"ok": True, "revs": len(revs)}
     except Exception as exc:
-        outcomes["succeeder"] = {"ok": False, "type": type(exc).__name__,
-                                 "code": getattr(exc, "code", None)}
+        outcomes["b"] = {"ok": False, "type": type(exc).__name__,
+                         "code": getattr(exc, "code", None)}
 
-def failer_wrapped():
-    try:
-        failer()
-    finally:
-        f_failed.set()
-
-ta = threading.Thread(target=failer_wrapped)
-tb = threading.Thread(target=succeeder)
+contact_break_mod.register = paused_cb
+ta = threading.Thread(target=caller_a)
 ta.start()
+report["entered_wait"] = entered.wait(timeout=30)
+# Start caller B while A is paused INSIDE the production lock.
+tb = threading.Thread(target=caller_b)
 tb.start()
+# Bounded observation window: B must have started but NOT returned while A
+# holds the production lock.
+deadline = time.monotonic() + 5.0
+while "b" in outcomes and time.monotonic() < deadline:
+    time.sleep(0.05)
+time.sleep(1.0)
+report["b_blocked_before_release"] = ("b" not in outcomes) and tb.is_alive()
+report["a_alive_before_release"] = ta.is_alive()
+release.set()
+# Join A FIRST: the lock guarantees B cannot enter the critical section
+# until A has fully exited (failure + stale rollback to the empty
+# pre-call snapshot).  B then bootstraps cleanly on the empty registry
+# and converges to the exact ten-band -- no repair call anywhere.
 ta.join(timeout=60)
 tb.join(timeout=60)
 report["a_alive"] = ta.is_alive()
 report["b_alive"] = tb.is_alive()
 report["outcomes"] = outcomes
-# One succeeder path: a clean retry converges to the exact ordered ten-band.
-revs = ensure_full_band_registered()
+contact_break_mod.register = real_cb_register
+# IMMEDIATE final four-field snapshot/order -- NO post-thread repair call.
+report["pre"] = pre
+report["final_snap"] = snap4()
+report["final_names"] = list(registry.names())
 report["final_names_eq_band"] = list(registry.names()) == band
 report["final_count"] = len(registry.names())
-report["revs_ok"] = all(isinstance(v, str) and v for v in revs.values())
+print("C4R1-JSON:" + json.dumps(report))
+"""
+
+_PAYLOAD_R3_BASEEXC = """\
+import json, sys
+from pathlib import Path
+ROOT = Path(%(root)r)
+sys.path.insert(0, str(ROOT))
+from app.services.qc_checks.registry import registry
+from app.workflow.qc_checks_handler import (
+    SCOPE_FULL, ensure_full_band_registered, scope_detectors,
+)
+import app.services.qc_checks.contact_break as contact_break_mod
+
+
+def snap4():
+    return [
+        (n, registry.get(n).entry_point, registry.get(n).version,
+         registry.get(n).description)
+        for n in registry.names()
+    ]
+
+
+band = scope_detectors(SCOPE_FULL)
+report = {}
+real_cb_register = contact_break_mod.register
+for kind, exc_factory in (
+    ("ki", KeyboardInterrupt),
+    ("se", SystemExit),
+):
+    for n in list(registry.names()):
+        registry.unregister(n)
+    ensure_full_band_registered()
+    pre = snap4()
+    marker = "r3-baseexc-" + kind + "-boom"
+
+    def poisoned_cb(exc_factory=exc_factory, marker=marker, **kwargs):
+        real_cb_register(**kwargs)
+        raise exc_factory(marker)
+
+    contact_break_mod.register = poisoned_cb
+    row = {}
+    try:
+        ensure_full_band_registered()
+        row["outcome"] = "UNEXPECTED_SUCCESS"
+    except BaseException as exc:
+        row["outcome"] = type(exc).__name__
+        row["message"] = str(exc)
+        row["is_ki"] = isinstance(exc, KeyboardInterrupt)
+        row["is_se"] = isinstance(exc, SystemExit)
+        row["is_runqc"] = type(exc).__name__ == "RunQcChecksError"
+    finally:
+        contact_break_mod.register = real_cb_register
+    row["restored"] = snap4() == pre
+    row["pre_len"] = len(pre)
+    report[kind] = row
+    # Clean reconverge ONLY after the failure assertions are recorded.
+    for n in list(registry.names()):
+        registry.unregister(n)
+    revs = ensure_full_band_registered()
+    row["reconverge_names_eq_band"] = list(registry.names()) == band
+    row["reconverge_count"] = len(registry.names())
+    row["revs_ok"] = all(isinstance(v, str) and v for v in revs.values())
 print("C4R1-JSON:" + json.dumps(report))
 """
 
@@ -415,18 +496,58 @@ def test_c4r2_explicit_registration_side_effect_rolls_back() -> None:
 
 
 def test_c4r2_two_live_threads_contested_bootstrap_converges() -> None:
-    """Two live threads at contested bootstrap converge to ten-band (row 7)."""
+    """True contention INSIDE the production lock converges (R3 rewrite)."""
     report = _run_payload(_PAYLOAD_R2_TWO_THREAD)
+    assert report["entered_wait"] is True, report
+    assert report["b_blocked_before_release"] is True, report
+    assert report["a_alive_before_release"] is True, report
     assert report["a_alive"] is False, report
     assert report["b_alive"] is False, report
-    assert set(report["outcomes"]) == {"failer", "succeeder"}, report
-    failer = report["outcomes"]["failer"]
-    succeeder = report["outcomes"]["succeeder"]
-    assert failer["ok"] is False, report
-    assert failer["type"] == "RunQcChecksError", report
-    assert failer["code"] == "QC_RUN_BOOTSTRAP_CONFLICT", report
-    assert succeeder["ok"] is True, report
-    assert succeeder["revs"] == 10, report
+    assert set(report["outcomes"]) == {"a", "b", "a_release_wait"}, report
+    assert report["outcomes"]["a_release_wait"] is True, report
+    caller_a = report["outcomes"]["a"]
+    caller_b = report["outcomes"]["b"]
+    assert caller_a["ok"] is False, report
+    assert caller_a["type"] == "RunQcChecksError", report
+    assert caller_a["code"] == "QC_RUN_BOOTSTRAP_CONFLICT", report
+    assert caller_a["cause"] == "RuntimeError", report
+    assert "r3-true-contention-boom" in (caller_a["cause_msg"] or ""), report
+    assert caller_b["ok"] is True, report
+    assert caller_b["revs"] == 10, report
+    assert report["pre"] == [], report
     assert report["final_names_eq_band"] is True, report
     assert report["final_count"] == 10, report
-    assert report["revs_ok"] is True, report
+    assert [row[0] for row in report["final_snap"]] == report["final_names"], (
+        report
+    )
+    assert all(
+        isinstance(row[1], str) and row[1]
+        and isinstance(row[2], str) and row[2]
+        and isinstance(row[3], str)
+        for row in report["final_snap"]
+    ), report
+
+
+def test_c4r3_baseexception_rollback_and_propagate() -> None:
+    """KI + SystemExit: exact snapshot restore, unwrapped propagate (R3)."""
+    report = _run_payload(_PAYLOAD_R3_BASEEXC)
+    ki = report["ki"]
+    assert ki["outcome"] == "KeyboardInterrupt", report
+    assert ki["is_ki"] is True, report
+    assert ki["is_runqc"] is False, report
+    assert "r3-baseexc-ki-boom" in (ki["message"] or ""), report
+    assert ki["restored"] is True, report
+    assert ki["pre_len"] == 10, report
+    assert ki["reconverge_names_eq_band"] is True, report
+    assert ki["reconverge_count"] == 10, report
+    assert ki["revs_ok"] is True, report
+    se = report["se"]
+    assert se["outcome"] == "SystemExit", report
+    assert se["is_se"] is True, report
+    assert se["is_runqc"] is False, report
+    assert "r3-baseexc-se-boom" in (se["message"] or ""), report
+    assert se["restored"] is True, report
+    assert se["pre_len"] == 10, report
+    assert se["reconverge_names_eq_band"] is True, report
+    assert se["reconverge_count"] == 10, report
+    assert se["revs_ok"] is True, report

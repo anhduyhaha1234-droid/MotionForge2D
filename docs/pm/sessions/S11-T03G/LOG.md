@@ -263,3 +263,25 @@ Forbidden không đụng: models.py, migrations/**, detector modules, thresholds
 - Row 8: R1 test docstring now names the covered rows ("Ghost plus the two conflicting-identity rows restore pre-call state") instead of "every conflict".
 - Gate: c4r1 file 5 passed (5.26s) + job 130 + api 16 = 151 passed; ruff `--select F` clean; mypy handler Success; `git diff --check` clean; guard VERIFIED (4 entries, 0 failures).
 - Commit (local only): xem `REPORT.md` §12.
+
+## 2026-09-06 — S11-C4-R3 true-contention correction (sole owner, test-only)
+- Rereview verdict: production mechanism CORRECT/FROZEN; committed two-thread
+  test was SEQUENTIAL (B waited `f_failed` until A fully returned) + repair
+  call before final asserts. Fix = test file ONLY, no production bytes.
+- New two-thread payload: caller A pauses INSIDE the production
+  explicit-registration op (monkeypatched `contact_break.register` signals
+  `entered`, waits bounded `release`); caller B starts while A holds
+  `_BOOTSTRAP_LOCK`; asserted B blocked (started, not returned, thread
+  alive) before release; A fails via one-shot `RuntimeError` →
+  `RunQcChecksError`/`QC_RUN_BOOTSTRAP_CONFLICT` with cause; poison
+  self-restores so B bootstraps clean to exactly 10 revisions; IMMEDIATE
+  final four-field snapshot/order asserted with NO repair call.
+- New `test_c4r3_baseexception_rollback_and_propagate`: one durable
+  subprocess test covering BOTH `KeyboardInterrupt` and `SystemExit` —
+  side effect inside explicit registration → exact 10-entry snapshot
+  restored → original type/message unwrapped → clean reconverge only after
+  failure asserts.
+- Gate: c4r1 module 6 passed; 3-module matrix 152 passed (168.87s);
+  ruff `--select F` clean; mypy handler Success; `git diff --check` clean;
+  guard VERIFIED (4 entries, 0 failures).
+- Commit (local only): xem `REPORT.md` §13.
