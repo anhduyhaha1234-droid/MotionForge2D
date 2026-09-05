@@ -247,3 +247,9 @@ Forbidden không đụng: models.py, migrations/**, detector modules, thresholds
   32507B 727L; job tests `735ee4fa3d48ba4d78da176f4cbf85508f580fc0` 90626B
   2174L; api tests `75ae5c391c509e4e612a64d2ee0b3463b0ac4cb4` 34455B 841L.
 - Commit (local only): xem `REPORT.md` §10.
+
+## 2026-09-05 — S11-C4-R1 recovery (writer session, exact lineage 20260905_043139_01a91f)
+- P1 finding 1 (bootstrap snapshot/rollback): repro confirmed ghost→success-11 + conflict→partial-7-poisoned. Fixed `ensure_full_band_registered()`: FULL pre-call snapshot of ENTIRE registry; EVERY failure path restores exact snapshot (import conflict, band drift, pre-existing entry/version conflict, foreign entry, explicit-registration failure, post-verify mismatch); foreign non-band entries rejected (name-based, never entry-string match); post-verify demands exact equality (set+order+revisions).
+- P1 finding 2 (durable clean-process): new `tests/test_s11_t03g_qc_check_c4r1.py` — fresh interpreter, empty registry, only ordinary app imports, real JobService over fresh Alembic-head DB asserts exact 10-band; rollback matrix (ghost/entry-conflict/version-conflict → RunQcChecksError + exact restore; clean → exact + idempotent).
+- P1 finding 3 (authority matrix): 3 new legs in job module — resolver-raises→failed+not_run(unresolvable); two-audio-only registry claiming ten→failed+not_run; server revision drift→stale completion failed, restore→completed. Fixed order-dependence in the 2 registry-mutating tests (finally restores via ensure_full_band_registered, victim fixed to audio_missing).
+- Gate: 148 passed (130 job + 16 api + 2 c4r1, 274.06s) + ruff --select F All checks passed + mypy binding scope Success + git diff --check CLEAN.

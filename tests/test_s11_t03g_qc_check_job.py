@@ -2105,6 +2105,86 @@ def test_c3a1_manifest_source_foreign_fails_closed(
     assert _readiness(session_factory, video_id).status == "not_run"
 
 
+def test_c4r1_resolver_raises_is_failed_not_run_fail_closed(
+    session_factory, svc: JobService, monkeypatch
+) -> None:
+    """C4-R1 authority leg: the server revision resolver raising (any
+    member unresolvable) is authority-unavailable — failed + not_run
+    with a truthful detail, never a substituted revision."""
+    import app.persistence.qc_check_runs as _runs
+
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    _seed_full_job(session_factory, video_id=video_id)
+
+    def _boom(_detectors):
+        raise RuntimeError("c4r1-simulated-resolver-outage")
+
+    monkeypatch.setattr(_runs, "_server_detector_revisions", _boom)
+    try:
+        state = _full_state(session_factory, video_id)
+        assert state.run_state == "failed"
+        assert "unresolvable" in state.check_state_detail
+        assert _readiness(session_factory, video_id).status == "not_run"
+    finally:
+        monkeypatch.undo()
+
+
+def test_c4r1_two_audio_only_registry_cannot_bless_ten_claim(
+
+    session_factory, svc: JobService
+) -> None:
+    """C4-R1 authority leg: a registry holding ONLY the 2 audio members
+    cannot bless a completion claiming the full ten — an incomplete
+    authority view fails closed (failed + not_run)."""
+    from app.services.qc_checks.registry import registry
+
+    try:
+        for n in list(registry.names()):
+            registry.unregister(n)
+        ensure_full_band_registered()
+        for n in list(registry.names()):
+            if n not in ("audio_missing", "av_sync_drift"):
+                registry.unregister(n)
+        video_id = seed_ws_project(session_factory(), video_id=None)
+        _seed_full_job(session_factory, video_id=video_id)
+        state = _full_state(session_factory, video_id)
+        assert state.run_state == "failed"
+        assert "unresolvable" in state.check_state_detail
+        assert _readiness(session_factory, video_id).status == "not_run"
+    finally:
+        for n in list(registry.names()):
+            registry.unregister(n)
+        ensure_full_band_registered()
+
+
+def test_c4r1_server_revision_drift_invalidates_stale_completion(
+    session_factory, svc: JobService
+) -> None:
+    """C4-R1 authority leg: when the server revision moves after the
+    completion was written, the stale completion fails against the
+    CURRENT server revisions (no replay of old authority)."""
+    from app.services.qc_checks.registry import registry
+
+    video_id = seed_ws_project(session_factory(), video_id=None)
+    _seed_full_job(session_factory, video_id=video_id)
+    assert _full_state(session_factory, video_id).run_state == "completed"
+    victim = "audio_missing"
+    spec = registry.get(victim)
+    try:
+        # Same name + same entry, drifted version: registry refresh is
+        # identity-idempotent, so no unregister is needed and no foreign
+        # name is ever created.
+        registry.register(spec.name, spec.entry_point, version="0.0.0-drift")
+        state = _full_state(session_factory, video_id)
+        assert state.run_state == "failed"
+        assert "revision" in state.check_state_detail
+        assert _readiness(session_factory, video_id).status == "not_run"
+    finally:
+        registry.unregister(victim)
+        registry.register(spec.name, spec.entry_point, version=spec.version)
+    assert _full_state(session_factory, video_id).run_state == "completed"
+
+
 def test_c3a1_detector_revision_wrong_value_fails_closed(
     session_factory, svc: JobService
 ) -> None:

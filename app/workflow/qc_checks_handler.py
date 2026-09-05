@@ -263,28 +263,47 @@ def ensure_full_band_registered() -> dict[str, str]:
     comes from the detector modules' own constants (never hard-coded
     here, never a test-only shim).
 
-    Fail-closed: a pre-existing registration whose entry point or revision
-    differs from the owning module's constants raises ``RunQcChecksError``
-    with code ``QC_RUN_BOOTSTRAP_CONFLICT`` BEFORE any state is touched
-    (the registry is snapshotted before the detector imports run, because
-    those imports carry registration side effects that would otherwise
-    launder a conflicting identity); a post-bootstrap registry whose
-    revision map differs from the modules' constants raises the same code
-    (the T03A registry only conflicts on entry points, so the revision leg
-    is verified here).  Calling twice is a no-op returning the same
-    revision map.
+    Fail-closed with FULL rollback: the ENTIRE pre-call registry (every
+    name with its entry point, version and description) is snapshotted
+    before any state is touched, and EVERY failure path — conflicting
+    pre-existing identity, import-time conflict, explicit-registration
+    failure, post-bootstrap mismatch, foreign (non-band) entries — restores
+    that snapshot exactly and raises ``RunQcChecksError`` with code
+    ``QC_RUN_BOOTSTRAP_CONFLICT`` (the registry only conflicts on entry
+    points, so the revision leg is verified here).  Success requires the
+    post-bootstrap registry to equal the binding FULL band EXACTLY (same
+    set, same order, same revisions — a foreign ``ghost_detector`` entry
+    is rejected, never absorbed).  Calling twice is a no-op returning the
+    same revision map.
     """
     band = list(SCOPE_BANDS[SCOPE_FULL])
-    # Snapshot BEFORE importing: detector imports self-register at module
-    # level, which would overwrite (launder) a conflicting pre-existing
-    # version before any check could see it.
-    pre_existing: dict[str, tuple[str, str]] = {}
-    for _name in band:
-        try:
+    # C4-R1: FULL pre-call snapshot of the ENTIRE registry (every name,
+    # not just band members).  Detector imports self-register at module
+    # level — they would overwrite (launder) a conflicting pre-existing
+    # identity before any check could see it — so every failure path below
+    # restores this snapshot exactly (same set, same order, same
+    # entry/version/description per name).
+    def _snapshot() -> list[tuple[str, str, str, str]]:
+        snap: list[tuple[str, str, str, str]] = []
+        for _name in registry.names():
             _spec = registry.get(_name)
-        except QcRegistryError:
-            continue  # absent — the register leg below fills it
-        pre_existing[_name] = (_spec.entry_point, _spec.version)
+            snap.append(
+                (_name, _spec.entry_point, _spec.version, _spec.description)
+            )
+        return snap
+
+    def _restore(snap: list[tuple[str, str, str, str]]) -> None:
+        for _name in registry.names():
+            registry.unregister(_name)
+        for _name, _entry, _version, _desc in snap:
+            registry.register(
+                _name, _entry, version=_version, description=_desc
+            )
+
+    pre_call = _snapshot()
+    pre_existing = {
+        _name: (_entry, _version) for _name, _entry, _version, _ in pre_call
+    }
     try:
         from app.services.qc_checks import (  # noqa: E402  (bootstrap imports)
             audio_missing,
@@ -299,6 +318,7 @@ def ensure_full_band_registered() -> dict[str, str]:
             z_order_error,
         )
     except QcRegistryError as exc:
+        _restore(pre_call)
         raise RunQcChecksError(
             QC_RUN_BOOTSTRAP_CONFLICT,
             "detector bootstrap hit a conflicting registry identity "
@@ -348,6 +368,7 @@ def ensure_full_band_registered() -> dict[str, str]:
         ),
     }
     if sorted(expected) != sorted(band):
+        _restore(pre_call)
         raise RunQcChecksError(
             QC_RUN_BOOTSTRAP_CONFLICT,
             "bootstrap binding drifted from the frozen FULL band "
@@ -357,10 +378,14 @@ def ensure_full_band_registered() -> dict[str, str]:
     # Pre-check on the PRE-IMPORT snapshot: a conflicting registration that
     # existed before the detector imports ran fails closed even when the
     # import side effect already overwrote (laundered) the live entry.
+    # The live registry is restored BEFORE raising, so a conflict never
+    # leaves a partial or poisoned registry behind (a retry sees the exact
+    # pre-call state, never laundered entries).
     for name in band:
         entry_point, version = expected[name]
         snap = pre_existing.get(name)
         if snap is not None and (snap[0] != entry_point or snap[1] != version):
+            _restore(pre_call)
             raise RunQcChecksError(
                 QC_RUN_BOOTSTRAP_CONFLICT,
                 f"detector {name!r} already registered with a conflicting "
@@ -374,38 +399,77 @@ def ensure_full_band_registered() -> dict[str, str]:
                     "binding_version": version,
                 },
             )
+    # A foreign (non-band) pre-existing entry is NOT part of the binding
+    # band: absorbing it would silently widen the production detector
+    # surface, so it fails closed with the snapshot restored.  Only names
+    # (not entry-point strings) participate — an entry point that merely
+    # MENTIONS a band module path is still a foreign registration name and
+    # is judged by its own name.
+    _band_names = set(band)
+    foreign = [name for name in pre_existing if name not in _band_names]
+    if foreign:
+        _restore(pre_call)
+        raise RunQcChecksError(
+            QC_RUN_BOOTSTRAP_CONFLICT,
+            "detector registry holds foreign entries outside the binding "
+            f"FULL band ({sorted(foreign)}); refusing to absorb unknown "
+            "detectors into the production band",
+            details={"foreign": sorted(foreign), "band": band},
+        )
     # Importing the seven self-registering modules above already registered
     # them (module-level identity-idempotent side effect); the three
     # explicit modules need their register() call.  The registry keeps
     # FIRST-insertion order, so a registry pre-populated by earlier imports
     # (any subset, any order) is re-seated into exact band order:
-    # unregister + re-register of the SAME identity is contract-safe, and
-    # the pre-check above already rejected every conflicting identity.
+    # unregister plus re-register of the SAME identity is contract-safe,
+    # and the pre-check above already rejected every conflicting identity.
     _EXPLICIT = {
         "contact_break": contact_break.register,
         "z_order_error": z_order_error.register,
         "silhouette_clipping": silhouette_clipping.register,
     }
-    for name in band:
-        if name in _EXPLICIT:
-            registry.unregister(name)
-            _EXPLICIT[name]()
-    if [name for name in registry.names() if name in set(band)] != band:
+    try:
         for name in band:
-            registry.unregister(name)
-        for name in band:
-            entry_point, version = expected[name]
-            register_fn = _EXPLICIT.get(name)
-            if register_fn is not None:
-                register_fn()
-            else:
-                registry.register(name, entry_point, version=version)
+            if name in _EXPLICIT:
+                registry.unregister(name)
+                _EXPLICIT[name]()
+        if [name for name in registry.names() if name in set(band)] != band:
+            for name in band:
+                registry.unregister(name)
+            for name in band:
+                entry_point, version = expected[name]
+                register_fn = _EXPLICIT.get(name)
+                if register_fn is not None:
+                    register_fn()
+                else:
+                    registry.register(name, entry_point, version=version)
+    except QcRegistryError as exc:
+        _restore(pre_call)
+        raise RunQcChecksError(
+            QC_RUN_BOOTSTRAP_CONFLICT,
+            "detector bootstrap failed during explicit registration "
+            f"({exc.code}: {exc.message})",
+            details={
+                "registry_code": exc.code,
+                "registry_message": exc.message,
+            },
+        ) from exc
     # Post-verify: namespace, order and revision map must equal the binding.
     names = registry.names()
-    revisions = detector_revisions(band)
-    if [n for n in names if n in set(band)] != band or any(
+    try:
+        revisions = detector_revisions(band)
+    except QcRegistryError as exc:
+        _restore(pre_call)
+        raise RunQcChecksError(
+            QC_RUN_BOOTSTRAP_CONFLICT,
+            "post-bootstrap registry does not equal the binding FULL band "
+            f"({exc.code}: {exc.message})",
+            details={"band": band, "registered": names},
+        ) from exc
+    if names != band or any(
         revisions[name] != expected[name][1] for name in band
     ):
+        _restore(pre_call)
         raise RunQcChecksError(
             QC_RUN_BOOTSTRAP_CONFLICT,
             "post-bootstrap registry does not equal the binding FULL band",
