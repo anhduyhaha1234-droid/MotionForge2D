@@ -159,3 +159,8 @@ readiness not_run thay vì blocked/completed. Lane T06C gốc verify GREEN trư�
 - Merge no-ff T03G `d9c439b` → `67b4acf`, zero conflict (parents 11dd50a + d9c439b).
 - Gates: diff-check GREEN; ruff GREEN; T03G matrix **152/152**.
 - Raw: `s11-c4/manager/raw/int01-c4r3-gate.txt`. KHONG push. Status: TASK_SUBMITTED.
+
+## 21. S11-C4-R4 no-ff 7c58c37 + PUSH — TASK_SUBMITTED
+
+- Merge no-ff T03G `7c58c37` → `7e474d4`, zero conflict (parents 4f2c787 + 7c58c37).
+- Worker correction Manager-verified (test-only, prod frozen). KHONG sua tay.

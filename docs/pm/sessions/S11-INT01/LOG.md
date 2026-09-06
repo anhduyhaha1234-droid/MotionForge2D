@@ -329,3 +329,14 @@ Owner cần xử lý: T03G (nới gate cho run hợp lệ) hoặc T06C (seed run
   [2] RUFF 4 binding paths **All checks passed** — GREEN;
   [3] T03G matrix **152 passed, 169.22s** fresh root — GREEN.
 - Local only KHONG push. Commit docs nay, exit.
+
+## 20. S11-C4-R4 no-ff 7c58c37 + docs + PUSH — TASK_SUBMITTED
+
+- Preflight: pwd s11-integration, HEAD `4f2c787`, remote `4f2c787` (local==remote), porcelain 0.
+- Tip verified: `7c58c37` (parent d9c439b, C4-R4 lock-boundary probe + revision-map equality),
+  test-only 3 files (c4r1 test 120±, T03G LOG/REPORT), Manager-verified, KHONG sua tay.
+- Merge: `git merge --no-ff 7c58c37 -m "Merge T03G-C4-R4 7c58c37 ..."` (exit 0) —
+  3 files 100 ins / 39 del. Zero conflict, porcelain 0.
+  → HEAD `7e474d44a5da8b59cd19b0a09a7f63fdfdbcd60b`
+  (parents `4f2c787` + `7c58c37`).
+- Docs commit nay, sau do push non-force (Manager-authorized ONE push). Local only cho toi push.
