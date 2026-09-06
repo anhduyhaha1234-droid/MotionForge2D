@@ -285,3 +285,15 @@ Forbidden không đụng: models.py, migrations/**, detector modules, thresholds
   ruff `--select F` clean; mypy handler Success; `git diff --check` clean;
   guard VERIFIED (4 entries, 0 failures).
 - Commit (local only): xem `REPORT.md` §13.
+
+## 2026-09-06 — S11-C4-R4 lock-boundary probe correction (sole owner, test-only)
+- R4: `LockProbe` context-manager delegates to the ORIGINAL real RLock and
+  signals `b_lock_attempted` only for the named B thread immediately before
+  delegating; bounded-wait proves B reached the lock-acquire boundary while
+  A still owns the real lock; assert B not-returned + live pre-release.
+- Expected clean revision map + exact ordered four-field snapshot derived
+  BEFORE clearing for the race; B returns COMPLETE dict asserted equal
+  (not only length); immediate final snapshot == expected, names == band.
+- `finally` releases events + restores lock/register on every failure path.
+- Gate: c4r1 6 passed; ruff F clean; diff-check clean; guard VERIFIED.
+- Commit (local only): xem `REPORT.md` §14.
