@@ -276,7 +276,7 @@ print("C4R1-JSON:" + json.dumps(report))
 """
 
 _PAYLOAD_R2_TWO_THREAD = """\
-import json, sys, threading, time
+import json, sys, threading
 from pathlib import Path
 ROOT = Path(%(root)r)
 sys.path.insert(0, str(ROOT))
@@ -297,20 +297,45 @@ def snap4():
 
 
 band = scope_detectors(SCOPE_FULL)
+# R4 step 5: derive/capture the exact expected clean revision map + exact
+# ordered four-field snapshot BEFORE clearing the registry for the race.
 for n in list(registry.names()):
     registry.unregister(n)
-# R3 true contention: caller A enters the REAL production
-# explicit-registration operation while holding _BOOTSTRAP_LOCK, signals
-# `entered`, then pauses on a bounded release event.  The pause is injected
-# by monkeypatching contact_break.register -- the patched function runs
-# INSIDE the production critical section (unregister+register leg), not
-# before the bootstrap call.
+expected_revs = ensure_full_band_registered()
+expected_snap = snap4()
+assert list(expected_revs) == band
+assert [row[0] for row in expected_snap] == band
+assert len(expected_revs) == 10
+for n in list(registry.names()):
+    registry.unregister(n)
+# R4: caller A stays paused INSIDE the real explicit-registration operation
+# while the real production _BOOTSTRAP_LOCK RLock is held.  The pause is
+# injected by monkeypatching contact_break.register -- the patched function
+# runs INSIDE the production critical section, not before the call.
 entered = threading.Event()
 release = threading.Event()
+b_lock_attempted = threading.Event()
+b_tid = {}
 real_cb_register = contact_break_mod.register
+real_lock = handler._BOOTSTRAP_LOCK
 report = {}
 pre = snap4()
 outcomes = {}
+
+
+class LockProbe:
+    # R4 step 2: delegating context-manager probe.  Signals
+    # `b_lock_attempted` only for the named B thread immediately before
+    # delegating acquire/release to the ORIGINAL real RLock.
+
+    def __enter__(self):
+        if threading.get_ident() == b_tid.get("id"):
+            b_lock_attempted.set()
+        return real_lock.__enter__()
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        return real_lock.__exit__(exc_type, exc_value, traceback)
+
 
 def paused_cb(**kwargs):
     entered.set()
@@ -321,6 +346,7 @@ def paused_cb(**kwargs):
     # lock serializes AFTER A's full exit) bootstraps cleanly.
     contact_break_mod.register = real_cb_register
     raise RuntimeError("r3-true-contention-boom")
+
 
 def caller_a():
     try:
@@ -335,46 +361,56 @@ def caller_a():
         outcomes["a"]["cause_msg"] = (
             str(cause) if cause is not None else None)
 
+
 def caller_b():
+    b_tid["id"] = threading.get_ident()
     try:
         revs = ensure_full_band_registered()
-        outcomes["b"] = {"ok": True, "revs": len(revs)}
+        outcomes["b"] = {"ok": True, "revs": dict(revs)}
     except Exception as exc:
         outcomes["b"] = {"ok": False, "type": type(exc).__name__,
                          "code": getattr(exc, "code", None)}
 
+
 contact_break_mod.register = paused_cb
-ta = threading.Thread(target=caller_a)
-ta.start()
-report["entered_wait"] = entered.wait(timeout=30)
-# Start caller B while A is paused INSIDE the production lock.
-tb = threading.Thread(target=caller_b)
-tb.start()
-# Bounded observation window: B must have started but NOT returned while A
-# holds the production lock.
-deadline = time.monotonic() + 5.0
-while "b" in outcomes and time.monotonic() < deadline:
-    time.sleep(0.05)
-time.sleep(1.0)
-report["b_blocked_before_release"] = ("b" not in outcomes) and tb.is_alive()
-report["a_alive_before_release"] = ta.is_alive()
-release.set()
-# Join A FIRST: the lock guarantees B cannot enter the critical section
-# until A has fully exited (failure + stale rollback to the empty
-# pre-call snapshot).  B then bootstraps cleanly on the empty registry
-# and converges to the exact ten-band -- no repair call anywhere.
-ta.join(timeout=60)
-tb.join(timeout=60)
-report["a_alive"] = ta.is_alive()
-report["b_alive"] = tb.is_alive()
+handler._BOOTSTRAP_LOCK = LockProbe()
+try:
+    ta = threading.Thread(target=caller_a)
+    ta.start()
+    report["entered_wait"] = entered.wait(timeout=30)
+    # Start caller B while A is paused INSIDE the production lock.
+    tb = threading.Thread(target=caller_b)
+    tb.start()
+    # R4 step 3: bounded-wait for PROOF B reached the lock-acquire boundary
+    # (probe fires immediately before delegating to the real RLock).  A
+    # fixed sleep, Thread.is_alive() alone, or a pre-bootstrap marker is
+    # NOT proof -- only this probe event is.
+    report["b_lock_attempted_wait"] = b_lock_attempted.wait(timeout=30)
+    # While A still owns the real lock, B must not have returned and must
+    # still be live.  Recorded BEFORE releasing A.
+    report["b_blocked_before_release"] = (
+        report["b_lock_attempted_wait"]
+        and ("b" not in outcomes) and tb.is_alive())
+    report["a_alive_before_release"] = ta.is_alive()
+    release.set()
+    ta.join(timeout=60)
+    tb.join(timeout=60)
+    report["a_alive"] = ta.is_alive()
+    report["b_alive"] = tb.is_alive()
+finally:
+    # R4 step 4: every failure path releases events and restores patches.
+    release.set()
+    handler._BOOTSTRAP_LOCK = real_lock
+    contact_break_mod.register = real_cb_register
 report["outcomes"] = outcomes
-contact_break_mod.register = real_cb_register
-# IMMEDIATE final four-field snapshot/order -- NO post-thread repair call.
+# R4 steps 5-7: expected clean state + IMMEDIATE final four-field
+# snapshot/order -- NO post-thread repair/bootstrap/cleanup call.
+report["expected_revs"] = expected_revs
+report["expected_snap"] = expected_snap
+report["band"] = band
 report["pre"] = pre
 report["final_snap"] = snap4()
 report["final_names"] = list(registry.names())
-report["final_names_eq_band"] = list(registry.names()) == band
-report["final_count"] = len(registry.names())
 print("C4R1-JSON:" + json.dumps(report))
 """
 
@@ -496,9 +532,12 @@ def test_c4r2_explicit_registration_side_effect_rolls_back() -> None:
 
 
 def test_c4r2_two_live_threads_contested_bootstrap_converges() -> None:
-    """True contention INSIDE the production lock converges (R3 rewrite)."""
+    """True contention at the production lock boundary converges (R4)."""
     report = _run_payload(_PAYLOAD_R2_TWO_THREAD)
     assert report["entered_wait"] is True, report
+    # R4 step 3: proof B reached the lock-acquire boundary, then proof B
+    # was blocked while A still owned the real lock.
+    assert report["b_lock_attempted_wait"] is True, report
     assert report["b_blocked_before_release"] is True, report
     assert report["a_alive_before_release"] is True, report
     assert report["a_alive"] is False, report
@@ -513,10 +552,13 @@ def test_c4r2_two_live_threads_contested_bootstrap_converges() -> None:
     assert caller_a["cause"] == "RuntimeError", report
     assert "r3-true-contention-boom" in (caller_a["cause_msg"] or ""), report
     assert caller_b["ok"] is True, report
-    assert caller_b["revs"] == 10, report
+    # R4 step 6: B's COMPLETE revision dict equals the exact expected map.
+    assert caller_b["revs"] == report["expected_revs"], report
+    assert len(caller_b["revs"]) == 10, report
     assert report["pre"] == [], report
-    assert report["final_names_eq_band"] is True, report
-    assert report["final_count"] == 10, report
+    # R4 step 7: immediate final snapshot == expected, names == band order.
+    assert report["final_snap"] == report["expected_snap"], report
+    assert report["final_names"] == report["band"], report
     assert [row[0] for row in report["final_snap"]] == report["final_names"], (
         report
     )

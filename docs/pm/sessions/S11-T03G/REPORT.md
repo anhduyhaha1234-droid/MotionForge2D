@@ -205,3 +205,10 @@ Forbidden verified: `git status --porcelain` chỉ 8 file allowlist + docs; `mod
 - Gate: c4r1 6 passed + full matrix **152 passed** (168.87s); ruff F clean;
   mypy handler Success; diff-check clean; guard VERIFIED.
 - Commit (local only): xem SHA sau commit.
+
+## §14 — S11-C4-R4 lock-boundary probe correction (2026-09-06, sole owner)
+- Production FROZEN. Lock-acquire probe proves B at the boundary while A
+  owns the real RLock; full revision-dict equality; immediate snapshot ==
+  expected; `finally` restores on all paths. Node count unchanged (6/152).
+- Gate: c4r1 6 passed; ruff F clean; diff-check clean; guard VERIFIED.
+- Commit (local only): xem SHA sau commit.
