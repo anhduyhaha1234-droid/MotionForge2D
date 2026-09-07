@@ -44,6 +44,7 @@ from app.api.routes import (
     s09_demo_compare,
     s09_demo_loops,
     s10_full_apply,
+    s12_export_preflight,
     structural_evidence,
 )
 from app.api.security import (
@@ -194,6 +195,10 @@ app.include_router(s09_approval.router)
 # Additive, project-scoped; HTTP returns without performing full render
 # synchronously — the durable worker executes outside the request.
 app.include_router(s10_full_apply.router)
+
+
+# S12 export preflight (S12-T01) — POST-only verdict, never renders in request.
+app.include_router(s12_export_preflight.router)
 
 
 @app.get("/health")
