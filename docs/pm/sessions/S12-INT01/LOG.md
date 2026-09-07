@@ -1,0 +1,72 @@
+# S12-INT01 — Session LOG (Git-only integration owner, whole sprint)
+
+- Task ID: S12-INT01 (Manager acts as Git-only owner; no worker dispatch — contract §INT01: Git metadata + docs only, no hand-edit production/test).
+- Route: provider `muse` / `cmc/meta/muse-spark-1.3-contributor` / reasoning max / fallback OFF.
+- Worktree: `C:/Users/Admin/MotionForge2D-worktrees/s12-integration`, branch `codex/s12-integration`.
+- Evidence root: `C:/Users/Admin/MotionForge2D-evidence/s12/20260907-083200-s12-coding/` (REGISTRY.md + per-task packets).
+
+## 1. Pin ranges (exact, full SHA)
+
+Base = parent of T01 feat commit (`0d04673~1`); HEAD evolves bda893a → e60ec5f (T05-docs) → INT01-close (this packet).
+
+| # | Commit | Subject |
+|---|---|---|
+| 1 | 0d04673 | feat(s12-t01): export preflight frozen contract s12-export-v1 |
+| 2 | c375b87 | feat(s12-t04a): independent output validator over s12-export-v1 |
+| 3 | 0aedb22 | Merge S12-T04A c375b87 |
+| 4 | be1def0 | feat(s12-t02): spawn-probe capability detection + render profiles |
+| 5 | 2618e8f | Merge S12-T02 be1def0 |
+| 6 | fc6789f | feat(s12-t03a): durable export domain run-chunk-lease + claim-fence |
+| 7 | 0ab5765 | docs(s12-t03a): LOG + REPORT SHA record |
+| 8 | 584797c | Merge S12-T03A fc6789f |
+| 9 | 49fe2be | Merge S12-T03A docs 0ab5765 |
+| 10 | 6297869 | S12-T03B: chunk render, stitch, checkpoint resume (19 tests green) |
+| 11 | ec45da1 | Merge S12-T03B 6297869 |
+| 12 | 8f80fe3 | S12-T03C: durable job/API wiring + validated publication (15 tests) |
+| 13 | 16598ea | Merge S12-T03C 8f80fe3 |
+| 14 | 030553b | S12-T05: Export UI preflight-submit-status-cancel-retry-evidence real-API + E2E |
+| 15 | f2cdf0e | Merge S12-T05 030553b |
+| 16 | ddc5d05 | S12-T06A: Windows portable-beta packaging harness |
+| 17 | 1c9cd07 | Merge S12-T06A ddc5d05 |
+| 18 | 48bf514 | S12-T06B: independent acceptance (F upscale + G resume) + hardware matrix |
+| 19 | bda893a | Merge S12-T06B 48bf514 |
+| 20 | 4a3630a | S12-T05: docs LOG + REPORT (E2E 15 passed, T03C 15/15, gates green) |
+| 21 | e60ec5f | Merge S12-T05 docs 4a3630a |
+| 22 | (this) | S12-INT01: sprint-close packet (LOG + REPORT + NEXT_REVIEW_PACKET) |
+
+Full-SHA pin list: `C:/Users/Admin/MotionForge2D-evidence/s12/20260907-083200-s12-coding/s12-int01/pin_ranges.txt` (21 rows pre-INT01).
+
+## 2. Merges (all Manager-executed, --no-ff, zero conflict)
+
+- W1 T01 ff-base; W2 T04A+T02+T03A merges `0aedb22`/`2618e8f`/`584797c`+`49fe2be`; W3 T03B `ec45da1`; W4 T03C `16598ea`; W5 T05 `f2cdf0e`; W6 T06A `1c9cd07`; W7 T06B `bda893a`; T05-docs correction `e60ec5f` (gap backfill, owner T05 — INT01 did not edit lane code).
+- Every merge: conflict-free, `git diff --check` 0, porcelain clean post-merge.
+
+## 3. Frozen-HEAD wave gates (exact commands, isolated basetemp, -p no:cacheprovider)
+
+| Gate | Result (real output) |
+|---|---|
+| W2 gate @ post-T03A HEAD | 99 passed / 52.13s |
+| W6 gate @ post-T06A HEAD | 133 passed + ruff clean |
+| FINAL @ `bda893a` | **144 passed, 1 skipped / 97.57s**, exit 0 |
+| `ruff check --select F app/ tests/s12/` | All checks passed |
+| Alembic heads | sole head `c3d4e5f6a7b8` |
+| `git diff --check` | 0 |
+| `app.main` import | APP_IMPORT_OK |
+| T01 re-run (post-close sanity) | 15 passed / 16.26s |
+| T06B Manager-independent @ WT | 11 passed, 1 skipped / 10.17s |
+| T06B zero-prod-touch | NONALLOW_COUNT 0 |
+
+## 4. Correction history (single-writer §4 respected)
+
+- T01 duplicate `...481996` FROZEN (kept `...186832`); T06A duplicate `...0c1e8a` STOPPED 22:21; T05 docs gap backfill by exact owner `...67a9b5` → `4a3630a`, merged `e60ec5f`. INT01 never edited lane production/test.
+
+## 5. Push / remote
+
+- `bda893a` pushed OK (`1c9cd07..bda893a`); `ls-remote` confirms remote == `bda893a` pre-docs-merge.
+- This INT01 commit → push → verify `ls-remote` == local HEAD (record SHA below in REPORT §6).
+
+## 6. Known non-gates (disclosed, not waived)
+
+- Mypy scope `s12_export`: 26 errors / 8 files (type-level only; runtime fully green). NOT an S12 gate; routed to Codex + owners.
+- Clean-machine: NOT_RUN (no clean VM; clean venv does not qualify). No beta-pass claim.
+- Finding F-OBS-01 → owner T01 (dims-only fallback in `classify_source_kind`; verifier read-only, repro in T06B LOG).
