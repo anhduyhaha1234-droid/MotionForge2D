@@ -502,7 +502,12 @@ class S12ExportRepository:
         result = cast("CursorResult[Any]", self._session.execute(stmt))
         if result.rowcount == 1:
             self._session.flush()
-            self._activate_run(run, expected="pending")
+            if run.status == "pending":
+                self._activate_run(run, expected="pending")
+            elif run.status != "running":  # pragma: no cover - defensive
+                raise S12ExportError(
+                    f"run {run_id} status {run.status!r} cannot accept a claim"
+                )
             run.revision += 1
             self._session.flush()
             return self.get_lease(run_id) or _lease_record(
@@ -560,6 +565,10 @@ class S12ExportRepository:
         self._session.flush()
         if run.status == "pending":
             self._activate_run(run, expected="pending")
+        elif run.status != "running":  # pragma: no cover - defensive
+            raise S12ExportError(
+                f"run {run_id} status {run.status!r} cannot accept a re-claim"
+            )
         run.revision += 1
         self._session.flush()
         return self.get_lease(run_id) or _lease_record(
