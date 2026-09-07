@@ -28,3 +28,10 @@ tests/s12/s12-t01/test_preflight_contract.py.
 PATCH: app/api/app.py (+5).
 
 ## TASK_SUBMITTED (transport checkpoint, local branch — không phải APPROVED)
+
+## C1 correction (W1)
+- F-OBS-01 closed: native label requires proved origin; already-upscaled-4K honesty.
+- C02 real capability probe (libx264/libx265 via ffmpeg); unavailable/failed encoder rejected with concrete reason.
+- C03 5 provenance cases; C04 T01-part current-authority cases with 0 runs/Jobs/outputs on every invalid path.
+- Tests: 31 passed (15 contract + 16 closure: C02 x5, C03 x6, C04 x5).
+- TASK_SUBMITTED (transport checkpoint, local branch — không phải APPROVED).

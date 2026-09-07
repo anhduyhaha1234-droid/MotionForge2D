@@ -38,8 +38,11 @@ video/project mismatch → 404); stale/param → 422.
 
 ## 3. Native 4K vs upscale (Scenario F)
 
-- Native 4K **only** when provenance says the source render is 4K **and**
-  source dims are 3840x2160. File size alone never decides.
+- Native 4K **only** when PROVED native origin (F-OBS-01): recorded
+  artifact sha256 + a matching full-apply checkpoint pin + ready 3840x2160
+  source with no .partial marker.  A 3840x2160 file of unproved origin
+  (e.g. already-upscaled) is `upscale_4k`.  Dims/file size alone never
+  decide; response carries `source_provenance: proved-native | unproven`.
 - Anything else targeting 4K is `upscale_4k` and must carry a labeled
   `upscale_method` (T02 provides the method; T01 marks it required).
 - Aspect: target DAR must match source DAR within 1% or the request must use
@@ -62,8 +65,10 @@ video/project mismatch → 404); stale/param → 422.
   | master-4k-hevc     | 3840x2160 | hevc  |
   | preview-1080p-h264 | 1920x1080 | h264  |
 
-  `supported` is **always false at T01** (basis string says T02 pending) —
-  T02 fills real encoder-probe results, never grep-only lists.
+  `supported` comes from the C02 real capability probe
+  (`probe_encoder_support`: ffmpeg binary + `-encoders` listing + 1-frame
+  CPU encode smoke, rc=0; failures never cached, never silent fallback).
+  T02 consumes the measured basis and refines estimates/methods.
 
 ## 5. Validation contract (T04A consumes)
 

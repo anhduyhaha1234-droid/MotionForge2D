@@ -60,3 +60,10 @@ T03G authority + S10 repo + structural-lock repo + QC policy bundle.
 - app.py bounded +5 (hash 7334f81b, 224 lines/9424 bytes).
 - Tests 15/15 pass (basetemp $TEMP/s12t01_i); ruff F clean; regression S10 15 + S11-readiness 9 pass.
 - Debug note: QC seed manifest source identity must pair producer-exact (None+empty iff no-source) else coverage-stale not_run.
+
+## C1 correction (W1)
+- F-OBS-01 fixed: classify_source_kind no longer labels 3840x2160 dims alone as native_4k; route proves native origin via artifact sha256 + matching checkpoint pin.
+- C02: probe_encoder_support (ffmpeg binary + -encoders + 1-frame smoke rc=0); failures never cached, no const flag, no silent fallback.
+- Response adds source_provenance (proved-native | unproven).
+- Fix test bug: _http_body now honors ckpt checkpoint_revision (was hard-coded 1, made stale-revision case vacuous).
+- Gates: 31 passed (basetemp $TEMP/s12t01_gate); ruff F clean; diff-check 0.
