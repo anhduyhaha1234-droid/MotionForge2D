@@ -48,3 +48,14 @@ PATCH: none (T01 files untouched, no app.py change — no new route).
 - `ResolvedProfile.as_export_fields()` khớp strict `ExportProfile` T01.
 
 ## TASK_SUBMITTED (transport checkpoint, local branch — không phải APPROVED)
+
+## C1 W2 correction (local, pending review)
+
+- Consume frozen T01-C1 (không redesign): PROFILE_ENCODERS mirror +
+  delegate `probe_encoder_support`; proved-native vs labeled-upscale honesty.
+- NEW `tests/s12/s12-t02/test_c1_closure.py` — 8 tests chứng minh T01/T03B
+  consume được (resolve→estimate→ExportProfile fields).
+- Gates: 35 passed + 1 skipped (1 test skip khi T01-C1 chưa merge vào cây);
+  ruff F clean; diff-check 0; porcelain = allowlist only.
+
+## TASK_SUBMITTED (transport checkpoint, local branch — không phải APPROVED)

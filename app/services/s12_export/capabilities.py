@@ -47,6 +47,9 @@ __all__ = [
     "detect_capabilities",
     "probe_encoder",
     "vram_sufficient_for_4k",
+    "profile_encoders",
+    "encoder_for_profile",
+    "probe_profile_support",
 ]
 
 #: Contract consumed (T01 owns it; T02 must not bump without Codex review).
@@ -291,3 +294,74 @@ def vram_sufficient_for_4k(report: CapabilityReport) -> tuple[bool, str]:
         f"vram_insufficient: free {report.gpu_free_mib}MiB < "
         f"{MIN_FREE_VRAM_MIB_4K}MiB heuristic for 4K — CPU fallback required"
     )
+
+
+#: C1 — frozen T01-C1 encoder-per-profile table mirror.  T01 owns
+#: ``PROFILE_ENCODERS`` in ``preflight.py``; this fallback keeps T02 working
+#: on pre-C1 trees and MUST equal the frozen table (closure test pins it).
+_FROZEN_PROFILE_ENCODERS_FALLBACK: dict[str, str] = {
+    "master-4k-h264": "libx264",
+    "master-4k-hevc": "libx265",
+    "preview-1080p-h264": "libx264",
+}
+
+
+def profile_encoders() -> dict[str, str]:
+    """Frozen encoder-per-profile table (T01-C1 owns; T02 consumes)."""
+    try:
+        from app.services.s12_export.preflight import PROFILE_ENCODERS
+
+        return dict(PROFILE_ENCODERS)
+    except Exception:
+        return dict(_FROZEN_PROFILE_ENCODERS_FALLBACK)
+
+
+def encoder_for_profile(profile_id: str) -> str | None:
+    """Encoder the frozen table names for one profile (None = unknown)."""
+    return profile_encoders().get(str(profile_id))
+
+
+def probe_profile_support(
+    profile_id: str,
+    work_dir: str | Path | None = None,
+    *,
+    timeout_s: float = PROBE_TIMEOUT_S,
+    runner: Callable[..., subprocess.CompletedProcess[str]] | None = None,
+) -> tuple[bool, str]:
+    """C1 consumption entry: ``(supported, basis)`` for one frozen profile.
+
+    Delegates to T01-C1 ``probe_encoder_support`` when present (no redesign
+    when the frozen interface suffices); otherwise spawn-probes the mapped
+    encoder directly.  Unknown profile → ``(False, reason)`` fail-closed.
+    """
+    pid = str(profile_id)
+    try:
+        from app.services.s12_export import preflight as _preflight
+
+        frozen_probe = getattr(_preflight, "probe_encoder_support", None)
+        if callable(frozen_probe):
+            ok, basis = frozen_probe(pid)
+            return bool(ok), f"T01-C1 probe: {basis}"
+    except Exception:
+        pass
+    encoder = encoder_for_profile(pid)
+    if encoder is None:
+        return False, f"unknown profile {pid!r} — fail-closed"
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg is None:
+        return False, "ffmpeg binary not found (capability unproven)"
+    import tempfile
+
+    if work_dir is None:
+        with tempfile.TemporaryDirectory(prefix="s12t02_prof_") as tmp:
+            probe = probe_encoder(ffmpeg, encoder, tmp,
+                                  timeout_s=timeout_s, runner=runner)
+    else:
+        probe = probe_encoder(ffmpeg, encoder, work_dir,
+                              timeout_s=timeout_s, runner=runner)
+    if probe.available:
+        return True, (
+            f"probed {encoder} via spawn encode "
+            f"({probe.output_bytes}B in {probe.elapsed_ms}ms)"
+        )
+    return False, f"{probe.reason}: {probe.detail}"

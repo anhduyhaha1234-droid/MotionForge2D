@@ -89,6 +89,7 @@ class ResolvedProfile:
     support_basis: str
     cpu_fallback_encoder: str | None = None
     reason: str = "S12_EXPORT_OK"
+    upscale_method: str | None = None  # C1: labeled method for upscale_4k
 
     def as_export_fields(self) -> dict[str, object]:
         return {
@@ -142,16 +143,39 @@ def resolve_profile(
     source_width: int | None = None,
     source_height: int | None = None,
     aspect_handling: str = "letterbox",
+    source_provenance: str = "unproven",
 ) -> ResolvedProfile:
-    """Resolve one frozen profile against a probed capability report."""
+    """Resolve one frozen profile against a probed capability report.
+
+    C1: ``source_provenance`` mirrors T01-C1 ``source_provenance``
+    (``proved-native | unproven``); a 4K target on unproven origin gets a
+    labeled ``upscale_method`` (never a silent native claim).
+    """
     spec = RENDER_PROFILES.get(profile_id)
     if spec is None:
         return ResolvedProfile(profile_id, 0, 0, "h264", "cpu", None, False,
                                f"unknown profile {profile_id!r} — fail-closed",
-                               None, "S12_EXPORT_UNSUPPORTED_PROFILE")
+                               None, "S12_EXPORT_UNSUPPORTED_PROFILE", None)
     width = int(spec["width"])
     height = int(spec["height"])
     codec = str(spec["codec"])
+
+    # C1 — encoder must match the frozen T01-C1 PROFILE_ENCODERS table for
+    # this profile (guards silent encoder substitution; the table itself is
+    # pinned by the closure test).
+    from app.services.s12_export.capabilities import encoder_for_profile
+    frozen_encoder = encoder_for_profile(profile_id)
+
+    # Labeled upscale method for 4K targets on unproved origin (T01-C1
+    # honesty: dims alone never prove native).
+    upscale_method: str | None = None
+    if width >= 3840 and height >= 2160 and source_provenance != "proved-native":
+        upscale_method = f"labeled-upscale-{codec}-from-unproven-source"
+    if frozen_encoder is None:
+        return ResolvedProfile(
+            profile_id, width, height, codec, "cpu", None, False,
+            f"unknown profile {profile_id!r} — fail-closed",
+            None, "S12_EXPORT_UNSUPPORTED_PROFILE", upscale_method)
 
     aspect_ok, aspect_detail = _aspect_ok(profile_id, source_width,
                                          source_height, aspect_handling)
@@ -160,9 +184,14 @@ def resolve_profile(
         return ResolvedProfile(
             profile_id, width, height, codec, "cpu", None, False,
             f"aspect fail-closed: {aspect_detail}", cpu_fb,
-            "S12_EXPORT_ASPECT_MISMATCH")
+            "S12_EXPORT_ASPECT_MISMATCH", upscale_method)
 
     cpu_encoder = _cpu_encoder_for(codec, report)
+    # C1 encoder-consistency: the resolved encoder must be the frozen
+    # table's encoder for this profile — never a silent substitution.
+    if cpu_encoder is not None and frozen_encoder is not None:
+        assert cpu_encoder == frozen_encoder, (
+            f"encoder drift: {cpu_encoder} != frozen {frozen_encoder}")
 
     if prefer_gpu:
         gpu_encoder = _gpu_encoder_for(codec, report)
@@ -175,7 +204,8 @@ def resolve_profile(
                                    cpu_encoder, cpu_encoder is not None,
                                    basis, cpu_encoder,
                                    "S12_EXPORT_OK" if cpu_encoder else
-                                   "S12_EXPORT_UNSUPPORTED_PROFILE")
+                                   "S12_EXPORT_UNSUPPORTED_PROFILE",
+                                   upscale_method)
         vram_ok, vram_detail = vram_sufficient_for_4k(report)
         if not vram_ok:
             basis = (f"gpu {gpu_encoder} probe passed but {vram_detail}")
@@ -185,12 +215,13 @@ def resolve_profile(
                                    cpu_encoder, cpu_encoder is not None,
                                    basis, cpu_encoder,
                                    "S12_EXPORT_OK" if cpu_encoder else
-                                   "S12_EXPORT_UNSUPPORTED_PROFILE")
+                                   "S12_EXPORT_UNSUPPORTED_PROFILE",
+                                   upscale_method)
         gpu_name = report.gpu_name or "GPU"
         return ResolvedProfile(
             profile_id, width, height, codec, "gpu", gpu_encoder, True,
             f"gpu path: {gpu_encoder} probe-passed on {gpu_name}; {vram_detail}",
-            cpu_encoder, "S12_EXPORT_OK")
+            cpu_encoder, "S12_EXPORT_OK", upscale_method)
 
     # CPU path (default, always checked): H.264 baseline always resolves
     # here when libx264 probed usable.  The aspect verdict rides along in
@@ -200,7 +231,7 @@ def resolve_profile(
                   f"({codec} baseline); aspect: {aspect_detail}")
         return ResolvedProfile(profile_id, width, height, codec, "cpu",
                                cpu_encoder, True, detail, cpu_encoder,
-                               "S12_EXPORT_OK")
+                               "S12_EXPORT_OK", upscale_method)
     # No usable encoder for this codec at all — HEVC lands here when its
     # probe failed; the probe reason is preserved for T03 consumers.
     failed = [p for p in report.probes
@@ -210,7 +241,7 @@ def resolve_profile(
     return ResolvedProfile(
         profile_id, width, height, codec, "cpu", None, False,
         f"{cause}: {codec} has no probe-verified encoder ({detail})",
-        None, "S12_EXPORT_UNSUPPORTED_PROFILE")
+        None, "S12_EXPORT_UNSUPPORTED_PROFILE", upscale_method)
 
 
 def resolve_all_profiles(
@@ -220,12 +251,14 @@ def resolve_all_profiles(
     source_width: int | None = None,
     source_height: int | None = None,
     aspect_handling: str = "letterbox",
+    source_provenance: str = "unproven",
 ) -> dict[str, ResolvedProfile]:
     """Resolve every frozen profile (consumed by T03A scheduler)."""
     return {
         pid: resolve_profile(
             pid, report, prefer_gpu=prefer_gpu, source_width=source_width,
             source_height=source_height, aspect_handling=aspect_handling,
+            source_provenance=source_provenance,
         )
         for pid in RENDER_PROFILES
     }
