@@ -33,7 +33,11 @@ from app.schemas.s12_export import (
     ExportPreflightRequest,
     ExportPreflightResponse,
 )
-from app.services.s12_export.preflight import PreflightContext, evaluate_preflight
+from app.services.s12_export.preflight import (
+    PreflightContext,
+    evaluate_preflight,
+    probe_encoder_support,
+)
 
 router = APIRouter(prefix="/api/v2", tags=["s12-export-preflight"])
 
@@ -86,9 +90,10 @@ def post_export_preflight(
                 frame_count = None
     except (TypeError, ValueError, ZeroDivisionError):
         frame_count = None
-    native_4k = (
-        source_w == 3840 and source_h == 2160 and not source_partial and source_ready
-    )
+    # F-OBS-01: native_4k resolved AFTER the checkpoint block below (it
+    # needs the checkpoint pin facts as the native-origin authority).
+    _artifact_sha = str(getattr(artifact, "sha256", "") or "") if source_found else ""
+    native_4k = False
 
     # ── checkpoint pin facts (read-only row comparison) ─────────────
     s10 = S10ApplyRepository(session)
@@ -115,6 +120,24 @@ def post_export_preflight(
         raise
     except Exception:
         ckpt_found = False
+
+    # F-OBS-01: native label needs PROVED native origin — dims alone never
+    # suffice.  The server-owned native-origin authority T01 reads is the
+    # full-apply lineage: recorded artifact sha256 AND a matching checkpoint
+    # pin AND ready 3840x2160 source with no .partial marker.  Anything else
+    # (incl. 3840x2160 of unproved origin, e.g. an already-upscaled file)
+    # is upscale honesty.
+    native_4k = (
+        source_ready
+        and not source_partial
+        and source_w == 3840
+        and source_h == 2160
+        and len(_artifact_sha) == 64
+        and ckpt_found
+        and ckpt_hash_ok
+        and ckpt_rev_ok
+        and not ckpt_cross
+    )
 
     # ── structural-lock pin facts (read-only) ───────────────────────
     lock_repo = StructuralLockRepository(session)
@@ -166,7 +189,10 @@ def post_export_preflight(
     except Exception:
         disk_free = None
 
-    profile_basis = "T02 capability detection pending — support unproven"
+    # C02 real capability probe (no permanent stub, no const flag): support
+    # is True ONLY when the ffmpeg encoder probe passes; any failure keeps
+    # the profile check failed with the concrete reason.
+    _cap_ok, profile_basis = probe_encoder_support(str(body.profile_id))
     ctx = PreflightContext(
         project_id=project_id,
         video_item_id=body.video_item_id,
@@ -189,7 +215,7 @@ def post_export_preflight(
         readiness_policy=readiness_policy,
         readiness_policy_current=policy_current,
         disk_free_bytes=disk_free,
-        profile_supported=False,
+        profile_supported=_cap_ok,
         profile_support_basis=profile_basis,
     )
     return evaluate_preflight(body, ctx)

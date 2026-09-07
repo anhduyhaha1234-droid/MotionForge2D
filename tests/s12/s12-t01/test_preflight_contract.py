@@ -425,7 +425,7 @@ def _http_body(vid: str, ckpt: dict[str, str], mani: dict[str, str]) -> dict[str
         "checkpoint": {
             "checkpoint_id": ckpt["checkpoint_id"],
             "checkpoint_hash": ckpt["checkpoint_hash"],
-            "checkpoint_revision": 1,
+            "checkpoint_revision": ckpt.get("checkpoint_revision", 1),
         },
         "lock": {
             "manifest_id": mani["manifest_id"],
@@ -464,10 +464,11 @@ def test_unknown_video_404(client: TestClient, s12_session: Any) -> None:
     assert "not found" in resp.text
 
 
-def test_t01_profile_unsupported_open_check(
+def test_t01_profile_probed_open_check(
     client: TestClient, s12_session: Any
 ) -> None:
-    """Eligible-path: everything pinned passes EXCEPT T02 support (expected)."""
+    """C02 eligible-path: everything pinned passes AND the real CPU encoder
+    probe passes (ffmpeg libx264 present) — no permanent stub."""
     vid = f"v-open-{uuid.uuid4().hex[:6]}"
     pid = f"p-open-{uuid.uuid4().hex[:6]}"
     _seed_ws_project_video(
@@ -484,7 +485,10 @@ def test_t01_profile_unsupported_open_check(
     assert body["contract_version"] == "s12-export-v1"
     assert body["source_kind"] == "upscale_4k"  # 1080p source honesty
     assert body["readiness_status"] == "ready"
-    assert "S12_EXPORT_UNSUPPORTED_PROFILE" in body["reasons"]
+    assert body["eligible"] is True
+    assert body["reasons"] == ["S12_EXPORT_OK"]
+    assert body["profile"]["supported"] is True
+    assert "probed libx264" in (body["profile"]["support_basis"] or "")
     passed = {c["name"] for c in body["checks"] if c["passed"]}
     assert {
         "source",

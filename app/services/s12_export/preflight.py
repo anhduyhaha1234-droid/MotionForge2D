@@ -8,6 +8,8 @@ pure function for enqueue-time AND pre-publish re-checks.
 
 from __future__ import annotations
 
+import subprocess
+import time
 from dataclasses import dataclass, field
 
 from app.schemas.s12_export import (
@@ -24,10 +26,12 @@ from app.schemas.s12_export import (
 
 __all__ = [
     "PREFLIGHT_PROFILES",
+    "PROFILE_ENCODERS",
     "ESTIMATE_BPP",
     "PreflightContext",
     "evaluate_preflight",
     "classify_source_kind",
+    "probe_encoder_support",
 ]
 
 #: Master raster (WS-08 outcome).
@@ -62,6 +66,100 @@ PREFLIGHT_PROFILES: dict[str, dict[str, object]] = {
 
 #: Aspect tolerance: relative DAR drift above this fails closed (or letterbox).
 ASPECT_EPSILON = 0.01
+
+#: C02 — encoder required per frozen profile.  No heuristic guessing: each
+#: profile names its ffmpeg encoder; support is PROBED (binary + encode
+#: smoke), never a constant flag and never a silent fallback.
+PROFILE_ENCODERS: dict[str, str] = {
+    "master-4k-h264": "libx264",
+    "master-4k-hevc": "libx265",
+    "preview-1080p-h264": "libx264",
+}
+
+#: Probe TTL (seconds): positive results cache briefly; failures NEVER cache.
+_PROBE_TTL_SEC = 300.0
+_probe_cache: dict[str, tuple[float, str]] = {}
+
+
+def _find_ffmpeg() -> str | None:
+    try:
+        from app.services.ffmpeg_utils import find_ffmpeg
+
+        try:
+            return find_ffmpeg()
+        except Exception:
+            return None
+    except Exception:
+        return None
+
+
+def probe_encoder_support(profile_id: str) -> tuple[bool, str]:
+    """C02 real capability probe for one frozen profile.
+
+    Returns ``(supported, basis)``.  ``supported`` is True ONLY when the
+    ffmpeg binary is located AND ``-encoders`` lists the profile's encoder
+    AND a 1-frame CPU encode smoke test exits 0.  Any failure returns False
+    with the concrete reason (binary missing / encoder absent / smoke rc).
+    No constant flag, no silent fallback to another encoder.
+    """
+    spec = PREFLIGHT_PROFILES.get(str(profile_id))
+    if spec is None:
+        return False, f"unknown profile {profile_id!r}"
+    encoder = str(PROFILE_ENCODERS.get(str(profile_id), ""))
+    now = time.monotonic()
+    cached = _probe_cache.get(str(profile_id))
+    if cached is not None and (now - cached[0]) < _PROBE_TTL_SEC:
+        return True, cached[1]
+    ffmpeg = _find_ffmpeg()
+    if not ffmpeg:
+        return False, "ffmpeg binary not found (capability unproven)"
+    try:
+        enc = subprocess.run(
+            [ffmpeg, "-hide_banner", "-encoders"],
+            capture_output=True,
+            timeout=30,
+        )
+    except Exception as exc:
+        return False, f"ffmpeg -encoders probe failed: {exc}"
+    if encoder.encode() not in (enc.stdout or b""):
+        return False, f"encoder {encoder!r} absent from ffmpeg -encoders"
+    import tempfile
+    from pathlib import Path
+
+    try:
+        with tempfile.TemporaryDirectory(prefix="s12cap_") as tmp:
+            out = str(Path(tmp) / "smoke.mp4")
+            codec_flag = (
+                "libx264" if encoder == "libx264" else encoder
+            )
+            smoke = subprocess.run(
+                [
+                    ffmpeg,
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    "color=c=black:s=64x64:d=1:r=5",
+                    "-frames:v",
+                    "1",
+                    "-c:v",
+                    codec_flag,
+                    "-y",
+                    out,
+                ],
+                capture_output=True,
+                timeout=60,
+            )
+        if smoke.returncode != 0:
+            tail = (smoke.stderr or b"")[-200:].decode("utf-8", "replace")
+            return False, f"encoder {encoder!r} smoke failed rc={smoke.returncode}: {tail}"
+    except Exception as exc:
+        return False, f"encoder {encoder!r} smoke error: {exc}"
+    basis = f"probed {encoder} via ffmpeg -encoders + 1-frame smoke (rc=0)"
+    _probe_cache[str(profile_id)] = (now, basis)
+    return True, basis
 
 
 @dataclass(frozen=True)
@@ -102,16 +200,20 @@ class PreflightContext:
 
 
 def classify_source_kind(ctx: PreflightContext) -> SourceKind:
-    """Native vs upscale from provenance, never from output file size."""
+    """Native vs upscale from PROVED provenance only (F-OBS-01 fix).
+
+    ``source_native_4k`` may be set ONLY from a proved native-origin
+    authority — dimensions alone NEVER imply native.  A 3840x2160 file of
+    unproved origin is ``upscale_4k`` (already-upscaled-4K honesty), never
+    ``native_4k``.
+    """
     if (
         ctx.source_native_4k
-        and ctx.source_width == MASTER_WIDTH
-        and ctx.source_height == MASTER_HEIGHT
+            and ctx.source_width == MASTER_WIDTH
+            and ctx.source_height == MASTER_HEIGHT
     ):
         return "native_4k"
     if ctx.source_width is not None and ctx.source_height is not None:
-        if ctx.source_width >= MASTER_WIDTH and ctx.source_height >= MASTER_HEIGHT:
-            return "native_4k"
         return "upscale_4k"
     return "below_4k"
 
@@ -303,6 +405,8 @@ def evaluate_preflight(
     if eligible:
         final_reasons = ["S12_EXPORT_OK"]
 
+    provenance = "proved-native" if source_kind == "native_4k" else "unproven"
+
     method = ctx.upscale_method
     if source_kind == "upscale_4k" and not method:
         method = "labeled-upscale-method-required-by-T02"
@@ -321,6 +425,7 @@ def evaluate_preflight(
         video_item_id=ctx.video_item_id,
         profile=profile,
         source_kind=source_kind,
+        source_provenance=provenance,
         source_width=ctx.source_width,
         source_height=ctx.source_height,
         eligible=eligible,

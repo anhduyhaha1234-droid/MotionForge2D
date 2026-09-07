@@ -154,6 +154,11 @@ class ExportPreflightResponse(_StrictBase):
     video_item_id: str = Field(min_length=1)
     profile: ExportProfile
     source_kind: SourceKind
+    source_provenance: str = Field(
+        default="",
+        max_length=64,
+        description="proved-native | unproven (F-OBS-01: native label needs proof)",
+    )
     source_width: int | None = Field(default=None, ge=1)
     source_height: int | None = Field(default=None, ge=1)
     eligible: bool
