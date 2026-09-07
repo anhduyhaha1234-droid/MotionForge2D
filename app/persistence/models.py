@@ -122,6 +122,13 @@ __all__ = [
     "S10_FULL_APPLY_CHUNK_STATES",
     "S10_FULL_APPLY_PUBLICATION_STATES",
     "S10_FULL_APPLY_RUN_STATUSES",
+    "S12ExportChunk",
+    "S12ExportLease",
+    "S12ExportRun",
+    "S12_EXPORT_CHUNK_STATES",
+    "S12_EXPORT_CHUNK_STATE_CHECK_SQL",
+    "S12_EXPORT_RUN_STATUSES",
+    "S12_EXPORT_RUN_STATUS_CHECK_SQL",
     "VideoItem",
     "Workspace",
     "utc_now",
@@ -2705,6 +2712,42 @@ class S09Correction(TimestampMixin, Base):
 
 # ── S10 FullApply domain (S10-T01A) ─────────────────────────────────────────
 
+# ── S12 export domain (S12-T03A) ────────────────────────────────────────────
+#: Canonical export-run lifecycle (s12-export-v1 §6 ownership fence):
+#: ``pending`` (created, unclaimed) → ``running`` (claimed by a fenced
+#: worker) → ``verifying`` (chunks rendered, awaiting validation) →
+#: ``completed`` / ``failed`` / ``cancelled`` (terminal).  EXACTLY these six
+#: values are authoritative across ORM CHECK, migration CHECK and repository
+#: validation — never a second copy of the taxonomy.
+S12_EXPORT_RUN_STATUSES = (
+    "pending",
+    "running",
+    "verifying",
+    "completed",
+    "failed",
+    "cancelled",
+)
+#: SQL literal for the ``s12_export_run.status`` CHECK, DERIVED from
+#: ``S12_EXPORT_RUN_STATUSES`` (single authority).
+S12_EXPORT_RUN_STATUS_CHECK_SQL = (
+    "status IN (" + ",".join("'" + s + "'" for s in S12_EXPORT_RUN_STATUSES) + ")"
+)
+#: Canonical export-chunk states: ``pending`` → ``running`` → ``completed`` /
+#: ``failed`` / ``skipped``.  EXACTLY these five values are authoritative
+#: across ORM CHECK, migration CHECK and repository validation.
+S12_EXPORT_CHUNK_STATES = (
+    "pending",
+    "running",
+    "completed",
+    "failed",
+    "skipped",
+)
+#: SQL literal for the ``s12_export_chunk.state`` CHECK, DERIVED from
+#: ``S12_EXPORT_CHUNK_STATES`` (single authority).
+S12_EXPORT_CHUNK_STATE_CHECK_SQL = (
+    "state IN (" + ",".join("'" + s + "'" for s in S12_EXPORT_CHUNK_STATES) + ")"
+)
+
 S10_FULL_APPLY_RUN_STATUSES = (
     "pending",
     "running",
@@ -3223,3 +3266,289 @@ class QCItem(TimestampMixin, Base):
         String(16), nullable=False, default="model"
     )
     checkpoint_ref: Mapped[str] = mapped_column(String(64), nullable=False)
+
+
+# ── S12 export domain entities (S12-T03A) ───────────────────────────────────
+
+
+class S12ExportRun(TimestampMixin, Base):
+    """Durable export run aggregate (S12-T03A, s12-export-v1 §6).
+
+    One row pins the FULL export identity at creation: the frozen
+    ``ApplyCheckpoint`` pin (id + hash + revision), the frozen structural-lock
+    manifest pin (id + hash + generation), the frozen profile
+    (``profile_id``/dims/codec snapshot from the T01 profile table) and the
+    render-plan identity (``plan_id``/``plan_hash``).  Identity is pinned once
+    and never rewritten — a stale caller replays against the frozen pins and
+    fails closed instead of mutating the run.
+
+    - Ownership: ``status`` starts ``pending``; exactly one worker wins the
+      atomic claim (``s12_export_lease`` INSERT-wins, same pattern as
+      ``JobRepository.acquire_lease`` step 1).  The claim moves the run to
+      ``running`` under the same transaction; losers fail closed.
+    - Fence: every worker write carries the lease ``fence_token``; a token
+      mismatch means the worker was fenced and the write is rejected with
+      ``FENCED_WORKER``.
+    - Idempotency: UNIQUE(workspace_id, idempotency_key) WHERE NOT NULL —
+      equivalent replay returns the existing row, materially different
+      payload → conflict.
+    - Natural key UNIQUE(workspace_id, natural_key) WHERE NOT NULL binds the
+      content-derived lineage identity (project/video/profile/plan/checkpoint
+      pins) so duplicate lineage can never create a second run.
+    - All FKs ondelete RESTRICT fail closed; revision CAS > 0.
+    """
+
+    __tablename__ = "s12_export_run"
+    __table_args__ = (
+        CheckConstraint(
+            S12_EXPORT_RUN_STATUS_CHECK_SQL,
+            name="ck_s12_run_status",
+        ),
+        CheckConstraint(
+            "length(checkpoint_hash) = 64", name="ck_s12_run_checkpoint_hash_len"
+        ),
+        CheckConstraint(
+            "checkpoint_revision >= 1", name="ck_s12_run_checkpoint_revision_positive"
+        ),
+        CheckConstraint(
+            "length(manifest_hash) = 64", name="ck_s12_run_manifest_hash_len"
+        ),
+        CheckConstraint(
+            "length(manifest_generation) BETWEEN 1 AND 64",
+            name="ck_s12_run_manifest_generation_len",
+        ),
+        CheckConstraint(
+            "length(profile_id) BETWEEN 1 AND 64", name="ck_s12_run_profile_id_len"
+        ),
+        CheckConstraint("length(plan_id) = 64", name="ck_s12_run_plan_id_len"),
+        CheckConstraint("length(plan_hash) = 64", name="ck_s12_run_plan_hash_len"),
+        CheckConstraint("frame_count >= 1", name="ck_s12_run_frame_count_positive"),
+        CheckConstraint("attempt >= 1", name="ck_s12_run_attempt_positive"),
+        CheckConstraint("revision > 0", name="ck_s12_run_revision_positive"),
+        CheckConstraint(
+            "length(natural_key) <= 255", name="ck_s12_run_natural_key_len"
+        ),
+        CheckConstraint(
+            "length(idempotency_key) <= 255", name="ck_s12_run_idem_key_len"
+        ),
+        UniqueConstraint(
+            "workspace_id",
+            "project_id",
+            "video_item_id",
+            "profile_id",
+            "plan_hash",
+            "checkpoint_hash",
+            name="uq_s12_run_identity",
+        ),
+        Index(
+            "uq_s12_run_natural",
+            "workspace_id",
+            "natural_key",
+            unique=True,
+            sqlite_where=sa_text("natural_key IS NOT NULL"),
+        ),
+        Index(
+            "uq_s12_run_workspace_idempotency",
+            "workspace_id",
+            "idempotency_key",
+            unique=True,
+            sqlite_where=sa_text("idempotency_key IS NOT NULL"),
+        ),
+        Index("ix_s12_run_workspace", "workspace_id"),
+        Index("ix_s12_run_project", "project_id"),
+        Index("ix_s12_run_video", "video_item_id"),
+        Index("ix_s12_run_checkpoint", "checkpoint_id"),
+        Index("ix_s12_run_manifest", "manifest_id"),
+        Index("ix_s12_run_status", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    project_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("project.id", ondelete="RESTRICT"), nullable=False
+    )
+    video_item_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("video_item.id", ondelete="RESTRICT"), nullable=False
+    )
+    checkpoint_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("apply_checkpoint.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    checkpoint_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    checkpoint_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    manifest_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("structural_lock_manifest.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    manifest_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    manifest_generation: Mapped[str] = mapped_column(String(64), nullable=False)
+    profile_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    profile_dims: Mapped[str] = mapped_column(String(32), nullable=False)
+    profile_codec: Mapped[str] = mapped_column(String(16), nullable=False)
+    plan_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    plan_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="pending")
+    frame_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    chunk_config_json: Mapped[str] = mapped_column(Text, nullable=False)
+    attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    natural_key: Mapped[str | None] = mapped_column(String(255))
+    idempotency_key: Mapped[str | None] = mapped_column(String(255))
+    revision: Mapped[int] = mapped_column(
+        Integer, default=1, server_default=sa_text("1"), nullable=False
+    )
+
+    workspace: Mapped[Workspace] = relationship()
+    project: Mapped[Project] = relationship()
+    video_item: Mapped[VideoItem] = relationship()
+    checkpoint: Mapped[ApplyCheckpoint] = relationship()
+    manifest: Mapped[StructuralLockManifest] = relationship()
+
+
+class S12ExportChunk(TimestampMixin, Base):
+    """Deterministic export chunk boundary (S12-T03A).
+
+    One row per (run, chunk_index, attempt): the timeline-contributing core
+    range [``core_start_frame``, ``core_end_frame``] plus context-only
+    overlaps (never duplicated in the final timeline).  ``content_hash``
+    binds plan + chunk position + attempt + frozen checkpoint pin so a stale
+    or ambiguous replay fails closed instead of overwriting a chunk.
+    UNIQUE(run_id, chunk_index, attempt) keeps attempts scoped; the natural
+    key (run + index + attempt) blocks duplicate lineage.  All FKs RESTRICT.
+    """
+
+    __tablename__ = "s12_export_chunk"
+    __table_args__ = (
+        CheckConstraint("chunk_index >= 0", name="ck_s12_chunk_index_nonneg"),
+        CheckConstraint("order_index >= 0", name="ck_s12_chunk_order_nonneg"),
+        CheckConstraint(
+            "core_start_frame >= 0", name="ck_s12_chunk_core_start_nonneg"
+        ),
+        CheckConstraint(
+            "core_end_frame >= core_start_frame",
+            name="ck_s12_chunk_core_end_ge_start",
+        ),
+        CheckConstraint("overlap_before >= 0", name="ck_s12_chunk_overlap_before_nonneg"),
+        CheckConstraint("overlap_after >= 0", name="ck_s12_chunk_overlap_after_nonneg"),
+        CheckConstraint("length(content_hash) = 64", name="ck_s12_chunk_content_hash_len"),
+        CheckConstraint(
+            S12_EXPORT_CHUNK_STATE_CHECK_SQL,
+            name="ck_s12_chunk_state",
+        ),
+        CheckConstraint("attempt >= 1", name="ck_s12_chunk_attempt_positive"),
+        CheckConstraint("verified IN (0, 1)", name="ck_s12_chunk_verified_bool"),
+        CheckConstraint("revision > 0", name="ck_s12_chunk_revision_positive"),
+        CheckConstraint(
+            "length(natural_key) <= 255", name="ck_s12_chunk_natural_key_len"
+        ),
+        CheckConstraint(
+            "length(idempotency_key) <= 255", name="ck_s12_chunk_idem_key_len"
+        ),
+        UniqueConstraint(
+            "run_id", "chunk_index", "attempt", name="uq_s12_chunk_run_index_attempt"
+        ),
+        Index(
+            "uq_s12_chunk_natural",
+            "workspace_id",
+            "natural_key",
+            unique=True,
+            sqlite_where=sa_text("natural_key IS NOT NULL"),
+        ),
+        Index(
+            "uq_s12_chunk_workspace_idempotency",
+            "workspace_id",
+            "idempotency_key",
+            unique=True,
+            sqlite_where=sa_text("idempotency_key IS NOT NULL"),
+        ),
+        Index("ix_s12_chunk_run", "run_id"),
+        Index("ix_s12_chunk_state", "state"),
+        Index("ix_s12_chunk_run_state", "run_id", "state"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    run_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("s12_export_run.id", ondelete="RESTRICT"), nullable=False
+    )
+    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    order_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    core_start_frame: Mapped[int] = mapped_column(Integer, nullable=False)
+    core_end_frame: Mapped[int] = mapped_column(Integer, nullable=False)
+    overlap_before: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    overlap_after: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    state: Mapped[str] = mapped_column(String(24), nullable=False, default="pending")
+    attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    artifact_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("artifact.id", ondelete="RESTRICT")
+    )
+    verified: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    natural_key: Mapped[str | None] = mapped_column(String(255))
+    idempotency_key: Mapped[str | None] = mapped_column(String(255))
+    revision: Mapped[int] = mapped_column(
+        Integer, default=1, server_default=sa_text("1"), nullable=False
+    )
+
+    run: Mapped[S12ExportRun] = relationship(back_populates="chunks")
+    artifact: Mapped[Artifact | None] = relationship()
+
+
+S12ExportRun.chunks = relationship(
+    "S12ExportChunk",
+    back_populates="run",
+    order_by="S12ExportChunk.order_index",
+    cascade="save-update, merge, refresh-expire, expunge",
+)
+
+
+class S12ExportLease(TimestampMixin, Base):
+    """Single-winner claim lease for one export run (S12-T03A).
+
+    Exactly one row per run (PK = ``run_id``): the atomic claim primitive.
+    The first INSERT wins; every later claimant loses unless the existing
+    lease is expired/released, in which case a guarded CAS on
+    ``lease_version`` re-claims with a fresh ``fence_token``.  The token is
+    the enforcement point — every worker write carries it, and a mismatch is
+    rejected with ``FENCED_WORKER``.  ``lease_version`` and the run's
+    ``revision`` bump monotonically on every (re)claim.  The row is retired,
+    never deleted, so process restart replays from the current lease state.
+    """
+
+    __tablename__ = "s12_export_lease"
+    __table_args__ = (
+        CheckConstraint("lease_version >= 1", name="ck_s12_lease_version_positive"),
+        CheckConstraint(
+            "length(fence_token) > 0", name="ck_s12_lease_token_nonempty"
+        ),
+        CheckConstraint("ttl_seconds >= 1", name="ck_s12_lease_ttl_positive"),
+        CheckConstraint("revision > 0", name="ck_s12_lease_revision_positive"),
+        Index("ix_s12_lease_worker", "worker_id"),
+    )
+
+    run_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("s12_export_run.id", ondelete="RESTRICT"),
+        primary_key=True,
+    )
+    worker_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    lease_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    fence_token: Mapped[str] = mapped_column(String(64), nullable=False)
+    acquired_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    heartbeat_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    ttl_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
+    revision: Mapped[int] = mapped_column(
+        Integer, default=1, server_default=sa_text("1"), nullable=False
+    )
+
+    run: Mapped[S12ExportRun] = relationship()
