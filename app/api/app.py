@@ -44,6 +44,7 @@ from app.api.routes import (
     s09_demo_compare,
     s09_demo_loops,
     s10_full_apply,
+    s12_export,
     s12_export_preflight,
     structural_evidence,
 )
@@ -199,6 +200,11 @@ app.include_router(s10_full_apply.router)
 
 # S12 export preflight (S12-T01) — POST-only verdict, never renders in request.
 app.include_router(s12_export_preflight.router)
+
+
+# S12 export durable jobs (S12-T03C) — submit/status/cancel/retry; the
+# request pins rows only, the durable worker renders outside the request.
+app.include_router(s12_export.router)
 
 
 @app.get("/health")
