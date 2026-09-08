@@ -4,9 +4,10 @@ import { test, expect } from "@playwright/test";
  * S12-T05 Export UI — real-backend E2E (no route mocks anywhere).
  *
  * Runs against the task-owned backend (localhost:8415, test-only harness
- * mounting production app + s12_export router) + frontend (localhost:3015)
- * via playwright.s12-export.config.ts. Seeds REAL durable rows via the
- * repo-adjacent seed script (T03C fixture shape).
+ * mounting production app + s12_export router — the W4 production wiring
+ * (9a91e18) is NOT in this branch's history, so the harness mount stays)
+ * + frontend (localhost:3015) via playwright.s12-export.config.ts. Seeds
+ * REAL durable rows via the repo-adjacent seed script (T03C fixture shape).
  *
  * Verified backend behaviour (fail-closed, asserted as-is):
  *  - T02 capability gate NOT implemented (profile_supported=False hardcoded)
@@ -246,4 +247,73 @@ test("run completed seed hien evidence + dinh danh + tieng Viet", async ({
   await expect(page.getByTestId("export-run-id")).toContainText(
     seed.completed_run_id.slice(0, 8),
   );
+});
+
+// ── C21 durable-refresh: active run → refresh/reopen → same run ──────────
+// Server owns the run; localStorage keeps only pointers. Refresh must show
+// the SAME run with live status — never a forked/empty local copy.
+
+test("C21: refresh giu nguyen run dang active, khong tao run moi", async ({
+  request,
+  page,
+}, testInfo) => {
+  const res = await request.post(`${API}/s12-exports/submit`, {
+    data: submitBody(seed, "s12t05-ui-c21", `${testInfo.project.name}:${testInfo.title}`),
+  });
+  expect(res.status()).toBe(202);
+  const { run_id } = await res.json();
+  const url =
+    `${FE}/export?run=${run_id}&project=${seed.project_id}&video=${seed.video_ready}`;
+  await page.goto(url);
+  await expect(page.getByTestId("export-panel")).toBeVisible();
+  await expect(page.getByTestId("export-run-id")).toContainText(run_id.slice(0, 8));
+
+  await page.reload();
+  await expect(page.getByTestId("export-panel")).toBeVisible();
+  await expect(page.getByTestId("export-run-id")).toContainText(run_id.slice(0, 8));
+  await expect(page.getByTestId("export-progress")).toBeVisible();
+
+  // localStorage is pointer-only: wiping it then reopening the same URL
+  // must still resolve the SAME server run (no local authority).
+  await page.evaluate(() => localStorage.clear());
+  await page.goto(url);
+  await expect(page.getByTestId("export-panel")).toBeVisible();
+  await expect(page.getByTestId("export-run-id")).toContainText(run_id.slice(0, 8));
+});
+
+// ── C22 result-access: evidence only for completed; nothing served ────────
+// The status API carries no media/download URL; the panel must not invent
+// one. Non-completed runs show progress, never evidence; unknown/stale run
+// ids surface an error, never evidence.
+
+test("C22: run completed khong co media URL hay download tu suy dien", async ({
+  page,
+}) => {
+  await page.goto(
+    `${FE}/export?run=${seed.completed_run_id}&project=${seed.project_id}&video=${seed.video_ready}`,
+  );
+  const evidence = page.getByTestId("export-evidence");
+  await expect(evidence).toBeVisible();
+  expect(await evidence.locator("a[href], video, audio").count()).toBe(0);
+  expect(await page.locator("a[href$='.mp4']").count()).toBe(0);
+});
+
+test("C22: run pending chi thay progress, khong thay evidence", async ({
+  page,
+}) => {
+  await page.goto(
+    `${FE}/export?run=${seed.pending_run_id}&project=${seed.project_id}&video=${seed.video_ready}`,
+  );
+  await expect(page.getByTestId("export-panel")).toBeVisible();
+  await expect(page.getByTestId("export-progress")).toBeVisible();
+  await expect(page.getByTestId("export-evidence")).toBeHidden();
+});
+
+test("C22: run id la hien loi, khong hien evidence", async ({ page }) => {
+  await page.goto(
+    `${FE}/export?run=00000000-0000-4000-8000-000000000000&project=${seed.project_id}&video=${seed.video_ready}`,
+  );
+  await expect(page.getByTestId("export-panel")).toBeVisible();
+  await expect(page.getByRole("alert").first()).toBeVisible();
+  await expect(page.getByTestId("export-evidence")).toBeHidden();
 });

@@ -33,7 +33,24 @@ Owner: T05 duy nhất | Backend T03C read-only (không sửa 1 dòng production)
    trên port riêng) + `playwright.s12-export.config.ts` (78, ports 8415/3015,
    output `%TEMP%/s12t05_pw`, QA root `%TEMP%/s12t05_root`).
 
-## Key findings during build (real output, not assumptions)
+## C1 correction (owner 20260907_184514_67a9b5, W5 rows C20/C21/C22)
+
+- P1: Đọc full `HERMES_AUTOPILOT_RULES.md` (277 dòng, SHA256
+  `c9b068b2…8f`) trong lượt làm việc — RULES_LOADED, không dùng memory.
+- P2: Tip `4a3630a` + porcelain sạch đã verify trước mọi sửa đổi.
+- P4: Fetch read-only W4 `9a91e18` (mount router + handler registration);
+  `merge-base --is-ancestor` = NOT in branch history → GIỮ harness mount
+  test-only, không merge/rebase.
+- P5: Scope C1 S5 đúng allowlist (spec + docs T05 + evidence C1 root);
+  0 file `app/` backend production.
+- C20 project-export: đã phủ bởi 8 tests base (không xóa case nào).
+- C21 durable-refresh (+1 test): active run → reload → cùng run + progress;
+  xóa localStorage → reopen cùng URL → cùng server run (pointer-only).
+- C22 result-access (+3 tests): completed → 0 media/download URL suy diễn;
+  pending → progress only; stale id → role=alert, không evidence.
+- P6: Playwright full 23 passed + 1 skip (deliberate mobile-nav) + T03C
+  regression 15/15 tại tree + `tsc --noEmit` exit 0 + `ruff --select F`
+  touched scope + `diff-check` 0 + porcelain allowlist-only.
 
 - F1: Router T03C `s12_export` (submit/status/cancel/retry) UNMOUNTED trên
   production app — chỉ `s12_export_preflight` mount. E2E bắt buộc harness
