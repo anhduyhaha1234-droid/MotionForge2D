@@ -43,6 +43,7 @@ __all__ = [
     "ChunkMedia",
     "count_video_frames",
     "probe_duration_sec",
+    "check_source_cfr",
     "trim_core",
     "concat_cores",
     "mux_audio_once",
@@ -123,6 +124,56 @@ def probe_duration_sec(path: str | Path) -> float | None:
         return float(payload["format"]["duration"])
     except (ValueError, TypeError, KeyError):
         return None
+
+
+def check_source_cfr(path: str | Path) -> tuple[float, str, str]:
+    """Pre-work CFR gate: reject VFR sources before any chunk renders.
+
+    Returns ``(fps, r_frame_rate, avg_frame_rate)``.  Raises
+    :class:`StitchError` when the video stream is unreadable or
+    ``r_frame_rate != avg_frame_rate`` (variable frame rate — the T03B
+    frame-exact trim math assumes constant frame rate).  Never guesses.
+    """
+    completed = _run(
+        [
+            find_ffprobe(),
+            "-hide_banner",
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=r_frame_rate,avg_frame_rate",
+            "-of",
+            "json",
+            str(path),
+        ]
+    )
+    if completed.returncode != 0:
+        raise StitchError(
+            f"ffprobe cannot read video stream of {path}: "
+            f"{completed.stderr.strip()[:300]}"
+        )
+    try:
+        payload = json.loads(completed.stdout)
+        stream = payload["streams"][0]
+        rfr = str(stream["r_frame_rate"])
+        afr = str(stream["avg_frame_rate"])
+    except (ValueError, TypeError, KeyError, IndexError) as err:
+        raise StitchError(f"frame-rate entries unreadable for {path}") from err
+    if rfr != afr:
+        raise StitchError(
+            f"VFR source rejected pre-work: r_frame_rate={rfr} != "
+            f"avg_frame_rate={afr} (frame-exact trim needs CFR)"
+        )
+    try:
+        num, den = afr.split("/", 1)
+        fps = float(num) / float(den)
+    except (ValueError, ZeroDivisionError) as err:
+        raise StitchError(f"unparseable avg_frame_rate {afr!r}") from err
+    if fps <= 0:
+        raise StitchError(f"non-positive fps {afr!r}")
+    return fps, rfr, afr
 
 
 def trim_core(

@@ -63,6 +63,7 @@ from app.services.s12_export.stitch import (
     ChunkMedia,
     StitchError,
     assemble_run,
+    check_source_cfr,
     count_video_frames,
 )
 
@@ -78,6 +79,106 @@ __all__ = [
 
 #: Chunk artifact filename pattern inside the run chunk directory.
 CHUNK_FILENAME = "chunk_{index:04d}.mp4"
+
+#: Frozen profile→encoder mirror (T01 ``PROFILE_ENCODERS`` is authoritative;
+#: this fallback keeps the runner working on trees that predate the C1
+#: interface — the same pattern canonical ``capabilities.py`` uses).
+_FROZEN_PROFILE_ENCODERS_FALLBACK: dict[str, str] = {
+    "master-4k-h264": "libx264",
+    "master-4k-hevc": "libx265",
+    "preview-1080p-h264": "libx264",
+}
+
+
+def _encoder_for_profile(profile_id: str) -> str:
+    """Frozen encoder for *profile_id* (T01 ``PROFILE_ENCODERS``, read-only).
+
+    Prefers the live T02-C1 table when the tree provides it; otherwise uses
+    the frozen mirror above.  Unknown profile → fail-closed (no guessing).
+    """
+    table: dict[str, str] | None = None
+    try:
+        from app.services.s12_export.preflight import PROFILE_ENCODERS
+
+        table = dict(PROFILE_ENCODERS)
+    except Exception:
+        table = None
+    if table is None:
+        table = _FROZEN_PROFILE_ENCODERS_FALLBACK
+    encoder = table.get(profile_id)
+    if not encoder:
+        raise RunnerError(
+            f"unknown profile {profile_id!r} — no frozen encoder (fail-closed)"
+        )
+    return str(encoder)
+
+
+def _probe_encoder_usable(encoder: str) -> tuple[bool, str]:
+    """Real encoder usability probe (binary + listed + 1-frame smoke).
+
+    Prefers T01-C02 ``probe_encoder_support`` per-profile when importable;
+    otherwise probes the encoder name directly with the same semantics:
+    True ONLY on located binary + listed encoder + smoke rc 0.
+    """
+    try:
+        from app.services.s12_export.preflight import _find_ffmpeg as _locate
+    except Exception:
+        _locate = None  # type: ignore[assignment]
+    ffmpeg: str | None = None
+    if _locate is not None:
+        try:
+            ffmpeg = _locate()
+        except Exception:
+            ffmpeg = None
+    if ffmpeg is None:
+        import shutil as _shutil
+
+        ffmpeg = _shutil.which("ffmpeg")
+    if not ffmpeg:
+        return False, "ffmpeg binary not found (capability unproven)"
+    try:
+        enc = subprocess.run(
+            [ffmpeg, "-hide_banner", "-encoders"],
+            capture_output=True,
+            timeout=30,
+        )
+    except Exception as exc:
+        return False, f"ffmpeg -encoders probe failed: {exc}"
+    if encoder.encode() not in (enc.stdout or b""):
+        return False, f"encoder {encoder!r} absent from ffmpeg -encoders"
+    import tempfile as _tempfile
+
+    try:
+        with _tempfile.TemporaryDirectory(prefix="s12t03b_enc_") as tmp:
+            out = str(Path(tmp) / "smoke.mp4")
+            smoke = subprocess.run(
+                [
+                    ffmpeg,
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-y",
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    "testsrc=size=64x64:rate=10:duration=0.2",
+                    "-frames:v",
+                    "1",
+                    "-c:v",
+                    encoder,
+                    "-pix_fmt",
+                    "yuv420p",
+                    out,
+                ],
+                capture_output=True,
+                timeout=60,
+            )
+    except Exception as exc:
+        return False, f"encoder smoke probe failed: {exc}"
+    if smoke.returncode != 0:
+        tail = (smoke.stderr or b"")[-200:].decode("utf-8", "replace")
+        return False, f"encoder {encoder!r} smoke rc={smoke.returncode}: {tail}"
+    return True, f"encoder {encoder!r} listed + 1-frame smoke rc 0"
 
 
 class RunnerError(ValueError):
@@ -220,6 +321,16 @@ class ExportRunner:
         if self._cfg.fps <= 0:
             raise RunnerError("fps must be > 0")
         run = self._run_pins()
+        # C10 — the chunk encoder is the run profile's frozen encoder (never
+        # a silent substitution): it must probe usable (binary + listed +
+        # smoke rc 0) or the render fails explicit.
+        encoder = _encoder_for_profile(run.profile_id)
+        usable, basis = _probe_encoder_usable(encoder)
+        if not usable:
+            raise RunnerError(
+                f"profile {run.profile_id!r} encoder {encoder!r} unusable: "
+                f"{basis}"
+            )
         rs, re = render_window(spec, run.frame_count)
         window_frames = re - rs + 1
         dest_final.parent.mkdir(parents=True, exist_ok=True)
@@ -242,7 +353,7 @@ class ExportRunner:
                     "setpts=PTS-STARTPTS",
                     "-an",
                     "-c:v",
-                    "libx264",
+                    encoder,
                     "-preset",
                     "ultrafast",
                     "-pix_fmt",
@@ -269,7 +380,8 @@ class ExportRunner:
                     f"disk full rendering chunk {spec.chunk_index}"
                 )
             raise RunnerError(
-                f"chunk {spec.chunk_index} render failed: {stderr[-300:]}"
+                f"chunk {spec.chunk_index} render failed "
+                f"(encoder={encoder}): {stderr[-300:]}"
             )
         try:
             got = count_video_frames(scratch)
@@ -312,6 +424,11 @@ class ExportRunner:
         """Render every non-completed chunk; reuse verified + exact files."""
         self._require_live_lease()
         run = self._run_pins()
+        # C12 — VFR rejected pre-work: frame-exact trim math needs CFR.
+        try:
+            _src_fps, _rfr, _afr = check_source_cfr(Path(self._cfg.source_path))
+        except StitchError as err:
+            raise RunnerError(f"source CFR gate failed: {err}") from err
         chunk_dir = Path(self._cfg.chunk_dir)
         chunk_dir.mkdir(parents=True, exist_ok=True)
         Path(self._cfg.scratch_dir).mkdir(parents=True, exist_ok=True)
