@@ -30,6 +30,7 @@ from __future__ import annotations
 import hashlib
 import json
 import subprocess
+from fractions import Fraction
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -109,6 +110,17 @@ class ValidationExpectation:
     # Provenance identity: sha256 of the completed output, from the
     # manifest. ``None`` → provenance probe is NOT_MEASURED.
     expected_sha256: str | None = None
+    # CFR control: manifest-asserted fps. ``None`` → unconstrained.
+    expected_fps: float | None = None
+    # VFR inputs are rejected pre-work (C12): any r_frame_rate vs
+    # avg_frame_rate mismatch fails ``timebase``. Disable only when the
+    # manifest explicitly allows variable frame rate (never for masters).
+    reject_vfr: bool = True
+    # Source-locked seam cuts in seconds (C12): each cut must land on a
+    # keyframe within tolerance. Empty → unconstrained.
+    expected_cuts: tuple[float, ...] = ()
+    # Cut match tolerance in frame durations (rational, CFR-derived).
+    cut_tolerance_frames: float = 1.5
 
 
 @dataclass(frozen=True)
@@ -147,7 +159,7 @@ def _ffprobe_json(path: Path) -> dict | None:
                 "error",
                 "-show_entries",
                 (
-                    "stream=index,codec_type,codec_name,width,height,"
+                    "stream=index,codec_type,codec_name,width,height,r_frame_rate,"
                     "avg_frame_rate,time_base,duration,nb_frames"
                 ),
                 "-show_entries",
@@ -241,6 +253,47 @@ def _parse_rate(value: object) -> float | None:
     return rate
 
 
+def _check_cuts(
+    pts_values: list[int],
+    key_pts: list[int],
+    stream: dict,
+    exp: ValidationExpectation,
+) -> list[ProbeVerdict]:
+    """Cut/seam sub-checks folded into ``frame_order`` (C12 source-locked).
+
+    Every manifest cut must land on a keyframe (I-frame) within
+    ``cut_tolerance_frames`` frame durations, compared as exact rationals
+    (pts x time_base) -- never float seconds. No cuts asserted → no verdict
+    (keeps the 10-probe shape stable).
+    """
+    if not exp.expected_cuts:
+        return []
+    try:
+        num, den = str(stream.get("time_base", "1/90000")).split("/", 1)
+        scale = Fraction(int(num), int(den))
+    except (ValueError, ZeroDivisionError):
+        return [_unknown("frame_order", "time_base unreadable for cut check")]
+    fps = exp.expected_fps or _parse_rate(stream.get("avg_frame_rate"))
+    if not fps:
+        return [_unknown("frame_order", "fps unreadable for cut check")]
+    frame_dur = Fraction(1, 1) / Fraction(fps).limit_denominator(100000)
+    key_times = {Fraction(pts) * scale for pts in key_pts}
+    step = float(frame_dur) * exp.cut_tolerance_frames
+    missing = [
+        cut
+        for cut in exp.expected_cuts
+        if not any(abs(float(key) - cut) <= step for key in key_times)
+    ]
+    if missing:
+        return [
+            _fail(
+                "frame_order",
+                f"cuts without keyframe: {missing} (keys={len(key_pts)})",
+            )
+        ]
+    return [_pass("frame_order", f"{len(exp.expected_cuts)} cuts keyframe-locked")]
+
+
 def validate(
     output_path: str | Path,
     expectation: ValidationExpectation | None = None,
@@ -314,8 +367,16 @@ def validate(
             probes.append(_unknown("codec", "codec_name unreadable"))
 
     # --- streams ----------------------------------------------------------
+    foreign = [
+        s
+        for s in streams
+        if isinstance(s, dict) and s.get("codec_type") not in ("video", "audio")
+    ]
     if not video:
         probes.append(_fail("streams", "no video stream present"))
+    elif foreign:
+        kinds = sorted({str(s.get("codec_type")) for s in foreign})
+        probes.append(_fail("streams", f"unexpected stream types: {kinds}"))
     else:
         probes.append(
             _pass(
@@ -353,10 +414,17 @@ def validate(
             )
 
         pts_values: list[int] = []
+        key_pts: list[int] = []
         order_ok = True
         for item in frames:
             try:
                 pts_values.append(int(item["pts"]))
+                try:
+                    is_key = int(item.get("key_frame", 0)) == 1
+                except (TypeError, ValueError):
+                    is_key = False
+                if is_key or item.get("pict_type") == "I":
+                    key_pts.append(pts_values[-1])
             except (KeyError, TypeError, ValueError):
                 order_ok = False
                 break
@@ -366,13 +434,38 @@ def validate(
             probes.append(_fail("frame_order", "unreadable presentation timestamp"))
         elif all(later > earlier for earlier, later in zip(pts_values, pts_values[1:])):
             probes.append(_pass("frame_order", f"{len(pts_values)} pts strictly increasing"))
+            probes.extend(_check_cuts(pts_values, key_pts, video[0], exp))
         else:
             probes.append(_fail("frame_order", "presentation timestamps not monotonic"))
 
         time_base = video[0].get("time_base")
         fps = _parse_rate(video[0].get("avg_frame_rate"))
+        rfr = _parse_rate(video[0].get("r_frame_rate"))
         if isinstance(time_base, str) and "/" in time_base and fps is not None:
-            probes.append(_pass("timebase", f"time_base={time_base} fps~{fps:.3f}"))
+            if (
+                exp.reject_vfr
+                and rfr is not None
+                and abs(rfr - fps) > max(0.01 * fps, 1e-3)
+            ):
+                probes.append(
+                    _fail(
+                        "timebase",
+                        "VFR rejected: r_frame_rate="
+                        f"{video[0].get('r_frame_rate')!r} != avg_frame_rate="
+                        f"{video[0].get('avg_frame_rate')!r}",
+                    )
+                )
+            elif exp.expected_fps is not None and abs(fps - exp.expected_fps) > max(
+                0.01 * exp.expected_fps, 1e-3
+            ):
+                probes.append(
+                    _fail(
+                        "timebase",
+                        f"fps~{fps:.3f} vs expected {exp.expected_fps:.3f}",
+                    )
+                )
+            else:
+                probes.append(_pass("timebase", f"time_base={time_base} fps~{fps:.3f}"))
         else:
             probes.append(
                 _unknown(

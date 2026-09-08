@@ -1,7 +1,8 @@
 # S12-T04A — REPORT (independent output validator)
 
-**Status: TASK_SUBMITTED** — branch `codex/s12/s12-s12-t04a-0907a`
-(baseline `0d04673`). Không push — Manager/INT01 lo.
+**Status: TASK_SUBMITTED (W2 correction)** — branch
+`codex/s12/s12-s12-t04a-0907a` (baseline `0d04673`, W1 checkpoint `0c3ad1a`
+có locally). Không push — Manager/INT01 lo.
 
 ## What was built
 
@@ -27,6 +28,20 @@ contract `s12-export-v1` (§5 `ValidationContract`, T01 owner):
 - Binary discovery qua `ffmpeg_utils.find_ffprobe()` (SINGLE authority),
   không hardcode path; không đụng models/migration (T03A lock).
 
+## W2 correction — C1 rows C19 + C12-part
+
+- `ValidationExpectation`: `expected_fps` (CFR control), `reject_vfr=True`
+  (VFR rejected pre-work), `expected_cuts` + `cut_tolerance_frames=1.5`
+  (source-locked seams, rational `pts × time_base` qua Fraction).
+- `timebase` FAIL khi `r_frame_rate != avg_frame_rate` (VFR) hoặc fps sai
+  manifest; `_check_cuts` fold vào `frame_order` — mỗi cut phải land trên
+  keyframe; `streams` FAIL với unexpected stream types.
+- `test_c1_closure.py` (22 tests): C19 full matrix (corrupt/truncate/dims/
+  codec/streams/count/order/cut/timing/audio/provenance, missing-extra
+  chunk, `.partial` → FAIL/NOT_MEASURED; self-hash circular → overall FAIL)
+  + C12-part (A+B stitch PASS với cuts keyframe-locked + CFR exact; VFR
+  giả lập FAIL; CFR control PASS). Không xóa case cũ.
+
 ## Tests (26, isolated fixtures + real-media negatives)
 
 `tests/s12/s12-t04a/` — conftest riêng (KHÔNG sửa conftest chung/test cũ);
@@ -50,8 +65,10 @@ fresh isolated roots (`$TEMP/s12t04a_bt` basetemp ngắn):
 
 ## Gates (exact commands)
 
-- `python -m pytest tests/s12/s12-t04a/ -q --basetemp="$TEMP/s12t04a_bt" -p no:cacheprovider`
-  → **26 passed in 4.11s**
+- `python -m pytest tests/s12/s12-t04a/ -q --basetemp="$TEMP/s12t04a_all" -p no:cacheprovider`
+  → **48 passed in 6.64s** (W2: 26 cũ + 22 `test_c1_closure.py` C19/C12-part)
+- `python -m pytest tests/s12/s12-t04a/test_c1_closure.py -q --basetemp="$TEMP/s12t04a_c1" -p no:cacheprovider`
+  → **22 passed in 4.92s**
 - `ruff check --select F app/services/s12_export/validation.py tests/s12/s12-t04a/`
   → **All checks passed!**
 - `python -m pytest tests/s12/s12-t01/ -q --basetemp="$TEMP/s12t04a_t01" -p no:cacheprovider`

@@ -35,6 +35,51 @@
    T01 regression 15 passed (18.14s). Guard: 5 file T01 CLEAN (git diff),
    chỉ 2 path mới (validation.py + tests/s12/s12-t04a/).
 
+## Correction W2 — C1 rows C19 + C12-part (2026-09-08, UTC+7)
+
+Owner resumed exact session/branch @ `c375b87`, porcelain clean.
+RULES_LOADED (277 dòng, SHA c9b068b2). W1 checkpoint `0c3ad1a` đã có
+locally (fetch remote bị chặn bởi ref rác `turn-diffs/captures`, không
+merge/rebase). Contract W1 chỉ đổi §3 provenance + §4 capability —
+validation contract §5 T04A consume KHÔNG đổi.
+
+Validator mở rộng (`validation.py`, bounded patch + helper script):
+- `ValidationExpectation` thêm `expected_fps`, `reject_vfr=True`,
+  `expected_cuts`, `cut_tolerance_frames=1.5`.
+- `timebase`: `r_frame_rate != avg_frame_rate` → FAIL (VFR rejected
+  pre-work, C12); `expected_fps` mismatch → FAIL (CFR control).
+- `_check_cuts` (fold vào `frame_order`): mỗi manifest cut phải land
+  trên keyframe trong tolerance, so rational `pts × time_base`
+  (Fraction) — không float seconds. Không cuts → không verdict
+  (giữ 10-probe shape).
+- `streams`: unexpected stream types (subtitle/data/…) → FAIL.
+- Inventory bổ sung `r_frame_rate`.
+
+`tests/s12/s12-t04a/test_c1_closure.py` (NEW, 22 tests, C1 MATRIX.md
+convention `test_c1_closure.py`, không xóa case cũ):
+- C19 control PASS + truncate-half/header-corrupt/non-media FAIL;
+  mid-bytes-corrupt → FAIL/NOT_MEASURED (không PASS).
+- dims/codec FAIL (+ hevc-match shape); missing/extra chunk FAIL.
+- cut mid-GOP (1.0s, GOP chỉ key tại 0) → frame_order FAIL;
+  cut tại 0.0 → PASS.
+- duration +30s FAIL; fps 25-vs-10 FAIL; audio hai chiều FAIL.
+- provenance: wrong-hash FAIL; self-hash sub-clip (hash đúng chính nó
+  nhưng count/duration sai manifest) → provenance PASS nhưng overall
+  FAIL — circular PASS không bao giờ đủ.
+- `.partial` FAIL; swapped-concat B+A (provenance pin chunk A) FAIL.
+- C12-part: A+B stitch đúng thứ tự (cuts 0.0/1.0 keyframe-locked,
+  CFR exact) → PASS; VFR giả lập (monkeypatch r_frame_rate 15/1 vs
+  avg 10/1) → timebase FAIL; CFR control PASS.
+
+Pitfalls: cut 0.05s PASS đúng behavior (tolerance 1.5 frame × 0.1s =
+0.15s bao 0.05) → đổi cut test sang 1.0s; self-hash truncate nửa file
+→ completeness FAIL early (probe provenance None) → đổi sang sub-clip
+`-c copy -t 1.0` decode được; pict IPPPP (ultrafast GOP dài, key duy
+nhất pts 0) xác nhận bằng ffprobe thật.
+
+Gate W2: full `tests/s12/s12-t04a/` 48 passed (6.57s) + ruff F clean +
+`git diff --check` 0 + T01 regression 15 passed (14.99s).
+
 ## Gate outputs
 
 - `python -m pytest tests/s12/s12-t04a/ -q --basetemp="$TEMP/s12t04a_bt" -p no:cacheprovider`
