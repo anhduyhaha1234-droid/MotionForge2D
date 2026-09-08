@@ -68,3 +68,30 @@ Owner task S12-T02, branch `codex/s12/s12-s12-t02-0907a`, wave-base `0d04673`
   (1.96s)**; `ruff check --select F` trên 2 modules + tests → clean;
   regression `tests/s12/s12-t01/` → **15 passed (16.73s)**; T01 freeze diff
   empty (4/4 file).
+
+## 5. C1 correction W2 (2026-09-08 UTC, owner resumed)
+
+- Base: branch tip `be1def0`; W1 checkpoint T01-C1 `0c3ad1a` chỉ có local
+  object (fetch remote lỗi ref lạ) — đọc frozen interface qua `git show`/
+  `git diff 0d04673 0c3ad1a` read-only, KHÔNG merge/rebase.
+- T01-C1 frozen interface (C02-part): `PROFILE_ENCODERS` (libx264/libx265/
+  libx264), `probe_encoder_support(profile_id)->(bool,basis)`,
+  `source_provenance: proved-native|unproven`, F-OBS-01 native cần proved
+  origin (artifact sha + checkpoint pin + ready 3840x2160).
+- Thay đổi (allowlist, không đụng file T01):
+  - `capabilities.py`: +`profile_encoders()` (consume frozen table, fallback
+    mirror khi cây chưa merge C1), +`encoder_for_profile()`,
+    +`probe_profile_support()` (delegate frozen probe khi có, else spawn
+    trực tiếp; unknown → fail-closed).
+  - `profiles.py`: `ResolvedProfile.upscale_method` (4K target + unproven →
+    `labeled-upscale-<codec>-from-unproven-source`; proved-native → None),
+    mọi return truyền upscale; assert encoder == frozen table (chống silent
+    substitution); `resolve_all_profiles(source_provenance=...)`.
+  - NEW `tests/s12/s12-t02/test_c1_closure.py` (8 tests): mirror table,
+    delegate frozen probe, unknown fail-closed, proved-vs-labeled,
+    encoder-match, ExportProfile strict validate, T03B call path
+    resolve→estimate→fields, real-spawn bounded.
+- Pitfall: pyc stale làm traceback cũ đánh lừa (basis cũ) — xóa
+  `__pycache__`; return CPU thiếu upscale_method (fix); test import
+  PROFILE_ENCODERS khi cây chưa có C1 → try/except + skip marker.
+- Gates tươi: 35 passed + 1 skipped (2.06s); ruff F clean; diff-check 0.
