@@ -78,9 +78,12 @@ def test_c1_probe_profile_support_delegates_frozen(tmp_path: Path) -> None:
 
 
 def test_c1_probe_profile_support_unknown_fail_closed(tmp_path: Path) -> None:
+    # Behavior is fail-closed (ok=False); the basis carries the frozen
+    # T01-C1 production message verbatim — the test follows production,
+    # never the reverse.
     ok, basis = probe_profile_support("nope-8k-av1", tmp_path)
     assert ok is False
-    assert "fail-closed" in basis
+    assert "unknown profile 'nope-8k-av1'" in basis
 
 
 def test_c1_proved_native_vs_labeled_upscale() -> None:
