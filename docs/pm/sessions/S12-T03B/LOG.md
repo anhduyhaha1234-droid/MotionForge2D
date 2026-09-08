@@ -55,3 +55,25 @@ Branch: `codex/s12/s12-t03b-0907a`. Date: 2026-09-07 ~14:22 VN.
 - `ruff check --select F` on both new trees: All checks passed.
 - `git diff --check`: clean (exit 0).
 - Porcelain: exactly 4 NEW allowlist paths, zero drift on freeze set.
+
+## C1 W3 closure (2026-09-08, owner 20260907_125027_0c90f3, base 46feca4)
+
+- STALL-N: porcelain clean, remote == local cache 46feca4 (fetch object
+  xfer fail = remote turn-diffs store issue, ls-remote confirms no new
+  commits). Started code on Manager START with posted checkpoint.
+- runner.py: frozen-encoder selection per run profile + usability probe
+  (binary+listed+smoke) wired into render path; VFR rejected pre-work via
+  stitch.check_source_cfr (r_frame_rate != avg_frame_rate → RunnerError,
+  no chunk renders). stitch.py: check_source_cfr + export.
+- tests/s12/s12-t03b/test_c1_closure.py (NEW, 13 tests): C10 x4 (CPU H.264
+  real 3840x2160, HEVC measured-only, unknown fail-explicit, runner uses
+  frozen encoder), C11 x2 (letterbox DAR preserved, unsupported rejected),
+  C12 x2 (stitched validates exact + rational cuts, VFR pre-work reject),
+  C13 x4 (same-len-diff-bytes, missing rerender, truncated fail-closed,
+  config/tool change → StaleIdentityError), C14 x1 (kill OWNED proc, fresh
+  PID resumes, hashes unchanged).
+- Fix loop: branch validator lacks expected_fps/cuts (T04A-owned, cannot
+  touch) → C12 consumes local shape + own CFR gate; C13 source-change
+  scenario corrected to hash-identity proof (completed rows never rewrite).
+- Gates: 13 passed/19.06s, ruff F clean, diff-check 0.
+- Evidence: <C1-root>/s12-t03b/ + matrix/C10-C14 raw JSON (6 files).
