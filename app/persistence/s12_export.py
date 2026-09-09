@@ -387,6 +387,8 @@ class S12ExportRepository:
                 profile_id=profile_id,
                 plan_id=plan_id,
                 plan_hash=plan_hash,
+                frame_count=frame_count,
+                chunk_config_json=_canonical_json(chunk_config),
                 idempotency_key=idempotency_key,
                 natural_key=derived_natural,
                 cause=err,
@@ -405,30 +407,53 @@ class S12ExportRepository:
         profile_id: str,
         plan_id: str,
         plan_hash: str,
+        frame_count: int,
+        chunk_config_json: str,
         idempotency_key: str | None,
         natural_key: str,
         cause: IntegrityError,
     ) -> tuple[RunRecord, bool]:
-        """Resolve a create_run uniqueness conflict: replay or fail-closed."""
-        existing: S12ExportRun | None = None
+        """Resolve a create_run uniqueness conflict: replay or fail-closed.
+
+        Resolves the UNION of durable identities (workspace idempotency key
+        AND lineage natural key).  Every candidate that is found is compared
+        on the FULL material identity (lineage pins + frame count + chunk
+        configuration).  Any materially-different candidate fails closed with
+        :class:`IdempotencyConflictError` — a misleading key never silently
+        binds to a wrong run, and DB errors are never treated as absence.
+        """
+        candidates: list[S12ExportRun] = []
+        seen: set[str] = set()
         if idempotency_key is not None:
-            existing = self._session.scalar(
+            by_idem = self._session.scalar(
                 select(S12ExportRun).where(
                     S12ExportRun.workspace_id == workspace_id,
                     S12ExportRun.idempotency_key == idempotency_key,
                 )
             )
-        if existing is None:
-            existing = self._session.scalar(
-                select(S12ExportRun).where(
-                    S12ExportRun.workspace_id == workspace_id,
-                    S12ExportRun.natural_key == natural_key,
-                )
+            if by_idem is not None and by_idem.id not in seen:
+                candidates.append(by_idem)
+                seen.add(by_idem.id)
+        by_natural = self._session.scalar(
+            select(S12ExportRun).where(
+                S12ExportRun.workspace_id == workspace_id,
+                S12ExportRun.natural_key == natural_key,
             )
-        if existing is None:
+        )
+        if by_natural is not None and by_natural.id not in seen:
+            candidates.append(by_natural)
+            seen.add(by_natural.id)
+        if not candidates:
             raise S12ExportError(
                 f"export run creation conflict resolved to no row: {cause.orig}"
             ) from cause
+        if len(candidates) > 1:
+            raise IdempotencyConflictError(
+                "idempotency/natural keys resolve to DIFFERENT runs "
+                f"({[c.id for c in candidates]}); ambiguous — refusing "
+                "first-key-wins"
+            ) from cause
+        existing = candidates[0]
         same_identity = (
             existing.project_id == project_id
             and existing.video_item_id == video_item_id
@@ -438,6 +463,8 @@ class S12ExportRepository:
             and existing.profile_id == profile_id
             and existing.plan_id == plan_id
             and existing.plan_hash == plan_hash
+            and existing.frame_count == frame_count
+            and existing.chunk_config_json == chunk_config_json
         )
         if not same_identity:
             raise IdempotencyConflictError(
@@ -596,6 +623,29 @@ class S12ExportRepository:
         row = self._session.get(S12ExportLease, run_id)
         return _lease_record(row) if row is not None else None
 
+    def _aware(self, dt: datetime) -> datetime:
+        return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt
+
+    def _lease_live_sql(
+        self,
+        run_id: str,
+        worker_id: str,
+        fence_token: str,
+        *,
+        now: datetime,
+    ) -> bool:
+        """DB-truth lease liveness check (bypasses resident ORM snapshots)."""
+        row = self._session.execute(
+            sa_text(
+                "SELECT 1 FROM s12_export_lease WHERE run_id = :rid "
+                "AND worker_id = :wid AND fence_token = :tok "
+                "AND expires_at > :now LIMIT 1"
+            ).bindparams(
+                rid=run_id, wid=worker_id, tok=fence_token, now=now
+            )
+        ).first()
+        return row is not None
+
     def _require_fence_token(self, run_id: str, worker_id: str, fence_token: str) -> S12ExportLease:
         lease = self._session.get(S12ExportLease, run_id)
         if lease is None:
@@ -604,6 +654,13 @@ class S12ExportRepository:
             raise FencedWorkerError(
                 f"write rejected for run {run_id}: fence token mismatch "
                 "(worker was fenced)",
+                run_id=run_id,
+            )
+        if self._aware(lease.expires_at) <= datetime.now(UTC):
+            raise FencedWorkerError(
+                f"write rejected for run {run_id}: lease is not live "
+                f"(expired/released at {lease.expires_at.isoformat()}, "
+                f"lease_version={lease.lease_version})",
                 run_id=run_id,
             )
         return lease
@@ -616,23 +673,79 @@ class S12ExportRepository:
         *,
         ttl_seconds: int | None = None,
     ) -> LeaseRecord:
-        """Renew the lease; fails when the token no longer matches."""
-        lease = self._require_fence_token(run_id, worker_id, fence_token)
+        """Renew the lease with a conditional DB UPDATE (live ownership only).
+
+        A released/expired/reclaimed lease (rowcount 0) raises
+        :class:`FencedWorkerError` and mutates nothing.
+        """
         now = datetime.now(UTC)
+        lease = self._session.get(S12ExportLease, run_id)
+        if lease is None:
+            raise LeaseNotFoundError(f"no lease for run {run_id!r}")
         ttl = lease.ttl_seconds if ttl_seconds is None else ttl_seconds
         if ttl < 1:
             raise S12ExportError("ttl_seconds must be >= 1")
-        lease.heartbeat_at = now
-        lease.expires_at = now + timedelta(seconds=ttl)
-        lease.ttl_seconds = ttl
-        return _lease_record(lease)
+        new_expires = now + timedelta(seconds=ttl)
+        result = cast(
+            "CursorResult[Any]",
+            self._session.execute(
+                sa_text(
+                    "UPDATE s12_export_lease SET heartbeat_at = :now, "
+                    "expires_at = :new_expires, ttl_seconds = :ttl, "
+                    "updated_at = :now "
+                    "WHERE run_id = :rid AND worker_id = :wid "
+                    "AND fence_token = :tok AND expires_at > :now"
+                ).bindparams(
+                    now=now,
+                    new_expires=new_expires,
+                    ttl=ttl,
+                    rid=run_id,
+                    wid=worker_id,
+                    tok=fence_token,
+                )
+            ),
+        )
+        if result.rowcount != 1:
+            self._session.rollback()
+            raise FencedWorkerError(
+                f"heartbeat rejected for run {run_id}: lease is not live "
+                f"for worker {worker_id!r} (expired/released/reclaimed)",
+                run_id=run_id,
+            )
+        self._session.flush()
+        self._session.expire(lease)
+        fresh = self._session.get(S12ExportLease, run_id)
+        if fresh is None:  # pragma: no cover - defensive
+            raise LeaseNotFoundError(f"no lease for run {run_id!r}")
+        return _lease_record(fresh)
 
     def release_lease(self, run_id: str, worker_id: str, fence_token: str) -> None:
-        """Release the lease (graceful shutdown) — re-claimable from checkpoint."""
-        lease = self._require_fence_token(run_id, worker_id, fence_token)
+        """Release the lease (graceful shutdown) — re-claimable from checkpoint.
+
+        Conditional DB UPDATE: only a LIVE lease held by *worker_id* with the
+        matching *fence_token* can be released; anything else raises
+        :class:`FencedWorkerError` and mutates nothing.
+        """
         now = datetime.now(UTC)
-        lease.expires_at = now
-        lease.heartbeat_at = now
+        result = cast(
+            "CursorResult[Any]",
+            self._session.execute(
+                sa_text(
+                    "UPDATE s12_export_lease SET expires_at = :now, "
+                    "heartbeat_at = :now, updated_at = :now "
+                    "WHERE run_id = :rid AND worker_id = :wid "
+                    "AND fence_token = :tok AND expires_at > :now"
+                ).bindparams(now=now, rid=run_id, wid=worker_id, tok=fence_token)
+            ),
+        )
+        if result.rowcount != 1:
+            self._session.rollback()
+            raise FencedWorkerError(
+                f"release rejected for run {run_id}: lease is not live "
+                f"for worker {worker_id!r} (expired/released/reclaimed)",
+                run_id=run_id,
+            )
+        self._session.flush()
 
     # ── Fenced worker writes ─────────────────────────────────────────────
 
@@ -645,14 +758,22 @@ class S12ExportRepository:
         expected_revision: int,
         fence_token: str,
     ) -> RunRecord:
-        """Move the run lifecycle state under fence + revision CAS."""
+        """Move the run lifecycle state with a REAL conditional DB CAS.
+
+        The transition is a single conditional ``UPDATE`` whose WHERE clause
+        carries the full ownership/version guard — ``id``, ``status`` in the
+        legal source set, ``revision == expected_revision`` AND a live lease
+        (``worker_id``/``fence_token``/``expires_at > now``) resolved by the
+        database, never by a resident ORM snapshot.  Exactly one concurrent
+        transition wins (rowcount == 1); every loser raises
+        :class:`S12ExportError`/:class:`FencedWorkerError` and mutates
+        nothing.
+        """
         if to_status not in S12_EXPORT_RUN_STATUSES:
             raise S12ExportError(f"unknown export run status {to_status!r}")
         run = self._session.get(S12ExportRun, run_id)
         if run is None:
             raise RunNotFoundError(f"export run {run_id!r} not found")
-        lease = self._require_fence_token(run_id, actor, fence_token)
-        _ = lease
         if run.status in S12_EXPORT_TERMINAL_STATUSES:
             raise S12ExportError(
                 f"run {run_id} is terminal ({run.status!r}); no further transitions"
@@ -666,14 +787,56 @@ class S12ExportRepository:
             raise S12ExportError(
                 f"invalid export run transition {run.status!r} -> {to_status!r}"
             )
-        if run.revision != expected_revision:
+        now = datetime.now(UTC)
+        result = cast(
+            "CursorResult[Any]",
+            self._session.execute(
+                sa_text(
+                    "UPDATE s12_export_run SET status = :to_status, "
+                    "revision = revision + 1, updated_at = :now "
+                    "WHERE id = :rid AND status = :cur_status "
+                    "AND revision = :expected AND EXISTS ("
+                    "SELECT 1 FROM s12_export_lease "
+                    "WHERE run_id = :rid AND worker_id = :wid "
+                    "AND fence_token = :tok AND expires_at > :now)"
+                ).bindparams(
+                    to_status=to_status,
+                    rid=run_id,
+                    cur_status=run.status,
+                    expected=expected_revision,
+                    wid=actor,
+                    tok=fence_token,
+                    now=now,
+                )
+            ),
+        )
+        if result.rowcount == 1:
+            self._session.flush()
+            self._session.expire(run)
+            fresh = self._session.get(S12ExportRun, run_id)
+            if fresh is None:  # pragma: no cover - defensive
+                raise RunNotFoundError(f"export run {run_id!r} not found")
+            return _map_run(fresh)
+        # Loser path: classify the real reason from DB truth.
+        self._session.rollback()
+        fresh_run = self._session.get(S12ExportRun, run_id)
+        if fresh_run is None:
+            raise RunNotFoundError(f"export run {run_id!r} not found")
+        if not self._lease_live_sql(run_id, actor, fence_token, now=now):
+            raise FencedWorkerError(
+                f"transition lost for run {run_id}: lease is not live for "
+                f"worker {actor!r} (expired/released/reclaimed)",
+                run_id=run_id,
+            )
+        if fresh_run.revision != expected_revision:
             raise S12ExportError(
                 f"revision mismatch for run {run_id}: expected "
-                f"{expected_revision}, current {run.revision}"
+                f"{expected_revision}, current {fresh_run.revision}"
             )
-        run.status = to_status
-        run.revision += 1
-        return _map_run(run)
+        raise S12ExportError(
+            f"invalid export run transition {fresh_run.status!r} -> {to_status!r} "
+            f"(concurrent winner already moved the run)"
+        )
 
     def upsert_chunk(
         self,
@@ -704,7 +867,13 @@ class S12ExportRepository:
         run = self._session.get(S12ExportRun, run_id)
         if run is None:
             raise RunNotFoundError(f"export run {run_id!r} not found")
-        self._require_fence_token(run_id, actor, fence_token)
+        now = datetime.now(UTC)
+        if not self._lease_live_sql(run_id, actor, fence_token, now=now):
+            raise FencedWorkerError(
+                f"chunk write rejected for run {run_id}: lease is not live "
+                f"for worker {actor!r} (expired/released/reclaimed)",
+                run_id=run_id,
+            )
         if run.status in S12_EXPORT_TERMINAL_STATUSES:
             raise S12ExportError(
                 f"run {run_id} is terminal ({run.status!r}); chunks are frozen"
@@ -744,6 +913,12 @@ class S12ExportRepository:
                 self._session.flush()
         except IntegrityError as err:
             self._session.rollback()
+            if not self._lease_live_sql(run_id, actor, fence_token, now=now):
+                raise FencedWorkerError(
+                    f"chunk write conflict for run {run_id}: lease is not "
+                    f"live for worker {actor!r} (expired/released/reclaimed)",
+                    run_id=run_id,
+                ) from err
             existing = self._session.scalar(
                 select(S12ExportChunk).where(
                     S12ExportChunk.run_id == run_id,
@@ -755,11 +930,18 @@ class S12ExportRepository:
                 raise S12ExportError(
                     f"chunk write conflict resolved to no row: {err.orig}"
                 ) from err
-            if existing.content_hash != content_hash:
+            material_same = (
+                existing.core_start_frame == core_start_frame
+                and existing.core_end_frame == core_end_frame
+                and existing.overlap_before == overlap_before
+                and existing.overlap_after == overlap_after
+            )
+            if existing.content_hash != content_hash or not material_same:
                 raise StaleIdentityError(
                     f"chunk (run {run_id}, index {chunk_index}, attempt "
-                    f"{attempt}) already pinned with a different content_hash "
-                    "(ambiguous identity — refusing to overwrite)"
+                    f"{attempt}) already pinned with a different material "
+                    "identity (content_hash/core frame/overlap) — refusing "
+                    "to overwrite an ambiguous replay"
                 ) from err
             if (
                 expected_content_hash is not None
@@ -792,7 +974,6 @@ class S12ExportRepository:
         chunk = self._session.get(S12ExportChunk, chunk_id)
         if chunk is None:
             raise S12ExportError(f"export chunk {chunk_id!r} not found")
-        self._require_fence_token(chunk.run_id, actor, fence_token)
         allowed = {
             "pending": ("running", "skipped"),
             "running": ("completed", "failed", "skipped"),
@@ -804,18 +985,63 @@ class S12ExportRepository:
             raise S12ExportError(
                 f"invalid chunk transition {chunk.state!r} -> {to_state!r}"
             )
-        if chunk.revision != expected_revision:
+        now = datetime.now(UTC)
+        verified_sql = (
+            "verified = :verified, " if verified is not None else ""
+        )
+        result = cast(
+            "CursorResult[Any]",
+            self._session.execute(
+                sa_text(
+                    "UPDATE s12_export_chunk SET state = :to_state, "
+                    + verified_sql
+                    + "revision = revision + 1, updated_at = :now "
+                    "WHERE id = :cid AND state = :cur_state "
+                    "AND revision = :expected AND EXISTS ("
+                    "SELECT 1 FROM s12_export_chunk c2 "
+                    "JOIN s12_export_lease L ON L.run_id = c2.run_id "
+                    "WHERE c2.id = :cid AND L.worker_id = :wid "
+                    "AND L.fence_token = :tok AND L.expires_at > :now)"
+                ).bindparams(
+                    to_state=to_state,
+                    cid=chunk_id,
+                    cur_state=chunk.state,
+                    expected=expected_revision,
+                    wid=actor,
+                    tok=fence_token,
+                    now=now,
+                    **({"verified": verified} if verified is not None else {}),
+                )
+            ),
+        )
+        if result.rowcount == 1:
+            self._session.flush()
+            self._session.expire(chunk)
+            fresh = self._session.get(S12ExportChunk, chunk_id)
+            if fresh is None:  # pragma: no cover - defensive
+                raise S12ExportError(f"export chunk {chunk_id!r} not found")
+            return _map_chunk(fresh)
+        # Loser path: classify from DB truth.
+        self._session.rollback()
+        fresh = self._session.get(S12ExportChunk, chunk_id)
+        if fresh is None:
+            raise S12ExportError(f"export chunk {chunk_id!r} not found")
+        run_id = fresh.run_id
+        if not self._lease_live_sql(run_id, actor, fence_token, now=now):
+            raise FencedWorkerError(
+                f"chunk transition lost for {chunk_id}: lease is not live for "
+                f"worker {actor!r} (expired/released/reclaimed)",
+                run_id=run_id,
+            )
+        if fresh.revision != expected_revision:
             raise S12ExportError(
                 f"revision mismatch for chunk {chunk_id}: expected "
-                f"{expected_revision}, current {chunk.revision}"
+                f"{expected_revision}, current {fresh.revision}"
             )
-        chunk.state = to_state
-        if verified is not None:
-            if verified not in (0, 1):
-                raise S12ExportError("verified must be 0 or 1")
-            chunk.verified = verified
-        chunk.revision += 1
-        return _map_chunk(chunk)
+        raise S12ExportError(
+            f"invalid chunk transition {fresh.state!r} -> {to_state!r} "
+            f"(concurrent winner already moved the chunk)"
+        )
 
     def list_chunks(self, run_id: str) -> list[ChunkRecord]:
         """List chunk snapshots for a run in order_index order."""
