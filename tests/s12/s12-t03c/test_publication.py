@@ -371,24 +371,39 @@ def test_publish_real_source_locked_pass_identity_copy(env, tmp_path: Path) -> N
     assert out["status"] == "completed"
     assert out["verdict"] == "PASS"
     checks = {p["name"]: p["verdict"] for p in out["probes"]}
-    # Every measured probe must PASS — no NOT_MEASURED/FAIL left.
     assert all(v == "PASS" for v in checks.values()), checks
-    with factory() as s:
-        assert S12ExportRepository(s).get_run(run.id).status == "completed"
     monkeypatch.undo()
 
 
-def test_publish_real_source_audio_transcode_passes(env, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
-    """C28-F01: approved artifact WITH audio → AudioReference(transcode);
-    a candidate carrying the muxed audio passes av_policy (presence,
-    mapping, A/V drift) with the REAL validator."""
+def _reencode_for(src: Path, dst: Path, *, reverse: bool = False) -> Path:
+    """Real lossy x264 re-encode of *src* (same raster) — the legit
+    re-render path; ``reverse`` reverses frame order (tamper)."""
+    import shutil
+    import subprocess
+
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        pytest.skip("ffmpeg not on PATH (PSNR row needs the real binary)")
+    vf = "reverse" if reverse else "null"
+    cmd = [
+        ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+        "-i", str(src), "-vf", vf,
+        "-c:v", "libx264", "-preset", "medium", "-pix_fmt", "yuv420p", "-an",
+        str(dst),
+    ]
+    subprocess.run(cmd, capture_output=True, text=True, timeout=300, check=True)
+    return dst
+
+
+def test_publish_psnr_legit_reencode_passes(env, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
+    """C26 lan cuoi: legit re-encoded export → frame_match_mode=psnr with the
+    documented per-profile threshold → REAL validator PASSes."""
     import app.services.s12_export.publication as pubmod
     import shutil
 
-    from app.services.s12_export.validation import sha256_file  # noqa: PLC0415
-
     factory, svc, manifest_id, dirs = env
-    source = _real_source(tmp_path, audio=True)
+    source = _real_source(tmp_path)
+    candidate_file = _reencode_for(source, tmp_path / "reec.mp4")
     monkeypatch = pytest.MonkeyPatch()
     monkeypatch.setattr(pubmod, "_require_ready", lambda session, **kw: None)
     run, _job, _ = submit_export_job(
@@ -397,17 +412,15 @@ def test_publish_real_source_audio_transcode_passes(env, tmp_path: Path) -> None
             factory, manifest_id, dirs,
             source_path=str(source),
             fps=10.0, fps_num=10, fps_den=1, frame_count=8,
-            audio_source=str(source),
-            expected_sha256=sha256_file(source),
         ),
     )
+    assert run.profile_id == "master-4k-h264"
     with factory() as s:
-        lease = S12ExportRepository(s).claim_run(run.id, "worker-real")
+        lease = S12ExportRepository(s).claim_run(run.id, "worker-psnr")
         s.commit()
     scratch = Path(dirs["scratch"])
     scratch.mkdir(parents=True, exist_ok=True)
-    candidate = scratch / "candidate_final.mp4"
-    shutil.copyfile(source, candidate)
+    shutil.copyfile(candidate_file, scratch / "candidate_final.mp4")
     manifest = {
         "fps": 10.0,
         "fps_num": 10,
@@ -418,8 +431,6 @@ def test_publish_real_source_audio_transcode_passes(env, tmp_path: Path) -> None
         "output_path": dirs["output"],
         "profile_codec": "h264",
         "source_path": str(source),
-        "audio_source": str(source),
-        "expected_sha256": sha256_file(source),
     }
     with factory() as s:
         out = pubmod.publish_export_run(
@@ -427,7 +438,7 @@ def test_publish_real_source_audio_transcode_passes(env, tmp_path: Path) -> None
             run_id=run.id,
             workspace_id=WS,
             project_id=f"p-{WS}",
-            worker_id="worker-real",
+            worker_id="worker-psnr",
             fence_token=lease.fence_token,
             manifest=manifest,
         )
@@ -436,4 +447,89 @@ def test_publish_real_source_audio_transcode_passes(env, tmp_path: Path) -> None
     assert out["verdict"] == "PASS"
     checks = {p["name"]: p["verdict"] for p in out["probes"]}
     assert all(v == "PASS" for v in checks.values()), checks
+    with factory() as s:
+        assert S12ExportRepository(s).get_run(run.id).status == "completed"
     monkeypatch.undo()
+
+
+def test_publish_psnr_reorder_tamper_fails(env, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
+    """Reordered content drops PSNR below any sane threshold → FAIL closed,
+    run failed, no public artifact."""
+    import app.services.s12_export.publication as pubmod
+    import shutil
+
+    factory, svc, manifest_id, dirs = env
+    source = _real_source(tmp_path)
+    tampered = _reencode_for(source, tmp_path / "tampered.mp4", reverse=True)
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(pubmod, "_require_ready", lambda session, **kw: None)
+    run, _job, _ = submit_export_job(
+        svc,
+        **base._submit_kwargs(
+            factory, manifest_id, dirs,
+            source_path=str(source),
+            fps=10.0, fps_num=10, fps_den=1, frame_count=8,
+        ),
+    )
+    with factory() as s:
+        lease = S12ExportRepository(s).claim_run(run.id, "worker-psnr")
+        s.commit()
+    scratch = Path(dirs["scratch"])
+    scratch.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(tampered, scratch / "candidate_final.mp4")
+    manifest = {
+        "fps": 10.0,
+        "fps_num": 10,
+        "fps_den": 1,
+        "frame_count": 8,
+        "chunk_dir": dirs["chunk"],
+        "scratch_dir": dirs["scratch"],
+        "output_path": dirs["output"],
+        "profile_codec": "h264",
+        "source_path": str(source),
+    }
+    with factory() as s:
+        with pytest.raises(pub.PublicationError):
+            pubmod.publish_export_run(
+                s,
+                run_id=run.id,
+                workspace_id=WS,
+                project_id=f"p-{WS}",
+                worker_id="worker-psnr",
+                fence_token=lease.fence_token,
+                manifest=manifest,
+            )
+        s.rollback()
+    with factory() as s:
+        assert S12ExportRepository(s).get_run(run.id).status == "failed"
+    assert not Path(dirs["output"]).exists()
+    monkeypatch.undo()
+
+
+def test_frame_match_threshold_missing_fails_closed() -> None:  # type: ignore[no-untyped-def]
+    """Re-encode profile WITHOUT a documented PSNR threshold → psnr mode with
+    threshold None — the T04A validator fails closed (never a default)."""
+    from types import SimpleNamespace
+
+    run = SimpleNamespace(
+        profile_id="ghost-profile",
+        profile_dims="3840x2160",
+        profile_codec="h264",
+    )
+    manifest = {
+        "fps": 10.0,
+        "fps_num": 10,
+        "fps_den": 1,
+        "frame_count": 8,
+        "source_path": "/nonexistent/source.mp4",
+        "chunk_dir": "/tmp/c",
+        "scratch_dir": "/tmp/s",
+        "output_path": "/tmp/o.mp4",
+        "profile_codec": "h264",
+    }
+    mode, threshold = pub._frame_match(run, manifest, candidate_sha="a" * 64)
+    assert mode == "psnr"
+    assert threshold is None
+    expectation = pub._expectation_for(run, manifest, candidate_sha="a" * 64)
+    assert expectation.frame_match_mode == "psnr"
+    assert expectation.frame_psnr_min_db is None

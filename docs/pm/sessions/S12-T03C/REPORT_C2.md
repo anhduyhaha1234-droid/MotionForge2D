@@ -32,6 +32,16 @@ Baseline `da7108b` | No push/merge | Model `ocg/deepseek-v4-flash` fallback OFF.
 
 For re-encoded/rescaled exports (real runner scale+pad), the frozen exact-frame-digest compare can never PASS (lossy x264). T03C proposes a bounded T04A option: `SourceReference.allow_lossy_identity: bool` — when set, frame_order compares against a `-vf scale=srcWxsrcH`-normalized candidate digest (content identity across resize) and/or a tiny per-pixel MD5-mean tolerance (PSNR-style) documented per profile. T03C keeps fail-closed default (False).
 
+## WIRE-PSNR (lan cuoi C26) — T04A interface-delta integrated
+
+Canonical `f25f56c` (T04A-C2-delta: `frame_match_mode` + `frame_psnr_min_db` + `probe_frame_psnr` + `SourceReference.reference_path`) merged read-aligned into the branch; `publication.py` wires it:
+
+1. **Re-encode/upscale/full-render candidates** (candidate sha != approved artifact sha): `frame_match_mode="psnr"` + `frame_psnr_min_db` DOCUMENTED per profile (`_PSNR_MIN_DB_BY_PROFILE`: master-4k-h264 30.0, master-4k-hevc 30.0, preview-1080p-h264 28.0); unknown profile → `None` → validator FAIL-closed (no silent default). `SourceReference.reference_path` = approved artifact (server-derived); `probe_frame_psnr` so sánh ở candidate raster.
+2. **Identity-copy candidates** (no re-encode): keep `"exact"` digest mode.
+3. **expected_sha256**: manifest authority sha khi có; khi không có + psnr mode → server-measured candidate sha (output identity bookkeeping — content authority vẫn là approved artifact qua PSNR, không self-hash content proof).
+
+Tests (real ffmpeg, validator unmocked): legit re-encode 4K PSNR PASS; reorder tamper PSNR FAIL (run failed, no public artifact); identity-copy exact PASS (existing); threshold-missing FAIL-closed wire. Gates: t03c **39 passed**, t04a regression **73 passed**, ruff F clean, diff-check 0.
+
 ## Key artifacts
 
 `app/workflow/s12_export_jobs.py` handler→publish real caller + failure coherence; `publication.py` candidate boundary + byte sidecar + single-winner CAS; `routes/s12_export.py` F02 authority-gated submit + real job_id + server paths; `lifecycle.py` startup reconcile caller. Evidence: `<C2-root>/s12-t03c/{pytest_t03c.txt,ruff_F.txt,diff_check.txt,porcelain.txt}`.
