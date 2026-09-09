@@ -480,7 +480,9 @@ export function ExportPanel({ projectId, videoItemId, workspaceId, initialRunId 
         />
       )}
 
-      {runStatus?.status === "completed" && <ExportEvidence data={runStatus} />}
+      {runStatus?.status === "completed" && (
+        <ExportEvidence data={runStatus} workspaceId={workspaceId} projectId={projectId} />
+      )}
     </section>
   );
 }

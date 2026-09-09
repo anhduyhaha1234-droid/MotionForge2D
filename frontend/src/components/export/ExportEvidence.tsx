@@ -1,23 +1,53 @@
 "use client";
 
-import { useState } from "react";
-import { isS12ExportCompleted, type S12ExportRunStatusPayload } from "@/lib/s12-export-api";
+import { useCallback, useEffect, useState } from "react";
+import {
+  exportResult,
+  isS12ExportCompleted,
+  s12MediaUrl,
+  type S12ExportResultPayload,
+  type S12ExportRunStatusPayload,
+} from "@/lib/s12-export-api";
 
 const HELPER = "text-[11px] leading-snug text-gray-400";
-const SERVER_OUTPUT_NOTE =
-  "Đầu ra được backend ghi và xác nhận ở phía server. Export API không trả media URL cho panel này, nên không có URL media nào được hiển thị hoặc suy diễn.";
 
 interface ExportEvidenceProps {
   data: S12ExportRunStatusPayload | null;
+  /** Only needed for C22 result fetch; the media URL is server-owned. */
+  workspaceId?: string;
+  projectId?: string;
 }
 
 function copyValue(value: string | null): string {
   return value ?? "—";
 }
 
-export function ExportEvidence({ data }: ExportEvidenceProps) {
+export function ExportEvidence({ data, workspaceId, projectId }: ExportEvidenceProps) {
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
+  const [result, setResult] = useState<S12ExportResultPayload | null>(null);
+  const [resultError, setResultError] = useState<string | null>(null);
+
+  // C22-part positive access: fetch the server-owned result metadata only
+  // when the run is completed; the media URL is resolved BY THE SERVER and
+  // the panel NEVER invents a path/hash/URL of its own.
+  const loadResult = useCallback(async () => {
+    if (!data || !isS12ExportCompleted(data.status)) return;
+    setResultError(null);
+    try {
+      const payload = await exportResult(data.run_id, workspaceId, projectId);
+      setResult(payload);
+    } catch (error: unknown) {
+      setResult((prev) => (prev ? prev : null));
+      setResultError(error instanceof Error ? error.message : "Không tải được kết quả export.");
+    }
+  }, [data, workspaceId, projectId]);
+
+  useEffect(() => {
+    if (data && isS12ExportCompleted(data.status)) {
+      void loadResult();
+    }
+  }, [data, loadResult]);
 
   if (!data || !isS12ExportCompleted(data.status)) return null;
 
@@ -32,6 +62,8 @@ export function ExportEvidence({ data }: ExportEvidenceProps) {
       setCopyError("Không thể sao chép ghi chú server trên trình duyệt này.");
     }
   };
+
+  const mediaHref = result ? s12MediaUrl(result.media_url) : null;
 
   return (
     <section
@@ -98,6 +130,41 @@ export function ExportEvidence({ data }: ExportEvidenceProps) {
         <p className={HELPER}>Mỗi dòng là chunk identity/state/verified/attempt nhận từ server.</p>
       </div>
 
+      <div className="mt-4 min-w-0 rounded border border-emerald-700/50 bg-emerald-900/10 p-3">
+        <p className="text-xs font-medium text-emerald-200">Kết quả export (server-owned)</p>
+        {result ? (
+          <div className="mt-2 min-w-0 space-y-2">
+            <p className="break-all font-mono text-[11px] text-gray-300">
+              {result.filename} · {(result.size_bytes / 1024).toFixed(1)} KB · {result.mime}
+            </p>
+            <video
+              controls
+              preload="metadata"
+              data-testid="export-result-player"
+              className="max-h-64 w-full rounded border border-gray-800 bg-black"
+              src={mediaHref ?? undefined}
+            />
+            <div className="flex min-w-0 flex-col items-start gap-1">
+              <a
+                href={mediaHref ?? undefined}
+                download={result.filename}
+                className="min-h-9 rounded bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-600"
+                data-testid="export-result-download"
+              >
+                Tải kết quả ({result.filename})
+              </a>
+              <p className={HELPER}>URL media do backend cấp (result.media_url); panel không tự xây hay suy diễn đường dẫn nào.</p>
+            </div>
+          </div>
+        ) : resultError ? (
+          <p className="mt-2 text-[11px] text-red-300" role="alert">
+            Không tải được kết quả export: {resultError}
+          </p>
+        ) : (
+          <p className="mt-2 text-[11px] text-gray-400">Đang tải thông tin kết quả từ server…</p>
+        )}
+      </div>
+
       <div className="mt-4 min-w-0 rounded border border-gray-700 bg-gray-900/50 p-3">
         <p className="break-words text-xs text-gray-200">{SERVER_OUTPUT_NOTE}</p>
         <div className="mt-2 flex flex-col items-start gap-1">
@@ -109,10 +176,13 @@ export function ExportEvidence({ data }: ExportEvidenceProps) {
           >
             {copied ? "Đã sao chép ghi chú" : "Sao chép ghi chú server"}
           </button>
-          <p className={HELPER}>Sao chép nguyên văn ghi chú về output server; không sao chép hay tạo media URL.</p>
+          <p className={HELPER}>Sao chép nguyên văn ghi chú về output server; media URL chỉ lấy từ server khi có.</p>
           {copyError && <p className="text-[11px] text-red-300" role="alert">{copyError}</p>}
         </div>
       </div>
     </section>
   );
 }
+
+const SERVER_OUTPUT_NOTE =
+  "Đầu ra được backend ghi và xác nhận ở phía server. Bản ghi này chỉ mô tả output; mọi đường dẫn/URL media phải do server cấp qua result endpoint.";

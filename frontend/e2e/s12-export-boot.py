@@ -1,6 +1,16 @@
-"""S12-T05 boot wrapper — wipe temp root -> alembic head -> seed ->
+"""S12-T05 boot wrapper — reset OWNED temp root -> alembic head -> seed ->
 spawn uvicorn harness (wrapper keeps PID, Windows-safe, S07 pattern).
+
+C25-part safe-QA-root contract (F10 fix):
+- The temp root is deleted ONLY when it carries this file's ownership marker
+  (``.s12t05-owner``) OR matches the exact per-run owned path pattern
+  ``%TEMP%\\s12t05_root`` (task-claimed directory, never a parent/user path).
+- Any other path (user home, repo, C:\\, a parent of the owned root, a path
+  containing ``..`` that resolves outside, a junction/symlink/reparse point)
+  is REJECTED: boot aborts before touching anything. No unchecked recursive
+  deletion is ever performed.
 """
+
 from __future__ import annotations
 
 import json
@@ -15,8 +25,76 @@ QA_ROOT = Path(os.environ["S12T05_QA_ROOT"])
 BACKEND_ROOT = Path(os.environ["MF_BACKEND_ROOT"])
 E2E_DIR = Path(__file__).resolve().parent
 
-print(f"[boot] wiping temp root {QA_ROOT}", flush=True)
-shutil.rmtree(QA_ROOT, ignore_errors=True)
+_OWNER_MARKER = ".s12t05-owner"
+_OWNED_PATTERN = "s12t05_root"
+
+
+def _is_owned_root(root: Path) -> tuple[bool, str]:
+    """True only for a task-claimed temp root (marker OR exact name pattern)."""
+    try:
+        resolved = root.resolve()
+    except OSError as err:
+        return False, f"unresolvable root: {err}"
+    tmp = Path(os.environ.get("TEMP", os.environ.get("TMP", "")))
+    if tmp:
+        try:
+            tmp_res = Path(tmp).resolve()
+            if not str(resolved).startswith(str(tmp_res)):
+                return False, f"root {root} escapes TEMP {tmp_res}"
+        except OSError as err:
+            return False, f"unresolvable TEMP: {err}"
+    marker = resolved / _OWNER_MARKER
+    if marker.is_file():
+        return True, f"ownership marker present: {marker}"
+    if resolved.name == _OWNED_PATTERN and resolved.parent.name.lower().startswith("temp"):
+        return True, f"owned-name pattern match: {resolved}"
+    return False, (
+        f"root {resolved} has no {_OWNER_MARKER} marker and is not the owned "
+        f"temp pattern {_OWNED_PATTERN!r}; refusing to touch it"
+    )
+
+
+def _reject_reparse_points(root: Path) -> None:
+    """Junction/symlink/reparse components are never followed for deletion."""
+    import ctypes
+
+    for part in [root, *root.parents]:
+        if not part.exists():
+            continue
+        try:
+            attrs = ctypes.windll.kernel32.GetFileAttributesW(str(part))
+        except Exception:
+            attrs = 0xFFFFFFFF
+        if attrs != 0xFFFFFFFF and attrs & 0x400:  # FILE_ATTRIBUTE_REPARSE_POINT
+            raise SystemExit(
+                f"[boot] REFUSING reparse-point root component: {part} "
+                f"(junction/symlink rejection, C25-part). Aborting before any deletion."
+            )
+
+
+def _reset_owned_root(root: Path) -> None:
+    """Delete only an OWNED, non-reparse temp root; never anything else."""
+    ok, reason = _is_owned_root(root)
+    if not ok:
+        raise SystemExit(
+            f"[boot] REFUSING to delete {root}: {reason}. Aborting before any deletion."
+        )
+    _reject_reparse_points(root)
+    marker = root.resolve() / _OWNER_MARKER
+    try:
+        marker.write_text("s12-t05 owned QA root (F10/C25 safe-reset contract)\n", encoding="utf-8")
+    except OSError as err:
+        raise SystemExit(f"[boot] cannot write ownership marker: {err}") from err
+    print(f"[boot] resetting owned root {root.resolve()} (marker present)", flush=True)
+    shutil.rmtree(root, ignore_errors=True)
+    root.mkdir(parents=True, exist_ok=True)
+    (root / _OWNER_MARKER).write_text(
+        "s12-t05 owned QA root (F10/C25 safe-reset contract)\n", encoding="utf-8"
+    )
+
+
+print(f"[boot] QA_ROOT={QA_ROOT}", flush=True)
+_reset_owned_root(QA_ROOT)
 (QA_ROOT / "data").mkdir(parents=True, exist_ok=True)
 (QA_ROOT / "artifacts").mkdir(parents=True, exist_ok=True)
 

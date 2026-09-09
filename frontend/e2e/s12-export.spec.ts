@@ -3,20 +3,23 @@ import { test, expect } from "@playwright/test";
 /**
  * S12-T05 Export UI — real-backend E2E (no route mocks anywhere).
  *
- * Runs against the task-owned backend (localhost:8415, test-only harness
- * mounting production app + s12_export router — the W4 production wiring
- * (9a91e18) is NOT in this branch's history, so the harness mount stays)
- * + frontend (localhost:3015) via playwright.s12-export.config.ts. Seeds
- * REAL durable rows via the repo-adjacent seed script (T03C fixture shape).
+ * Runs against the production backend (localhost:8415 — the T03C router
+ * is now production-mounted on the canonical app, so no test-only router
+ * include anywhere; the harness boots `app.api.app` as-is) + frontend
+ * (localhost:3015) via playwright.s12-export.config.ts. Seeds REAL durable
+ * rows via the repo-adjacent seed script (T03C fixture shape).
  *
  * Verified backend behaviour (fail-closed, asserted as-is):
- *  - T02 capability gate NOT implemented (profile_supported=False hardcoded)
- *    => preflight NEVER eligible through the real API; eligible path is a
- *    client-side state the panel must still render if the API ever returns it.
- *  - readiness aggregate over BOTH seeded videos => not_run (Decision F).
+ *  - server-owned authority (C2 F02): client never supplies filesystem
+ *    paths; submit body is FLAT checkpoint/manifest pins + profile/plan.
+ *  - preflight resolves the REAL Full Apply authority + readiness first, so
+ *    a fixture without completed Full Apply publication fails closed
+ *    (S12_EXPORT_FULL_APPLY_MISSING / NOT_READY) — never a fake eligible.
  *  - submit 202 real run -> poll status -> cancel 200 (pending->cancelled)
  *    -> retry 202 (cancelled->pending, new attempt) -> completed seed shows
  *    evidence + identity via /export?run=<completed-id>.
+ *  - C22 access: a VALID completed result is reachable through the server's
+ *    owned endpoints; no client-invented media URL is ever constructed.
  */
 import fs from "fs";
 import path from "path";
@@ -32,6 +35,7 @@ const QA_ROOT =
 interface SeedResult {
   case: string;
   project_id: string;
+  project_blocked_id: string;
   workspace_id: string;
   video_ready: string;
   video_blocked: string;
@@ -44,7 +48,10 @@ interface SeedResult {
   plan_id: string;
   plan_hash: string;
   pending_run_id: string;
+  cancel_run_id: string;
+  retry_base_run_id: string;
   completed_run_id: string;
+  tampered_run_id: string;
 }
 
 function submitBody(seed: SeedResult, idem: string, salt?: string) {
@@ -73,11 +80,6 @@ function submitBody(seed: SeedResult, idem: string, salt?: string) {
     plan_hash: `${seed.plan_hash.slice(0, 56)}${planTail}`,
     frame_count: 100,
     chunk_config: { overlap: 5, max_frames: 50 },
-    source_path: path.join(QA_ROOT, "artifacts", "s12t05", "source_ready.mp4"),
-    fps: 30.0,
-    chunk_dir: path.join(QA_ROOT, "chunks"),
-    scratch_dir: path.join(QA_ROOT, "scratch"),
-    output_path: path.join(QA_ROOT, "out.mp4"),
     idempotency_key: unique,
   };
 }
@@ -116,7 +118,7 @@ test("trang trong hien trang thai rong tieng Viet", async ({ page }) => {
 
 test("preflight that: video blocked tra SOURCE_MISSING", async ({ request }) => {
   const res = await request.post(
-    `${API}/api/v2/projects/${seed.project_id}/export/preflight`,
+    `${API}/api/v2/projects/${seed.project_blocked_id}/export/preflight`,
     {
       data: {
         video_item_id: seed.video_blocked,
@@ -141,9 +143,12 @@ test("preflight that: video blocked tra SOURCE_MISSING", async ({ request }) => 
   expect(body.reasons).toContain("S12_EXPORT_SOURCE_MISSING");
 });
 
-test("preflight that: video ready fail-closed vi T02 capability + readiness", async ({
+test("preflight that: video ready eligible that (authority + readiness real)", async ({
   request,
 }) => {
+  // C2 server-owned authority + readiness: seed cung cấp completed Full
+  // Apply publication + completed FULL QC band run (T03G band registered
+  // production) => preflight phải eligible TRÊN API THẬT (positive path).
   const res = await request.post(
     `${API}/api/v2/projects/${seed.project_id}/export/preflight`,
     {
@@ -166,14 +171,16 @@ test("preflight that: video ready fail-closed vi T02 capability + readiness", as
   );
   expect(res.status()).toBe(200);
   const body = await res.json();
-  expect(body.eligible).toBe(false);
-  expect(body.reasons).toContain("S12_EXPORT_UNSUPPORTED_PROFILE");
+  expect(body.eligible).toBe(true);
+  expect(body.reasons).toContain("S12_EXPORT_OK");
 });
 
-test("submit that -> 202, poll status that thay pending/running", async ({
+test("submit that -> 202 real (readiness+authority ready)", async ({
   request,
   page,
 }, testInfo) => {
+  // C2 base fb59215: T03G band + Full Apply authority đều sẵn sàng, submit
+  // qua API THẬT phải 202 và run pending/running (worker real có thể claim).
   const res = await request.post(`${API}/s12-exports/submit`, {
     data: submitBody(seed, "s12t05-ui-submit", `${testInfo.project.name}:${testInfo.title}`),
   });
@@ -196,13 +203,14 @@ test("submit that -> 202, poll status that thay pending/running", async ({
   await expect(page.getByTestId("export-progress")).toBeVisible();
 });
 
-test("cancel that run pending -> cancelled", async ({ request }, testInfo) => {
-  const res = await request.post(`${API}/s12-exports/submit`, {
-    data: submitBody(seed, "s12t05-ui-cancel", `${testInfo.project.name}:${testInfo.title}`),
-  });
-  expect(res.status()).toBe(202);
-  const { run_id } = await res.json();
-
+test("cancel that run pending -> cancelled", async ({ request, isMobile }) => {
+  // State-changing: the desktop project owns this API test (the seeded DB
+  // is shared between projects; cancel is terminal so one project runs it).
+  test.skip(!!isMobile, "state-changing API test runs once (desktop)");
+  // Runs against the SEED cancel run (repo-created, no durable job, so
+  // the production worker never claims it mid-test): cancel over the real
+  // API must 200 → cancelled.
+  const run_id = seed.cancel_run_id;
   const cancel = await request.post(`${API}/s12-exports/${run_id}/cancel`, {
     data: { workspace_id: "default" },
   });
@@ -211,16 +219,14 @@ test("cancel that run pending -> cancelled", async ({ request }, testInfo) => {
   expect(body.status).toBe("cancelled");
 });
 
-test("retry run cancelled -> tao run ke thua status pending", async ({ request }, testInfo) => {
-  const res = await request.post(`${API}/s12-exports/submit`, {
-    data: submitBody(seed, "s12t05-ui-retry", `${testInfo.project.name}:${testInfo.title}`),
-  });
-  expect(res.status()).toBe(202);
-  const { run_id } = await res.json();
-  await request.post(`${API}/s12-exports/${run_id}/cancel`, {
-    data: { workspace_id: "default" },
-  });
-
+test("retry run cancelled -> tao run ke thua status pending", async ({ request, isMobile }) => {
+  // State-changing (same rationale as cancel): desktop only.
+  test.skip(!!isMobile, "state-changing API test runs once (desktop)");
+  // The SEED retry base run is already cancelled WITH its real durable job
+  // (job row in cancelling) so retry inherits render pins from the real
+  // job manifest through the real submit path (202) — the assert is the
+  // predecessor linkage, never a fake happy path.
+  const run_id = seed.retry_base_run_id;
   const retry = await request.post(`${API}/s12-exports/${run_id}/retry`, {
     data: { workspace_id: "default" },
   });
@@ -256,12 +262,12 @@ test("run completed seed hien evidence + dinh danh + tieng Viet", async ({
 test("C21: refresh giu nguyen run dang active, khong tao run moi", async ({
   request,
   page,
-}, testInfo) => {
-  const res = await request.post(`${API}/s12-exports/submit`, {
-    data: submitBody(seed, "s12t05-ui-c21", `${testInfo.project.name}:${testInfo.title}`),
-  });
-  expect(res.status()).toBe(202);
-  const { run_id } = await res.json();
+}) => {
+  // Server owns the run; localStorage keeps only pointers.  The seed
+  // pending run is repo-created (no durable job) so it stays active for
+  // the whole spec; refresh/reopen must show the SAME run with live
+  // status — never a forked/empty local copy.
+  const run_id = seed.pending_run_id;
   const url =
     `${FE}/export?run=${run_id}&project=${seed.project_id}&video=${seed.video_ready}`;
   await page.goto(url);
@@ -281,12 +287,13 @@ test("C21: refresh giu nguyen run dang active, khong tao run moi", async ({
   await expect(page.getByTestId("export-run-id")).toContainText(run_id.slice(0, 8));
 });
 
-// ── C22 result-access: evidence only for completed; nothing served ────────
-// The status API carries no media/download URL; the panel must not invent
-// one. Non-completed runs show progress, never evidence; unknown/stale run
-// ids surface an error, never evidence.
+// ── C22 result-access: completed run plays/downloads via server URL ─────
+// C22-part backend (T03C addendum fb59215): GET /s12-exports/{run}/result
+// returns server-owned media_url; GET /media streams the REAL video bytes
+// ONLY for completed + owned runs with matching sidecar.  The UI uses that
+// server URL verbatim — never an invented path.
 
-test("C22: run completed khong co media URL hay download tu suy dien", async ({
+test("C22: run completed -> result media_url server-owned + UI player/download", async ({
   page,
 }) => {
   await page.goto(
@@ -294,8 +301,77 @@ test("C22: run completed khong co media URL hay download tu suy dien", async ({
   );
   const evidence = page.getByTestId("export-evidence");
   await expect(evidence).toBeVisible();
-  expect(await evidence.locator("a[href], video, audio").count()).toBe(0);
-  expect(await page.locator("a[href$='.mp4']").count()).toBe(0);
+  const player = page.getByTestId("export-result-player");
+  await expect(player).toBeVisible();
+  const src = await player.getAttribute("src");
+  expect(src).toContain(`/s12-exports/${seed.completed_run_id}/media`);
+  const download = page.getByTestId("export-result-download");
+    await expect(download).toBeVisible();
+    await expect(download).toHaveAttribute(
+      "href",
+      new RegExp(`/s12-exports/${seed.completed_run_id}/media`),
+    );
+    await expect(download).toContainText(/export_master\.mp4/);
+});
+
+test("C22: result metadata that + media tra dung video/mp4 bytes that", async ({
+  request,
+}) => {
+  const res = await request.get(
+    `${API}/s12-exports/${seed.completed_run_id}/result?workspace_id=default`,
+  );
+  expect(res.status()).toBe(200);
+  const body = await res.json();
+  expect(body.status).toBe("completed");
+  expect(body.media_url).toBe(`/s12-exports/${seed.completed_run_id}/media`);
+  expect(body.mime).toBe("video/mp4");
+  expect(body.size_bytes).toBeGreaterThan(1024);
+
+  const media = await request.get(
+    `${API}${body.media_url}?workspace_id=default`,
+  );
+  expect(media.status()).toBe(200);
+  expect(media.headers()["content-type"]).toMatch(/video\/mp4/);
+  const bytes = await media.body();
+  expect(bytes.length).toBe(body.size_bytes);
+  // mp4 ftyp atom — playable container, không phải stub/empty
+  const magic = bytes.subarray(4, 12).toString("latin1");
+  expect(magic).toContain("ftyp");
+});
+
+test("C22: pending/failed run -> result bi tu choi (409, khong media)", async ({
+  request,
+}) => {
+  const res = await request.get(
+    `${API}/s12-exports/${seed.pending_run_id}/result?workspace_id=default`,
+  );
+  expect(res.status()).toBe(409);
+  const media = await request.get(
+    `${API}/s12-exports/${seed.pending_run_id}/media?workspace_id=default`,
+  );
+  expect(media.status()).toBe(409);
+});
+
+test("C22: cross-project run -> 404 (khong lo result cua project khac)", async ({
+  request,
+}) => {
+  const res = await request.get(
+    `${API}/s12-exports/${seed.completed_run_id}/result?workspace_id=default&project_id=other-project`,
+  );
+  expect(res.status()).toBe(404);
+});
+
+test("C22: tampered artifact -> 403 (byte identity mismatch, khong serve)", async ({
+  request,
+}) => {
+  const res = await request.get(
+    `${API}/s12-exports/${seed.tampered_run_id}/result?workspace_id=default`,
+  );
+  expect(res.status()).toBe(403);
+  const media = await request.get(
+    `${API}/s12-exports/${seed.tampered_run_id}/media?workspace_id=default`,
+  );
+  expect(media.status()).toBe(403);
 });
 
 test("C22: run pending chi thay progress, khong thay evidence", async ({
