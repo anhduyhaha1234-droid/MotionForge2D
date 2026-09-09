@@ -96,5 +96,13 @@ owner, không tự fix).
   Repro: `ok_ctx(source_width=3840, source_height=2160,
   source_native_4k=False)` -> `classify_source_kind(...) == "native_4k"`.
   Verifier does not fix production.
+- INT01 C1 correction (2026-09-09): T01-C1 closed F-OBS-01 in
+  `0d5bc77` — bare >=3840x2160 dims without proved provenance now
+  classify `upscale_4k`. T06B `test_f3` updated to assert the NEW
+  behavior (`== "upscale_4k"`). NOTE: this T06B worktree baseline
+  (`48bf514`) still carries pre-fix production, so the updated `test_f3`
+  FAILS locally here by design (proves the test tracks the fix) and
+  PASSES on canonical merged with T01-C1. Verifier stays read-only prod:
+  no merge/rebase of production into this branch.
 - Clean-machine: NOT_RUN (no clean VM; env `S12_T06B_CLEAN_MACHINE` unset).
   Beta packaging (T06A harness) therefore NOT claimed pass on clean machine.

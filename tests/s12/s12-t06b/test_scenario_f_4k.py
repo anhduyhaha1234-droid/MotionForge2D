@@ -158,17 +158,17 @@ def test_f3_provenance_decides_not_filesize() -> None:
     assert classify_source_kind(upscale_ctx) == "upscale_4k"
     assert classify_source_kind(native_ctx) == "native_4k"
 
-    # F-OBS-01 (route owner T01, KHÔNG tự fix): dims >= 3840x2160 mà không
-    # có provenance flag vẫn classify native_4k qua nhánh dims-only
-    # (preflight.classify_source_kind dòng fallback). Ghi nhận hành vi thực
-    # tế tại đây để REPORT route exact owner; test giữ xanh theo behavior.
+    # F-OBS-01 CLOSED by T01-C1 (commit 0d5bc77): bare 3840x2160 dims
+    # WITHOUT proved provenance now classify "upscale_4k"
+    # (already-upscaled-4K honesty), never "native_4k".  Dims alone never
+    # imply native — "file size alone never decides".
     bare_ctx: PreflightContext = ok_ctx(
         source_width=3840,
         source_height=2160,
         source_native_4k=False,
         upscale_method=None,
     )
-    assert classify_source_kind(bare_ctx) == "native_4k"  # F-OBS-01 documented
+    assert classify_source_kind(bare_ctx) == "upscale_4k"  # F-OBS-01 closed
 
 
 def test_f4_aspect_fail_closed_and_letterbox() -> None:
