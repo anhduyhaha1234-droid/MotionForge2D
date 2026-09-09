@@ -92,6 +92,26 @@ SHA-256 `c9b068b2195461b1f867a5ec95714cea3ab09881757f5607094574d15dda428f`,
   one candidate frame). Normal render pipeline only publishes when the
   candidate raster equals the source raster. Verifier does not fix.
 
+## REVERIFY-3 on base 3439545 (T04A cross-raster PSNR fit+pad) — vòng cuối
+
+- Full T06B suite: **20 passed, 1 skipped in 89.35s**; ruff F clean.
+- Native-4K same-raster positive closure: STILL PASS (publish completed +
+  result/media 200 + playable).
+- C27 kill/restart positive: PASS. C28 audio: PASS. Tamper under PSNR:
+  reorder FAILs (no tolerance leak).
+- **F11-T06B-02 UPDATE (owner T04A/T03C) — cross-raster PSNR STILL
+  blocked on Windows**: T04A fit+pad landed, but on this machine
+  `probe_frame_psnr(candidate_4k, reference_1080p, 3840, 2160)` returns
+  **7 of 30 frames** with PSNR ~7.5dB (vs 59-71dB same-raster) -> the
+  upscale and 4:3-letterbox candidates still fail frame_order and cannot
+  publish.  Standalone evidence: the same fit+pad reference pipe decoded
+  alone yields 30 frames; the failing shape is the TWO concurrent raw
+  pipes each pushing ~12.4MB/frame — Windows pipe-read is not robust at
+  that frame size (`src vs cand` at 1920x1080 = 3.1MB/frame works: 30).
+  Test-side assertions (fail-closed) kept; verifier does not fix.
+- C26 FULL status: native-4K positive; upscale/letterbox still
+  fail-closed (F11-T06B-02 open).
+
 ## Findings routed (verifier does NOT fix production)
 
 - F11-T06B-01 (owner T03C/T04A): `publication._expectation_for` gives
