@@ -98,3 +98,52 @@ Gate W2: full `tests/s12/s12-t04a/` 48 passed (6.57s) + ruff F clean +
 
 Không sửa conftest chung/test cũ, không đụng models/migration (T03A lock),
 không touch S11 files, không đụng ports demo, không hardcode user path.
+
+## Correction C2 W2 — source-locked validator (2026-09-09, UTC+7)
+
+Owner resumed @ `0bbb3b3` (canonical post T01-C2), porcelain clean.
+RULES_LOADED: C:/Users/Admin/MotionForge2D/docs/pm/HERMES_AUTOPILOT_RULES.md,
+SHA c9b068b2…, 277 lines. Sources read before coding: REVIEW.md F01–F11
+(`.../outputs/s12-c1-review-20260909/`), S12-C2-HERMES-PROMPT.md §4 T04A +
+§5 rows C12/C19/C28, docs/contracts/s12-export.md §5/§8 (T01-C2 authority).
+
+F07 validator part closed (app/services/s12_export/validation.py only):
+- NEW dataclasses: `SourceReference` (artifact_sha256, frame_count,
+  fps_num/den, per-frame `frame_digests`, rational `cuts`, `audio`),
+  `AudioReference(mode=remux|transcode|absent, digest, stream_index)`,
+  `CutPoint(frame_index, pts_num, pts_den)`; `ValidationExpectation` gains
+  `source_locked: bool` + `source_reference`.
+- Source-locked mode: candidate self-evidence (monotonic PTS, keyframes,
+  audio presence, self-hash) is NOT accepted as proof. Probes are
+  recomputed against the independent reference: streams inventory,
+  exact frame_count, frame_order via decoded-content digests (rawvideo
+  per-frame sha256, presentation order) or rational cut placement,
+  timebase exact rational CFR (VFR rejected — no false confidence),
+  duration within the one-source-frame bound (1/fps, replacing the old
+  2%+50ms gate), av_policy presence/mapping + remux PCM digest +
+  A/V start/end drift <= 1 frame, provenance requires server-owned sha.
+- Missing reference authority → FAIL; missing content-order evidence
+  (no digests, no cuts) → NOT_MEASURED, never fake PASS.
+- NEW helpers exported: `probe_frame_digests`, `probe_audio_digest`;
+  `_probe_av_bounds` now also reports median packet deltas so end-drift
+  compares last-packet-end (a_last+a_delta vs v_last+v_delta).
+
+Tests (NEW tests/s12/s12-t04a/test_c2_source_locked.py, 16): C19 — full
+pass w/ reference; equal-length reordered content (B+A) FAIL; changed
+audio (remux digest) FAIL; timing drift FAIL; wrong reference FAIL;
+missing reference FAIL; combined reorder+audio FAIL; self-hash PASS but
+misplaced-cut reference FAILs overall. C12 — rational cut placement
+PASS; missing order authority NOT_MEASURED; wrong cut time FAIL; VFR
+(monkeypatched r_frame_rate) FAIL; fps mismatch vs rational reference
+FAIL. C28 — remux matching audio PASS; transcode explicit not
+content-compared PASS; audio start drift (+0.5s itsoffset) FAIL.
+
+Pitfalls: adelay filter silently not applied in multi-input remap (ffmpeg
+graph quirk) → drift test uses `-itsoffset` (verified real: a_first 0.476
+vs bound 0.1); AAC negative priming pts (-0.0232) is normal and inside
+the 1-frame bound; transcode re-encode adds encoder tail so end drift is
+measured packet-end-to-packet-end; cuts-only reference is legitimate
+authority (PASS), missing both digests AND cuts is NOT_MEASURED.
+
+Gates C2 W2: full tests/s12/s12-t04a/ 64 passed (14.62s) + ruff F clean
++ git diff --check 0 + T01 regression 38 passed (55.51s).
