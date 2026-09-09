@@ -1,7 +1,7 @@
 {
   "schema": "s12-t06a-manifest/1",
-  "generated_at_utc": "2026-09-07T15:42:10.616373+00:00",
-  "source_commit": "f2cdf0e73854e18564a0a8682b51ea8308adb15b",
+  "generated_at_utc": "2026-09-09T03:55:07.178621+00:00",
+  "source_commit": "ddc5d05bd716a969b6edff04025a86fe40103525",
   "backend": {
     "pins": [
       "Pillow==12.2.0",
