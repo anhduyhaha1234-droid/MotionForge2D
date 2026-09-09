@@ -95,3 +95,36 @@ Owner task S12-T02, branch `codex/s12/s12-s12-t02-0907a`, wave-base `0d04673`
   `__pycache__`; return CPU thiếu upscale_method (fix); test import
   PROFILE_ENCODERS khi cây chưa có C1 → try/except + skip marker.
 - Gates tươi: 35 passed + 1 skipped (2.06s); ruff F clean; diff-check 0.
+
+## 6. C2 W2 (2026-09-09, exact owner resumed) — verify C02 on current contract
+
+- Base `0bbb3b3` (canonical post T01-C2 authority; T02 commits be1def0→81793a8
+  đã integrate trong base). Porcelain sạch trước khi làm việc.
+- Read: REVIEW.md F01–F11 (full), S12-C2-HERMES-PROMPT.md §4 T02 + §5
+  (C02 = T01/T02; C30 = T03A/Manager), contract s12-export.md (T01-C2 §8
+  authority, server-owned fields).
+- Verify C02 trên current contract — ZERO production change cần thiết:
+  - Real encoder probes retained: `detect_capabilities` spawn-encode thật;
+    live: libx264/libx265 `encoder_ok`; h264_nvenc/hevc_nvenc
+    `encoder_failed` (reject kèm reason — không silent).
+  - Supported CPU eligible: 3/3 profiles `supported=True` qua CPU path
+    (libx264/libx265 probe-pass), reason `S12_EXPORT_OK`.
+  - No constant flag: static scan không có support hằng số; `supported`
+    chỉ derive từ probe (`cpu_encoder is not None`).
+  - No silent fallback: mọi GPU-unavailable/vram_insufficient branch khai
+    rõ "CPU fallback <enc>" trong basis; `cpu_fallback_encoder` field.
+  - Frozen selection: `S12_T02_PROFILES_VERSION = s12-t02-profiles-v1`,
+    H264/HEVC CPU+GPU encoder pools constants; profile dims/codec mirror
+    frozen `PREFLIGHT_PROFILES` (T01-owned, consume read-only).
+  - Upscale/aspect method: `labeled-upscale-<codec>-from-unproven-source`
+    cho 4K unproven origin; aspect mirror epsilon T01 (letterbox/fail-closed).
+  - Measured-vs-estimated: `estimate_for_profile` dùng measured probe
+    B/px (clamp [0.02, 2.0]) khi có probe; heuristic T01 khi không; frames
+    unknown → fail-closed. Basis luôn ghi công thức.
+  - `probe_profile_support` delegate frozen T01-C1 `probe_encoder_support`
+    khi có (live: 3/3 ok, bogus → unknown profile fail-closed).
+- Gates (foreground, isolated %TEMP%/s12t02c2*): pytest tests/s12/s12-t02/
+  → 36 passed (2.55s, exit 0) — gồm closure test delegate (không còn skip
+  vì T01-C2 merge); ruff `--select F` 2 files + tests clean; diff-check 0.
+- Evidence: C2 root `s12-t02/` pytest_c2.log + ruff_c2.log +
+  live_c02_verify.log.
