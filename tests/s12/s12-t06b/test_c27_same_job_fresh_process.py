@@ -42,7 +42,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from test_c26_normal_product import _manifest_hash  # noqa: E402
 
-G_SMALL_FRAMES = 30  # 3.0s @ 10fps, 3 chunks @ max 12
+G_SMALL_FRAMES = 20  # native 4K 2.0s @ 10fps, 3 chunks @ max 12
 
 
 def _payload(
@@ -108,13 +108,13 @@ def test_c27_same_job_kill_stage1_fresh_pid_resume_and_publish(
     svc = JobService(factory, managed_root=tmp_path / "artifacts")
     workdir = tmp_path / "work"
     workdir.mkdir()
-    src = build_media_silent(workdir / "src.mp4", width=320, height=180, duration=3.0)
-    assert probe_dims(src) == (320, 180)
+    src = build_media_silent(workdir / "src.mp4", width=3840, height=2160, duration=2.0)
+    assert probe_dims(src) == (3840, 2160)
 
     dirs = {
         "chunk": str(workdir / "chunks"),
         "scratch": str(workdir / "scratch"),
-        "output": str(workdir / "out" / "final.mp4"),
+        "output": str(workdir / "final.mp4"),
     }
     worker = "worker-c27"
     payload = _payload(factory, manifest_id, dirs, src, worker)
@@ -204,21 +204,12 @@ def test_c27_same_job_kill_stage1_fresh_pid_resume_and_publish(
     assert run.id in report["resumable"]
 
     # Fresh PID (this process) re-enters the SAME normal job handler.
-    # F11-T06B-01 (owner T03C/T04A): publication has no server-owned
-    # authority wiring -> the real handler rejects the candidate and the
-    # run lands failed (retryable) AFTER verified-chunk reuse.  We assert
-    # the fail-closed behaviour AND the verified reuse (no re-render).
-    from app.services.s12_export.publication import PublicationError
-
+    # WIRE-PSNR base: same-raster re-encode PASSES the psnr gate and the
+    # handler PUBLISHES.  The verified-chunk reuse (no re-render) is the
+    # Scenario-G core proof; the job lands completed with artifact.
     ctx = SimpleNamespace(input_manifest=payload, worker_id=worker, session_factory=factory)
-    try:
-        outcome = _s12_export_handler(ctx)
-        raise AssertionError(
-            f"job unexpectedly published: {outcome.get('status')} "
-            "(did F11 authority wiring land in base?)"
-        )
-    except PublicationError as err:
-        assert "validation" in str(err), str(err)
+    outcome = _s12_export_handler(ctx)
+    assert outcome["status"] == "completed", outcome
 
     # Verified chunks REUSED (no re-render): mtimes unchanged.
     after = {p.name: p.stat().st_mtime_ns for p in chunk_dir.glob("chunk_*.mp4")}
@@ -226,25 +217,24 @@ def test_c27_same_job_kill_stage1_fresh_pid_resume_and_publish(
     for name, ts in mtimes.items():
         assert after[name] == ts, f"chunk {name} re-rendered instead of reused"
 
-    candidate = Path(dirs["scratch"]) / "candidate_final.mp4"
-    assert candidate.is_file()
-    assert not candidate.name.endswith(".partial")
+    out = Path(dirs["output"])
+    assert out.is_file()  # candidate moved to the public artifact on publish
+    assert not out.name.endswith(".partial")
     assert list(Path(dirs["scratch"]).glob("*.partial")) == []
     from app.services.s12_export.stitch import count_video_frames
 
-    assert count_video_frames(candidate) == G_SMALL_FRAMES
+    assert count_video_frames(out) == G_SMALL_FRAMES
 
-    # Run state after the fail-closed publication: failed (retryable),
-    # never a fake completed; UI payload reflects it (no forged repair).
+    # UI continuity: run completed; job row stays queued because this
+    # harness calls the handler directly (the durable worker would
+    # transition it); run state is authoritative.
     from app.api.routes import s12_export as route
 
     with factory() as s:
         pl = route._run_payload(s, run.id, WS)
-    assert pl["status"] == "failed"
-    # Job row stays queued because this harness calls the handler directly
-    # (the durable worker would transition it); run state is authoritative.
-    assert pl["job_state"] in ("queued", "failed", "completed")
+    assert pl["status"] == "completed"
+    assert pl["job_state"] in ("queued", "completed")
     print(
         "[C27] fresh-pid resume reused "
-        f"{len(after)} chunks, publish fail-closed (F11-T06B-01)"
+        f"{len(after)} chunks and PUBLISHED (positive closure)"
     )

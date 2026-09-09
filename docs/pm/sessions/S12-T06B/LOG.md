@@ -70,6 +70,28 @@ SHA-256 `c9b068b2195461b1f867a5ec95714cea3ab09881757f5607094574d15dda428f`,
   real reversed-concat candidate FAILs `frame_order` under PSNR
   (frame_psnr_min_db set) — tamper remains rejected.
 
+## REVERIFY-2 on base 6352b1b (T03C WIRE-PSNR) — POSITIVE CLOSURE
+
+- Full T06B suite: **20 passed, 1 skipped in 93.92s**; ruff F clean.
+- C26 native 4K / same-raster re-encode: **publish COMPLETED** (psnr
+  30dB PASS, measured 59-71dB), public artifact + sha256 sidecar, GET
+  result/media served with playable decode (20 frames) — positive
+  closure on the normal product path (F11-T06B-01 resolved by WIRE-PSNR
+  for same-raster renders).
+- C27 same-job kill/restart: **positive PASS** — stage-1 subprocess pid
+  killed (tasklist-verified), production reconciler released expired
+  lease, fresh pid re-claimed, verified chunks reused (mtime-identical),
+  handler PUBLISHED (run completed).
+- C28 audio: PASS (unchanged).
+- Tamper under PSNR: reversed-concat candidate still FAILs frame_order —
+  no tolerance leak.
+- **F11-T06B-02 (new, owner T04A/T03C)**: cross-raster PSNR still
+  blocked — `probe_frame_psnr` decodes reference at its ORIGINAL raster
+  (no scale/pad to candidate raster), so upscale 1080p->4K and 4:3
+  letterbox candidates fail frame_order (reference stream shorter than
+  one candidate frame). Normal render pipeline only publishes when the
+  candidate raster equals the source raster. Verifier does not fix.
+
 ## Findings routed (verifier does NOT fix production)
 
 - F11-T06B-01 (owner T03C/T04A): `publication._expectation_for` gives

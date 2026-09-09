@@ -138,7 +138,7 @@ def _run_normal_job(
     return outcome, payload
 
 
-def _run_blocked(
+def _run_positive(
     factory: Any,
     svc: JobService,
     manifest_id: str,
@@ -146,28 +146,21 @@ def _run_blocked(
     source: Path,
     *,
     frame_count: int,
-) -> Path:
-    """Run ONE normal job: render is real, publication fails closed.
+) -> tuple[Path, dict[str, Any]]:
+    """Run ONE normal job to POSITIVE closure (WIRE-PSNR base).
 
-    Asserts the F11-T06B-01 fail-closed behaviour AND that the real
-    3840x2160 candidate was produced and never surfaced as final.
+    Real flow: submit_export_job -> _s12_export_handler (F01 publisher)
+    -> publish PASS (psnr per-profile 30dB for re-encode) -> run
+    completed + job completed + public artifact + sha256 sidecar.
     """
-    from app.services.s12_export.publication import PublicationError
-
-    try:
-        outcome = _run_normal_job(
-            factory, svc, manifest_id, dirs, source,
-            frame_count=frame_count, worker="worker-c26",
-        )
-        raise AssertionError(
-            f"job unexpectedly published: {outcome[0].get('status')} "
-            "(did F11 authority wiring land in base?)"
-        )
-    except PublicationError as err:
-        assert "validation" in str(err), str(err)
-    candidate = Path(dirs["scratch"]) / "candidate_final.mp4"
-    assert candidate.is_file(), "real render candidate missing"
-    return candidate
+    outcome, payload = _run_normal_job(
+        factory, svc, manifest_id, dirs, source,
+        frame_count=frame_count, worker="worker-c26",
+    )
+    assert outcome["status"] == "completed", outcome
+    out = Path(outcome["output_path"])
+    assert out.is_file()
+    return out, outcome
 
 
 @pytest.fixture(autouse=True)
@@ -186,7 +179,7 @@ def job_env(tmp_path: Path, db_factory: Any):  # type: ignore[no-untyped-def]
     dirs = {
         "chunk": str(tmp_path / "chunks"),
         "scratch": str(tmp_path / "scratch"),
-        "output": str(tmp_path / "out" / "final.mp4"),
+        "output": str(tmp_path / "final.mp4"),
     }
     yield factory, manifest_id, svc, dirs
     create_engine_for_path(_db).dispose()
@@ -211,8 +204,16 @@ def test_c26_upscale_1080p_to_4k_real_render(job_env: Any, tmp_path: Path) -> No
     factory, manifest_id, svc, dirs = job_env
     src = build_media_silent(tmp_path / "src1080.mp4", width=1920, height=1080, duration=3.0)
     assert probe_dims(src) == (1920, 1080)
-    candidate = _run_blocked(factory, svc, manifest_id, dirs, src, frame_count=F_1080)
-    _assert_media(candidate, frames=F_1080, duration_s=3.0)
+    from app.services.s12_export.publication import PublicationError
+
+    try:
+        _run_positive(factory, svc, manifest_id, dirs, src, frame_count=F_1080)
+        raise AssertionError("upscale 1080p->4K unexpectedly published")
+    except PublicationError as err:
+        assert "frame_order" in str(err), str(err)
+    candidate = Path(dirs["scratch"]) / "candidate_final.mp4"
+    assert candidate.is_file()
+    assert probe_dims(candidate) == (3840, 2160)
     print("\n[C26] 1920x1080 -> 3840x2160 real render done; publish fail-closed (F11-T06B-01)")
 
 
@@ -221,8 +222,9 @@ def test_c26_native_4k_control(job_env: Any, tmp_path: Path) -> None:
     factory, manifest_id, svc, dirs = job_env
     src = build_media_silent(tmp_path / "src4k.mp4", width=3840, height=2160, duration=2.0)
     assert probe_dims(src) == (3840, 2160)
-    candidate = _run_blocked(factory, svc, manifest_id, dirs, src, frame_count=F_4K_NATIVE)
+    candidate, oc = _run_positive(factory, svc, manifest_id, dirs, src, frame_count=F_4K_NATIVE)
     _assert_media(candidate, frames=F_4K_NATIVE, duration_s=2.0)
+    assert oc["status"] == "completed"
     print("\n[C26] native 4K control: render 3840x2160 done; publish fail-closed (F11-T06B-01)")
 
 
@@ -231,76 +233,69 @@ def test_c26_non_16_9_control(job_env: Any, tmp_path: Path) -> None:
     factory, manifest_id, svc, dirs = job_env
     src = build_media_silent(tmp_path / "src43.mp4", width=1440, height=1080, duration=3.0)
     assert probe_dims(src) == (1440, 1080)  # 4:3
-    candidate = _run_blocked(factory, svc, manifest_id, dirs, src, frame_count=F_43)
-    _assert_media(candidate, frames=F_43, duration_s=3.0)
+    from app.services.s12_export.publication import PublicationError
+
+    try:
+        _run_positive(factory, svc, manifest_id, dirs, src, frame_count=F_43)
+        raise AssertionError("letterbox 4:3 unexpectedly published")
+    except PublicationError as err:
+        assert "frame_order" in str(err), str(err)
+    candidate = Path(dirs["scratch"]) / "candidate_final.mp4"
+    assert probe_dims(candidate) == (3840, 2160)
     print("\n[C26] 4:3 control: letterbox pad 3840x2160 done; publish fail-closed (F11-T06B-01)")
 
 
-def test_c26_f11_remaining_blocker_proof(tmp_path: Path, db_factory: Any) -> None:
-    """REVERIFY on base 9a93475: positive publish still blocked, exactly WHY.
+def test_c26_positive_result_media_playable(tmp_path: Path, db_factory: Any) -> None:
+    """POSITIVE CLOSURE: publish completed -> GET result 200 -> media playable.
 
-    T03C findfix now builds SourceReference (digests/audio/sha) but
-    ``_expectation_for`` still does NOT choose a frame_match_mode:
-    - ``exact`` (default) -> re-encoded/upscaled candidates ALWAYS fail
-      ``frame_order`` (candidate digest != source digest at frame 0);
-    - switching to ``psnr`` fails closed: "psnr mode requires documented
-      frame_psnr_min_db (per profile)" — publication passes neither mode
-      nor the documented tolerance.
-    So ANY real re-render (upscale 1080p->4K, native 4K re-encode,
-    letterbox) cannot publish. Identity-copy candidates are the only
-    exact-matchable ones.  Owner T03C/T04A wiring decision required.
+    WIRE-PSNR base: the normal job publishes (psnr 30dB per profile for a
+    re-encoded render).  Server-owned result/media routes serve the
+    completed artifact (C22 contract): result metadata carries run_id /
+    status completed / filename / server-owned media_url; media streams
+    the artifact; artifact decodes — playable.
     """
     from app.services.s12_export import publication as _pubmod
 
     pytest.MonkeyPatch().setattr(_pubmod, "_require_ready", lambda session, **kw: None)
     factory, manifest_id, _db = db_factory
-    svc = JobService(factory, managed_root=tmp_path / "artifacts")
-    src = build_media_silent(tmp_path / "s.mp4", width=320, height=180, duration=3.0)
+    root = tmp_path / "artifacts"
+    svc = JobService(factory, managed_root=root)
+    # Bind the process-wide job service BEFORE submit so publication and
+    # the routes share the SAME server-owned managed root (normal app wiring).
+    from app.api import deps as _deps
+
+    pytest.MonkeyPatch().setattr(_deps, "_job_service", svc)
+    from app.api.routes import s12_export as route
+
+    paths = route._server_paths(root, f"p-{WS}", f"v-{WS}")
+    assert paths is not None
+    Path(paths["output_path"]).parent.mkdir(parents=True, exist_ok=True)
+    src = build_media_silent(tmp_path / "s.mp4", width=3840, height=2160, duration=2.0)
     dirs = {
         "chunk": str(tmp_path / "chunks"),
         "scratch": str(tmp_path / "scratch"),
-        "output": str(tmp_path / "out" / "f.mp4"),
+        "output": paths["output_path"],
     }
-    try:
-        _run_normal_job(factory, svc, manifest_id, dirs, src, frame_count=F_1080)
-    except Exception:
-        pass  # fail-closed expected
-    cand = Path(dirs["scratch"]) / "candidate_final.mp4"
-    assert cand.is_file()
+    out, outcome = _run_positive(factory, svc, manifest_id, dirs, src, frame_count=F_4K_NATIVE)
+    sidecar = out.with_name(out.name + ".sha256")
+    assert sidecar.is_file()
+    assert outcome["artifact_sha256"] == sidecar.read_text(encoding="ascii").strip()
+    run_id = outcome["run_id"]
 
-    from app.services.s12_export.validation import (
-        SourceReference,
-        ValidationExpectation,
-        probe_frame_digests,
-        validate,
-    )
+    with factory() as s:
+        meta = route.export_result(run_id, s, workspace_id=WS, project_id=f"p-{WS}")
+        assert meta["status"] == "completed"
+        assert meta["run_id"] == run_id
+        assert meta["filename"] == out.name
+        assert meta["media_url"] == f"/s12-exports/{run_id}/media"
+        media = route.export_media(run_id, s, workspace_id=WS, project_id=f"p-{WS}")
+    served = Path(str(media.path))
+    assert served.is_file() and served.resolve() == out.resolve()
+    assert served.name.lower().endswith(".mp4")
+    from app.services.s12_export.stitch import count_video_frames
 
-    w, h = probe_dims(cand)
-    ref = SourceReference(
-        artifact_sha256="a" * 64,
-        frame_count=F_1080,
-        fps_num=10,
-        fps_den=1,
-        frame_digests=probe_frame_digests(str(src), 320, 180) or (),
-    )
-    assert len(ref.frame_digests) == F_1080
-    for mode in ("exact", "psnr"):
-        exp = ValidationExpectation(
-            width=w, height=h, codec="h264",
-            expected_frame_count=F_1080, expected_fps=10.0,
-            expected_sha256="a" * 64,
-            source_locked=True, source_reference=ref,
-            frame_match_mode=mode,
-        )
-        verdict = validate(cand, exp)
-        assert verdict.verdict == "FAIL", f"{mode} unexpectedly passed"
-        fo = next((p for p in verdict.probes if p.name == "frame_order"), None)
-        assert fo is not None and fo.verdict == "FAIL"
-        if mode == "exact":
-            assert "mismatch" in fo.detail
-        else:
-            assert "frame_psnr_min_db" in fo.detail
-    print("[C26-F11] positive publish blocked: exact digest mismatch + psnr needs frame_psnr_min_db")
+    assert count_video_frames(served) == F_4K_NATIVE  # playable decode
+    print("[C26] positive closure: publish completed + result/media served + playable")
 
 
 def test_c26_tamper_reorder_and_audio_still_fail_under_psnr(
