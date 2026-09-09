@@ -773,7 +773,7 @@ def _letterbox_candidate(
 
 def _cross_psnr_expectation(
     approved: Path, candidate: Path, ref_w: int, ref_h: int,
-    out_w: int, out_h: int, **overrides
+    out_w: int, out_h: int, *, frame_count: int = FRAMES, **overrides
 ) -> ValidationExpectation:
     base: dict = {
         "width": out_w,
@@ -784,7 +784,7 @@ def _cross_psnr_expectation(
         "frame_psnr_min_db": 30.0,
         "source_reference": SourceReference(
             artifact_sha256=sha256_file(approved),
-            frame_count=FRAMES,
+            frame_count=frame_count,
             fps_num=FPS,
             fps_den=1,
             reference_path=str(approved),
@@ -911,3 +911,84 @@ def test_xr_no_reference_raster_is_same_raster_path(
     verdict = validate(candidate, exp)
     assert verdict.verdict in ("FAIL", "NOT_MEASURED")
     assert verdict.verdict != "PASS"
+
+
+# ── Pipe-fix verification (F11-T06B-02): 30/30 frames decoded at scale ──
+#
+# Regression guard for the Windows rawvideo pipe dropping frames when the
+# filter graph scales up: the cross-raster reference is now decoded to a
+# temp raw FILE (never piped), so ALL 30 frames must be measured.
+
+
+def _letterbox_segments_30(tmp_path_factory: pytest.TempPathFactory) -> dict:
+    root = tmp_path_factory.mktemp("s12t04a_pf")
+    seg_a = _media_43(root / "pf_a.mp4", "testsrc", duration=3.0)
+    seg_b = _media_43(root / "pf_b.mp4", "smptebars", duration=3.0)
+    return {"root": root, "seg_a": seg_a, "seg_b": seg_b}
+
+
+def test_pf_upscale_letterbox_30_of_30_frames_pass(
+    tmp_path_factory: pytest.TempPathFactory, tmp_path: Path
+) -> None:
+    """Full 30-frame upscale 1080p-ish -> 16:9 canvas: every frame measured."""
+    segs = _letterbox_segments_30(tmp_path_factory)
+    approved = tmp_path / "approved_30.mp4"
+    _concat([segs["seg_a"]], approved)  # reference: 30 frames 4:3
+    candidate = _letterbox_candidate(
+        [segs["seg_a"]], tmp_path / "candidate_30.mp4", 640, 360
+    )
+    exp = _cross_psnr_expectation(
+        approved, candidate, ref_w=320, ref_h=240, out_w=640, out_h=360,
+        frame_count=30,
+    )
+    verdict = validate(candidate, exp)
+    assert verdict.verdict == "PASS", [
+        (item.name, item.verdict, item.detail) for item in verdict.probes
+    ]
+    order = verdict.probe("frame_order")
+    assert order is not None and order.verdict == "PASS"
+    assert "30 frames PSNR" in order.detail  # literally all 30 compared
+
+
+def test_pf_letterbox_30_reorder_fails(
+    tmp_path_factory: pytest.TempPathFactory, tmp_path: Path
+) -> None:
+    """30-frame cross-raster reorder (A+B vs B+A) still FAILs."""
+    segs = _letterbox_segments_30(tmp_path_factory)
+    approved_a = tmp_path / "approved_a.mp4"
+    _concat([segs["seg_a"]], approved_a)
+    approved_b = tmp_path / "approved_b.mp4"
+    _concat([segs["seg_b"]], approved_b)
+    # reference = A(3s); candidate = B(3s) -> content entirely different
+    candidate = _letterbox_candidate(
+        [segs["seg_b"]], tmp_path / "candidate_mismatch.mp4", 640, 360
+    )
+    exp = _cross_psnr_expectation(
+        approved_a, candidate, ref_w=320, ref_h=240, out_w=640, out_h=360,
+        frame_count=30,
+    )
+    verdict = validate(candidate, exp)
+    assert verdict.probe("frame_order").verdict == "FAIL"
+    assert verdict.verdict == "FAIL"
+
+
+def test_pf_letterbox_30_missing_raster_fails(
+    tmp_path_factory: pytest.TempPathFactory, tmp_path: Path
+) -> None:
+    """Missing reference raster keeps same-raster path -> real cross-raster
+    FAILs closed (never a wrong PASS), 30 frames still fully consumed."""
+    segs = _letterbox_segments_30(tmp_path_factory)
+    approved = tmp_path / "approved_30.mp4"
+    _concat([segs["seg_a"]], approved)
+    candidate = _letterbox_candidate(
+        [segs["seg_a"]], tmp_path / "candidate_30.mp4", 640, 360
+    )
+    exp = _cross_psnr_expectation(
+        approved, candidate, ref_w=None, ref_h=None, out_w=640, out_h=360,
+        frame_count=30,
+    )
+    verdict = validate(candidate, exp)
+    assert verdict.verdict in ("FAIL", "NOT_MEASURED")
+    assert verdict.verdict != "PASS"
+    order = verdict.probe("frame_order")
+    assert order is not None and order.verdict != "PASS"

@@ -37,7 +37,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
+import tempfile
 from fractions import Fraction
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -484,20 +486,39 @@ def probe_frame_psnr(
         and reference_height > 0
     ):
         ref_vf = _fit_filter(width, height)
+    # Windows rawvideo PIPE drops frames when the filter graph scales up
+    # (F11-T06B-02 follow-up: 7/30 frames read). The scaled reference is
+    # therefore decoded into a temp raw FILE (outside the repo) and read
+    # frame-by-frame from disk; the unscaled candidate keeps its pipe
+    # (proven 30/30 for the same-raster path).
+    ref_file: Path | None = None
+    ref_pipe = None
+    if ref_vf is None:
+        ref_pipe = _open_raw_pipe(reference)
+    else:
+        ref_file = _decode_raw_to_file(reference, ref_vf, width, height)
     cand = _open_raw_pipe(candidate)
-    ref = _open_raw_pipe(reference, ref_vf)
-    if cand is None or ref is None:
+    if cand is None or (ref_pipe is None and ref_file is None):
         if cand is not None:
             cand.kill()
-        if ref is not None:
-            ref.kill()
+        if ref_pipe is not None:
+            ref_pipe.kill()
+        if ref_file is not None:
+            ref_file.unlink(missing_ok=True)
         return None
     values: list[float] = []
+    ref_handle = None
     try:
-        assert cand.stdout is not None and ref.stdout is not None
+        assert cand.stdout is not None
+        if ref_file is not None:
+            ref_handle = open(ref_file, "rb")
         while True:
             ca = _read_exact(cand.stdout, frame_size)
-            rb = _read_exact(ref.stdout, frame_size)
+            if ref_handle is not None:
+                rb = _read_exact(ref_handle, frame_size)
+            else:
+                assert ref_pipe is not None and ref_pipe.stdout is not None
+                rb = _read_exact(ref_pipe.stdout, frame_size)
             if ca is None or rb is None:
                 break
             if len(ca) != len(rb):
@@ -513,8 +534,63 @@ def probe_frame_psnr(
                 values.append(10.0 * math.log10(255.0 * 255.0 / mse))
     finally:
         cand.kill()
-        ref.kill()
+        if ref_pipe is not None:
+            ref_pipe.kill()
+        if ref_handle is not None:
+            ref_handle.close()
+        if ref_file is not None:
+            ref_file.unlink(missing_ok=True)
     return tuple(99.0 if v == float("inf") else v for v in values) if values else None
+
+
+def _decode_raw_to_file(
+    path: str | Path, vf: str, width: int, height: int
+) -> Path | None:
+    # Decode the reference (with the fit filter) into a temp raw file so
+    # scaled frames are never lost on the Windows pipe. The raw file is
+    # validated to be a whole number of WxH yuv420p frames; garbage or a
+    # truncated decode returns None (fail-closed).
+    frame_size = width * height * 3 // 2
+    if frame_size <= 0:
+        return None
+    fd, tmp_name = tempfile.mkstemp(prefix="s12psnr_ref_", suffix=".raw")
+    os.close(fd)
+    out = Path(tmp_name)
+    try:
+        completed = subprocess.run(
+            [
+                find_ffmpeg(),
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-y",
+                "-i",
+                str(path),
+                "-vf",
+                vf,
+                "-map",
+                "0:v:0",
+                "-f",
+                "rawvideo",
+                "-pix_fmt",
+                "yuv420p",
+                str(out),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
+        if completed.returncode != 0:
+            return None
+        size = out.stat().st_size
+        if size <= 0 or size % frame_size != 0:
+            return None
+        return out
+    except (OSError, subprocess.SubprocessError):
+        return None
+    finally:
+        if not out.is_file():
+            out.unlink(missing_ok=True)
 
 
 def probe_audio_digest(

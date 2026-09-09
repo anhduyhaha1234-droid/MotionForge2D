@@ -158,3 +158,24 @@ reorder + audio + drift still FAIL under the tolerance.
 
 Write-set: app/services/s12_export/validation.py (M), tests/s12/s12-t04a/
 test_c2_source_locked.py (M, +5), LOG.md/REPORT.md (M).
+
+## Pipe-fix (F11-T06B-02 encore)
+
+probe_frame_psnr now decodes the cross-raster (scaled) reference into a
+temp raw FILE (outside the repo) instead of piping rawvideo through
+stdout — the Windows pipe dropped frames at large scale (7/30). All 30
+frames are measured for upscale 4K + letterbox (asserted literally);
+reorder and missing-raster still FAIL; same-raster path unchanged.
+
+## Gates pipe-fix (exact commands)
+
+- `python -m pytest tests/s12/s12-t04a/ -q --basetemp="$TEMP/s12t04a_fullpf" -p no:cacheprovider`
+  → **81 passed in 14.78s** (78 prior + 3 pipe-fix)
+- `ruff check --select F app/services/s12_export/validation.py tests/s12/s12-t04a/`
+  → **All checks passed!**
+- `git diff --check` → 0
+- `python -m pytest tests/s12/s12-t03c/ -q --basetemp="$TEMP/s12t04a_t03cpf" -p no:cacheprovider`
+  → **19 passed in 20.30s**
+
+Write-set: app/services/s12_export/validation.py (M), tests/s12/s12-t04a/
+test_c2_source_locked.py (M, +3), LOG.md/REPORT.md (M).
