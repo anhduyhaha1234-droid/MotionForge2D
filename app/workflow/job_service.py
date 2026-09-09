@@ -244,6 +244,13 @@ class JobService:
             from app.workflow.s10_full_apply_jobs import register_s10_full_apply_handler
 
             register_s10_full_apply_handler(self._worker)
+            # S12 export render worker (S12-T03C): claim → T03B resume →
+            # chunk evidence; never completes, never publishes.
+            from app.workflow.s12_export_jobs import (  # noqa: PLC0415
+                register_s12_export_handler,
+            )
+
+            register_s12_export_handler(self._worker)
         self._worker_owned = worker is None
         self._managed_root = resolved_root
 

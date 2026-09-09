@@ -138,7 +138,9 @@ def _require_ready(session: Any, *, workspace_id: str, project_id: str) -> None:
         policy_bundle,
     )
 
-    record = compute_project_readiness(session, workspace_id, project_id)
+    record = compute_project_readiness(
+        session, workspace_id=workspace_id, project_id=project_id
+    )
     videos = list(getattr(record, "videos", []) or [])
     if not videos:
         raise PublicationError("no videos in project; readiness not_run — cannot publish")
@@ -212,6 +214,8 @@ def _load_chunks(repo: Any, run_id: str, manifest: dict[str, Any]) -> list[Any]:
                     core_end_frame=int(row.core_end_frame),
                     overlap_before=int(row.overlap_before),
                     overlap_after=int(row.overlap_after),
+                    content_hash=str(row.content_hash),
+                    attempt=int(row.attempt),
                 ),
                 path=path,
             )
