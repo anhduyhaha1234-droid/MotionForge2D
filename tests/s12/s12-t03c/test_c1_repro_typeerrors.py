@@ -34,65 +34,16 @@ def test_R1_chunkspec_requires_content_hash() -> None:
 
 
 def test_R1_load_chunks_fixed_no_typeerror(tmp_path) -> None:  # type: ignore[no-untyped-def]
-    """Historical R1b: pre-fix this raised TypeError missing 'content_hash'.
+    """Historical R1b: pre-fix _load_chunks raised TypeError.
 
-    Post-fix _load_chunks forwards row content_hash + attempt — asserts
-    the fixed behavior directly.  The original pre-fix message is preserved
-    in test_R1_chunkspec_requires_content_hash.
+    C2 removed the double-assembly path from publication entirely — the
+    runner's private candidate is validated, never re-assembled.  The
+    original pre-fix TypeError message is preserved in
+    test_R1_chunkspec_requires_content_hash.
     """
-    from types import SimpleNamespace
-
-    chunk_dir = tmp_path / "chunks"
-    chunk_dir.mkdir()
-    (chunk_dir / "chunk_0000.mp4").write_bytes(b"\x00" * 64)
-    row = SimpleNamespace(
-        chunk_index=0,
-        order_index=0,
-        core_start_frame=0,
-        core_end_frame=49,
-        overlap_before=0,
-        overlap_after=5,
-        content_hash="a" * 64,
-        attempt=1,
-        verified=1,
+    assert not hasattr(pub, "_load_chunks"), (
+        "publication must not load chunks for assembly (C2 no double-assembly)"
     )
-
-    class _Repo:
-        def list_chunks(self, run_id: str) -> list:
-            return [row]
-
-    media = pub._load_chunks(_Repo(), "run-x", {"chunk_dir": str(chunk_dir)})
-    assert len(media) == 1
-    assert media[0].spec.content_hash == "a" * 64
-
-
-def test_R1b_fixed_load_chunks_forwards_content_hash(tmp_path) -> None:  # type: ignore[no-untyped-def]
-    """Post-fix regression: _load_chunks forwards row content_hash + attempt."""
-    from types import SimpleNamespace
-
-    chunk_dir = tmp_path / "chunks_ok"
-    chunk_dir.mkdir()
-    (chunk_dir / "chunk_0000.mp4").write_bytes(b"\x00" * 64)
-    row = SimpleNamespace(
-        chunk_index=0,
-        order_index=0,
-        core_start_frame=0,
-        core_end_frame=49,
-        overlap_before=0,
-        overlap_after=5,
-        content_hash="b" * 64,
-        attempt=2,
-        verified=1,
-    )
-
-    class _Repo:
-        def list_chunks(self, run_id: str) -> list:
-            return [row]
-
-    media = pub._load_chunks(_Repo(), "run-x", {"chunk_dir": str(chunk_dir)})
-    assert len(media) == 1
-    assert media[0].spec.content_hash == "b" * 64
-    assert media[0].spec.attempt == 2
 
 
 def test_R2_require_ready_unmocked_traceback(tmp_path) -> None:  # type: ignore[no-untyped-def]

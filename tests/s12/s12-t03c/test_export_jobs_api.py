@@ -269,7 +269,7 @@ def test_retry_active_predecessor_fails_closed(env, monkeypatch: pytest.MonkeyPa
     assert "active" in str(exc.value).lower() or "pending" in str(exc.value).lower()
 
 
-def test_reconcile_releases_expired_lease(env) -> None:  # type: ignore[no-untyped-def]
+def test_reconcile_reports_expired_lease_resumable(env) -> None:  # type: ignore[no-untyped-def]
     factory, svc, manifest_id, dirs = env
     run, _job, _ = submit_export_job(svc, **_submit_kwargs(factory, manifest_id, dirs))
     with factory() as s:
@@ -277,17 +277,22 @@ def test_reconcile_releases_expired_lease(env) -> None:  # type: ignore[no-untyp
         s.commit()
         fence = lease.fence_token
     with factory() as s:
-        row = S12ExportRepository(s).get_lease(run.id)
-        assert row is not None
         from app.persistence.models import S12ExportLease as LeaseRow
 
-        orm = s.get(LeaseRow, (row.run_id,))
+        orm = s.get(LeaseRow, (run.id,))
         assert orm is not None
         orm.expires_at = datetime.now(UTC).replace(tzinfo=None) - timedelta(seconds=5)
         s.commit()
     report = reconcile_export_jobs(factory, batch_size=10)
-    assert report["released"] == 1
+    assert report["scanned"] == 1
+    assert report["expired"] == 1
+    assert run.id in report["resumable"]
     assert report["errors"] == []
+    # Zero-mutation: the run stays running and a fresh claim CAS re-claims
+    # the expired lease with a NEW fence token (T03A C2 fencing).
+    with factory() as s:
+        run_row = S12ExportRepository(s).get_run(run.id)
+        assert run_row.status == "running"
     with factory() as s:
         lease2 = S12ExportRepository(s).claim_run(run.id, "worker-2")
         s.commit()
@@ -302,7 +307,9 @@ def test_reconcile_skips_live_lease(env) -> None:  # type: ignore[no-untyped-def
         s.commit()
     report = reconcile_export_jobs(factory, batch_size=10)
     assert report["scanned"] == 1
-    assert report["released"] == 0
+    assert report["expired"] == 0
+    assert report["resumable"] == []
+    assert report["errors"] == []
 
 
 def test_submit_stale_identity_fails_closed(env) -> None:  # type: ignore[no-untyped-def]
