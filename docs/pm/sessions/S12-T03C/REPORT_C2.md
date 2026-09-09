@@ -24,6 +24,7 @@ Baseline `da7108b` | No push/merge | Model `ocg/deepseek-v4-flash` fallback OFF.
 | C15 | PASS | cancel winner + 409; retry converges ≤1 run; job/run states agree |
 | C16 | PASS (bounded) | real worker render + real publication + real validator: no TypeError, no double assembly, coherent `failed` on NOT_MEASURED; positive PASS depends on T04A digest authority (reported) |
 | C17/C18 (consumer) | PASS (bounded) | fence re-check mid-publication + atomic rename + sidecar bytes + partials never public + tampered replay fails |
+| C22-part (backend) | PASS | `GET /s12-exports/{run_id}/result` (metadata + server-owned media_url) + `GET /s12-exports/{run_id}/media` (stream/download): only completed + owned; pending → 409; cross-project/missing → 404; tampered (sidecar mismatch) → 403; paths derived server-side, never client/manifest-supplied |
 
 ## Key artifacts
 

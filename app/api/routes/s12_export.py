@@ -12,6 +12,7 @@ converges on the winner instead of a duplicate successor.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -458,9 +459,113 @@ def retry_export(
         "predecessor_run_id": run_id,
         "status": new_run.status,
         "attempt": new_run.attempt,
-        "job_id": getattr(job, "id", None),
+        "job_id": getattr(job, "job_id", None) or getattr(job, "id", None),
         "created": created,
     }
+
+
+# ── C22-part: scoped result playback/download (server-owned context) ───
+
+_MEDIA_MIME = "video/mp4"
+
+
+def _owned_completed_artifact(
+    session: Session,
+    run_id: str,
+    workspace_id: str,
+    project_id: str | None,
+) -> tuple[Any, Path]:
+    """Resolve the completed run's public artifact, fail-closed.
+
+    Ownership first (workspace + optional project scope), then terminal
+    ``completed`` state.  The artifact path is DERIVED from the server-owned
+    project/video context — never from any client-supplied or manifest
+    path.  A missing file, a ``.partial`` name, a missing byte-identity
+    sidecar, or a sidecar mismatch (tampered artifact) all fail closed.
+    """
+    from app.services.s12_export.publication import _sidecar_path, _sha256_file  # noqa: PLC0415
+
+    repo = S12ExportRepository(session)
+    try:
+        rec = repo.get_run(run_id)
+    except RunNotFoundError as err:
+        raise HTTPException(status_code=404, detail=str(err)) from err
+    if rec.workspace_id != workspace_id:
+        raise HTTPException(status_code=404, detail=f"export run {run_id!r} not found")
+    if project_id is not None and rec.project_id != project_id:
+        raise HTTPException(status_code=404, detail=f"export run {run_id!r} not found in project")
+    if rec.status != "completed":
+        raise HTTPException(
+            status_code=409,
+            detail=f"export run {run_id} in status {rec.status!r}; result available only when completed",
+        )
+    paths = _server_paths(get_managed_root(), rec.project_id, rec.video_item_id)
+    if paths is None:
+        raise HTTPException(status_code=404, detail="export result identity invalid")
+    artifact = Path(paths["output_path"])
+    if artifact.name.lower().endswith(".partial"):
+        raise HTTPException(status_code=404, detail="export result is partial; not served")
+    if not artifact.is_file():
+        raise HTTPException(status_code=404, detail="export result artifact missing")
+    sidecar = _sidecar_path(artifact)
+    if not sidecar.is_file():
+        raise HTTPException(status_code=403, detail="export result byte identity missing; not served")
+    stored = sidecar.read_text(encoding="ascii").strip().lower()
+    if _sha256_file(artifact) != stored:
+        raise HTTPException(status_code=403, detail="export result tampered; not served")
+    return rec, artifact
+
+
+@router.get("/s12-exports/{run_id}/result")
+def export_result(
+    run_id: str,
+    session: SessionDep,
+    workspace_id: str = Query(default=WORKSPACE_ID, min_length=1),
+    project_id: str | None = Query(default=None),
+) -> dict[str, Any]:
+    """Metadata for the completed export result (C22-part backend).
+
+    Only a ``completed`` run owned by the request scope is served.  The
+    media URL is server-owned (this API), never a client-supplied path.
+    """
+    rec, artifact = _owned_completed_artifact(session, run_id, workspace_id, project_id)
+    size = artifact.stat().st_size
+    return {
+        "run_id": rec.id,
+        "status": rec.status,
+        "project_id": rec.project_id,
+        "video_item_id": rec.video_item_id,
+        "profile_id": rec.profile_id,
+        "frame_count": rec.frame_count,
+        "filename": artifact.name,
+        "size_bytes": size,
+        "mime": _MEDIA_MIME,
+        "media_url": f"/s12-exports/{rec.id}/media",
+    }
+
+
+@router.get("/s12-exports/{run_id}/media")
+def export_media(
+    run_id: str,
+    session: SessionDep,
+    workspace_id: str = Query(default=WORKSPACE_ID, min_length=1),
+    project_id: str | None = Query(default=None),
+) -> Any:
+    """Stream the completed export artifact (play/download, C22-part).
+
+    Same ownership + byte-integrity gates as the result metadata.  A
+    missing/tampered/partial artifact is never served; pending/failed/
+    cancelled runs return 409 (never media).
+    """
+    from fastapi.responses import FileResponse  # noqa: PLC0415
+
+    rec, artifact = _owned_completed_artifact(session, run_id, workspace_id, project_id)
+    return FileResponse(
+        path=str(artifact),
+        media_type=_MEDIA_MIME,
+        filename=f"{rec.id}_{artifact.name}",
+        content_disposition_type="inline",
+    )
 
 
 def _retry_manifest(
