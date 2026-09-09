@@ -92,6 +92,23 @@ SHA-256 `c9b068b2195461b1f867a5ec95714cea3ab09881757f5607094574d15dda428f`,
   one candidate frame). Normal render pipeline only publishes when the
   candidate raster equals the source raster. Verifier does not fix.
 
+## REVERIFY-4 FINAL on base 68f40b3 (T04A pipe-fix: ref -> temp raw file)
+
+- Full T06B suite: **20 passed, 1 skipped in 90.94s**; ruff F clean.
+- Native-4K positive closure PASS, C27 kill/restart PASS, C28 PASS,
+  tamper reorder FAILs under PSNR (no tolerance leak).
+- **F11-T06B-02 UPDATE (owner T04A/T03C) — STILL blocked**: the pipe-fix
+  routed the REFERENCE decode to a temp raw FILE, but the CANDIDATE side
+  keeps `_open_raw_pipe(candidate)` — a 4K candidate still pushes
+  ~12.4MB/frame through the Windows pipe and drops frames:
+  `probe_frame_psnr(candidate_4k, reference_1080p, 3840, 2160)` still
+  returns **7 of 30** frames, PSNR ~7.6dB (same-raster 59-71dB).
+  Upscale 1080p->4K and 4:3-letterbox candidates still fail frame_order
+  and cannot publish. Fix direction: decode the CANDIDATE to a temp raw
+  file as well (mirror the reference path). Verifier does not fix.
+- C26 FINAL status: native-4K positive; upscale/letterbox fail-closed
+  (F11-T06B-02 open). No case removal, no waive.
+
 ## REVERIFY-3 on base 3439545 (T04A cross-raster PSNR fit+pad) — vòng cuối
 
 - Full T06B suite: **20 passed, 1 skipped in 89.35s**; ruff F clean.
