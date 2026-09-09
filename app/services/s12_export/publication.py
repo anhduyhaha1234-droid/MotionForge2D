@@ -313,7 +313,6 @@ def _expectation_for(run: Any, manifest: dict[str, Any]) -> Any:
     from app.services.s12_export.validation import (  # noqa: PLC0415
         MASTER_HEIGHT,
         MASTER_WIDTH,
-        SourceReference,
         ValidationExpectation,
     )
 
@@ -322,12 +321,7 @@ def _expectation_for(run: Any, manifest: dict[str, Any]) -> Any:
     fps = float(manifest.get("fps") or 0)
     fps_num, fps_den = _fps_rational(fps, manifest)
     expected_sha = manifest.get("expected_sha256") or manifest.get("authority_sha256")
-    source_ref = SourceReference(
-        artifact_sha256=str(expected_sha or ""),
-        frame_count=int(manifest.get("frame_count") or 0) or None,
-        fps_num=fps_num,
-        fps_den=fps_den,
-    )
+    source = _build_source_reference(manifest, fps_num, fps_den)
     return ValidationExpectation(
         width=width or MASTER_WIDTH,
         height=height or MASTER_HEIGHT,
@@ -336,8 +330,96 @@ def _expectation_for(run: Any, manifest: dict[str, Any]) -> Any:
         expected_fps=fps or None,
         expected_sha256=str(expected_sha) if expected_sha else None,
         source_locked=True,
-        source_reference=source_ref,
+        source_reference=source,
     )
+
+
+def _build_source_reference(
+    manifest: dict[str, Any], fps_num: int, fps_den: int
+) -> Any:
+    """Server-owned source-locked reference from the CURRENT approved artifact.
+
+    Probes the approved Full Apply artifact (the job's server-derived
+    ``source_path``) with the T04A helpers — never the candidate:
+    - per-frame decoded content digests at the approved raster;
+    - approved audio evidence (``transcode`` when the artifact carries
+      audio — the S12 assembly re-encodes audio via AAC per C28-F01;
+      ``absent`` when silent);
+    - approved artifact sha256 + exact fps rational + frame count.
+
+    When the artifact is unreadable/absent (legacy manifest), the
+    reference degrades to fps/frame/sha only — the T04A source-locked
+    validator then answers NOT_MEASURED/FAIL explicitly instead of a
+    fabricated PASS.
+    """
+    from app.services.s12_export.validation import (  # noqa: PLC0415
+        AudioReference,
+        SourceReference,
+        probe_audio_digest,
+        probe_frame_digests,
+    )
+
+    frame_count = int(manifest.get("frame_count") or 0) or None
+    expected_sha = manifest.get("expected_sha256") or manifest.get("authority_sha256")
+    source = str(manifest.get("source_path") or "")
+    digests: tuple[str, ...] = ()
+    audio: Any = None
+    if source and Path(source).is_file():
+        dims = _probe_source_dims(source)
+        if dims is not None:
+            width, height = dims
+            probed = probe_frame_digests(source, width, height)
+            if probed:
+                digests = probed
+        audio_digest = probe_audio_digest(source, 0)
+        if audio_digest is not None:
+            # The assembly layer re-encodes audio (AAC) — content digest is
+            # NOT compared for transcode; mapping + A/V drift still are.
+            audio = AudioReference(mode="transcode", stream_index=0)
+        else:
+            audio = AudioReference(mode="absent", stream_index=0)
+    return SourceReference(
+        artifact_sha256=str(expected_sha or ""),
+        frame_count=frame_count,
+        fps_num=fps_num if fps_num > 0 else 0,
+        fps_den=fps_den if fps_den > 0 else 0,
+        frame_digests=digests,
+        audio=audio,
+    )
+
+
+def _probe_source_dims(path: str) -> tuple[int, int] | None:
+    """Probe the approved artifact's video raster (ffprobe, read-only)."""
+    import json  # noqa: PLC0415
+    import subprocess  # noqa: PLC0415
+
+    from app.services.s12_export.stitch import find_ffprobe  # noqa: PLC0415
+
+    try:
+        completed = subprocess.run(
+            [
+                find_ffprobe(),
+                "-hide_banner",
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=width,height",
+                "-of",
+                "json",
+                path,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        if completed.returncode != 0:
+            return None
+        stream = json.loads(completed.stdout)["streams"][0]
+        return int(stream["width"]), int(stream["height"])
+    except (OSError, ValueError, KeyError, IndexError, json.JSONDecodeError):
+        return None
 
 
 def _dims(dims: str) -> tuple[int | None, int | None]:
