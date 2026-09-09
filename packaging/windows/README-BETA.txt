@@ -1,17 +1,27 @@
-MotionForge 2D — Windows portable beta (S12-T06A harness)
-===========================================================
+MotionForge 2D — Windows staged beta (S12-T06A C2)
+====================================================
 
-QUICK START (no admin, no system changes):
-  1. Install Python 3.11, Node.js 20+, FFmpeg (see docs\packaging\s12-windows.md).
-  2. Install-MotionForge-Beta.cmd CODE_ROOT
-  3. Start-MotionForge-Beta.cmd CODE_ROOT
-  4. Open http://127.0.0.1:3121 (ports printed by serve; defaults 8421/3121).
+This is a STAGED PACKAGE, not a fully self-contained portable build.
+It bundles the built frontend (.next) + backend artifacts and declares
+the EXTERNAL runtimes it needs; it never installs, downloads, elevates,
+or edits PATH/registry/firewall/ACL.
 
-STOP:  Stop-MotionForge-Beta.cmd CODE_ROOT
-REMOVE: Uninstall-MotionForge-Beta.cmd CODE_ROOT  (keeps your data/ by default)
+QUICK START:
+  1. Ensure declared runtimes on PATH: Python 3.11, Node.js 20+, FFmpeg.
+  2. Install-MotionForge-Beta.cmd STAGE_ROOT [BACKEND_PORT] [FRONTEND_PORT]
+     -> builds the stage (rebuilds frontend with the backend port baked).
+  3. Start-MotionForge-Beta.cmd PACKAGE_ROOT [RUNTIME_ROOT]
+     -> setup preflight (fail-closed) + serve; open the printed URL.
+  4. Diagnose-MotionForge-Beta? run:
+     python PACKAGE_ROOT\scripts\s12_t06a_run.py diagnose --install-root RUNTIME_ROOT
+  5. Stop-MotionForge-Beta.cmd PACKAGE_ROOT [RUNTIME_ROOT]
+     -> graceful shutdown, process-identity guarded (reused/wrong PIDs
+        never killed; failed stop keeps evidence + nonzero exit).
+  6. Uninstall-MotionForge-Beta.cmd PACKAGE_ROOT [RUNTIME_ROOT]
+     -> keeps data/ artifacts/ output/ by default.
 
-CODE_ROOT = the folder containing scripts\s12\s12_t06a_run.py.
-Runtime data lives under %LOCALAPPDATA%\MotionForge2D-beta-runtime
-(data/ artifacts/ output/ logs/ RUNTIME.json) — never in this folder.
+RUNTIME_ROOT defaults to %LOCALAPPDATA%\MotionForge2D-beta-runtime
+(data/, artifacts/, output/, logs/, RUNTIME.json) — user-local, never
+inside the package tree.
 
-Full guide: docs\packaging\s12-windows.md
+Full guide: docs/packaging/s12-windows.md
