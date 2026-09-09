@@ -38,6 +38,7 @@ cancel request, disk-full (ENOSPC), tampered chunk, source/identity drift.
 from __future__ import annotations
 
 import errno
+import hashlib
 import os
 import subprocess
 from dataclasses import dataclass, field
@@ -333,6 +334,16 @@ class ExportRunner:
             )
         rs, re = render_window(spec, run.frame_count)
         window_frames = re - rs + 1
+        # F03/M04 — the chunk raster is the SELECTED profile raster, never the
+        # source raster: scale (preserving aspect) then pad to the frozen
+        # profile dims. 4K selection → real 3840x2160 chunk output.
+        target_w, target_h = _parse_profile_dims(run.profile_dims)
+        vf = (
+            f"scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,"
+            f"pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,"
+            f"trim=start_frame={rs}:end_frame={re + 1},"
+            "setpts=PTS-STARTPTS"
+        )
         dest_final.parent.mkdir(parents=True, exist_ok=True)
         # Scratch keeps a real .mp4 suffix (the muxer sniffs format from the
         # extension — ".partial" is not muxable); only the T03C-visible
@@ -349,8 +360,7 @@ class ExportRunner:
                     "-i",
                     str(src),
                     "-vf",
-                    f"trim=start_frame={rs}:end_frame={re + 1},"
-                    "setpts=PTS-STARTPTS",
+                    vf,
                     "-an",
                     "-c:v",
                     encoder,
@@ -383,6 +393,8 @@ class ExportRunner:
                 f"chunk {spec.chunk_index} render failed "
                 f"(encoder={encoder}): {stderr[-300:]}"
             )
+        # F06/M05 — byte identity: verify the rendered window decodes to the
+        # exact window size AND carries the selected profile raster.
         try:
             got = count_video_frames(scratch)
         except StitchError as err:
@@ -398,6 +410,16 @@ class ExportRunner:
                 f"chunk {spec.chunk_index} has {got} frames, window needs "
                 f"{window_frames} (short/tampered render?)"
             )
+        got_w, got_h = _probe_dims(scratch)
+        if (got_w, got_h) != (target_w, target_h):
+            try:
+                os.remove(scratch)
+            except OSError:
+                pass
+            raise RunnerError(
+                f"chunk {spec.chunk_index} raster {got_w}x{got_h} != selected "
+                f"profile {target_w}x{target_h} (M04 substitution rejected)"
+            )
         try:
             os.replace(scratch, dest_final)
         except OSError as err:
@@ -406,12 +428,26 @@ class ExportRunner:
                     f"disk full finalizing chunk {spec.chunk_index}"
                 ) from err
             raise
+        # F06/M05 — persist byte identity beside the chunk: a resume may only
+        # reuse a chunk whose ACTUAL file sha256 matches this recorded hash.
+        _write_chunk_sha(dest_final)
         return dest_final
 
     def _chunk_usable(self, spec: ChunkSpec) -> bool:
-        """A stored chunk file is reusable only when it decodes exact."""
+        """A stored chunk file is reusable ONLY with verified byte identity.
+
+        Three independent facts must hold: the recorded sidecar sha256
+        exists, the ACTUAL file sha256 equals it (a byte-changed chunk of
+        the same frame count is rejected — F06/M05), and the file decodes
+        to the exact window size.
+        """
         path = self.chunk_path(spec.chunk_index)
         if not path.is_file():
+            return False
+        try:
+            if not _read_chunk_sha(path) == _chunk_sha256(path):
+                return False
+        except OSError:
             return False
         run = self._run_pins()
         rs, re = render_window(spec, run.frame_count)
@@ -457,12 +493,13 @@ class ExportRunner:
                 if self._chunk_usable(spec):
                     media.append(ChunkMedia(spec=spec, path=self.chunk_path(spec.chunk_index)))
                     continue
-                # Completed+verified in the DB but the file on disk is short/
-                # unreadable → tampered chunk: fail closed, never silently
-                # accept it and never rewrite a terminal row.
+                # Completed+verified in the DB but the file on disk no longer
+                # matches its recorded byte identity (or decodes short) →
+                # tampered chunk: fail closed, never silently accept it and
+                # never rewrite a terminal row.
                 raise RunnerError(
                     f"chunk {spec.chunk_index} is completed+verified but its "
-                    "file decodes short/unreadable (tampered chunk?)"
+                    "byte identity mismatch (tampered chunk?)"
                 )
             # (Re)render: pending / failed / skipped / unverified / tampered.
             if row.state == "pending":
@@ -534,6 +571,7 @@ class ExportRunner:
         self._require_live_lease()
         self._require_not_cancelled()
         run = self._run_pins()
+        encoder = _encoder_for_profile(run.profile_id)
         if len(media) != len(self.build_plan()):
             raise RunnerError(
                 f"cannot assemble: {len(media)} chunk files for "
@@ -547,6 +585,7 @@ class ExportRunner:
                 output_path=Path(self._cfg.output_path),
                 audio_source=self._cfg.audio_source,
                 scratch_dir=Path(self._cfg.scratch_dir),
+                encoder=encoder,
             )
         except StitchError as err:
             raise RunnerError(f"assemble failed: {err}") from err
@@ -605,3 +644,48 @@ def _probe_dims(path: Path) -> tuple[int, int]:
         return int(stream["width"]), int(stream["height"])
     except Exception:
         return 3840, 2160
+
+
+# ── profile raster + chunk byte-identity helpers (F03/F06) ────────────
+
+
+def _parse_profile_dims(profile_dims: str) -> tuple[int, int]:
+    """Parse the frozen ``WxH`` profile dims string; fail-closed on drift."""
+    try:
+        w_text, h_text = profile_dims.lower().split("x", 1)
+        width, height = int(w_text), int(h_text)
+    except (ValueError, AttributeError) as err:
+        raise RunnerError(
+            f"unparseable profile_dims {profile_dims!r} (fail-closed)"
+        ) from err
+    if width < 1 or height < 1:
+        raise RunnerError(
+            f"profile_dims {profile_dims!r} non-positive (fail-closed)"
+        )
+    return width, height
+
+
+def _chunk_sha256(path: Path) -> str:
+    """Streamed sha256 of a chunk file (lowercase 64-hex)."""
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _chunk_sha_sidecar(path: Path) -> Path:
+    return path.parent / f"{path.name}.sha256"
+
+
+def _write_chunk_sha(path: Path) -> None:
+    """Record byte identity beside the chunk (atomic write + fsync)."""
+    sidecar = _chunk_sha_sidecar(path)
+    tmp = sidecar.with_suffix(".sha256.tmp")
+    tmp.write_text(_chunk_sha256(path) + "\n", encoding="ascii")
+    os.replace(tmp, sidecar)
+
+
+def _read_chunk_sha(path: Path) -> str:
+    """Read the recorded byte identity; OSError/ValueError → mismatch."""
+    return _chunk_sha_sidecar(path).read_text(encoding="ascii").strip()

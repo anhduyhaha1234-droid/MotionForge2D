@@ -183,12 +183,17 @@ def trim_core(
     frame_count: int,
     fps: float,
     dest: str | Path,
+    encoder: str = "libx264",
 ) -> Path:
     """Trim one render window down to its core-only segment (frame-exact).
 
     ``chunk_path`` holds frames ``[rs, re]`` (:func:`render_window`); the
     core starts at offset ``spec.core_start_frame - rs`` inside the file.
     Only the ``core_frame_count`` frames enter the timeline.
+
+    F03 — the trim re-encodes with the *selected supported* encoder (from
+    the frozen profile), never a hardcoded ``libx264``: HEVC chunks stay
+    HEVC through the final assembly.
     """
     src = Path(chunk_path)
     if not src.is_file():
@@ -197,6 +202,8 @@ def trim_core(
         raise StitchError(f"refusing .partial chunk as stitch input: {src.name}")
     if fps <= 0:
         raise StitchError("fps must be > 0")
+    if not encoder:
+        raise StitchError("encoder must be non-empty")
     rs, _ = render_window(spec, frame_count)
     offset = spec.core_start_frame - rs
     if offset < 0:
@@ -217,7 +224,7 @@ def trim_core(
             "setpts=PTS-STARTPTS",
             "-an",
             "-c:v",
-            "libx264",
+            encoder,
             "-preset",
             "ultrafast",
             "-pix_fmt",
@@ -381,6 +388,7 @@ def assemble_run(
     output_path: str | Path,
     audio_source: str | Path | None,
     scratch_dir: str | Path,
+    encoder: str = "libx264",
 ) -> Path:
     """Full stitch pipeline: trim cores → concat → mux audio → atomic finalize.
 
@@ -388,6 +396,11 @@ def assemble_run(
     stitched frame count, then atomically replaces the completed path.  An
     existing completed output is NEVER overwritten (contract §6).  Crash-safe:
     only ``.partial`` scratch remains on failure.
+
+    F03 — ``encoder`` is the profile-selected supported codec; the trim
+    keeps it (never hardcoded libx264) so the final candidate codec matches
+    the selected profile.  F07 — the output produced here is a PRIVATE
+    candidate path the caller owns; publication is never part of assembly.
     """
     output = Path(output_path)
     if output.name.endswith(PARTIAL_SUFFIX):
@@ -400,6 +413,8 @@ def assemble_run(
         raise StitchError("fps must be > 0")
     if frame_count < 1:
         raise StitchError("frame_count must be >= 1")
+    if not encoder:
+        raise StitchError("encoder must be non-empty")
     ordered = sorted(chunks, key=lambda item: item.spec.order_index)
     if not ordered:
         raise StitchError("no chunk media to assemble")
@@ -424,6 +439,7 @@ def assemble_run(
                 frame_count=frame_count,
                 fps=fps,
                 dest=scratch / f"core_{item.spec.order_index:04d}.mp4",
+                encoder=encoder,
             )
         )
     stitched = scratch / "stitched_video.mp4"
@@ -441,5 +457,34 @@ def assemble_run(
         raise StitchError(
             f"final candidate has {got_final} frames, expected {frame_count}"
         )
+    _verify_codec(candidate, encoder, "final candidate")
     os.replace(candidate, output)
     return output
+
+
+def _verify_codec(path: str | Path, encoder: str, label: str) -> None:
+    """Assert the file's actual video codec matches the selected encoder."""
+    expected_codec = "hevc" if "265" in encoder.lower() else "h264"
+    completed = _run(
+        [
+            find_ffprobe(),
+            "-hide_banner",
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=codec_name",
+            "-of",
+            "csv=p=0",
+            str(path),
+        ]
+    )
+    if completed.returncode != 0:
+        raise StitchError(f"{label} codec probe failed: {path}")
+    actual = (completed.stdout or "").strip().splitlines()
+    if not actual or actual[0].strip() != expected_codec:
+        raise StitchError(
+            f"{label} codec {actual[0] if actual else '?'} != selected "
+            f"{expected_codec} ({encoder}) — substitution rejected"
+        )
