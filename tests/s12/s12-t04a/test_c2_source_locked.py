@@ -743,3 +743,171 @@ def test_delta_psnr_missing_reference_path_fails_closed(
     verdict = validate(candidate, exp)
     assert verdict.probe("frame_order").verdict == "FAIL"
     assert verdict.verdict == "FAIL"
+
+
+# ── C2 cross-raster PSNR (F11-T06B-02): reference fit+pad to candidate ──
+#
+# Upscale 1080p->4K/letterbox publishes now PASS because probe_frame_psnr
+# scale+pad'ed the reference to the candidate raster (product letterbox
+# policy) before measuring. Tamper still FAILs under the same tolerance.
+
+
+def _letterbox_candidate(
+    parts: list[Path], dest: Path, out_w: int, out_h: int
+) -> Path:
+    """Concat parts then fit+pad to the canvas (product letterbox policy)."""
+    lst = dest.with_suffix(".lst.txt")
+    lst.write_text("".join(f"file '{part}'\n" for part in parts))
+    rc = subprocess.run(
+        [_ffmpeg(), "-hide_banner", "-loglevel", "error", "-y",
+         "-f", "concat", "-safe", "0", "-i", str(lst),
+         "-vf", f"scale={out_w}:{out_h}:force_original_aspect_ratio=decrease,"
+                f"pad={out_w}:{out_h}:(ow-iw)/2:(oh-ih)/2:color=black",
+         "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+         "-an", str(dest)],
+        capture_output=True, text=True, timeout=300,
+    )
+    assert rc.returncode == 0, rc.stderr[-400:]
+    return dest
+
+
+def _cross_psnr_expectation(
+    approved: Path, candidate: Path, ref_w: int, ref_h: int,
+    out_w: int, out_h: int, **overrides
+) -> ValidationExpectation:
+    base: dict = {
+        "width": out_w,
+        "height": out_h,
+        "codec": "h264",
+        "source_locked": True,
+        "frame_match_mode": "psnr",
+        "frame_psnr_min_db": 30.0,
+        "source_reference": SourceReference(
+            artifact_sha256=sha256_file(approved),
+            frame_count=FRAMES,
+            fps_num=FPS,
+            fps_den=1,
+            reference_path=str(approved),
+            reference_width=ref_w,
+            reference_height=ref_h,
+            audio=AudioReference(mode="absent"),
+        ),
+        "expected_sha256": sha256_file(candidate),
+    }
+    base.update(overrides)
+    return ValidationExpectation(**base)
+
+
+def _media_43(dest: Path, pattern: str, duration: float = 1.0) -> Path:
+    """4:3 segment (320x240) — letterbox source for the 16:9 canvas."""
+    cmd = [_ffmpeg(), "-hide_banner", "-loglevel", "error", "-y",
+           "-f", "lavfi", "-i",
+           f"{pattern}=size=320x240:rate={FPS}:duration={duration}"]
+    cmd += ["-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+            "-an", str(dest)]
+    rc = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    assert rc.returncode == 0, rc.stderr[-400:]
+    return dest
+
+
+@pytest.fixture(scope="module")
+def letterbox_segments(tmp_path_factory: pytest.TempPathFactory) -> dict:
+    root = tmp_path_factory.mktemp("s12t04a_xr")
+    seg_a = _media_43(root / "lb_a.mp4", "testsrc")
+    seg_b = _media_43(root / "lb_b.mp4", "smptebars")
+    seg_b2 = _media_43(root / "lb_b2.mp4", "testsrc2")
+    return {"root": root, "seg_a": seg_a, "seg_b": seg_b, "seg_b2": seg_b2}
+
+
+def test_xr_upscale_letterbox_passes(
+    letterbox_segments: dict, tmp_path: Path
+) -> None:
+    """1080p-ish 4:3 source published to a 16:9 canvas PASSes (fit+pad)."""
+    approved = tmp_path / "approved_lb.mp4"
+    _concat([letterbox_segments["seg_a"], letterbox_segments["seg_b"]], approved)
+    candidate = _letterbox_candidate(
+        [letterbox_segments["seg_a"], letterbox_segments["seg_b"]],
+        tmp_path / "candidate_lb.mp4", 640, 360,
+    )
+    exp = _cross_psnr_expectation(
+        approved, candidate, ref_w=320, ref_h=240, out_w=640, out_h=360
+    )
+    verdict = validate(candidate, exp)
+    assert verdict.verdict == "PASS", [
+        (item.name, item.verdict, item.detail) for item in verdict.probes
+    ]
+    order = verdict.probe("frame_order")
+    assert order is not None and "fit+pad" in order.detail
+
+
+def test_xr_upscale_same_raster_still_passes(
+    approved_ab: Path, tmp_path: Path
+) -> None:
+    """Same-raster PSNR path unchanged (no scale filter applied)."""
+    candidate = _reencode(approved_ab, tmp_path / "cand_same.mp4")
+    exp = _cross_psnr_expectation(
+        approved_ab, candidate, ref_w=W, ref_h=H, out_w=W, out_h=H
+    )
+    verdict = validate(candidate, exp)
+    assert verdict.verdict == "PASS", [
+        (item.name, item.verdict, item.detail) for item in verdict.probes
+    ]
+    order = verdict.probe("frame_order")
+    assert order is not None and "fit+pad" not in order.detail
+
+
+def test_xr_reorder_still_fails(
+    letterbox_segments: dict, tmp_path: Path
+) -> None:
+    """Cross-raster reordered content FAILs under PSNR tolerance."""
+    approved = tmp_path / "approved_lb.mp4"
+    _concat([letterbox_segments["seg_a"], letterbox_segments["seg_b"]], approved)
+    candidate = _letterbox_candidate(
+        [letterbox_segments["seg_b"], letterbox_segments["seg_a"]],
+        tmp_path / "reordered_lb.mp4", 640, 360,
+    )
+    exp = _cross_psnr_expectation(
+        approved, candidate, ref_w=320, ref_h=240, out_w=640, out_h=360
+    )
+    verdict = validate(candidate, exp)
+    assert verdict.probe("frame_order").verdict == "FAIL"
+    assert verdict.verdict == "FAIL"
+
+
+def test_xr_wrong_raster_dims_fail_closed(
+    letterbox_segments: dict, tmp_path: Path
+) -> None:
+    """Reference raster claimed wrongly (500x300 vs real 320x240) FAILs."""
+    approved = tmp_path / "approved_lb.mp4"
+    _concat([letterbox_segments["seg_a"], letterbox_segments["seg_b"]], approved)
+    candidate = _letterbox_candidate(
+        [letterbox_segments["seg_a"], letterbox_segments["seg_b"]],
+        tmp_path / "candidate_lb.mp4", 640, 360,
+    )
+    exp = _cross_psnr_expectation(
+        approved, candidate, ref_w=640, ref_h=360, out_w=640, out_h=360
+    )
+    verdict = validate(candidate, exp)
+    assert verdict.verdict in ("FAIL", "NOT_MEASURED")
+    assert verdict.verdict != "PASS"
+    order = verdict.probe("frame_order")
+    assert order is not None and order.verdict != "PASS"
+
+
+def test_xr_no_reference_raster_is_same_raster_path(
+    letterbox_segments: dict, tmp_path: Path
+) -> None:
+    """Missing ref raster keeps same-raster path — real cross-raster FAILs
+    (fail-closed, never a wrong PASS)."""
+    approved = tmp_path / "approved_lb.mp4"
+    _concat([letterbox_segments["seg_a"], letterbox_segments["seg_b"]], approved)
+    candidate = _letterbox_candidate(
+        [letterbox_segments["seg_a"], letterbox_segments["seg_b"]],
+        tmp_path / "candidate_lb.mp4", 640, 360,
+    )
+    exp = _cross_psnr_expectation(
+        approved, candidate, ref_w=None, ref_h=None, out_w=640, out_h=360
+    )
+    verdict = validate(candidate, exp)
+    assert verdict.verdict in ("FAIL", "NOT_MEASURED")
+    assert verdict.verdict != "PASS"
