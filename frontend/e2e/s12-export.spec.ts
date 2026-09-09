@@ -35,6 +35,7 @@ const QA_ROOT =
 interface SeedResult {
   case: string;
   project_id: string;
+  project_blocked_id: string;
   workspace_id: string;
   video_ready: string;
   video_blocked: string;
@@ -50,6 +51,7 @@ interface SeedResult {
   cancel_run_id: string;
   retry_base_run_id: string;
   completed_run_id: string;
+  tampered_run_id: string;
 }
 
 function submitBody(seed: SeedResult, idem: string, salt?: string) {
@@ -116,7 +118,7 @@ test("trang trong hien trang thai rong tieng Viet", async ({ page }) => {
 
 test("preflight that: video blocked tra SOURCE_MISSING", async ({ request }) => {
   const res = await request.post(
-    `${API}/api/v2/projects/${seed.project_id}/export/preflight`,
+    `${API}/api/v2/projects/${seed.project_blocked_id}/export/preflight`,
     {
       data: {
         video_item_id: seed.video_blocked,
@@ -141,16 +143,12 @@ test("preflight that: video blocked tra SOURCE_MISSING", async ({ request }) => 
   expect(body.reasons).toContain("S12_EXPORT_SOURCE_MISSING");
 });
 
-test("preflight that: video ready fail-closed vi authority + readiness that", async ({
+test("preflight that: video ready eligible that (authority + readiness real)", async ({
   request,
 }) => {
-  // C2 server-owned authority (F02/F08): preflight resolves the REAL Full
-  // Apply authority + readiness aggregate BEFORE eligibility.  The seed
-  // now provides a completed Full Apply publication, so the authority
-  // items pass; readiness stays NOT_READY because the REAL QC band
-  // (T03G lane: detector modules + durable full-band revisions) is not
-  // part of this canonical base — the E2E asserts the fail-closed reason,
-  // never a fake eligible.
+  // C2 server-owned authority + readiness: seed cung cấp completed Full
+  // Apply publication + completed FULL QC band run (T03G band registered
+  // production) => preflight phải eligible TRÊN API THẬT (positive path).
   const res = await request.post(
     `${API}/api/v2/projects/${seed.project_id}/export/preflight`,
     {
@@ -173,23 +171,36 @@ test("preflight that: video ready fail-closed vi authority + readiness that", as
   );
   expect(res.status()).toBe(200);
   const body = await res.json();
-  expect(body.eligible).toBe(false);
-  expect(body.reasons).toContain("S12_EXPORT_NOT_READY");
+  expect(body.eligible).toBe(true);
+  expect(body.reasons).toContain("S12_EXPORT_OK");
 });
 
-test("submit that: fail-closed 409 NOT_READY (readiness that chua dat)", async ({
+test("submit that -> 202 real (readiness+authority ready)", async ({
   request,
+  page,
 }, testInfo) => {
-  // C2 no-bypass: submit runs the REAL project-readiness gate.  The
-  // canonical base does not carry the T03G full-band QC detector modules,
-  // so the real aggregate stays not_run and a fresh submit FAILS CLOSED
-  // with 409 — the E2E proves the gate, never a fake 202.
+  // C2 base fb59215: T03G band + Full Apply authority đều sẵn sàng, submit
+  // qua API THẬT phải 202 và run pending/running (worker real có thể claim).
   const res = await request.post(`${API}/s12-exports/submit`, {
     data: submitBody(seed, "s12t05-ui-submit", `${testInfo.project.name}:${testInfo.title}`),
   });
-  expect(res.status()).toBe(409);
-  const body = await res.json();
-  expect(String(body.detail)).toMatch(/readiness 'not_run'|S12_EXPORT_NOT_READY/);
+  expect(res.status()).toBe(202);
+  const created = await res.json();
+  expect(created.run_id).toBeTruthy();
+
+  const st = await request.get(
+    `${API}/s12-exports/${created.run_id}?workspace_id=default`,
+  );
+  expect(st.status()).toBe(200);
+  const statusBody = await st.json();
+  expect(["pending", "running"]).toContain(statusBody.status);
+  expect(Array.isArray(statusBody.chunks)).toBe(true);
+
+  await page.goto(
+    `${FE}/export?run=${created.run_id}&project=${seed.project_id}&video=${seed.video_ready}`,
+  );
+  await expect(page.getByTestId("export-panel")).toBeVisible();
+  await expect(page.getByTestId("export-progress")).toBeVisible();
 });
 
 test("cancel that run pending -> cancelled", async ({ request, isMobile }) => {
@@ -276,12 +287,13 @@ test("C21: refresh giu nguyen run dang active, khong tao run moi", async ({
   await expect(page.getByTestId("export-run-id")).toContainText(run_id.slice(0, 8));
 });
 
-// ── C22 result-access: evidence only for completed; nothing served ────────
-// The status API carries no media/download URL; the panel must not invent
-// one. Non-completed runs show progress, never evidence; unknown/stale run
-// ids surface an error, never evidence.
+// ── C22 result-access: completed run plays/downloads via server URL ─────
+// C22-part backend (T03C addendum fb59215): GET /s12-exports/{run}/result
+// returns server-owned media_url; GET /media streams the REAL video bytes
+// ONLY for completed + owned runs with matching sidecar.  The UI uses that
+// server URL verbatim — never an invented path.
 
-test("C22: run completed khong co media URL hay download tu suy dien", async ({
+test("C22: run completed -> result media_url server-owned + UI player/download", async ({
   page,
 }) => {
   await page.goto(
@@ -289,8 +301,77 @@ test("C22: run completed khong co media URL hay download tu suy dien", async ({
   );
   const evidence = page.getByTestId("export-evidence");
   await expect(evidence).toBeVisible();
-  expect(await evidence.locator("a[href], video, audio").count()).toBe(0);
-  expect(await page.locator("a[href$='.mp4']").count()).toBe(0);
+  const player = page.getByTestId("export-result-player");
+  await expect(player).toBeVisible();
+  const src = await player.getAttribute("src");
+  expect(src).toContain(`/s12-exports/${seed.completed_run_id}/media`);
+  const download = page.getByTestId("export-result-download");
+    await expect(download).toBeVisible();
+    await expect(download).toHaveAttribute(
+      "href",
+      new RegExp(`/s12-exports/${seed.completed_run_id}/media`),
+    );
+    await expect(download).toContainText(/export_master\.mp4/);
+});
+
+test("C22: result metadata that + media tra dung video/mp4 bytes that", async ({
+  request,
+}) => {
+  const res = await request.get(
+    `${API}/s12-exports/${seed.completed_run_id}/result?workspace_id=default`,
+  );
+  expect(res.status()).toBe(200);
+  const body = await res.json();
+  expect(body.status).toBe("completed");
+  expect(body.media_url).toBe(`/s12-exports/${seed.completed_run_id}/media`);
+  expect(body.mime).toBe("video/mp4");
+  expect(body.size_bytes).toBeGreaterThan(1024);
+
+  const media = await request.get(
+    `${API}${body.media_url}?workspace_id=default`,
+  );
+  expect(media.status()).toBe(200);
+  expect(media.headers()["content-type"]).toMatch(/video\/mp4/);
+  const bytes = await media.body();
+  expect(bytes.length).toBe(body.size_bytes);
+  // mp4 ftyp atom — playable container, không phải stub/empty
+  const magic = bytes.subarray(4, 12).toString("latin1");
+  expect(magic).toContain("ftyp");
+});
+
+test("C22: pending/failed run -> result bi tu choi (409, khong media)", async ({
+  request,
+}) => {
+  const res = await request.get(
+    `${API}/s12-exports/${seed.pending_run_id}/result?workspace_id=default`,
+  );
+  expect(res.status()).toBe(409);
+  const media = await request.get(
+    `${API}/s12-exports/${seed.pending_run_id}/media?workspace_id=default`,
+  );
+  expect(media.status()).toBe(409);
+});
+
+test("C22: cross-project run -> 404 (khong lo result cua project khac)", async ({
+  request,
+}) => {
+  const res = await request.get(
+    `${API}/s12-exports/${seed.completed_run_id}/result?workspace_id=default&project_id=other-project`,
+  );
+  expect(res.status()).toBe(404);
+});
+
+test("C22: tampered artifact -> 403 (byte identity mismatch, khong serve)", async ({
+  request,
+}) => {
+  const res = await request.get(
+    `${API}/s12-exports/${seed.tampered_run_id}/result?workspace_id=default`,
+  );
+  expect(res.status()).toBe(403);
+  const media = await request.get(
+    `${API}/s12-exports/${seed.tampered_run_id}/media?workspace_id=default`,
+  );
+  expect(media.status()).toBe(403);
 });
 
 test("C22: run pending chi thay progress, khong thay evidence", async ({

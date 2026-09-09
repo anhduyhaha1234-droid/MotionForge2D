@@ -394,6 +394,40 @@ export function exportStatus(
   );
 }
 
+/** C22-part result metadata: server-owned media URL (never client-invented). */
+export interface S12ExportResultPayload {
+  run_id: string;
+  status: S12ExportRunStatus;
+  project_id: string;
+  video_item_id: string;
+  profile_id: string;
+  frame_count: number;
+  filename: string;
+  size_bytes: number;
+  mime: string;
+  media_url: string;
+}
+
+export function exportResult(
+  runId: string,
+  workspaceId = "default",
+  projectId?: string,
+): Promise<S12ExportResultPayload> {
+  return apiFetch<S12ExportResultPayload>(
+    withQuery(`/s12-exports/${encodeURIComponent(runId)}/result`, {
+      workspace_id: workspaceId,
+      project_id: projectId,
+    }),
+  );
+}
+
+/** Resolve a server-owned media URL against the API base (no invented URL). */
+export function s12MediaUrl(mediaUrl: string): string {
+  return mediaUrl.startsWith("http")
+    ? mediaUrl
+    : `${API_BASE}${mediaUrl.startsWith("/") ? mediaUrl : `/${mediaUrl}`}`;
+}
+
 export function cancelExport(
   runId: string,
   workspaceId = "default",

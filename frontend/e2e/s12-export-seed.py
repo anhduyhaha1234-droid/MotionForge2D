@@ -251,8 +251,47 @@ def _hex64(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+def _write_completed_artifact(
+    qa_root: _Path, pid: str, vid: str, source_media: str,
+) -> _Path:
+    """Write REAL export output + sha256 sidecar at the server-owned path.
+
+    The C22 result/media endpoints derive the artifact path from managed
+    root + project/video (app.api.routes.s12_export._server_paths) and
+    serve ONLY completed runs whose artifact matches its sidecar.  This
+    mirrors the T03C publication layout (export_master.mp4 + .sha256);
+    the source bytes are the REAL ffmpeg media (playable video/mp4).
+    """
+    import shutil as _shutil  # noqa: PLC0415
+
+    out_dir = qa_root / "artifacts" / "s12-exports" / pid / vid
+    out_dir.mkdir(parents=True, exist_ok=True)
+    artifact = out_dir / "export_master.mp4"
+    _shutil.copyfile(source_media, artifact)
+    sha = hashlib.sha256(artifact.read_bytes()).hexdigest()
+    sidecar = out_dir / "export_master.mp4.sha256"
+    sidecar.write_text(f"{sha}\n", encoding="ascii")
+    return artifact
+
+
+def _write_tampered_artifact(
+    qa_root: _Path, pid: str, vid: str, source_media: str,
+) -> _Path:
+    """Write artifact with a WRONG sidecar (byte-identity mismatch)."""
+    import shutil as _shutil  # noqa: PLC0415
+
+    out_dir = qa_root / "artifacts" / "s12-exports" / pid / vid
+    out_dir.mkdir(parents=True, exist_ok=True)
+    artifact = out_dir / "export_master.mp4"
+    _shutil.copyfile(source_media, artifact)
+    sidecar = out_dir / "export_master.mp4.sha256"
+    sidecar.write_text(f"{'0' * 64}\n", encoding="ascii")
+    return artifact
+
+
 def cmd_export(session: Session) -> dict:
     pid = str(_uuid.uuid4())
+    pid_blocked = str(_uuid.uuid4())
     v_ready = str(_uuid.uuid4())
     v_blocked = str(_uuid.uuid4())
 
@@ -261,9 +300,12 @@ def cmd_export(session: Session) -> dict:
         {"w": WS},
     )
     session.execute(
-        _text("INSERT INTO project(id,workspace_id,name,description,status) "
-              "VALUES (:p,:w,'ProjT05','','active') ON CONFLICT(id) DO NOTHING"),
+        _text("INSERT INTO project(id,workspace_id,name) VALUES (:p,:w,'ExportProj')"),
         {"p": pid, "w": WS},
+    )
+    session.execute(
+        _text("INSERT INTO project(id,workspace_id,name) VALUES (:p,:w,'BlockedProj')"),
+        {"p": pid_blocked, "w": WS},
     )
     session.execute(
         _text("INSERT INTO video_item(id,project_id,title,position,status,width,height,"
@@ -271,11 +313,14 @@ def cmd_export(session: Session) -> dict:
               "3840,2160,30,1,10000)"),
         {"v": v_ready, "p": pid},
     )
+    # Video blocked -> PROJECT RIÊNG (C2 readiness aggregate: not_run WINS
+    # khi ANY active video thiếu completed current run — gộp chung project
+    # làm readiness cả project not_run, không phải lỗi backend).
     session.execute(
         _text("INSERT INTO video_item(id,project_id,title,position,status,width,height,"
-              "fps_num,fps_den,duration_ms) VALUES (:v,:p,'VidBlocked',1,'imported',"
+              "fps_num,fps_den,duration_ms) VALUES (:v,:p,'VidBlocked',0,'imported',"
               "1920,1080,30,1,10000)"),
-        {"v": v_blocked, "p": pid},
+        {"v": v_blocked, "p": pid_blocked},
     )
     art_rel = "s12t05/source_ready.mp4"
     art_path = _Path(os.environ["S12T05_QA_ROOT"]) / "artifacts" / art_rel
@@ -500,9 +545,120 @@ def cmd_export(session: Session) -> dict:
         s2.commit()
         completed_id = rec2.id
 
+    # C22-part positive: the completed run must expose a REAL playable
+    # artifact at the server-derived output path (managed root
+    # s12-exports/{project}/{video}/export_master.mp4) + immutable sha256
+    # sidecar — the same layout the T03C publication writes.  We copy the
+    # REAL ffmpeg source media as the export output (real video/mp4 bytes)
+    # and write the byte-identity sidecar, so GET result/media serve it.
+    _write_completed_artifact(
+        qa_root, pid, v_ready, str(art_path),
+    )
+
+    # C22 denied: a TAMPERED artifact (sidecar mismatch) must NOT be
+    # served — completed run + real file but WRONG sidecar => 403.
+    # Server path is per project/video, so this uses the BLOCKED project's
+    # video (its own server-derived path, never touching the good result),
+    # with its OWN checkpoint/manifest/lock pins (create_run rejects
+    # cross-project pins).
+    with factory() as s3:
+        session3 = s3  # same factory session shape
+        session3.execute(
+            _text("INSERT INTO character(id,workspace_id,name,code) VALUES ('ch-t05b',:w,'H','h-t05b')"),
+            {"w": WS},
+        )
+        session3.execute(
+            _text("INSERT INTO character_pack_version(id,character_id,workspace_id,version,status) "
+                  "VALUES ('pv-t05b','ch-t05b',:w,1,'published')"),
+            {"w": WS},
+        )
+        session3.execute(
+            _text("INSERT INTO object_role(id,workspace_id,project_id,video_item_id,"
+                  "source_generation,name,kind,status) VALUES ('rl-t05b',:w,:p,:v,'g','C',"
+                  "'character','confirmed')"),
+            {"w": WS, "p": pid_blocked, "v": v_blocked},
+        )
+        session3.execute(
+            _text("INSERT INTO reskin_config(id,workspace_id,project_id,object_role_id,"
+                  "cast_mapping_id,character_id,pack_version_id,params_json,"
+                  "idempotency_key,revision) VALUES ('rc-t05b',:w,:p,'rl-t05b',NULL,"
+                  "'ch-t05b','pv-t05b','{}',NULL,1)"),
+            {"w": WS, "p": pid_blocked},
+        )
+        session3.execute(
+            _text("INSERT INTO apply_checkpoint(id,workspace_id,project_id,reskin_config_id,"
+                  "reskin_config_revision,pack_version_ids_json,loop_hashes_json,"
+                  "timebase_fingerprint,snapshot_json,checkpoint_hash,note,"
+                  "idempotency_key,revision) VALUES ('ac-t05b',:w,:p,'rc-t05b',1,'[]','[]',"
+                  "'tb','{}',:h,NULL,NULL,1)"),
+            {"w": WS, "p": pid_blocked, "h": CHK_HASH},
+        )
+        lock = StructuralLockRepository(session3)
+        m_b, _ = lock.create_manifest(WS, pid_blocked, v_blocked, "gen1", _manifest_doc())
+        session3.commit()
+        manifest_b = m_b.id
+        manifest_hash_b = str(m_b.manifest_hash_hex)
+
+        repo3 = S12ExportRepository(session3)
+        tamper_kw = dict(
+            workspace_id=WS,
+            project_id=pid_blocked,
+            video_item_id=v_blocked,
+            checkpoint_id="ac-t05b",
+            checkpoint_hash=CHK_HASH,
+            checkpoint_revision=1,
+            manifest_id=manifest_b,
+            manifest_hash=manifest_hash_b,
+            manifest_generation="gen1",
+            profile_id="master-4k-h264",
+            plan_id="b" * 63 + "1",
+            plan_hash="b" * 63 + "1",
+            frame_count=FRAME_COUNT,
+            chunk_config={"overlap": 5, "max_frames": 30},
+        )
+        tamper_run, _ = repo3.create_run(
+            idempotency_key="s12t05-ui-tampered",
+            **tamper_kw,
+        )
+        lease3 = repo3.claim_run(tamper_run.id, "seed-worker")
+        session3.commit()
+        ch3, _ = repo3.upsert_chunk(
+            run_id=tamper_run.id,
+            workspace_id=WS,
+            chunk_index=0,
+            order_index=0,
+            core_start_frame=0,
+            core_end_frame=29,
+            content_hash="c" * 64,
+            actor="seed-worker",
+            fence_token=lease3.fence_token,
+        )
+        session3.commit()
+        repo3.transition_chunk(
+            ch3.id, "running", actor="seed-worker",
+            fence_token=lease3.fence_token, expected_revision=ch3.revision,
+        )
+        session3.commit()
+        progressed3 = repo3.list_chunks(tamper_run.id)[0]
+        repo3.transition_chunk(
+            progressed3.id, "completed", actor="seed-worker",
+            fence_token=lease3.fence_token, expected_revision=progressed3.revision,
+            verified=1,
+        )
+        session3.execute(
+            _text("UPDATE s12_export_run SET status='completed', revision=revision+1 WHERE id=:r"),
+            {"r": tamper_run.id},
+        )
+        session3.commit()
+        tampered_id = tamper_run.id
+    _write_tampered_artifact(
+        qa_root, pid_blocked, v_blocked, str(art_path),
+    )
+
     return {
         "case": "export",
         "project_id": pid,
+        "project_blocked_id": pid_blocked,
         "workspace_id": WS,
         "video_ready": v_ready,
         "video_blocked": v_blocked,
@@ -518,6 +674,7 @@ def cmd_export(session: Session) -> dict:
         "cancel_run_id": cancel_id,
         "retry_base_run_id": retry_id,
         "completed_run_id": completed_id,
+        "tampered_run_id": tampered_id,
     }
 
 
