@@ -212,6 +212,12 @@ class SourceReference:
     # measured PSNR comparison (``frame_match_mode="psnr"``). Never a
     # client-supplied path; absent → PSNR probe fails closed.
     reference_path: str | None = None
+    # Raster of the immutable approved artifact (server-probed). When the
+    # PSNR comparison is cross-raster (e.g. 1080p -> 4K upscale), the
+    # reference is scale+pad'ed to the candidate raster with the product
+    # letterbox policy (fit, never stretch) before measuring dB.
+    reference_width: int | None = None
+    reference_height: int | None = None
     # Exact source cuts in frame index + rational seconds.
     cuts: tuple[CutPoint, ...] = ()
     # Approved audio evidence (``None`` = approved output has no audio).
@@ -414,26 +420,34 @@ def probe_frame_digests(
     return tuple(digests) if digests else None
 
 
-def _open_raw_pipe(path: str | Path) -> subprocess.Popen | None:
+def _fit_filter(width: int, height: int) -> str:
+    # Product letterbox policy: fit into the canvas, never stretch.
+    # ``scale`` with force_original_aspect_ratio=decrease preserves the
+    # source aspect inside WxH; ``pad`` centers it with black bars —
+    # exactly the WS-08 preserve policy, no silent stretch/crop.
+    return (
+        f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
+        f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black"
+    )
+
+
+def _open_raw_pipe(
+    path: str | Path, vf: str | None = None
+) -> subprocess.Popen | None:
     try:
+        argv = [
+            find_ffmpeg(),
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-i",
+            str(path),
+        ]
+        if vf:
+            argv += ["-vf", vf]
+        argv += ["-map", "0:v:0", "-f", "rawvideo", "-pix_fmt", "yuv420p", "-"]
         return subprocess.Popen(
-            [
-                find_ffmpeg(),
-                "-hide_banner",
-                "-loglevel",
-                "error",
-                "-i",
-                str(path),
-                "-map",
-                "0:v:0",
-                "-f",
-                "rawvideo",
-                "-pix_fmt",
-                "yuv420p",
-                "-",
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
+            argv, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
         )
     except OSError:
         return None
@@ -444,18 +458,34 @@ def probe_frame_psnr(
     reference: str | Path,
     width: int,
     height: int,
+    reference_width: int | None = None,
+    reference_height: int | None = None,
 ) -> tuple[float, ...] | None:
-    """Per-frame PSNR (dB) of decoded candidate vs reference, presentation
-    order, at the approved raster. None when either side fails to decode
-    or streams diverge. Used ONLY by the measured ``frame_match_mode="psnr"``
-    tolerance path — exact mode never calls this."""
+    # Per-frame PSNR (dB) of decoded candidate vs reference at the
+    # candidate raster. Cross-raster (F11-T06B-02): when the immutable
+    # reference artifact's raster (server-probed) differs from the
+    # candidate raster, the reference is scale+pad'ed to the candidate
+    # raster with the product letterbox policy BEFORE decoding — same
+    # geometry the runner produces, never stretch. Missing raster keeps
+    # the same-raster path (fail-closed: a real cross-raster case then
+    # measures low PSNR and FAILs). None on decode failure/divergence.
+    # Used ONLY by frame_match_mode="psnr"; exact mode never calls this.
     import math  # noqa: PLC0415
 
     frame_size = width * height * 3 // 2
     if frame_size <= 0:
         return None
+    ref_vf: str | None = None
+    if (
+        reference_width is not None
+        and reference_height is not None
+        and (reference_width, reference_height) != (width, height)
+        and reference_width > 0
+        and reference_height > 0
+    ):
+        ref_vf = _fit_filter(width, height)
     cand = _open_raw_pipe(candidate)
-    ref = _open_raw_pipe(reference)
+    ref = _open_raw_pipe(reference, ref_vf)
     if cand is None or ref is None:
         if cand is not None:
             cand.kill()
@@ -1101,7 +1131,14 @@ def _measure_psnr_order(
         width = height = 0
     if not width or not height:
         return [_fail("frame_order", "candidate raster unreadable for PSNR")]
-    values = probe_frame_psnr(path, reference_path, width, height)
+    values = probe_frame_psnr(
+        path,
+        reference_path,
+        width,
+        height,
+        ref.reference_width,
+        ref.reference_height,
+    )
     if values is None:
         return [
             _fail(
@@ -1131,11 +1168,20 @@ def _measure_psnr_order(
                 f"threshold {threshold:.1f} dB (tamper/content drift)",
             )
         ]
+    geometry = ""
+    if (
+        ref.reference_width is not None
+        and ref.reference_height is not None
+        and (ref.reference_width, ref.reference_height) != (width, height)
+    ):
+        geometry = (
+            f" (reference {ref.reference_width}x{ref.reference_height} "
+            f"fit+pad to {width}x{height})"
+        )
     return [
         _pass(
             "frame_order",
-            f"{len(values)} frames PSNR >= {threshold:.1f} dB "
-            "(approved-raster measured tolerance)",
+            f"{len(values)} frames PSNR >= {threshold:.1f} dB{geometry}",
         )
     ]
 
