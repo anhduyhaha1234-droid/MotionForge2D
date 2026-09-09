@@ -168,7 +168,11 @@ def test_pure_disk_insufficient() -> None:
 
 def test_frozen_reason_codes_stable() -> None:
     assert "S12_EXPORT_OK" in S12_EXPORT_REASON_CODES
-    assert len(S12_EXPORT_REASON_CODES) == 14
+    assert len(S12_EXPORT_REASON_CODES) == 18
+    assert "S12_EXPORT_FULL_APPLY_MISSING" in S12_EXPORT_REASON_CODES
+    assert "S12_EXPORT_SOURCE_STALE" in S12_EXPORT_REASON_CODES
+    assert "S12_EXPORT_SOURCE_SPOOFED" in S12_EXPORT_REASON_CODES
+    assert "S12_EXPORT_CONFIG_MISSING" in S12_EXPORT_REASON_CODES
     assert S12_EXPORT_CONTRACT_VERSION == "s12-export-v1"
     assert PREFLIGHT_PROFILES["master-4k-h264"]["width"] == 3840
 
@@ -406,6 +410,86 @@ def _seed_manifest(session: Any, *, ws: str, pid: str, vid: str) -> dict[str, st
     return {"manifest_id": record.id, "manifest_hash": record.manifest_hash_hex}
 
 
+def _seed_s10_authority(
+    session: Any,
+    *,
+    ws: str,
+    pid: str,
+    vid: str,
+    ckpt: dict[str, str],
+    frame_count: int = 300,
+    fps_num: int = 30,
+    fps_den: int = 1,
+    artifact_state: str = "ready",
+    artifact_sha: str | None = None,
+    partial: bool = False,
+    content_hash: str | None = None,
+) -> dict[str, str]:
+    """Seed the immutable CURRENT completed Full Apply authority (F02):
+    one completed S10FullApplyRun + one completed publication + its ready
+    video artifact, all pinning the given checkpoint."""
+    plan_id = _hex64(f"plan-{uuid.uuid4().hex}")
+    run_id = f"run-{uuid.uuid4().hex[:12]}"
+    pub_id = f"pub-{uuid.uuid4().hex[:12]}"
+    art_id = f"art-{uuid.uuid4().hex[:8]}"
+    sha = artifact_sha or _hex64(f"s10-out-{art_id}")
+    rel = f"apply/{uuid.uuid4().hex}.mp4"
+    if partial:
+        rel = rel + ".partial"
+    session.execute(
+        _text(
+            "INSERT INTO artifact(id,workspace_id,kind,relative_path,state,sha256,revision) "
+            "VALUES (:a,:w,'video',:rel,:st,:sha,1)"
+        ),
+        {"a": art_id, "w": ws, "rel": rel, "st": artifact_state, "sha": sha},
+    )
+    session.execute(
+        _text(
+            "INSERT INTO s10_full_apply_run(id,workspace_id,project_id,video_item_id,"
+            "apply_checkpoint_id,apply_checkpoint_hash,apply_checkpoint_revision,"
+            "plan_id,plan_hash,status,frame_count,fps_num,fps_den,chunk_config_json,attempt,revision)"
+            " VALUES (:rid,:w,:p,:v,:cid,:ch,:crev,:plan,:plan,"
+            "'completed',:fc,:fpsn,:fpsd,'{}',1,1)"
+        ),
+        {
+            "rid": run_id,
+            "w": ws,
+            "p": pid,
+            "v": vid,
+            "cid": ckpt["checkpoint_id"],
+            "ch": ckpt["checkpoint_hash"],
+            "crev": ckpt.get("checkpoint_revision", 1),
+            "plan": plan_id,
+            "fc": frame_count,
+            "fpsn": fps_num,
+            "fpsd": fps_den,
+        },
+    )
+    chash = content_hash or _hex64(f"pub-{pub_id}")
+    session.execute(
+        _text(
+            "INSERT INTO s10_full_apply_publication(id,workspace_id,run_id,artifact_id,"
+            "content_hash,frame_count,frame_metadata_json,checkpoint_id,checkpoint_hash,"
+            "checkpoint_revision,state,revision)"
+            " VALUES (:pub,:w,:rid,:aid,:ch,:fc,:fm,:cid,:ckh,:ckr,'completed',1)"
+        ),
+        {
+            "pub": pub_id,
+            "w": ws,
+            "rid": run_id,
+            "aid": art_id,
+            "ch": chash,
+            "fc": frame_count,
+            "fm": '{"fps_num": 30, "fps_den": 1}',
+            "cid": ckpt["checkpoint_id"],
+            "ckh": ckpt["checkpoint_hash"],
+            "ckr": ckpt.get("checkpoint_revision", 1),
+        },
+    )
+    session.commit()
+    return {"run_id": run_id, "publication_id": pub_id, "artifact_id": art_id}
+
+
 @pytest.fixture()
 def s12_session():
     factory = deps.get_job_service().session_factory
@@ -477,6 +561,7 @@ def test_t01_profile_probed_open_check(
     _seed_completed_check_run(s12_session, ws=WS, pid=pid, vid=vid)
     ckpt = _seed_checkpoint(s12_session, ws=WS, pid=pid, vid=vid)
     mani = _seed_manifest(s12_session, ws=WS, pid=pid, vid=vid)
+    _seed_s10_authority(s12_session, ws=WS, pid=pid, vid=vid, ckpt=ckpt)
     resp = client.post(
         f"/api/v2/projects/{pid}/export/preflight", json=_http_body(vid, ckpt, mani)
     )
@@ -484,10 +569,14 @@ def test_t01_profile_probed_open_check(
     body = resp.json()
     assert body["contract_version"] == "s12-export-v1"
     assert body["source_kind"] == "upscale_4k"  # 1080p source honesty
+    assert body["source_provenance"] == "unproven"
     assert body["readiness_status"] == "ready"
     assert body["eligible"] is True
     assert body["reasons"] == ["S12_EXPORT_OK"]
     assert body["profile"]["supported"] is True
+    assert body["full_apply_run_id"] and body["full_apply_publication_id"]
+    assert body["source_artifact_id"] and body["source_sha256"]
+    assert body["job_id"] is None  # preflight never mutates
     assert "probed libx264" in (body["profile"]["support_basis"] or "")
     passed = {c["name"] for c in body["checks"] if c["passed"]}
     assert {
@@ -546,17 +635,20 @@ def test_not_ready_422(client: TestClient, s12_session: Any) -> None:
 
 
 def test_partial_source_422(client: TestClient, s12_session: Any) -> None:
+    """Completed Full Apply publication whose output artifact is .partial."""
     vid = f"v-part-{uuid.uuid4().hex[:6]}"
     pid = f"p-part-{uuid.uuid4().hex[:6]}"
-    _seed_ws_project_video(s12_session, ws=WS, pid=pid, vid=vid, partial=True)
+    _seed_ws_project_video(s12_session, ws=WS, pid=pid, vid=vid)
     _seed_completed_check_run(s12_session, ws=WS, pid=pid, vid=vid)
     ckpt = _seed_checkpoint(s12_session, ws=WS, pid=pid, vid=vid)
     mani = _seed_manifest(s12_session, ws=WS, pid=pid, vid=vid)
+    _seed_s10_authority(s12_session, ws=WS, pid=pid, vid=vid, ckpt=ckpt, partial=True)
     resp = client.post(
         f"/api/v2/projects/{pid}/export/preflight", json=_http_body(vid, ckpt, mani)
     )
     assert resp.status_code == 200, resp.text
     assert "S12_EXPORT_SOURCE_PARTIAL" in resp.json()["reasons"]
+    assert resp.json()["eligible"] is False
 
 
 def test_cross_project_checkpoint_422(client: TestClient, s12_session: Any) -> None:

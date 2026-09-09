@@ -24,15 +24,12 @@ from sqlalchemy.orm import Session
 from app.api.deps import SessionDep, get_managed_root
 from app.persistence.models import Artifact, Project, VideoItem
 from app.persistence.readiness import compute_project_readiness
-from app.persistence.s10_full_apply import S10ApplyRepository
-from app.persistence.structural_lock import (
-    StructuralLockNotFoundError,
-    StructuralLockRepository,
-)
 from app.schemas.s12_export import (
     ExportPreflightRequest,
     ExportPreflightResponse,
+    PreflightCheck,
 )
+from app.services.s12_export.authority import resolve_export_authority
 from app.services.s12_export.preflight import (
     PreflightContext,
     evaluate_preflight,
@@ -71,91 +68,68 @@ def post_export_preflight(
             detail=f"video {body.video_item_id!r} not found in project {project_id!r}",
         )
 
-    # ── source media facts (read-only) ──────────────────────────────
-    artifact = None
-    if video.source_artifact_id:
-        artifact = session.get(Artifact, video.source_artifact_id)
-    source_found = artifact is not None
-    source_ready = bool(source_found and artifact.state == "ready")
+    # ── SERVER-OWNED AUTHORITY (F02) ────────────────────────────────
+    # Every durable identity is resolved READ-ONLY by the authority module:
+    # checkpoint pin (workspace/project/hash/revision), config/pack binding
+    # through the checkpoint's reskin_config, structural-lock pin, and the
+    # immutable CURRENT completed Full Apply output artifact.  An original
+    # import is never the export source.
+    authority = resolve_export_authority(
+        session,
+        workspace_id=workspace_id,
+        project_id=project_id,
+        video_item_id=body.video_item_id,
+        checkpoint_id=body.checkpoint.checkpoint_id,
+        checkpoint_hash=body.checkpoint.checkpoint_hash,
+        checkpoint_revision=body.checkpoint.checkpoint_revision,
+        manifest_id=body.lock.manifest_id,
+        manifest_hash=body.lock.manifest_hash,
+        manifest_generation=body.lock.source_generation,
+    )
+    src_artifact = (
+        session.get(Artifact, authority.source_artifact_id)
+        if authority.source_artifact_id
+        else None
+    )
+    source_found = src_artifact is not None
+    source_ready = bool(
+        source_found
+        and src_artifact.state == "ready"
+        and authority.full_apply_ok
+    )
     source_partial = bool(
-        source_found and ".partial" in str(artifact.relative_path or "")
+        src_artifact is not None
+        and ".partial" in str(src_artifact.relative_path or "")
     )
-    source_w = video.width
-    source_h = video.height
-    frame_count: int | None = None
-    try:
-        if video.duration_ms and video.fps_num and video.fps_den:
-            frame_count = int(video.duration_ms * video.fps_num / video.fps_den / 1000)
-            if frame_count < 1:
-                frame_count = None
-    except (TypeError, ValueError, ZeroDivisionError):
-        frame_count = None
-    # F-OBS-01: native_4k resolved AFTER the checkpoint block below (it
-    # needs the checkpoint pin facts as the native-origin authority).
-    _artifact_sha = str(getattr(artifact, "sha256", "") or "") if source_found else ""
-    native_4k = False
-
-    # ── checkpoint pin facts (read-only row comparison) ─────────────
-    s10 = S10ApplyRepository(session)
-    ckpt_found = ckpt_hash_ok = ckpt_rev_ok = False
-    ckpt_cross = False
-    try:
-        current: list = s10.list_runs(workspace_id, project_id=project_id)
-        ckpt_row = None
-        for run in current:
-            if run.video_item_id == body.video_item_id and run.status == "completed":
-                break
-        # Direct checkpoint row read for the requested pin.
-        from app.persistence.models import ApplyCheckpoint as _Ckpt
-
-        ckpt_row = session.get(_Ckpt, body.checkpoint.checkpoint_id)
-        if ckpt_row is not None and str(ckpt_row.workspace_id) == workspace_id:
-            ckpt_found = True
-            ckpt_cross = str(ckpt_row.project_id) != project_id
-            ckpt_hash_ok = str(ckpt_row.checkpoint_hash) == body.checkpoint.checkpoint_hash
-            ckpt_rev_ok = (
-                int(ckpt_row.reskin_config_revision) == body.checkpoint.checkpoint_revision
-            )
-    except HTTPException:
-        raise
-    except Exception:
-        ckpt_found = False
-
-    # F-OBS-01: native label needs PROVED native origin — dims alone never
-    # suffice.  The server-owned native-origin authority T01 reads is the
-    # full-apply lineage: recorded artifact sha256 AND a matching checkpoint
-    # pin AND ready 3840x2160 source with no .partial marker.  Anything else
-    # (incl. 3840x2160 of unproved origin, e.g. an already-upscaled file)
-    # is upscale honesty.
-    native_4k = (
-        source_ready
-        and not source_partial
-        and source_w == 3840
-        and source_h == 2160
-        and len(_artifact_sha) == 64
-        and ckpt_found
-        and ckpt_hash_ok
-        and ckpt_rev_ok
-        and not ckpt_cross
+    source_w = (
+        authority.source_width
+        if authority.source_width is not None
+        else (video.width if video.width else None)
     )
-
-    # ── structural-lock pin facts (read-only) ───────────────────────
-    lock_repo = StructuralLockRepository(session)
-    lock_found = lock_hash_ok = lock_gen_ok = False
-    try:
-        manifest = lock_repo.get_manifest(body.lock.manifest_id, workspace_id)
-        lock_found = True
-        lock_hash_ok = manifest.manifest_hash_hex == body.lock.manifest_hash
-        lock_gen_ok = (
-            manifest.video_item_id == body.video_item_id
-            and manifest.project_id == project_id
-            and manifest.source_generation == body.lock.source_generation
-            and manifest.status in ("draft", "active")
-        )
-    except StructuralLockNotFoundError:
-        lock_found = False
-    except Exception:
-        lock_found = False
+    source_h = (
+        authority.source_height
+        if authority.source_height is not None
+        else (video.height if video.height else None)
+    )
+    frame_count: int | None = authority.source_frame_count
+    if frame_count is None:
+        # Estimate fallback ONLY for the disk heuristic — never identity.
+        try:
+            if video.duration_ms and video.fps_num and video.fps_den:
+                frame_count = int(
+                    video.duration_ms * video.fps_num / video.fps_den / 1000
+                )
+                if frame_count < 1:
+                    frame_count = None
+        except (TypeError, ValueError, ZeroDivisionError):
+            frame_count = None
+    native_4k = authority.source_origin == "proved-native"
+    ckpt_found = ckpt_hash_ok = ckpt_rev_ok = authority.checkpoint_ok
+    ckpt_cross = any(
+        c.name == "checkpoint_cross_project" and not c.passed
+        for c in authority.checks
+    )
+    lock_found = lock_hash_ok = lock_gen_ok = authority.lock_ok
 
     # ── readiness aggregate (consumed, Decision F) ──────────────────
     try:
@@ -218,4 +192,32 @@ def post_export_preflight(
         profile_supported=_cap_ok,
         profile_support_basis=profile_basis,
     )
-    return evaluate_preflight(body, ctx)
+    resp = evaluate_preflight(body, ctx)
+    # Attach the SERVER-RESOLVED durable identities (F02) — actual artifact/
+    # run/publication ids — plus authority-only reasons the generic gates do
+    # not express (FULL_APPLY_MISSING / SOURCE_STALE / CONFIG_MISSING).
+    resp.source_artifact_id = authority.source_artifact_id
+    resp.source_sha256 = authority.source_sha256
+    resp.source_frame_count = authority.source_frame_count
+    resp.source_fps_num = authority.source_fps_num
+    resp.source_fps_den = authority.source_fps_den
+    resp.full_apply_run_id = authority.full_apply_run_id
+    resp.full_apply_publication_id = authority.full_apply_publication_id
+    resp.job_id = None  # preflight never mutates: no export Job is created here
+    seen = set(resp.reasons)
+    for c in authority.checks:
+        if c.passed:
+            continue
+        resp.checks.append(
+            PreflightCheck(
+                name="authority_" + c.name,
+                passed=False,
+                reason=c.reason,
+                detail=c.detail,
+            )
+        )
+        if c.reason not in seen:
+            resp.reasons.append(c.reason)
+            seen.add(c.reason)
+    resp.eligible = all(c.passed for c in resp.checks)
+    return resp

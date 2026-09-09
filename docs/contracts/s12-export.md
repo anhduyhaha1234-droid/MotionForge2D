@@ -93,3 +93,52 @@ never visible as completed.
   (fail-closed).
 - Source: `VideoItem.source_artifact_id` row must exist with `state == ready`;
   `.partial` in path → `S12_EXPORT_SOURCE_PARTIAL`.
+
+## 8. Server-owned export authority (C2 F02) — `app/services/s12_export/authority.py`
+
+`resolve_export_authority(session, *, workspace_id, project_id, video_item_id,
+checkpoint_id, checkpoint_hash, checkpoint_revision, manifest_id,
+manifest_hash, manifest_generation) -> ExportAuthority` resolves READ-ONLY,
+server-side, every durable identity an export may render from. Never trusts
+client-supplied source/output paths, frame counts, fps or pins.
+
+Binding checks (each returned as `ExportAuthorityCheck(name, passed, reason,
+detail)`; `ExportAuthority.resolved` = all pass):
+- `project`/`video` containment (404 domain);
+- `checkpoint` — row exists in workspace, same project, hash + revision equal;
+- `config_pack` — checkpoint's reskin_config exists, same workspace, revision
+  equal, pack_version_id set (else `S12_EXPORT_CONFIG_MISSING`);
+- `checkpoint_cross_project` — hard `S12_EXPORT_CROSS_PROJECT`;
+- `structural_lock` — manifest exists in workspace, same video/project/
+  generation, hash equal, status draft|active (else `S12_EXPORT_LOCK_MISSING`);
+- `full_apply_authority` — newest completed publication of the newest
+  completed `S10FullApplyRun` for the video, publication pins the SAME
+  checkpoint, artifact row ready + sha256(64) + not `.partial`. Missing →
+  `S12_EXPORT_FULL_APPLY_MISSING`; artifact unusable →
+  `S12_EXPORT_SOURCE_STALE`. An original import is NEVER the export source;
+- `source_origin` — `proved-native` ONLY for a 3840x2160 canvas WITH the
+  resolved Full Apply authority AND measured rational timing (fps_num/den
+  from the run/publication). Everything else is `upscale`/`unproven`
+  (already-upscaled-4K honesty; artifact SHA + dimensions is never proof).
+
+Resolved durable fields returned to consumers: `source_artifact_id`,
+`source_sha256`, `source_frame_count`, `source_fps_num/den`, `source_width/
+height`, `full_apply_run_id`, `full_apply_publication_id`.
+
+Preflight response (`ExportPreflightResponse`) carries these server-resolved
+fields; `job_id` is null on a pure preflight because preflight NEVER mutates
+(no run/Job/output is created — invalid authority = zero mutation). The
+submit route (T03C) must return the ACTUAL durable Job ID via
+`JobInfo.job_id` — never `job.id` — for every successful submit.
+
+Call-chain example (T03C submit consumes the same authority):
+`POST /api/v2/projects/{pid}/export/preflight` →
+`resolve_export_authority` → `PreflightContext` →
+`evaluate_preflight` → verdict + authority ids. Source of truth rows:
+`s10_full_apply_run` (status=completed, fps_num/fps_den),
+`s10_full_apply_publication` (state=completed, artifact_id, checkpoint pin,
+frame_count), `artifact` (state=ready, sha256), `apply_checkpoint`,
+`reskin_config`, `structural_lock_manifest`.
+
+Uncertainty is fail-closed: absence of any bind (or of measured timing)
+refuses the preflight — readiness is never lowered, no auto-approval.

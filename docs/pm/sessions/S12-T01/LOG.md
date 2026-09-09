@@ -67,3 +67,9 @@ T03G authority + S10 repo + structural-lock repo + QC policy bundle.
 - Response adds source_provenance (proved-native | unproven).
 - Fix test bug: _http_body now honors ckpt checkpoint_revision (was hard-coded 1, made stale-revision case vacuous).
 - Gates: 31 passed (basetemp $TEMP/s12t01_gate); ruff F clean; diff-check 0.
+
+## C2 W1 (F02 authority) — 2026-09-09
+- authority.py NEW: resolve_export_authority server-side (checkpoint/config_pack/lock/full-apply/source-origin binds, fail-closed).
+- Route preflight refactored to consume authority (original import never export source).
+- Schemas: +4 reason codes (FULL_APPLY_MISSING/SOURCE_STALE/SOURCE_SPOOFED/CONFIG_MISSING) + response server-owned fields (source_artifact_id/sha256/fps/frame_count, full_apply_run_id/publication_id, job_id).
+- Tests: +8 (C03 route x5 + C04 full-apply-missing/config-missing) ; S10 authority seed helper; 38 passed; ruff F clean; diff-check 0.

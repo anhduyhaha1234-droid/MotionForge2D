@@ -54,6 +54,10 @@ S12_EXPORT_REASON_CODES: tuple[str, ...] = (
     "S12_EXPORT_DISK_INSUFFICIENT",
     "S12_EXPORT_UNKNOWN_PROJECT",
     "S12_EXPORT_UNKNOWN_VIDEO",
+    "S12_EXPORT_FULL_APPLY_MISSING",
+    "S12_EXPORT_SOURCE_STALE",
+    "S12_EXPORT_SOURCE_SPOOFED",
+    "S12_EXPORT_CONFIG_MISSING",
 )
 
 PreflightReason = Literal[
@@ -71,6 +75,10 @@ PreflightReason = Literal[
     "S12_EXPORT_DISK_INSUFFICIENT",
     "S12_EXPORT_UNKNOWN_PROJECT",
     "S12_EXPORT_UNKNOWN_VIDEO",
+    "S12_EXPORT_FULL_APPLY_MISSING",
+    "S12_EXPORT_SOURCE_STALE",
+    "S12_EXPORT_SOURCE_SPOOFED",
+    "S12_EXPORT_CONFIG_MISSING",
 ]
 
 #: Render profiles frozen for T02 capability detection (T02 fills support).
@@ -147,7 +155,15 @@ class ExportPreflightRequest(_StrictBase):
 
 
 class ExportPreflightResponse(_StrictBase):
-    """Preflight verdict — no render happens inside the HTTP request."""
+    """Preflight verdict — no render happens inside the HTTP request.
+
+    ``authority`` carries the SERVER-RESOLVED durable identities (F02): the
+    immutable current completed Full Apply output artifact and its owning
+    run/publication.  ``job_id`` is the ACTUAL durable Job ID when this
+    preflight is answered from an existing queued/running export job of the
+    same lineage; it is ``null`` on a pure readiness verdict (no job was
+    created — preflight never mutates).
+    """
 
     contract_version: str = Field(default=S12_EXPORT_CONTRACT_VERSION)
     project_id: str = Field(min_length=1)
@@ -161,6 +177,14 @@ class ExportPreflightResponse(_StrictBase):
     )
     source_width: int | None = Field(default=None, ge=1)
     source_height: int | None = Field(default=None, ge=1)
+    source_artifact_id: str | None = Field(default=None)
+    source_sha256: str | None = Field(default=None)
+    source_frame_count: int | None = Field(default=None, ge=1)
+    source_fps_num: int | None = Field(default=None, ge=1)
+    source_fps_den: int | None = Field(default=None, ge=1)
+    full_apply_run_id: str | None = Field(default=None)
+    full_apply_publication_id: str | None = Field(default=None)
+    job_id: str | None = Field(default=None)
     eligible: bool
     reasons: list[PreflightReason] = Field(default_factory=list)
     checks: list[PreflightCheck] = Field(default_factory=list)
