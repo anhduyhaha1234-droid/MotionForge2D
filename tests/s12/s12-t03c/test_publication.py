@@ -138,8 +138,8 @@ def _submit(env, monkeypatch: pytest.MonkeyPatch):  # type: ignore[no-untyped-de
     candidate = Path(dirs["scratch"]) / "candidate_final.mp4"
     candidate.write_bytes(b"\x00" * 4096)
     manifest = {
-        "fps": 30.0,
-        "fps_num": 30,
+        "fps": 10.0,
+        "fps_num": 10,
         "fps_den": 1,
         "frame_count": 100,
         "chunk_dir": dirs["chunk"],
@@ -290,3 +290,150 @@ def test_publish_existing_output_never_overwritten(env, monkeypatch: pytest.Monk
             pub.publish_export_run(s, **kw)
         s.rollback()
     assert final.read_bytes() == b"pre-existing"
+
+
+def _real_source(tmp_path: Path, *, audio: bool = False) -> Path:
+    """Real ffmpeg source: 4K testsrc (native raster, master profile)."""
+    import shutil
+    import subprocess
+
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        pytest.skip("ffmpeg not on PATH (real source-locked row needs real binary)")
+    source = tmp_path / ("src_audio.mp4" if audio else "src.mp4")
+    cmd = [
+        ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+        "-f", "lavfi", "-i", "testsrc=size=3840x2160:rate=10:duration=0.8",
+    ]
+    if audio:
+        cmd += ["-f", "lavfi", "-i", "sine=frequency=440:duration=0.8"]
+        cmd += ["-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+                "-c:a", "aac", "-shortest"]
+    else:
+        cmd += ["-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-an"]
+    cmd.append(str(source))
+    subprocess.run(cmd, capture_output=True, text=True, timeout=300, check=True)
+    return source
+
+
+def test_publish_real_source_locked_pass_identity_copy(env, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
+    """REAL source-locked PASS: candidate is a byte-identical copy of the
+    approved artifact — every T04A probe (dims/fps/frames/digests/audio/
+    provenance) is measured and PASSes; publication completes once."""
+    import app.services.s12_export.publication as pubmod
+    import shutil
+
+    from app.services.s12_export.validation import sha256_file  # noqa: PLC0415
+
+    factory, svc, manifest_id, dirs = env
+    source = _real_source(tmp_path)
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(pubmod, "_require_ready", lambda session, **kw: None)
+    run, _job, _ = submit_export_job(
+        svc,
+        **base._submit_kwargs(
+            factory, manifest_id, dirs,
+            source_path=str(source),
+            fps=10.0, fps_num=10, fps_den=1, frame_count=8,
+            expected_sha256=sha256_file(source),
+        ),
+    )
+    with factory() as s:
+        lease = S12ExportRepository(s).claim_run(run.id, "worker-real")
+        s.commit()
+    scratch = Path(dirs["scratch"])
+    scratch.mkdir(parents=True, exist_ok=True)
+    candidate = scratch / "candidate_final.mp4"
+    shutil.copyfile(source, candidate)
+    manifest = {
+        "fps": 10.0,
+        "fps_num": 10,
+        "fps_den": 1,
+        "frame_count": 8,
+        "chunk_dir": dirs["chunk"],
+        "scratch_dir": dirs["scratch"],
+        "output_path": dirs["output"],
+        "profile_codec": "h264",
+        "source_path": str(source),
+        "expected_sha256": sha256_file(source),
+    }
+    with factory() as s:
+        out = pubmod.publish_export_run(
+            s,
+            run_id=run.id,
+            workspace_id=WS,
+            project_id=f"p-{WS}",
+            worker_id="worker-real",
+            fence_token=lease.fence_token,
+            manifest=manifest,
+        )
+        s.commit()
+    assert out["status"] == "completed"
+    assert out["verdict"] == "PASS"
+    checks = {p["name"]: p["verdict"] for p in out["probes"]}
+    # Every measured probe must PASS — no NOT_MEASURED/FAIL left.
+    assert all(v == "PASS" for v in checks.values()), checks
+    with factory() as s:
+        assert S12ExportRepository(s).get_run(run.id).status == "completed"
+    monkeypatch.undo()
+
+
+def test_publish_real_source_audio_transcode_passes(env, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
+    """C28-F01: approved artifact WITH audio → AudioReference(transcode);
+    a candidate carrying the muxed audio passes av_policy (presence,
+    mapping, A/V drift) with the REAL validator."""
+    import app.services.s12_export.publication as pubmod
+    import shutil
+
+    from app.services.s12_export.validation import sha256_file  # noqa: PLC0415
+
+    factory, svc, manifest_id, dirs = env
+    source = _real_source(tmp_path, audio=True)
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(pubmod, "_require_ready", lambda session, **kw: None)
+    run, _job, _ = submit_export_job(
+        svc,
+        **base._submit_kwargs(
+            factory, manifest_id, dirs,
+            source_path=str(source),
+            fps=10.0, fps_num=10, fps_den=1, frame_count=8,
+            audio_source=str(source),
+            expected_sha256=sha256_file(source),
+        ),
+    )
+    with factory() as s:
+        lease = S12ExportRepository(s).claim_run(run.id, "worker-real")
+        s.commit()
+    scratch = Path(dirs["scratch"])
+    scratch.mkdir(parents=True, exist_ok=True)
+    candidate = scratch / "candidate_final.mp4"
+    shutil.copyfile(source, candidate)
+    manifest = {
+        "fps": 10.0,
+        "fps_num": 10,
+        "fps_den": 1,
+        "frame_count": 8,
+        "chunk_dir": dirs["chunk"],
+        "scratch_dir": dirs["scratch"],
+        "output_path": dirs["output"],
+        "profile_codec": "h264",
+        "source_path": str(source),
+        "audio_source": str(source),
+        "expected_sha256": sha256_file(source),
+    }
+    with factory() as s:
+        out = pubmod.publish_export_run(
+            s,
+            run_id=run.id,
+            workspace_id=WS,
+            project_id=f"p-{WS}",
+            worker_id="worker-real",
+            fence_token=lease.fence_token,
+            manifest=manifest,
+        )
+        s.commit()
+    assert out["status"] == "completed"
+    assert out["verdict"] == "PASS"
+    checks = {p["name"]: p["verdict"] for p in out["probes"]}
+    assert all(v == "PASS" for v in checks.values()), checks
+    monkeypatch.undo()
