@@ -1,126 +1,126 @@
-# S12-T06A — Windows packaging (portable beta / installer harness)
+# S12-T06A — Windows packaging (staged beta package, C2)
 
-Status: local harness verified (`TASK_SUBMITTED` scope — no push/merge).
-Worktree: `s12-s12-t06a-0907a` | Branch: `codex/s12/s12-t06a-0907a` |
-Baseline: `f2cdf0e`.
+Status: C2 correction in progress (F09 closure: relocatable staged
+package + process-identity safety). Worktree: `s12-s12-t06a-0907a` |
+Branch: `codex/s12/s12-t06a-0907a` | Baseline: `6fc6aef`.
 
 ## What this is
 
-A local-only packaging harness for clean-machine Windows beta installs:
+A relocatable STAGED beta package for Windows:
 
-- `packaging/windows/` — portable-beta launchers (`.cmd`), dependency
-  manifest (`manifest.json`, generated — pinned backend pins from
-  `pyproject.toml`, frontend ranges + lockfile versions, compiled
-  `.next` BUILD_ID fingerprint, toolchain probes).
-- `scripts/s12/s12_t06a_*.py` — manifest builder, fail-closed preflight,
-  lifecycle runner (`setup / serve / diagnose / stop / uninstall`).
-- This doc — prerequisites, install, run, uninstall, hardware matrix,
-  and the explicit-blocker policy.
+- `packaging/windows/` — launchers (`Install/Start/Stop/Uninstall`),
+  dependency/build manifest (`manifest.json`, generated), README.
+- `scripts/s12/` — stage builder, package manifest builder, fail-closed
+  preflight, lifecycle runner (`setup / serve / diagnose / stop /
+  uninstall`).
+- `tests/s12/s12-t06a/` — process-identity / manifest-integrity /
+  data-retention tests.
+- This doc — prerequisites, install, run, uninstall, and the exact
+  blocker policy.
 
-What this is NOT: no system install (no PATH/firewall/registry writes),
-no elevation, no bundled Python/Node/FFmpeg, no signing cert, no model
-download, no user-data bundling.
+The package is a **staged build**, not a fully self-contained portable
+bundle: it bundles the built frontend (`frontend/.next`, baked at build
+time with the packaged backend port) and the backend artifact (app
+tree), and DECLARES the external runtimes it needs. It never installs
+anything, never downloads, never elevates, and never edits
+PATH/registry/firewall/ACL.
 
-## Prerequisites (declared, never silently installed)
+## Declared external prerequisites (probed — never installed)
 
-| Requirement | Minimum | Check |
+| Requirement | Check | Missing ->
 |---|---|---|
-| Python | 3.11.x (>=3.11, <3.13) | `python --version` |
-| Node.js | 20+ (provides `npx`, used for `next start`) | `node --version`, `npx --version` |
-| FFmpeg | any `ffmpeg -hide_banner -version` exits 0 | `ffmpeg -hide_banner -version` |
-| Disk | 2 GiB free under the runtime root | `diagnose` reports free MiB |
-| OS | Windows 10/11 x64, localhost bind allowed | preflight `localhost` check |
+| Python 3.11.x (>=3.11,<3.13) | `python --version` | `BLOCKED_PYTHON_VERSION` |
+| Node.js 20+ (`node`; `npm` only needed at stage/build) | `node --version` | `BLOCKED_NODE_MISSING` |
+| FFmpeg (exits 0 on `-hide_banner -version`) | ffmpeg probe | `BLOCKED_FFMPEG_MISSING` |
+| Localhost bind on 127.0.0.1 | preflight bind probe | `BLOCKED_LOCALHOST_BIND` |
+| Writable runtime roots | probe-write data/artifacts/output/logs | `BLOCKED_RUNTIME_ROOTS_NOT_WRITABLE` |
 
-Verified local matrix (2026-09-07): Python 3.11.9, Node v26.4.0,
-npm 11.17.0, FFmpeg 8.1.2-full_build-www.gyan.dev (GPL build,
-`--enable-gpl`), Windows 10 x64, CUDA GPU present
-(torch 2.11.0+cu128, `cuda.is_available()=True`) — GPU is optional;
-CPU render path works without it.
+Missing prerequisite = exact blocker (exit 3 + `NOT_RUN`, never waived).
 
-Missing anything = explicit blocker: preflight/serve exit 3 and print
-`BLOCKED_*` + `NOT_RUN` with the exact missing env. Blockers are
-recorded, never waived.
-
-## Install (portable beta)
+## Build the stage (C2: relocatable package)
 
 ```cmd
-Install-MotionForge-Beta.cmd CODE_ROOT [RUNTIME_ROOT]
+Install-MotionForge-Beta.cmd STAGE_ROOT [BACKEND_PORT] [FRONTEND_PORT]
 ```
 
-- `CODE_ROOT` = repo checkout this beta was staged from (contains
-  `scripts/s12/s12_t06a_run.py` + `packaging/windows/manifest.json`).
-- `RUNTIME_ROOT` = user-local dir holding `data/ artifacts/ output/
-  logs/ RUNTIME.json` (default `%LOCALAPPDATA%\MotionForge2D-beta-runtime`).
-- Refuses to use the protected MAIN tree (`%USERPROFILE%\MotionForge2D`)
-  as the runtime root.
-
-## Run
-
-```cmd
-Start-MotionForge-Beta.cmd CODE_ROOT [RUNTIME_ROOT]
-```
-
-Or directly:
+or directly:
 
 ```bash
-python scripts/s12/s12_t06a_run.py setup --install-root <RT>
-python scripts/s12/s12_t06a_run.py serve --install-root <RT> \
-  --backend-port 8421 --frontend-port 3121
-python scripts/s12/s12_t06a_run.py diagnose --install-root <RT>
+python scripts/s12/s12_t06a_stage.py --stage-root <ABS> \
+    --backend-port 8426 --frontend-port 3126
 ```
 
-`serve` spawns backend (`uvicorn app.main:app` on 127.0.0.1) + compiled
-frontend (`next start`), waits for backend `/health` and frontend `/`,
-then writes pids to `RUNTIME.json`. First backend boot runs the Alembic
-`head` upgrade into `<RT>/data/motionforge.db` (fresh file, user-local).
+What the stage does (real build/runtime boundary):
 
-Verified 2026-09-07 (runtime `%LOCALAPPDATA%\s12-t06a-rt1`, ports
-8423/3123): backend `/health` 200 `{"status":"ok"}`, frontend `/` 200,
-`/export` 200, `diagnose` verdict READY (all 6 checks), `static_file_count`
-45, build `SMMKnaiyQ5jEj09fkhU72`.
+1. **Rebuilds the frontend** with `NEXT_PUBLIC_API_URL` set to the
+   packaged backend (`http://127.0.0.1:<backend-port>`), so
+   `next.config` rewrites are baked at BUILD time — never the dev
+   default port.
+2. Copies backend artifact (`app/`, `alembic.ini`, `migrations/`) to
+   `stage/backend/`, frontend build + lockfile + runtime node_modules
+   (dev-only packages excluded) to `stage/frontend/`.
+3. Copies lifecycle scripts + launchers + README.
+4. Writes `manifest.json` (schema `s12-t06a-package/2`): backend exact
+   pins from `pyproject.toml`, frontend ranges + REAL locked versions
+   (scoped packages included — no null locks), artifact hashes
+   (BUILD_ID + sha256, required-server-files sha256, backend tree
+   digest), baked endpoint, and toolchain VERSIONS ONLY (no absolute
+   user paths).
 
-## Stop / uninstall
+Refusals: stage root inside the repo checkout, inside protected MAIN
+tree, existing stage (never overwrite), node/npm missing.
 
-```cmd
-Stop-MotionForge-Beta.cmd CODE_ROOT [RUNTIME_ROOT]
-Uninstall-MotionForge-Beta.cmd CODE_ROOT [RUNTIME_ROOT]
-```
+## Run the lifecycle from the staged root (C23)
 
-`stop` terminates frontend then backend gracefully (whole process tree
-via `taskkill /T`; `/F` fallback reported, never silent). `uninstall`
-stops, cleans `logs/` + temp files, and KEEPS user data (`data/`,
-`artifacts/`, `output/`) by default; `--no-keep-data
---confirm-remove-data` is required to delete them.
-
-## Supported hardware matrix
-
-| Tier | CPU / RAM | GPU | Render path | Status |
-|---|---|---|---|---|
-| Minimum | x64 4-core / 8 GiB | none (CPU) | CPU preview + FFmpeg encode | supported (preflight-enforced deps only) |
-| Recommended | x64 8-core / 16 GiB | NVIDIA GTX 1660+ / CUDA 12.x | GPU-accelerated (torch cu128) | verified present, optional |
-| Beta-tested | Win10 x64, 500+ GiB free | CUDA available | CPU serve verified 2026-09-07 | READY |
-
-GPU absence is NOT a blocker (CPU path). Missing Python/Node/FFmpeg,
-unwritable roots, or no localhost bind ARE blockers (exit 3 + NOT_RUN).
-
-## Manifest
-
-Regenerate after any dependency or frontend change:
+With the stage on an owned path OUTSIDE the repo checkout and only the
+declared runtimes on PATH:
 
 ```bash
-python scripts/s12/s12_t06a_build_manifest.py
-python scripts/s12/s12_t06a_preflight.py --install-root <RT>
+python <stage>/scripts/s12_t06a_run.py setup --install-root <RT>
+python <stage>/scripts/s12_t06a_run.py serve --install-root <RT>
+python <stage>/scripts/s12_t06a_run.py diagnose --install-root <RT>
+python <stage>/scripts/s12_t06a_run.py stop --install-root <RT>
+python <stage>/scripts/s12_t06a_run.py uninstall --install-root <RT>
 ```
 
-`manifest.json` schema `s12-t06a-manifest/1`: backend pins (17, exact
-`==` from `pyproject.toml`), frontend ranges + locked versions (17),
-`.next` BUILD_ID + `required-server-files.json` sha256 + static count,
-toolchain probes. Preflight refuses a stale manifest
-(`BLOCKED_MANIFEST_STALE` when manifest build_id != `.next/BUILD_ID`).
+- `serve` spawns backend (`uvicorn app.main:app` from `<stage>/backend`)
+  + frontend (`node <stage>/frontend/node_modules/next/dist/bin/next
+  start` — never `npx`), waits `/health` + `/`, writes RUNTIME.json.
+- Every spawned process records **identity**: PID + creation time +
+  executable + command line + ownership token. `stop` re-probes live
+  identity; a reused/wrong PID (creation-time/exe/cmd mismatch) is
+  REFUSED — never killed — evidence written (`evidence/stop_evidence.
+  json`) and exit nonzero with pids retained.
+- `uninstall` keeps user data (`data/ artifacts/ output/`) by default;
+  deletion requires explicit `--no-keep-data --confirm-remove-data`.
 
-## Forbidden (never in this harness)
+Runtime root `<RT>` must be a user-local OWNED dir — the protected MAIN
+tree and the package tree itself are rejected (C25-part qa-root guard).
+
+## Manifest integrity (C24)
+
+- backend pins exact `==` (17), frontend pins with locked versions.
+- Artifact hashes in manifest; preflight re-checks BUILD_ID parity and
+  required-server-files presence; tamper/missing/wrong-endpoint all
+  fail closed (`BLOCKED_MANIFEST_STALE`, `BLOCKED_WRONG_ENDPOINT`, ...).
+- Endpoint correctness at build boundary: preflight scans the staged
+  `.next` build manifests/server chunks for the manifest
+  `api_base_url`; a build baked for the wrong port (dev default) is
+  rejected.
+- No secrets, no absolute Admin tool paths in manifest/scripts
+  (toolchain = versions only); repo-wide hardcode scan in gates.
+
+## Forbidden (never in this package)
 
 Hardcoded `C:\Users\Admin`, system install / PATH / firewall / registry
-writes, elevation, model download, signing certs, bundling source video /
-user DB / keys / model weights. No dev checkout, Python, or Node is
-assumed without the declaration above; anything missing is a blocker.
+writes, elevation, model/cert downloads, bundling user DB/keys/media,
+labeling the developer launcher as portable/bundled. Missing approved
+bundler/runtime/license prerequisite = exact blocker; no silent
+workaround, no waiver.
+
+## Clean-machine row (C23 external)
+
+This machine is not a clean Windows VM with dev runtimes stripped. The
+local row runs the staged package from a path outside the checkout with
+only the declared tool dirs on a scrubbed PATH; the external clean-VM
+counterpart remains `NOT_RUN` and is recorded, never waived.

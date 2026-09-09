@@ -1,7 +1,12 @@
 {
-  "schema": "s12-t06a-manifest/1",
-  "generated_at_utc": "2026-09-09T03:55:07.178621+00:00",
-  "source_commit": "ddc5d05bd716a969b6edff04025a86fe40103525",
+  "schema": "s12-t06a-package/2",
+  "generated_at_utc": "2026-09-09T21:25:32.144455+00:00",
+  "source_commit": "6fc6aefb31f15011f62b4da4970dfe79135d8d3a",
+  "endpoint": {
+    "backend_port": 8421,
+    "frontend_port": 3121,
+    "api_base_url": "http://127.0.0.1:8421"
+  },
   "backend": {
     "pins": [
       "Pillow==12.2.0",
@@ -22,20 +27,14 @@
       "tqdm==4.69.0",
       "uvicorn[standard]==0.51.0"
     ],
-    "source_sha256": {
-      "app/main.py": "9ec66ee77ae8773535d0027c4bf6b4ae020d02d358620419a49300d99b015db1",
-      "app/api/app.py": "7334f81bde01bf95d4b83a8c91275ef086495ecac9396c230cdfd2a3bdd9dd94",
-      "app/config.py": "f761d689f8360ce89d01fc5473ed68524ea3437d78957ff636d8b40209f32317",
-      "app/lifecycle.py": "3a35f4b574af510aa707d2423701dc29e2dfbbe9949d69acdb599ca577c180af",
-      "alembic.ini": "9536a7218e333e46596cc3c931a5a126b1c40370035ffac049ed8fc2374206f1"
-    },
+    "tree_sha256": "500a7651ed542598ccfd271aa2e567c30e0e9102db2a8b9dcfeda5bfa4079047",
     "requires_python": ">=3.11,<3.13"
   },
   "frontend": {
     "pins": {
       "@tanstack/react-query": {
         "range": "^5.101.4",
-        "locked": null
+        "locked": "5.101.4"
       },
       "konva": {
         "range": "^10.3.0",
@@ -67,23 +66,23 @@
       },
       "@playwright/test": {
         "range": "^1.62.0",
-        "locked": null
+        "locked": "1.62.0"
       },
       "@tailwindcss/postcss": {
         "range": "^4",
-        "locked": null
+        "locked": "4.3.3"
       },
       "@types/node": {
         "range": "^20",
-        "locked": null
+        "locked": "20.19.43"
       },
       "@types/react": {
         "range": "^19",
-        "locked": null
+        "locked": "19.2.17"
       },
       "@types/react-dom": {
         "range": "^19",
-        "locked": null
+        "locked": "19.2.3"
       },
       "eslint": {
         "range": "^9",
@@ -103,35 +102,24 @@
       }
     },
     "artifact": {
-      "built": true,
-      "build_id": "SMMKnaiyQ5jEj09fkhU72",
-      "build_id_sha256": "5e99ccb51f6615c11ecfde256b2ff5d97a0f245a7f9939366d03239b3f34f7c7",
-      "required_server_files_sha256": "b668cf43e19285b48571deddf4e2d7fc5c2caa077a5588651ede75422783099c",
-      "static_file_count": 45
+      "build_id": "ilMFXRHX0rRYMrBt7RD0E",
+      "build_id_sha256": "61dd1068b5d478a8415970893732e431beb2f73b24c8ae9950c8af574da998db",
+      "required_server_files_sha256": "efd069e587841dcb4d4b54b0f630aaf2d6b6c4f512a3504fc1f086e1646d9afa"
     }
   },
   "toolchain": {
     "python": {
       "available": true,
-      "path": "C:\\Users\\Admin\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
       "version": "Python 3.11.9",
       "error": null
     },
     "node": {
       "available": true,
-      "path": "C:\\Program Files\\nodejs\\node.EXE",
       "version": "v26.4.0",
-      "error": null
-    },
-    "npm": {
-      "available": true,
-      "path": "C:\\Program Files\\nodejs\\npm.CMD",
-      "version": "11.17.0",
       "error": null
     },
     "ffmpeg": {
       "available": true,
-      "path": "C:\\Users\\Admin\\AppData\\Local\\Microsoft\\WinGet\\Links\\ffmpeg.EXE",
       "version": "ffmpeg version 8.1.2-full_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
       "error": null
     }

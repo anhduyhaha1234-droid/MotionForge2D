@@ -1,16 +1,29 @@
-"""S12-T06A local lifecycle runner — setup/serve/diagnose/stop/uninstall.
+"""S12-T06A lifecycle runner — setup/serve/diagnose/stop/uninstall.
 
-Local-only harness over the COMPILED frontend (.next via `next start`) +
-backend (uvicorn app.main:app). No dev-checkout requirement beyond the
-staged code tree, no install, no elevation, no network fetch, no
-registry/PATH/firewall changes.
+Operates on a RELOCATABLE STAGED PACKAGE (built by s12_t06a_stage.py),
+NOT the developer checkout:
 
-Code root = the repo tree containing these scripts (derived from
-__file__, never hardcoded). Runtime root = --install-root (user-local
-dir holding data/artifacts/output/logs + RUNTIME.json). Pointing the
-runtime root at the protected MAIN tree is refused.
+  - package root is derived from __file__ (stage/scripts/s12_t06a_run.py
+    -> stage; repo scripts/s12/s12_t06a_run.py -> repo) and is the only
+    code location used at runtime;
+  - backend runs from <pkg>/backend (cwd = package backend dir);
+  - frontend runs from <pkg>/frontend with the REAL offline runtime
+    (`node node_modules/next/dist/bin/next start`), never `npx`/dev;
+  - the backend endpoint is baked at build time into the staged .next
+    output (endpoint.api_base_url in manifest.json) and preflight
+    verifies it (wrong endpoint fails closed);
+  - external declared runtimes (Python 3.11, Node.js 20+, FFmpeg) are
+    probed, missing = exact BLOCKER (exit 3), never installed/elevated;
+  - process identity: every spawned process records {pid, creation_time,
+    executable, command, token}; stop re-probes live identity and NEVER
+    kills a reused/wrong PID; a failed stop retains stop_evidence.json
+    and returns nonzero, keeping pids in RUNTIME.json;
+  - uninstall keeps user data by default (data/ artifacts/ output/);
+    removal requires explicit confirmation.
 
-Missing prerequisite anywhere -> exit 3 + NOT_RUN line (never waived).
+Runtime root = --install-root (user-local dir holding data/artifacts/
+output/logs + RUNTIME.json). Pointing it at the protected MAIN tree or
+the repo checkout is refused.
 """
 
 from __future__ import annotations
@@ -18,36 +31,46 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
-import signal
 import subprocess
 import sys
 import time
 import urllib.request
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parent.parent.parent
-PKG = REPO / "packaging" / "windows"
-
+PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_BACKEND_PORT = 8421
 DEFAULT_FRONTEND_PORT = 3121
+PROC_KEYS = ("backend", "frontend")
 
 
 def log(msg: str) -> None:
     print(f"[s12-t06a] {msg}", flush=True)
 
 
+def now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
 def resolve_install_root(raw: str | None) -> Path:
-    root = Path(raw).expanduser() if raw else (REPO / ".s12-t06a-runtime")
+    root = Path(raw).expanduser() if raw else (
+        PACKAGE_ROOT / ".s12-t06a-runtime")
     if not root.is_absolute():
-        root = REPO / root
-    main = Path.home() / "MotionForge2D"
+        root = PACKAGE_ROOT / root
+    protected = (Path.home() / "MotionForge2D").resolve()
+    repo_resolved = PACKAGE_ROOT.resolve()
     try:
-        if root.resolve() == main.resolve() or root.resolve().is_relative_to(
-                main.resolve()):
-            log(f"BLOCKED: install root {root} is the protected MAIN "
-                "tree; use a user-local dir (e.g. "
-                "%LOCALAPPDATA%\\MotionForge2D-beta)")
+        rr = root.resolve()
+        if rr == protected or rr.is_relative_to(protected):
+            log("BLOCKED: install root is the protected MAIN tree; use a "
+                "user-local owned dir")
+            raise SystemExit(3)
+        if rr == repo_resolved or rr.is_relative_to(repo_resolved):
+            log("BLOCKED: install root must not live inside the package "
+                "tree (data/artifacts belong to a user-local owned dir)")
             raise SystemExit(3)
     except SystemExit:
         raise
@@ -58,17 +81,6 @@ def resolve_install_root(raw: str | None) -> Path:
 
 def runtime_path(install_root: Path) -> Path:
     return install_root / "RUNTIME.json"
-
-
-def run_preflight(install_root: Path) -> int:
-    proc = subprocess.run(
-        [sys.executable, str(REPO / "scripts" / "s12"
-                             / "s12_t06a_preflight.py"),
-         "--install-root", str(install_root)],
-        capture_output=True, text=True, encoding="utf-8")
-    print(proc.stdout, flush=True)
-    print(proc.stderr, flush=True)
-    return proc.returncode
 
 
 def read_runtime(install_root: Path) -> dict:
@@ -109,8 +121,7 @@ def wait_for(url: str, timeout_s: float, label: str) -> bool:
 
 
 def pid_alive(pid: int) -> bool:
-    # Windows-safe: os.kill(pid, 0) raises SystemError/WinError 87 on
-    # CPython 3.11 (sig 0 is invalid); fall back to tasklist lookup.
+    """Windows-safe aliveness: tasklist lookup (os.kill(pid,0) is broken)."""
     if os.name == "nt":
         try:
             out = subprocess.run(["tasklist", "/FI", f"PID eq {pid}",
@@ -126,6 +137,154 @@ def pid_alive(pid: int) -> bool:
         return False
 
 
+# --- process identity ---------------------------------------------------
+
+def probe_process(pid: int) -> dict | None:
+    """Read live identity (creation time, executable, command line).
+
+    Uses Windows-provisioned PowerShell/WMI — no psutil, no install.
+    Returns None when the PID is not alive / cannot be probed.
+    """
+    if not pid_alive(pid):
+        return None
+    if os.name != "nt":
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as fh:
+                raw = fh.read().replace(b"\0", b" ").decode("utf-8",
+                                                            errors="replace")
+        except OSError:
+            return None
+        return {"pid": pid, "creation_time": None,
+                "executable": None, "command": raw.strip()}
+    script = (
+        "Get-CimInstance Win32_Process -Filter 'ProcessId={pid}' | "
+        "Select-Object ProcessId,CreationDate,ExecutablePath,CommandLine | "
+        "ConvertTo-Json -Compress"
+    ).format(pid=pid)
+    try:
+        out = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+             script],
+            capture_output=True, text=True, timeout=20)
+    except (OSError, subprocess.TimeoutExpired) as err:
+        return {"pid": pid, "creation_time": None, "executable": None,
+                "command": None, "error": str(err)}
+    if out.returncode != 0 or not out.stdout.strip():
+        return {"pid": pid, "creation_time": None, "executable": None,
+                "command": None, "error": (out.stderr or "").strip()[-200:]}
+    try:
+        payload = json.loads(out.stdout.strip())
+    except json.JSONDecodeError:
+        return {"pid": pid, "creation_time": None, "executable": None,
+                "command": None, "error": "unparseable WMI JSON"}
+    if isinstance(payload, list):
+        payload = payload[0] if payload else {}
+    return {"pid": payload.get("ProcessId", pid),
+            "creation_time": _normalize_wmi_date(
+                payload.get("CreationDate")),
+            "executable": payload.get("ExecutablePath"),
+            "command": payload.get("CommandLine")}
+
+
+def _normalize_wmi_date(raw: object) -> str | None:
+    """Convert WMI /Date(<ms>)/ (or ISO) to ISO-8601 UTC."""
+    if raw is None:
+        return None
+    text = str(raw)
+    m = re.search(r"/Date\((\d+)\)/", text)
+    if m:
+        ms = int(m.group(1))
+        return datetime.fromtimestamp(ms / 1000.0, tz=timezone.utc).isoformat()
+    return text.replace("Z", "+00:00")
+
+
+def identity_ok(recorded: dict, current: dict | None) -> tuple[bool, str]:
+    """True only when the recorded identity matches the live process.
+
+    Never trusts a bare PID: creation time (round-tripped through the
+    second) + executable family + command marker must all match. A
+    reused PID (different creation time) or a foreign process (different
+    exe/cmd) is refused.
+    """
+    if current is None:
+        return False, "process not alive / not probeable"
+    if current.get("pid") != recorded.get("pid"):
+        return False, "pid mismatch"
+    rec_ct = recorded.get("creation_time")
+    cur_ct = current.get("creation_time")
+    if rec_ct and cur_ct:
+        try:
+            r = datetime.fromisoformat(str(rec_ct).replace("Z", "+00:00"))
+            c = datetime.fromisoformat(str(cur_ct).replace("Z", "+00:00"))
+            if abs((r - c).total_seconds()) > 2.0:
+                return False, (
+                    f"creation-time mismatch: recorded {rec_ct} != "
+                    f"live {cur_ct} (PID reused by another process)")
+        except ValueError:
+            return False, f"unparseable creation time: {rec_ct!r} / {cur_ct!r}"
+    else:
+        return False, "creation time unavailable"
+    exe = (current.get("executable") or "").lower()
+    cmd = (current.get("command") or "").lower()
+    expected = recorded.get("expected_executable", "").lower()
+    marker = recorded.get("command_marker", "").lower()
+    if expected and expected not in exe and expected not in cmd:
+        return False, f"executable mismatch: expected {expected}"
+    if marker and marker not in cmd:
+        return False, f"command mismatch: expected marker {marker}"
+    return True, "identity verified"
+
+
+def capture_identity(pid: int, expected_executable: str,
+                     command_marker: str) -> dict:
+    live = probe_process(pid) or {}
+    return {"pid": pid,
+            "creation_time": live.get("creation_time"),
+            "executable": live.get("executable"),
+            "command": live.get("command"),
+            "expected_executable": expected_executable,
+            "command_marker": command_marker,
+            "token": uuid.uuid4().hex}
+
+
+def write_stop_evidence(install_root: Path, attempts: list[dict]) -> None:
+    ev_dir = install_root / "evidence"
+    ev_dir.mkdir(parents=True, exist_ok=True)
+    ev_file = ev_dir / "stop_evidence.json"
+    prev: list = []
+    if ev_file.is_file():
+        try:
+            prev = json.loads(ev_file.read_text(encoding="utf-8"))
+            if not isinstance(prev, list):
+                prev = []
+        except (OSError, json.JSONDecodeError):
+            prev = []
+    prev.append({"timestamp": now_iso(), "attempts": attempts})
+    ev_file.write_text(json.dumps(prev, indent=2) + "\n", encoding="utf-8")
+    log(f"stop evidence written: {ev_file}")
+
+
+# --- commands ------------------------------------------------------------
+
+def run_preflight(install_root: Path) -> int:
+    proc = subprocess.run(
+        [sys.executable, str(PACKAGE_ROOT / "scripts"
+                             / "s12_t06a_preflight.py"),
+         "--install-root", str(install_root)],
+        capture_output=True, text=True, encoding="utf-8")
+    print(proc.stdout, flush=True)
+    print(proc.stderr, flush=True)
+    return proc.returncode
+
+
+def package_manifest() -> dict:
+    mf = PACKAGE_ROOT / "manifest.json"
+    if not mf.is_file():
+        raise SystemExit("BLOCKED: manifest.json missing in package root "
+                         f"{PACKAGE_ROOT}")
+    return json.loads(mf.read_text(encoding="utf-8"))
+
+
 def cmd_setup(args: argparse.Namespace) -> int:
     install_root = resolve_install_root(args.install_root)
     rc = run_preflight(install_root)
@@ -133,38 +292,30 @@ def cmd_setup(args: argparse.Namespace) -> int:
         log("NOT_RUN: preflight blocked setup (see BLOCKER above); "
             "not waived")
         return 3
-    manifest = json.loads(
-        (PKG / "manifest.json").read_text(encoding="utf-8"))
-    build_id = ((manifest.get("frontend", {}) or {}).get("artifact", {})
-                or {}).get("build_id")
+    manifest = package_manifest()
+    build_id = manifest.get("frontend", {}).get("artifact", {}).get(
+        "build_id")
+    endpoint = manifest.get("endpoint", {})
+    ports = dict(endpoint) if isinstance(endpoint, dict) else {}
     for name in ("data", "artifacts", "output", "logs"):
         (install_root / name).mkdir(parents=True, exist_ok=True)
     write_runtime(install_root,
-                  {"schema": "s12-t06a-runtime/1",
-                   "code_root": str(REPO),
+                  {"schema": "s12-t06a-runtime/2",
+                   "package_root": str(PACKAGE_ROOT),
                    "install_root": str(install_root),
                    "build_id": build_id,
-                   "backend_port": args.backend_port,
-                   "frontend_port": args.frontend_port,
+                   "backend_port": args.backend_port
+                   or ports.get("backend_port", DEFAULT_BACKEND_PORT),
+                   "frontend_port": args.frontend_port
+                   or ports.get("frontend_port", DEFAULT_FRONTEND_PORT),
                    "backend_pid": None, "frontend_pid": None})
     log(f"setup READY: roots ensured under {install_root}, "
         f"RUNTIME.json written (build {build_id})")
     return 0
 
 
-def cmd_serve(args: argparse.Namespace) -> int:
-    install_root = resolve_install_root(args.install_root)
-    if run_preflight(install_root) != 0:
-        log("NOT_RUN: preflight blocked serve (see BLOCKER above)")
-        return 3
-    runtime = read_runtime(install_root)
-    for key in ("backend_pid", "frontend_pid"):
-        pid = (runtime or {}).get(key)
-        if isinstance(pid, int) and pid_alive(pid):
-            log(f"BLOCKED: {key} {pid} already running; run 'stop' first")
-            return 3
-    backend_port = args.backend_port
-    frontend_port = args.frontend_port
+def spawn_backend(install_root: Path, backend_dir: Path,
+                  backend_port: int, frontend_port: int) -> tuple[subprocess.Popen, dict]:
     backend_env = os.environ.copy()
     backend_env["MOTIONFORGE_ROOT"] = str(install_root)
     backend_env["MOTIONFORGE_DATABASE_URL"] = (
@@ -179,46 +330,96 @@ def cmd_serve(args: argparse.Namespace) -> int:
         [sys.executable, "-m", "uvicorn", "app.main:app",
          "--host", "127.0.0.1", "--port", str(backend_port),
          "--log-level", "warning"],
-        cwd=str(REPO), env=backend_env,
+        cwd=str(backend_dir), env=backend_env,
         stdout=backend_log, stderr=subprocess.STDOUT)
-    log(f"backend pid {backend.pid} on 127.0.0.1:{backend_port}")
-    if not wait_for(f"http://127.0.0.1:{backend_port}/health", 90,
+    time.sleep(0.4)
+    ident = capture_identity(backend.pid, "python",
+                             "uvicorn app.main:app".lower())
+    log(f"backend pid {backend.pid} on 127.0.0.1:{backend_port} "
+        f"(created {ident.get('creation_time')})")
+    return backend, ident
+
+
+def spawn_frontend(install_root: Path, frontend_dir: Path,
+                   frontend_port: int, backend_port: int) -> tuple[subprocess.Popen, dict]:
+    node = shutil.which("node")
+    if node is None:
+        raise SystemExit("BLOCKED: BLOCKED_NODE_MISSING: node not found on "
+                         "PATH; Node.js 20+ is a declared external runtime "
+                         "(see docs/packaging/s12-windows.md)")
+    fe_env = os.environ.copy()
+    fe_env["PORT"] = str(frontend_port)
+    fe_env["NEXT_PUBLIC_API_URL"] = f"http://127.0.0.1:{backend_port}"
+    frontend_log = open(  # noqa: PTH123
+        install_root / "logs" / "frontend.log", "a", encoding="utf-8")
+    frontend = subprocess.Popen(
+        [node, str(frontend_dir / "node_modules" / "next" / "dist" / "bin"
+                   / "next"), "start", "-p", str(frontend_port)],
+        cwd=str(frontend_dir), env=fe_env,
+        stdout=frontend_log, stderr=subprocess.STDOUT)
+    time.sleep(0.4)
+    ident = capture_identity(frontend.pid, "node",
+                             "next start".lower())
+    log(f"frontend pid {frontend.pid} on 127.0.0.1:{frontend_port} "
+        f"(created {ident.get('creation_time')})")
+    return frontend, ident
+
+
+def cmd_serve(args: argparse.Namespace) -> int:
+    install_root = resolve_install_root(args.install_root)
+    if run_preflight(install_root) != 0:
+        log("NOT_RUN: preflight blocked serve (see BLOCKER above)")
+        return 3
+    runtime = read_runtime(install_root)
+    for key in PROC_KEYS:
+        rec = (runtime or {}).get(f"{key}_proc")
+        if isinstance(rec, dict) and isinstance(rec.get("pid"), int):
+            cur = probe_process(rec["pid"])
+            if cur is not None:
+                ok, why = identity_ok(rec, cur)
+                log(f"BLOCKED: {key} pid {rec['pid']} already running "
+                    f"({why}); run 'stop' first")
+                return 3
+    endpoint = package_manifest().get("endpoint", {})
+    backend_port = args.backend_port or endpoint.get(
+        "backend_port", DEFAULT_BACKEND_PORT)
+    frontend_port = args.frontend_port or endpoint.get(
+        "frontend_port", DEFAULT_FRONTEND_PORT)
+    backend_dir = PACKAGE_ROOT / "backend" if (
+        PACKAGE_ROOT / "backend").is_dir() else PACKAGE_ROOT
+    frontend_dir = PACKAGE_ROOT / "frontend"
+
+    backend, backend_ident = spawn_backend(
+        install_root, backend_dir, backend_port, frontend_port)
+    if not wait_for(f"http://127.0.0.1:{backend_port}/health", 120,
                     "backend"):
         backend.terminate()
         log("NOT_RUN: backend /health never came up; serve aborted")
         return 3
-    fe_env = os.environ.copy()
-    fe_env["PORT"] = str(frontend_port)
-    fe_env["NEXT_PUBLIC_API_URL"] = f"http://127.0.0.1:{backend_port}"
-    npx = shutil.which("npx") or shutil.which("npx.cmd")
-    if npx is None:
+    try:
+        frontend, frontend_ident = spawn_frontend(
+            install_root, frontend_dir, frontend_port, backend_port)
+    except SystemExit as err:
         backend.terminate()
-        log("NOT_RUN: BLOCKED_NODE_MISSING: npx not found on PATH; "
-            "install Node.js 20+ (see docs/packaging/s12-windows.md)")
+        log(f"NOT_RUN: {err}")
         return 3
-    frontend_log = open(  # noqa: PTH123
-        install_root / "logs" / "frontend.log", "a", encoding="utf-8")
-    frontend = subprocess.Popen(
-        [npx, "next", "start", "--port", str(frontend_port)],
-        cwd=str(REPO / "frontend"), env=fe_env,
-        stdout=frontend_log, stderr=subprocess.STDOUT)
-    log(f"frontend pid {frontend.pid} on 127.0.0.1:{frontend_port}")
     if not wait_for(f"http://127.0.0.1:{frontend_port}/", 120, "frontend"):
         frontend.terminate()
         backend.terminate()
         log("NOT_RUN: frontend never came up; both processes stopped")
         return 3
-    manifest = json.loads(
-        (PKG / "manifest.json").read_text(encoding="utf-8"))
-    build_id = ((manifest.get("frontend", {}) or {}).get("artifact", {})
-                or {}).get("build_id")
+    manifest = package_manifest()
+    build_id = manifest.get("frontend", {}).get("artifact", {}).get(
+        "build_id")
     write_runtime(install_root,
-                  {"schema": "s12-t06a-runtime/1",
-                   "code_root": str(REPO),
+                  {"schema": "s12-t06a-runtime/2",
+                   "package_root": str(PACKAGE_ROOT),
                    "install_root": str(install_root),
                    "build_id": build_id,
                    "backend_port": backend_port,
                    "frontend_port": frontend_port,
+                   "backend_proc": backend_ident,
+                   "frontend_proc": frontend_ident,
                    "backend_pid": backend.pid,
                    "frontend_pid": frontend.pid})
     log(f"serve READY: backend={backend.pid} frontend={frontend.pid}")
@@ -249,11 +450,19 @@ def cmd_diagnose(args: argparse.Namespace) -> int:
                                          for v in roots.values()),
                                "detail": roots}
     procs = {}
-    for key in ("backend_pid", "frontend_pid"):
-        pid = (runtime or {}).get(key)
-        procs[key] = {"pid": pid,
-                      "alive": pid_alive(pid) if isinstance(pid, int)
-                      else False}
+    for key in PROC_KEYS:
+        rec = (runtime or {}).get(f"{key}_proc")
+        pid = (rec or {}).get("pid") if isinstance(rec, dict) else None
+        if isinstance(pid, int):
+            cur = probe_process(pid)
+            ok, why = identity_ok(rec or {}, cur)
+            procs[key] = {"pid": pid, "alive": ok,
+                          "identity": why}
+        else:
+            pid2 = (runtime or {}).get(f"{key}_pid")
+            procs[key] = {"pid": pid2,
+                          "alive": pid_alive(pid2) if isinstance(pid2, int)
+                          else False}
     checks["processes"] = {"ok": True, "detail": procs}
     try:
         du = shutil.disk_usage(str(install_root))
@@ -267,45 +476,34 @@ def cmd_diagnose(args: argparse.Namespace) -> int:
     return 0 if all_ok else 1
 
 
-def stop_pid(pid: int, label: str, timeout: float = 20.0) -> bool:
+def kill_tree(pid: int, timeout: float = 20.0) -> tuple[bool, str]:
+    """Terminate the whole process tree (taskkill /T), graceful first."""
     if not pid_alive(pid):
-        log(f"{label} pid {pid} already gone")
-        return True
+        return True, "already gone"
     if os.name == "nt":
-        # Graceful first (whole process TREE: npx wrapper spawns the
-        # real next-server child), then force.
         subprocess.run(["taskkill", "/PID", str(pid), "/T"],
                        capture_output=True, timeout=10)
         deadline = time.time() + timeout
         while time.time() < deadline:
             if not pid_alive(pid):
-                log(f"{label} pid {pid} stopped gracefully")
-                return True
+                return True, "stopped gracefully"
             time.sleep(0.5)
         subprocess.run(["taskkill", "/F", "/PID", str(pid), "/T"],
                        capture_output=True, timeout=10)
         time.sleep(1.0)
-        alive = pid_alive(pid)
-        log(f"{label} pid {pid} "
-            f"{'STILL ALIVE after /F' if alive else 'killed (/F fallback)'}")
-        return not alive
+        if not pid_alive(pid):
+            return True, "stopped (/F fallback)"
+        return False, "STILL ALIVE after /F"
     try:
-        os.kill(pid, signal.SIGTERM)
-    except OSError as err:
-        log(f"{label} terminate failed: {err}")
-        return False
+        subprocess.run(["kill", "-TERM", str(pid)], timeout=10)
+    except (OSError, subprocess.TimeoutExpired) as err:
+        return False, f"terminate failed: {err}"
     deadline = time.time() + timeout
     while time.time() < deadline:
         if not pid_alive(pid):
-            log(f"{label} pid {pid} stopped gracefully")
-            return True
+            return True, "stopped gracefully"
         time.sleep(0.5)
-    try:
-        os.kill(pid, signal.SIGKILL)
-        log(f"{label} pid {pid} killed (graceful timeout)")
-        return False
-    except OSError:
-        return not pid_alive(pid)
+    return False, "STILL ALIVE after SIGTERM"
 
 
 def cmd_stop(args: argparse.Namespace) -> int:
@@ -314,24 +512,66 @@ def cmd_stop(args: argparse.Namespace) -> int:
     if not runtime:
         log("stop: no RUNTIME.json; nothing to stop")
         return 0
-    graceful = True
-    fp = runtime.get("frontend_pid")
-    if isinstance(fp, int):
-        graceful = stop_pid(fp, "frontend") and graceful
-    bp = runtime.get("backend_pid")
-    if isinstance(bp, int):
-        graceful = stop_pid(bp, "backend") and graceful
+    attempts: list[dict] = []
+    failed: list[str] = []
+    retained: dict[str, dict | None] = {}
+    # frontend first, then backend (drain UI before API).
+    for key in ("frontend", "backend"):
+        rec = runtime.get(f"{key}_proc")
+        if not isinstance(rec, dict) or not isinstance(rec.get("pid"), int):
+            attempts.append({"key": key, "action": "skip",
+                             "reason": "no proc record"})
+            retained[key] = runtime.get(f"{key}_proc")
+            continue
+        pid = rec["pid"]
+        cur = probe_process(pid)
+        ok, why = identity_ok(rec, cur)
+        if not ok:
+            attempts.append({"key": key, "pid": pid, "action": "REFUSE",
+                             "identity_check": why})
+            failed.append(key)
+            retained[key] = rec
+            log(f"REFUSE: {key} pid {pid} NOT killed ({why})")
+            continue
+        stopped, detail = kill_tree(pid)
+        attempts.append({"key": key, "pid": pid,
+                         "action": "kill_tree", "result": detail})
+        if not stopped:
+            failed.append(key)
+            retained[key] = rec
+        else:
+            retained[key] = None
+            log(f"{key} pid {pid}: {detail}")
+    if failed:
+        write_stop_evidence(install_root, attempts)
+        runtime["backend_proc"] = retained.get("backend")
+        runtime["frontend_proc"] = retained.get("frontend")
+        runtime["backend_pid"] = (
+            (retained.get("backend") or {}).get("pid")
+            if isinstance(retained.get("backend"), dict) else None)
+        runtime["frontend_pid"] = (
+            (retained.get("frontend") or {}).get("pid")
+            if isinstance(retained.get("frontend"), dict) else None)
+        write_runtime(install_root, runtime)
+        log(f"stop FAILED for: {', '.join(failed)}; pids retained, "
+            "evidence kept, exit nonzero")
+        return 1
     runtime["backend_pid"] = None
     runtime["frontend_pid"] = None
+    runtime["backend_proc"] = None
+    runtime["frontend_proc"] = None
     write_runtime(install_root, runtime)
-    log("stop done (graceful)" if graceful else
-        "stop done (SIGKILL fallback used)")
+    log("stop done (all processes stopped)")
     return 0
 
 
 def cmd_uninstall(args: argparse.Namespace) -> int:
     install_root = resolve_install_root(args.install_root)
-    cmd_stop(args)
+    rc = cmd_stop(args)
+    if rc != 0:
+        log("uninstall: stop FAILED; refusing further cleanup "
+            "(evidence retained)")
+        return rc
     (install_root / "logs").mkdir(parents=True, exist_ok=True)
     for p in (install_root / "logs").glob("*"):
         try:
@@ -363,7 +603,7 @@ def cmd_uninstall(args: argparse.Namespace) -> int:
 def add_root_arg(p: argparse.ArgumentParser) -> None:
     p.add_argument("--install-root", default=None,
                    help="user-local runtime root (default: "
-                        "<repo>/.s12-t06a-runtime)")
+                        "<package>/.s12-t06a-runtime)")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -371,16 +611,12 @@ def main(argv: list[str] | None = None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     setup = sub.add_parser("setup")
     add_root_arg(setup)
-    setup.add_argument("--backend-port", type=int,
-                       default=DEFAULT_BACKEND_PORT)
-    setup.add_argument("--frontend-port", type=int,
-                       default=DEFAULT_FRONTEND_PORT)
+    setup.add_argument("--backend-port", type=int, default=None)
+    setup.add_argument("--frontend-port", type=int, default=None)
     serve = sub.add_parser("serve")
     add_root_arg(serve)
-    serve.add_argument("--backend-port", type=int,
-                       default=DEFAULT_BACKEND_PORT)
-    serve.add_argument("--frontend-port", type=int,
-                       default=DEFAULT_FRONTEND_PORT)
+    serve.add_argument("--backend-port", type=int, default=None)
+    serve.add_argument("--frontend-port", type=int, default=None)
     diag = sub.add_parser("diagnose")
     add_root_arg(diag)
     stop = sub.add_parser("stop")
