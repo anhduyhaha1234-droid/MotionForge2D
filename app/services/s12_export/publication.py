@@ -139,7 +139,7 @@ def publish_export_run(
     _require_ready(session, workspace_id=workspace_id, project_id=project_id)
     _require_fence(repo, run_id, worker_id, fence_token)
 
-    expectation = _expectation_for(run, manifest)
+    expectation = _expectation_for(run, manifest, candidate_sha=_sha256_file(candidate))
     verdict = validate(candidate, expectation)
     if verdict.verdict != "PASS":
         _fail_run(repo, run_id, worker_id, fence_token, run.revision)
@@ -309,7 +309,19 @@ def _require_fence(repo: Any, run_id: str, worker_id: str, fence_token: str) -> 
         )
 
 
-def _expectation_for(run: Any, manifest: dict[str, Any]) -> Any:
+#: Documented per-profile PSNR content-identity thresholds (T03C-owned,
+#: C26/interface-delta). The validator fails closed when the profile's
+#: threshold is missing — never a silent default. 30 dB is the standard
+#: "visually lossless" benchmark for x264 master renders; preview lowers
+#: to 28 dB because smaller rasters tolerate less bit budget.
+_PSNR_MIN_DB_BY_PROFILE: dict[str, float] = {
+    "master-4k-h264": 30.0,
+    "master-4k-hevc": 30.0,
+    "preview-1080p-h264": 28.0,
+}
+
+
+def _expectation_for(run: Any, manifest: dict[str, Any], candidate_sha: str | None = None) -> Any:
     from app.services.s12_export.validation import (  # noqa: PLC0415
         MASTER_HEIGHT,
         MASTER_WIDTH,
@@ -322,16 +334,54 @@ def _expectation_for(run: Any, manifest: dict[str, Any]) -> Any:
     fps_num, fps_den = _fps_rational(fps, manifest)
     expected_sha = manifest.get("expected_sha256") or manifest.get("authority_sha256")
     source = _build_source_reference(manifest, fps_num, fps_den)
+    match_mode, psnr_min_db = _frame_match(run, manifest, candidate_sha)
+    # Output identity: the manifest authority sha when supplied; otherwise
+    # the server-measured candidate sha (recorded output identity).  In
+    # psnr mode the CONTENT authority is the approved artifact reference —
+    # the sha is identity bookkeeping, never the content proof.
+    if expected_sha:
+        output_sha = str(expected_sha)
+    elif candidate_sha and match_mode == "psnr":
+        output_sha = candidate_sha
+    else:
+        output_sha = str(expected_sha or "")
     return ValidationExpectation(
         width=width or MASTER_WIDTH,
         height=height or MASTER_HEIGHT,
         codec=manifest.get("profile_codec") or run.profile_codec or "h264",
         expected_frame_count=int(manifest.get("frame_count") or 0) or None,
         expected_fps=fps or None,
-        expected_sha256=str(expected_sha) if expected_sha else None,
+        expected_sha256=output_sha or None,
+        frame_match_mode=match_mode,
+        frame_psnr_min_db=psnr_min_db,
         source_locked=True,
         source_reference=source,
     )
+
+
+def _frame_match(
+    run: Any, manifest: dict[str, Any], candidate_sha: str | None
+) -> tuple[str, float | None]:
+    """Select the content-order match mode (exact vs measured PSNR).
+
+    - Identity copy: the candidate is byte-identical to the approved
+      artifact (no re-encode) → ``exact`` per-frame digests.
+    - Re-encode / upscale / full render: decoded content MUST be compared
+      against the approved artifact with the documented per-profile PSNR
+      threshold (fail-closed when the profile has no documented
+      threshold).
+    """
+    source = str(manifest.get("source_path") or "")
+    if (
+        candidate_sha
+        and source
+        and Path(source).is_file()
+        and _sha256_file(Path(source)) == candidate_sha
+    ):
+        return "exact", None
+    profile_id = str(getattr(run, "profile_id", "") or "")
+    threshold = _PSNR_MIN_DB_BY_PROFILE.get(profile_id)
+    return "psnr", threshold
 
 
 def _build_source_reference(
@@ -385,6 +435,10 @@ def _build_source_reference(
         fps_den=fps_den if fps_den > 0 else 0,
         frame_digests=digests,
         audio=audio,
+        # Immutable approved-artifact media path for measured PSNR mode
+        # (server-derived; never client-supplied). Absent → PSNR fails
+        # closed; exact mode never opens it.
+        reference_path=source if (source and Path(source).is_file()) else None,
     )
 
 
