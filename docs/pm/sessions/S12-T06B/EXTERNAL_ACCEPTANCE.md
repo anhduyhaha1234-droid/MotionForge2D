@@ -38,13 +38,22 @@ Split: **MEASURED / SIMULATED / NOT_RUN** — no case removal, no waive.
 
 ## Positive-path blockers found live (verifier findings, owners routed)
 
-- F11-T06B-01 (owner T03C/T04A): `publication._expectation_for` supplies
-  no server-owned authority (sha256 / frame digests / cuts / audio ref)
-  -> the source-locked validator rejects EVERY real job candidate
-  (provenance FAIL + frame_order NOT_MEASURED); runs land `failed`
-  (retryable) after producing a real candidate. Positive publish path is
-  not closable on base `5e6e0fa`; fail-closed behaviour asserted instead.
+- F11-T06B-01 (owner T03C/T04A) — UPDATED after REVERIFY on base
+  `9a93475` (T03C findfix landed digests/audio/sha into
+  `_expectation_for`): positive publish for REAL renders is STILL
+  blocked because publication wires NO `frame_match_mode`:
+  - default `exact` -> re-encoded/upscaled candidates fail
+    `frame_order` at frame 0 ("content order mismatch");
+  - `psnr` fails closed without the documented per-profile
+    `frame_psnr_min_db` (T04A delta present but unused);
+  - normal submit carries no `expected_sha256` -> provenance FAIL.
+  Exact match only suits identity-copy candidates. Required:
+  publication-side psnr wiring + documented min-db + authority sha.
+  Verified in `test_c26_f11_remaining_blocker_proof`; tamper still
+  rejected under PSNR (`test_c26_tamper_reorder_and_audio_still_fail_under_psnr`).
 - C28-F01 (owner T03C/T04A): `_expectation_for` never attaches
   `SourceReference.audio` -> audio-source jobs are rejected as
   `absent`; assembly-layer audio contract (mapping/drift/playability)
   verified independently in C28 tests.
+  (REVERIFY note: findfix DOES now attach AudioReference — see updated
+  C28-F01 status in REPORT.)

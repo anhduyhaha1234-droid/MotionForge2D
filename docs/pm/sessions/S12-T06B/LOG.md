@@ -51,6 +51,25 @@ SHA-256 `c9b068b2195461b1f867a5ec95714cea3ab09881757f5607094574d15dda428f`,
   rejected by >200Hz), end pin 3.00s, short-audio StitchError.
 - C29: EXTERNAL_ACCEPTANCE.md written; clean Windows NOT_RUN.
 
+## REVERIFY on base 9a93475 (T03C findfix + T04A psnr delta)
+
+- Full T06B suite: **20 passed, 1 skipped in 39.07s**; regression T03C
+  **37 passed**, T04A **73 passed**.
+- C26/C27 fail-closed assertions STILL hold (candidates real, chunks
+  reused, zero `.partial`).
+- New proof `test_c26_f11_remaining_blocker_proof`: positive publish
+  STILL blocked on the fixed base, exactly because:
+  - `publication._expectation_for` does NOT set `frame_match_mode`
+    (defaults to `exact`) -> re-encoded/upscaled candidates ALWAYS fail
+    `frame_order` (content digest mismatch at frame 0);
+  - with `frame_match_mode="psnr"` the validator fails closed:
+    "psnr mode requires documented frame_psnr_min_db (per profile)"
+    and publication wires neither the mode nor the documented tolerance.
+  Identity-copy candidates would be the only exact-matchable ones.
+- New tamper proof `test_c26_tamper_reorder_and_audio_still_fail_under_psnr`:
+  real reversed-concat candidate FAILs `frame_order` under PSNR
+  (frame_psnr_min_db set) — tamper remains rejected.
+
 ## Findings routed (verifier does NOT fix production)
 
 - F11-T06B-01 (owner T03C/T04A): `publication._expectation_for` gives

@@ -234,3 +234,123 @@ def test_c26_non_16_9_control(job_env: Any, tmp_path: Path) -> None:
     candidate = _run_blocked(factory, svc, manifest_id, dirs, src, frame_count=F_43)
     _assert_media(candidate, frames=F_43, duration_s=3.0)
     print("\n[C26] 4:3 control: letterbox pad 3840x2160 done; publish fail-closed (F11-T06B-01)")
+
+
+def test_c26_f11_remaining_blocker_proof(tmp_path: Path, db_factory: Any) -> None:
+    """REVERIFY on base 9a93475: positive publish still blocked, exactly WHY.
+
+    T03C findfix now builds SourceReference (digests/audio/sha) but
+    ``_expectation_for`` still does NOT choose a frame_match_mode:
+    - ``exact`` (default) -> re-encoded/upscaled candidates ALWAYS fail
+      ``frame_order`` (candidate digest != source digest at frame 0);
+    - switching to ``psnr`` fails closed: "psnr mode requires documented
+      frame_psnr_min_db (per profile)" — publication passes neither mode
+      nor the documented tolerance.
+    So ANY real re-render (upscale 1080p->4K, native 4K re-encode,
+    letterbox) cannot publish. Identity-copy candidates are the only
+    exact-matchable ones.  Owner T03C/T04A wiring decision required.
+    """
+    from app.services.s12_export import publication as _pubmod
+
+    pytest.MonkeyPatch().setattr(_pubmod, "_require_ready", lambda session, **kw: None)
+    factory, manifest_id, _db = db_factory
+    svc = JobService(factory, managed_root=tmp_path / "artifacts")
+    src = build_media_silent(tmp_path / "s.mp4", width=320, height=180, duration=3.0)
+    dirs = {
+        "chunk": str(tmp_path / "chunks"),
+        "scratch": str(tmp_path / "scratch"),
+        "output": str(tmp_path / "out" / "f.mp4"),
+    }
+    try:
+        _run_normal_job(factory, svc, manifest_id, dirs, src, frame_count=F_1080)
+    except Exception:
+        pass  # fail-closed expected
+    cand = Path(dirs["scratch"]) / "candidate_final.mp4"
+    assert cand.is_file()
+
+    from app.services.s12_export.validation import (
+        SourceReference,
+        ValidationExpectation,
+        probe_frame_digests,
+        validate,
+    )
+
+    w, h = probe_dims(cand)
+    ref = SourceReference(
+        artifact_sha256="a" * 64,
+        frame_count=F_1080,
+        fps_num=10,
+        fps_den=1,
+        frame_digests=probe_frame_digests(str(src), 320, 180) or (),
+    )
+    assert len(ref.frame_digests) == F_1080
+    for mode in ("exact", "psnr"):
+        exp = ValidationExpectation(
+            width=w, height=h, codec="h264",
+            expected_frame_count=F_1080, expected_fps=10.0,
+            expected_sha256="a" * 64,
+            source_locked=True, source_reference=ref,
+            frame_match_mode=mode,
+        )
+        verdict = validate(cand, exp)
+        assert verdict.verdict == "FAIL", f"{mode} unexpectedly passed"
+        fo = next((p for p in verdict.probes if p.name == "frame_order"), None)
+        assert fo is not None and fo.verdict == "FAIL"
+        if mode == "exact":
+            assert "mismatch" in fo.detail
+        else:
+            assert "frame_psnr_min_db" in fo.detail
+    print("[C26-F11] positive publish blocked: exact digest mismatch + psnr needs frame_psnr_min_db")
+
+
+def test_c26_tamper_reorder_and_audio_still_fail_under_psnr(
+    tmp_path: Path, db_factory: Any
+) -> None:
+    """T04A delta: measured PSNR still REJECTS real tamper (reorder/audio)."""
+    import subprocess as _sp
+
+    from app.services.s12_export.stitch import concat_cores
+    from app.services.s12_export.validation import (
+        AudioReference,
+        SourceReference,
+        ValidationExpectation,
+        probe_frame_digests,
+        validate,
+    )
+    from conftest import _find_ffmpeg as _ff
+
+    factory, manifest_id, _db = db_factory
+    _ = factory, manifest_id
+    src = build_media_silent(tmp_path / "s.mp4", width=320, height=180, duration=3.0)
+    # Reordered candidate: frames 15-29 then 0-14 (real concat, reversed).
+    seg_a = tmp_path / "seg_a.mp4"
+    seg_b = tmp_path / "seg_b.mp4"
+    for seg, start in ((seg_a, 15), (seg_b, 0)):
+        _sp.run(
+            [_ff(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(src),
+             "-vf", f"trim=start_frame={start}:end_frame={start + 15},setpts=PTS-STARTPTS",
+             "-c:v", "libx264", "-preset", "ultrafast", "-an", str(seg)],
+            capture_output=True, text=True, timeout=300, check=True,
+        )
+    reordered = tmp_path / "reordered.mp4"
+    concat_cores([seg_a, seg_b], dest=reordered, fps=float(FPS))
+
+    ref = SourceReference(
+        artifact_sha256="a" * 64,
+        frame_count=F_1080,
+        fps_num=10,
+        fps_den=1,
+        frame_digests=probe_frame_digests(str(src), 320, 180) or (),
+        audio=AudioReference(mode="absent", stream_index=0),
+    )
+    exp = ValidationExpectation(
+        width=320, height=180, codec="h264",
+        expected_frame_count=F_1080, expected_fps=10.0,
+        expected_sha256="a" * 64,
+        source_locked=True, source_reference=ref,
+        frame_match_mode="psnr", frame_psnr_min_db=20.0,
+    )
+    verdict = validate(reordered, exp)
+    fo = next((p for p in verdict.probes if p.name == "frame_order"), None)
+    assert fo is not None and fo.verdict == "FAIL", "reorder passed PSNR (tamper leak)"
+    print("[C26-TAMPER] reorder FAILs under PSNR:", fo.detail[:110])

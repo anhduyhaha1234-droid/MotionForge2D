@@ -23,21 +23,33 @@ Branch: `codex/s12/s12-t06b-0907a` | Baseline: `5e6e0fa` | No push/merge.
 
 ## Findings routed to owners (no product edits by verifier)
 
-1. **F11-T06B-01 (P1, owner T03C/T04A)** — `publication._expectation_for`
-   does not supply server-owned authority to the source-locked validator
-   (`expected_sha256` unset -> provenance FAIL; `frame_digests`/`cuts`
-   empty -> frame_order NOT_MEASURED), so NO real job can publish
-   positive on base `5e6e0fa`. Repro: run `submit_export_job` + real
-   handler; publication raises `export validation FAIL on
-   ['frame_order','provenance']`; run lands `failed` (retryable) after a
-   real candidate exists. Required: wire sha256 (+ digests/cuts) from
-   the server-owned authority into `_expectation_for`.
-2. **C28-F01 (P2, owner T03C/T04A)** — `_expectation_for` builds
-   `SourceReference(..., audio=None)`; a job candidate carrying audio is
-   rejected as `absent`. Required: attach `AudioReference` (mode
-   explicit) when the manifest supplies `audio_source`.
+1. **F11-T06B-01 (P1, owner T03C/T04A)** — REVERIFY on base `9a93475`:
+   T03C findfix now builds SourceReference (digests/audio/sha) but
+   `_expectation_for` still wires NO `frame_match_mode`: default `exact`
+   fails every re-encoded/upscaled candidate at `frame_order`
+   ("content order mismatch at frame 0"); `psnr` mode fails closed
+   ("psnr mode requires documented frame_psnr_min_db (per profile)");
+   and the server-owned `expected_sha256` remains unset in the normal
+   submit payload -> provenance FAIL. Positive publish for real
+   renders (upscale 1080p->4K, native re-encode, letterbox) is thus
+   STILL blocked. Required: publication-side wiring of
+   `frame_match_mode="psnr"` + documented `frame_psnr_min_db` (per
+   profile) + authority sha source. Repro: any C26 normal job on this
+   base (asserted in `test_c26_f11_remaining_blocker_proof`).
+2. **C28-F01 (P2, owner T03C/T04A) — CLOSED by T03C findfix on
+   `9a93475`**: `_build_source_reference` now attaches
+   `AudioReference(mode="transcode"|"absent")` derived from the approved
+   artifact; assembly-layer audio contract (mapping/drift/playability)
+   verified independently in C28 tests.
 
-## Files this correction
+## Full-suite gates (REVERIFY, base 9a93475)
+
+- `pytest tests/s12/s12-t06b/ -q -p no:cacheprovider` -> **20 passed,
+  1 skipped in 39.07s** (skip = clean-machine NOT_RUN only).
+- Regression: T03C **37 passed**, T04A **73 passed** (findfix + psnr
+  delta green).
+- `ruff check --select F tests/s12/s12-t06b/` -> All checks passed.
+- `git diff --check` clean; porcelain allowlist only at commit.
 
 `tests/s12/s12-t06b/` +2 (`test_c26_normal_product.py`,
 `test_c27_same_job_fresh_process.py`, `test_c28_audio_mapping.py`,
