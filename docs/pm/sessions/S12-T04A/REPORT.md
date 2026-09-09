@@ -136,3 +136,25 @@ psnr — proven by tests, assertions unchanged in spirit.
 
 Write-set: app/services/s12_export/validation.py (M), tests/s12/s12-t04a/
 test_c2_source_locked.py (M, +9 delta tests), LOG.md/REPORT.md (M).
+
+## Cross-raster PSNR (F11-T06B-02) — final fix loop
+
+`probe_frame_psnr` now fit+pad's the immutable reference artifact to the
+candidate raster (product letterbox policy, never stretch) before
+measuring per-frame dB; `SourceReference.reference_width/height`
+(server-probed). Native same-raster path unchanged (PSNR 59-71dB region).
+Missing/wrong reference raster fails closed. Tamper guards re-verified:
+reorder + audio + drift still FAIL under the tolerance.
+
+## Gates final (exact commands)
+
+- `python -m pytest tests/s12/s12-t04a/ -q --basetemp="$TEMP/s12t04a_fullxr" -p no:cacheprovider`
+  → **78 passed in 12.61s** (73 prior + 5 cross-raster)
+- `ruff check --select F app/services/s12_export/validation.py tests/s12/s12-t04a/`
+  → **All checks passed!**
+- `git diff --check` → 0
+- `python -m pytest tests/s12/s12-t03c/ -q --basetemp="$TEMP/s12t04a_t03cxr" -p no:cacheprovider`
+  → **19 passed in 21.02s** (T03C collection on this branch)
+
+Write-set: app/services/s12_export/validation.py (M), tests/s12/s12-t04a/
+test_c2_source_locked.py (M, +5), LOG.md/REPORT.md (M).

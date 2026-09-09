@@ -183,3 +183,37 @@ targets audio content, not frame trimming.
 Gates delta: tests/s12/s12-t04a/ 73 passed (10.54s) + ruff F clean +
 git diff --check 0 + T03C regression 19 passed (20.47s, collection present
 on this branch; manager runs the full 37 on the T03C branch).
+
+## Cross-raster PSNR fix (F11-T06B-02 P1, final fix loop) — 2026-09-10
+
+T06B re-verify: native-4K same-raster publish COMPLETED (PSNR 59-71dB),
+nhung upscale 1080p->4K + letterbox publish FAIL frame_order. Root cause:
+probe_frame_psnr decoded the reference at ITS OWN raster while the
+candidate was scale+pad'ed — cross-raster PSNR could never match.
+
+Fix (bounded, app/services/s12_export/validation.py only):
+- `probe_frame_psnr(..., reference_width=None, reference_height=None)`:
+  khi reference raster (server-probed, immutable) khac candidate raster,
+  reference duoc fit+pad DEN candidate raster TRUOC khi decode do dB —
+  dung product letterbox policy (`_fit_filter`: scale with
+  force_original_aspect_ratio=decrease + pad centered black bars, never
+  stretch). Same-raster path khong doi (native 4K PSNR 59-71dB giu nguyen).
+- `SourceReference.reference_width/reference_height` moi (server-owned).
+- Fail-closed: reference raster khong cap hoac claimed sai (khong match
+  file that) -> khong scale dung duoc -> PSNR thap / decode diverge -> FAIL.
+
+Tests (5 moi trong test_c2_source_locked.py, cross-raster section):
+- upscale 4:3->16:9 canvas + letterbox PASS (fit+pad geometry in detail).
+- same-raster re-encode PASS (no fit+pad applied — path unchanged).
+- cross-raster reorder (B+A letterbox) FAIL.
+- wrong-raster-dims (claim canvas dims cho ref 4:3 that) FAIL closed.
+- missing reference raster -> same-raster path -> real cross-raster FAIL
+  closed (never wrong PASS).
+
+Pitfall: reference dims sai NHUNG khac canvas van kich hoat filter dung
+(scale khong phu thuoc gia tri sai) -> wrong-dims test phai claim dims
+BANG canvas de channel bo filter; khi do ref decode o raster goc ->
+frame-size diverge -> PSNR None -> FAIL.
+
+Gates: tests/s12/s12-t04a/ 78 passed (12.61s) + ruff F clean +
+git diff --check 0 + T03C regression 19 passed (21.02s, local collection).
