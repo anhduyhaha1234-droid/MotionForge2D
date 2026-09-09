@@ -59,3 +59,17 @@ PATCH: none (T01 files untouched, no app.py change — no new route).
   ruff F clean; diff-check 0; porcelain = allowlist only.
 
 ## TASK_SUBMITTED (transport checkpoint, local branch — không phải APPROVED)
+
+## C2 W2 (2026-09-09) — C02 PASS on current contract, ZERO production change
+
+- Matrix C02 (T01/T02): real supported CPU eligible (3/3 profiles via
+  libx264/libx265 spawn-probe); failed/absent encoders rejected with reason
+  (live h264_nvenc/hevc_nvenc encoder_failed); no constant flag; no silent
+  fallback (declared CPU fallback in basis); frozen selection
+  (s12-t02-profiles-v1) + labeled upscale/aspect + measured-vs-estimated
+  resource basis. Static + live verified — evidence dưới C2 root s12-t02/.
+- Files changed C2 W2: none (production) — verify-only pass theo prompt
+  §6 "zero unnecessary implementation change".
+- Gates: 36 passed (2.55s), ruff F clean, diff-check 0.
+
+## TASK_SUBMITTED (transport checkpoint, local branch — không phải APPROVED)
