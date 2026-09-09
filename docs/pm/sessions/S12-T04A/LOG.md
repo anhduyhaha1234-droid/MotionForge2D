@@ -217,3 +217,26 @@ frame-size diverge -> PSNR None -> FAIL.
 
 Gates: tests/s12/s12-t04a/ 78 passed (12.61s) + ruff F clean +
 git diff --check 0 + T03C regression 19 passed (21.02s, local collection).
+
+## Pipe-fix (F11-T06B-02 encore: 7/30-frame Windows pipe) — 2026-09-10
+
+T06B re-verify: native-4K same-raster 30/30 PASS, nhung cross-raster
+fit+pad chi doc 7/30 frame → ffmpeg rawvideo PIPE mat frame khi filter
+graph scale lon (buffer/stall), khong phai content mismatch.
+
+Fix (bounded, probe_frame_psnr trong validation.py):
+- Reference cross-raster (co scale filter) decode ra FILE RAW TAM ngoai
+  repo (`_decode_raw_to_file`: mkstemp %TEMP% + ffmpeg -vf fit filter ->
+  rawvideo file; validate size % frame_size == 0 -> fail-closed None)
+  roi doc frame-by-frame TU DISK; candidate khong scale giu pipe
+  (same-raster 30/30 da chung minh). File tam bi xoa trong finally.
+- Same-raster path khong doi. Tamper guards giu nguyen.
+
+Xac nhan 30/30: test moi test_pf_upscale_letterbox_30_of_30_frames_pass —
+30-frame 4:3 source -> 16:9 canvas fit+pad, frame_count=30, assert detail
+chua "30 frames PSNR" (chi PASS khi ca 30 frame duoc so; truoc day 7/30
+se FAIL frame_count mismatch). Kem test_pf_letterbox_30_reorder_fails +
+test_pf_letterbox_30_missing_raster_fails.
+
+Gates: tests/s12/s12-t04a/ 81 passed (14.78s) + ruff F clean +
+git diff --check 0 + T03C regression 19 passed (20.30s local collection).
