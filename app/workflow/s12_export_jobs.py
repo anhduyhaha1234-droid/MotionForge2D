@@ -22,6 +22,7 @@ scratch only — resume re-renders them, never accepts them as completed.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, Callable
 
 __all__ = [
@@ -66,6 +67,9 @@ def submit_export_job(
     idempotency_key: str | None = None,
     natural_key: str | None = None,
     priority: int = 50,
+    expected_sha256: str | None = None,
+    fps_num: int = 0,
+    fps_den: int = 0,
 ) -> tuple[Any, Any, bool]:
     """Pin the export run (T03A, idempotent) and enqueue its durable job.
 
@@ -137,6 +141,9 @@ def submit_export_job(
         "audio_source": audio_source,
         "max_frames_per_chunk": int(chunk_config.get("max_frames", 120)),
         "overlap_frames": int(chunk_config.get("overlap", 4)),
+        "expected_sha256": expected_sha256,
+        "fps_num": int(fps_num),
+        "fps_den": int(fps_den),
     }
     job_key = f"s12_export_job:{run.id}"
     try:
@@ -181,15 +188,24 @@ def _find_job_by_key(factory: Callable[[], Any], workspace_id: str, key: str) ->
 
 
 def _s12_export_handler(ctx: Any) -> dict[str, Any]:
-    """Execute one S12 export job: claim → render/resume → candidate.
+    """Execute one S12 export job: claim → render/resume → PUBLISH.
 
-    The claim is atomic (exactly one winner; losers fail closed).  A
-    restart re-claims the expired lease and resumes from the T03B
-    checkpoint — completed+verified chunks are reused only when their
-    file decodes to the exact window size.  Returns candidate evidence;
-    the handler never marks the run ``completed`` and never publishes.
+    Real production publisher (C2 F01): the handler is the ONLY caller of
+    :func:`publish_export_run <app.services.s12_export.publication.publish_export_run>`
+    on the normal worker path.  The runner assembles a PRIVATE candidate
+    under the scratch dir; publication validates it source-locked and, on
+    PASS, atomically moves it to the public output and completes the run.
+    The durable job completes AFTER the run reached ``completed`` — states
+    always agree (M13 closed).
+
+    A restart re-claims the expired lease and resumes from the T03B
+    checkpoint.  Failures raise so the durable worker records the failed
+    job; the run lands ``failed`` (retryable) when publication rejects.
     """
     from app.persistence.s12_export import S12ExportRepository  # noqa: PLC0415
+    from app.services.s12_export.publication import (  # noqa: PLC0415
+        publish_export_run,
+    )
     from app.services.s12_export.runner import (  # noqa: PLC0415
         ExportRunner,
         RunnerConfig,
@@ -198,6 +214,7 @@ def _s12_export_handler(ctx: Any) -> dict[str, Any]:
     manifest = ctx.input_manifest
     run_id = str(manifest["run_id"])
     workspace_id = str(manifest["workspace_id"])
+    project_id = str(manifest["project_id"])
     factory = getattr(ctx, "session_factory", None)
     if factory is None:
         raise RuntimeError("s12 export handler requires a session factory")
@@ -206,6 +223,9 @@ def _s12_export_handler(ctx: Any) -> dict[str, Any]:
         repo = S12ExportRepository(session)
         lease = repo.claim_run(run_id, ctx.worker_id)
         session.commit()
+        # The runner writes its assembly to a PRIVATE candidate under the
+        # server-owned scratch dir — never to the public output (C2 F07).
+        candidate_path = _candidate_for(manifest)
         cfg = RunnerConfig(
             run_id=run_id,
             workspace_id=workspace_id,
@@ -215,18 +235,58 @@ def _s12_export_handler(ctx: Any) -> dict[str, Any]:
             fps=float(manifest["fps"]),
             chunk_dir=str(manifest["chunk_dir"]),
             scratch_dir=str(manifest["scratch_dir"]),
-            output_path=str(manifest["output_path"]),
+            output_path=str(candidate_path),
             audio_source=manifest.get("audio_source"),
             max_frames_per_chunk=int(manifest.get("max_frames_per_chunk", 120)),
             overlap_frames=int(manifest.get("overlap_frames", 4)),
         )
-        candidate = ExportRunner(repo, cfg).resume()
-        session.commit()
+        try:
+            ExportRunner(repo, cfg).resume()
+            session.commit()
+            outcome = publish_export_run(
+                session,
+                run_id=run_id,
+                workspace_id=workspace_id,
+                project_id=project_id,
+                worker_id=ctx.worker_id,
+                fence_token=lease.fence_token,
+                manifest=manifest,
+            )
+            session.commit()
+        except Exception:
+            # Coherent states: any render/publication failure lands the run
+            # ``failed`` (retryable) under the fence; the durable job records
+            # the failure by re-raising.  Never a fake ``running`` leftover.
+            try:
+                rec = repo.get_run(run_id)
+                repo.transition_run(
+                    run_id,
+                    "failed",
+                    actor=ctx.worker_id,
+                    expected_revision=rec.revision,
+                    fence_token=lease.fence_token,
+                )
+                session.commit()
+            except Exception:
+                # Lost the fence mid-failure (fresh owner reclaimed): the
+                # run is owned elsewhere; nothing more to mutate.
+                session.rollback()
+            raise
     return {
         "run_id": run_id,
-        "candidate_path": str(candidate),
+        "status": outcome["status"],
+        "output_path": str(outcome.get("output_path") or ""),
+        "artifact_sha256": str(outcome.get("artifact_sha256") or ""),
+        "verdict": str(outcome.get("verdict") or ""),
         "frame_count": int(manifest["frame_count"]),
     }
+
+
+def _candidate_for(manifest: dict[str, Any]) -> Path:
+    """Private candidate path for the runner's assembly (never public)."""
+    scratch = Path(str(manifest["scratch_dir"]))
+    scratch.mkdir(parents=True, exist_ok=True)
+    return scratch / "candidate_final.mp4"
 
 
 def register_s12_export_handler(worker: Any) -> None:
@@ -240,13 +300,20 @@ def reconcile_export_jobs(
     batch_size: int = 100,
     now: datetime | None = None,
 ) -> dict[str, Any]:
-    """Release expired S12 export leases so a fresh claim can resume.
+    """Normal-startup S12 recovery scan (C2 F05/F01, zero-mutation).
 
-    Bounded, restart-safe, never raises: per-run failures are recorded on
-    the report and the pass continues.  Only ``running`` runs whose lease
-    ``expires_at`` has passed are released (re-claimable from the T03B
-    checkpoint); terminal runs, live leases and completed outputs are never
-    touched — no fake completion, no successor, no overwrite.
+    The T03A C2 fencing contract makes recovery self-healing: a fresh
+    ``claim_run`` CAS re-claims an expired/released lease on a ``running``
+    run (exactly one winner; losers never mutate).  This reconciler is the
+    REAL production startup caller that reports every resumable orphan —
+    a ``running`` run whose lease ``expires_at`` has passed — so the
+    restarted worker's job claim resumes it from the T03B checkpoint.
+
+    It NEVER calls ``release_lease`` (live-lease fencing) and NEVER flips a
+    run status: expired leases are reported as ``expired``/``resumable``,
+    live leases are skipped, terminal runs are untouched.  Bounded,
+    restart-safe, never raises: per-run failures are recorded on the report
+    and the pass continues.
     """
     from sqlalchemy import select  # noqa: PLC0415
 
@@ -254,9 +321,8 @@ def reconcile_export_jobs(
         S12ExportLease,
         S12ExportRun,
     )
-    from app.persistence.s12_export import S12ExportRepository  # noqa: PLC0415
 
-    report: dict[str, Any] = {"scanned": 0, "released": 0, "errors": []}
+    report: dict[str, Any] = {"scanned": 0, "expired": 0, "resumable": [], "errors": []}
     moment = now or datetime.now(UTC)
     if moment.tzinfo is None:
         moment = moment.replace(tzinfo=UTC)
@@ -270,26 +336,21 @@ def reconcile_export_jobs(
                 .limit(max(1, int(batch_size)))
             ).all()
             candidates = [
-                (row.run_id, row.worker_id, row.fence_token, row.expires_at)
+                (row.run_id, row.worker_id, row.expires_at)
                 for row in rows
             ]
     except Exception as exc:
         report["errors"].append({"stage": "scan", "error": str(exc)})
         return report
     report["scanned"] = len(candidates)
-    for run_id, worker_id, fence_token, expires_at in candidates:
+    for run_id, _worker_id, expires_at in candidates:
         exp = expires_at
         if exp.tzinfo is None:
             exp = exp.replace(tzinfo=UTC)
         if exp > moment:
             continue
-        try:
-            with session_factory() as session:
-                S12ExportRepository(session).release_lease(
-                    run_id, worker_id, fence_token
-                )
-                session.commit()
-            report["released"] += 1
-        except Exception as exc:  # noqa: BLE001 - per-run isolation
-            report["errors"].append({"run_id": run_id, "error": str(exc)})
+        # Expired lease on a running run: a fresh claim resumes from the
+        # checkpoint — record the resumable orphan, mutate nothing.
+        report["expired"] += 1
+        report["resumable"].append(run_id)
     return report

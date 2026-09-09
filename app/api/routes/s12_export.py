@@ -19,12 +19,16 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import SessionDep, get_job_service
+from app.api.deps import SessionDep, get_job_service, get_managed_root
 from app.persistence import DEFAULT_WORKSPACE_ID
 from app.persistence.jobs import JobRepository
 from app.persistence.models import Job as JobRow
 from app.persistence.models import S12ExportRun as RunRow
-from app.persistence.s12_export import RunNotFoundError, S12ExportRepository
+from app.persistence.s12_export import (
+    IdempotencyConflictError,
+    RunNotFoundError,
+    S12ExportRepository,
+)
 from app.workflow.s12_export_jobs import S12ExportSubmitError, submit_export_job
 
 WORKSPACE_ID = DEFAULT_WORKSPACE_ID
@@ -46,19 +50,96 @@ class S12ExportSubmitRequest(BaseModel):
     profile_id: str = Field(min_length=1)
     plan_id: str = Field(min_length=1)
     plan_hash: str = Field(min_length=1)
-    frame_count: int = Field(ge=1)
+    # Server-derived (C2 F02): accepted for backward compatibility only —
+    # the route resolves source/frame/fps from the T01 authority and
+    # derives every filesystem path under the server managed root.
+    frame_count: int | None = Field(default=None, ge=1)
     chunk_config: dict[str, Any] = Field(default_factory=dict)
-    source_path: str = Field(min_length=1)
-    fps: float = Field(gt=0)
-    chunk_dir: str = Field(min_length=1)
-    scratch_dir: str = Field(min_length=1)
-    output_path: str = Field(min_length=1)
+    source_path: str | None = Field(default=None)
+    fps: float | None = Field(default=None, gt=0)
+    chunk_dir: str | None = Field(default=None)
+    scratch_dir: str | None = Field(default=None)
+    output_path: str | None = Field(default=None)
     audio_source: str | None = None
     idempotency_key: str | None = None
 
 
 def _job_key(run_id: str) -> str:
     return f"{JOB_KEY_PREFIX}{run_id}"
+
+
+_MEDIA_SUFFIXES = {".mp4", ".mov", ".m4v", ".mkv"}
+
+
+def _source_artifact_path(session: Session, authority: Any) -> str | None:
+    """Resolve the authority's source artifact to a real file path.
+
+    The artifact row's ``relative_path`` is server-owned (managed root
+    relative).  A missing file or one escaping the managed root is treated
+    as absent — never exported.
+    """
+    from pathlib import Path  # noqa: PLC0415
+
+    from app.persistence.models import Artifact  # noqa: PLC0415
+
+    if not authority.source_artifact_id:
+        return None
+    artifact = session.get(Artifact, authority.source_artifact_id)
+    if artifact is None:
+        return None
+    rel = str(artifact.relative_path or "")
+    if not rel:
+        return None
+    root = get_managed_root()
+    candidate = (Path(root) / rel).resolve()
+    if not str(candidate).startswith(str(Path(root).resolve())):
+        return None
+    if not candidate.is_file():
+        return None
+    return str(candidate)
+
+
+def _check_source_media(path: str) -> None:
+    """Non-media source artifacts are rejected before mutation (C05)."""
+    from pathlib import Path  # noqa: PLC0415
+
+    suffix = Path(path).suffix.lower()
+    if suffix not in _MEDIA_SUFFIXES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"export source is not playable media ({suffix or 'no extension'})",
+        )
+
+
+def _check_no_partial(authority: Any, path: str) -> None:
+    from pathlib import Path  # noqa: PLC0415
+
+    if authority.source_partial or Path(path).name.lower().endswith(".partial"):
+        raise HTTPException(
+            status_code=422, detail="export source is a .partial artifact; cannot export"
+        )
+
+
+def _server_paths(root: Any, project_id: str, video_item_id: str) -> dict[str, str] | None:
+    """Server-owned export directories under the managed root (C2 F02).
+
+    Deterministic per project/video; the client never supplies filesystem
+    paths.  Returns ``None`` when the identity would escape the root.
+    """
+    from pathlib import Path  # noqa: PLC0415
+
+    try:
+        base = (Path(root) / "s12-exports" / str(project_id) / str(video_item_id)).resolve()
+        root_resolved = Path(root).resolve()
+    except OSError:
+        return None
+    if not str(base).startswith(str(root_resolved)):
+        return None
+    return {
+        "chunk_dir": str(base / "chunks"),
+        "scratch_dir": str(base / "scratch"),
+        "output_path": str(base / "export_master.mp4"),
+    }
 
 
 def _job_state_in(session: Session, key: str) -> tuple[str | None, str | None]:
@@ -111,39 +192,109 @@ def submit_export(
     session: SessionDep,
     workspace_id: str = Query(default=WORKSPACE_ID, min_length=1),
 ) -> dict[str, Any]:
-    """Pin the export run and enqueue its durable job (no render in request)."""
+    """Pin the export run and enqueue its durable job (no render in request).
+
+    Server-owned authority (C2 F02): every durable identity is resolved by
+    the T01 authority module and the readiness aggregate is consumed
+    (Decision F) BEFORE any mutation.  Invalid/missing/stale/cross-scope
+    authority, non-ready projects, unproven sources, tampered/non-media/
+    partial source artifacts and path spoofs fail closed with ZERO runs,
+    Jobs and outputs.  The client never supplies filesystem paths: output,
+    chunk and scratch locations are derived under the server managed root.
+    """
+    from app.persistence.readiness import compute_project_readiness  # noqa: PLC0415
+    from app.services.s12_export.authority import (  # noqa: PLC0415
+        resolve_export_authority,
+    )
+
+    if workspace_id != DEFAULT_WORKSPACE_ID:
+        raise HTTPException(status_code=404, detail="unknown export workspace")
+    authority = resolve_export_authority(
+        session,
+        workspace_id=workspace_id,
+        project_id=body.project_id,
+        video_item_id=body.video_item_id,
+        checkpoint_id=body.checkpoint_id,
+        checkpoint_hash=body.checkpoint_hash,
+        checkpoint_revision=body.checkpoint_revision,
+        manifest_id=body.manifest_id,
+        manifest_hash=body.manifest_hash,
+        manifest_generation=body.manifest_generation,
+    )
+    if not authority.resolved:
+        session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=f"export authority not resolved: {authority.failed_reasons}",
+        )
+    # Non-media / partial / tampered source artifacts are rejected BEFORE
+    # any run or job row exists (C05).
+    source_path = _source_artifact_path(session, authority)
+    if source_path is None:
+        raise HTTPException(status_code=422, detail="export source artifact missing")
+    _check_source_media(source_path)
+    _check_no_partial(authority, source_path)
+
+    readiness = compute_project_readiness(
+        session, workspace_id=workspace_id, project_id=body.project_id
+    )
+    if str(readiness.status) != "ready":
+        session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=f"project readiness {readiness.status!r}; export requires ready",
+        )
+
+    frame_count = authority.source_frame_count
+    fps_num = authority.source_fps_num or 30
+    fps_den = authority.source_fps_den or 1
+    fps = float(fps_num) / float(fps_den) if fps_den else 30.0
+    if not frame_count or frame_count < 1:
+        session.rollback()
+        raise HTTPException(
+            status_code=422, detail="source frame count not resolvable; cannot export"
+        )
+    paths = _server_paths(get_managed_root(), body.project_id, body.video_item_id)
+    if paths is None:
+        session.rollback()
+        raise HTTPException(status_code=422, detail="export identity invalid")
     try:
         run, job, created = submit_export_job(
             get_job_service(),
             workspace_id=workspace_id,
             project_id=body.project_id,
             video_item_id=body.video_item_id,
-            checkpoint_id=body.checkpoint_id,
-            checkpoint_hash=body.checkpoint_hash,
-            checkpoint_revision=body.checkpoint_revision,
-            manifest_id=body.manifest_id,
-            manifest_hash=body.manifest_hash,
+            checkpoint_id=str(authority.checkpoint_id),
+            checkpoint_hash=str(authority.checkpoint_hash),
+            checkpoint_revision=int(authority.checkpoint_revision or 1),
+            manifest_id=str(authority.lock_manifest_id),
+            manifest_hash=str(authority.lock_manifest_hash),
             manifest_generation=body.manifest_generation,
             profile_id=body.profile_id,
             plan_id=body.plan_id,
             plan_hash=body.plan_hash,
-            frame_count=body.frame_count,
+            frame_count=int(frame_count),
             chunk_config=dict(body.chunk_config),
-            source_path=body.source_path,
-            fps=body.fps,
-            chunk_dir=body.chunk_dir,
-            scratch_dir=body.scratch_dir,
-            output_path=body.output_path,
-            audio_source=body.audio_source,
+            source_path=str(source_path),
+            fps=fps,
+            fps_num=int(fps_num),
+            fps_den=int(fps_den),
+            chunk_dir=paths["chunk_dir"],
+            scratch_dir=paths["scratch_dir"],
+            output_path=paths["output_path"],
             idempotency_key=body.idempotency_key,
+            expected_sha256=str(authority.source_sha256 or ""),
         )
     except S12ExportSubmitError as err:
+        session.rollback()
+        raise HTTPException(status_code=409, detail=str(err)) from err
+    except IdempotencyConflictError as err:
         session.rollback()
         raise HTTPException(status_code=409, detail=str(err)) from err
     except Exception as err:
         session.rollback()
         raise HTTPException(status_code=500, detail=f"export submit failed: {err}") from err
-    job_id = getattr(job, "id", None)
+    job_id = getattr(job, "job_id", None) or getattr(job, "id", None)
     job_state = getattr(job, "state", None)
     return {
         "run_id": run.id,
@@ -151,6 +302,7 @@ def submit_export(
         "job_id": job_id,
         "job_state": job_state,
         "created": created,
+        "output_path": paths["output_path"],
     }
 
 
@@ -289,6 +441,9 @@ def retry_export(
             scratch_dir=str(manifest.get("scratch_dir") or ""),
             output_path=str(manifest.get("output_path") or ""),
             audio_source=manifest.get("audio_source"),
+            expected_sha256=manifest.get("expected_sha256"),
+            fps_num=int(manifest.get("fps_num") or 0),
+            fps_den=int(manifest.get("fps_den") or 0),
             **pins,  # type: ignore[arg-type]
         )
     except S12ExportSubmitError as err:
@@ -340,12 +495,21 @@ def _retry_manifest(
             "scratch_dir",
             "output_path",
             "audio_source",
-            "chunk_config",
             "max_frames_per_chunk",
             "overlap_frames",
+            "expected_sha256",
+            "fps_num",
+            "fps_den",
         ):
             if key in parsed and parsed[key] not in (None, ""):
                 out[key] = parsed[key]
+        # Rebuild the EXACT original chunk config from the flattened manifest
+        # so the T03A material-identity replay converges (C2 F04: retry must
+        # re-submit the identical material payload, never a drifted one).
+        out["chunk_config"] = {
+            "max_frames": int(parsed.get("max_frames_per_chunk", 120)),
+            "overlap": int(parsed.get("overlap_frames", 4)),
+        }
     except Exception:
         return out, job_state
     return out, job_state

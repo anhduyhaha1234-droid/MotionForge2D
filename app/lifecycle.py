@@ -111,8 +111,38 @@ class Lifecycle:
         if self._started:
             return
         self.reconcile_once()
+        self._reconcile_s12_exports()
         self._job_service.start_worker()
         self._started = True
+
+    def _reconcile_s12_exports(self) -> None:
+        """Normal-startup S12 recovery (C2 F01): release expired export leases.
+
+        Real production caller of
+        :func:`reconcile_export_jobs <app.workflow.s12_export_jobs.reconcile_export_jobs>`
+        — a normal app restart releases S12 export leases whose workers
+        died, so a fresh claim can resume each run from its T03B
+        checkpoint.  Bounded and never raises: per-run failures are
+        recorded on the report and the pass continues.
+        """
+        try:
+            from app.workflow.s12_export_jobs import (  # noqa: PLC0415
+                reconcile_export_jobs,
+            )
+
+            factory = self._job_service.session_factory
+            if factory is None:
+                return
+            report = reconcile_export_jobs(factory, batch_size=50)
+            if self._log_reconcile:
+                log.info(
+                    "startup s12 export reconcile: scanned=%d expired=%d errors=%d",
+                    report.get("scanned", 0),
+                    report.get("expired", 0),
+                    len(report.get("errors", []) or []),
+                )
+        except Exception as err:  # pragma: no cover - defensive, never blocks boot
+            log.warning("s12 export startup reconcile skipped: %s", err)
 
     def stop(self, timeout: float | None = 5.0) -> None:
         """Stop and join the worker poll loop (shutdown, AC1)."""

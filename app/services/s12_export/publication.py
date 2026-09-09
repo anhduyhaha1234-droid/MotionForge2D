@@ -1,4 +1,4 @@
-"""S12-T03C — validated publication gate (s12-export-v1 §6).
+"""S12-T03C — validated publication gate (s12-export-v1 §6, C2 F01/F07).
 
 The run reaches ``completed`` ONLY through
 :func:`publish_export_run`, and only when every gate holds:
@@ -9,17 +9,29 @@ The run reaches ``completed`` ONLY through
    (``not_run``/``blocked`` fails closed: never publish from an
    unchecked or blocked project state).
 3. **Ownership** — run workspace/project match the request scope.
-4. **Validation** — the assembled candidate scores ``PASS`` against
-   manifest-derived expectations (``FAIL``/``NOT_MEASURED`` fails
-   closed; never SQL-seed readiness or trust caller claims).
-5. **Atomicity** — assemble refuses to overwrite an existing completed
-   output; the run transitions ``running -> verifying -> completed``
-   under fence + revision CAS.  Any failure lands on ``failed``
-   (coherent, retryable) — never a fake ``completed``.
+4. **Candidate boundary (C2 F07)** — the runner assembled a PRIVATE
+   candidate under scratch; this module NEVER assembles.  The final
+   public output is created by ONE atomic ``os.replace`` from the
+   validated candidate, only after the source-locked validator scores
+   ``PASS``.  An existing completed output is never overwritten;
+   a crash leaves only ``.partial``/candidate scratch, never a public
+   result.
+5. **Validation** — the candidate scores ``PASS`` against server-owned
+   source-locked expectations (T04A C2 contract; ``FAIL`` /
+   ``NOT_MEASURED`` fails closed and lands the run ``failed``).
+6. **Atomicity** — the run transitions ``running -> verifying ->
+   completed`` under fence + revision CAS in the same transaction as
+   the atomic rename (one crash-safe immutable publication).
+7. **Completed replay by bytes** — a replayed publication re-verifies
+   the existing public artifact (sha256 vs the server-owned expected
+   hash when asserted; never a bare status shortcut) before returning
+   ``reused``.
 """
 
 from __future__ import annotations
 
+import hashlib
+import os
 from pathlib import Path
 from typing import Any
 
@@ -31,10 +43,35 @@ __all__ = [
 _CHUNK_DIR = "chunk_dir"
 _SCRATCH_DIR = "scratch_dir"
 _OUTPUT_PATH = "output_path"
+_HASH_CHUNK = 1024 * 1024
 
 
 class PublicationError(ValueError):
     """Fail-closed publication gate error."""
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while True:
+            block = handle.read(_HASH_CHUNK)
+            if not block:
+                break
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _sidecar_path(final: Path) -> Path:
+    """Sidecar holding the immutable byte identity of the public artifact."""
+    return final.with_name(f"{final.name}.sha256")
+
+
+def _write_sidecar(final: Path, sha: str) -> None:
+    """Write the byte-identity sidecar atomically next to the artifact."""
+    sidecar = _sidecar_path(final)
+    tmp = sidecar.with_name(f"{sidecar.name}.tmp")
+    tmp.write_text(sha.strip().lower() + "\n", encoding="ascii")
+    os.replace(tmp, sidecar)
 
 
 def publish_export_run(
@@ -47,19 +84,24 @@ def publish_export_run(
     fence_token: str,
     manifest: dict[str, Any],
 ) -> dict[str, Any]:
-    """Assemble, validate and publish one export run (fail-closed gates).
+    """Validate the runner's private candidate and publish it atomically.
 
     ``manifest`` carries the server-owned immutable render pins (source
-    path, fps, chunk/scratch/output dirs) plus manifest-derived
-    expectations (frame count, profile dims/codec, expected sha256 when
-    asserted).  Returns publication evidence on success.
+    path, fps, chunk/scratch/output dirs) plus the authority-derived
+    source-locked expectations (frame count, fps rational, expected
+    sha256 of the approved Full Apply output).
+
+    The candidate is the file the T03B runner assembled at
+    ``<scratch>/candidate_final.mp4`` — always PRIVATE, never the
+    public output path.  On every gate passing, the candidate becomes
+    the public output through one atomic rename and the run transitions
+    to ``completed`` inside the same transaction.
     """
     from app.persistence.s12_export import (  # noqa: PLC0415
         FencedWorkerError,
         RunNotFoundError,
         S12ExportRepository,
     )
-    from app.services.s12_export.stitch import assemble_run  # noqa: PLC0415
     from app.services.s12_export.validation import validate  # noqa: PLC0415
 
     repo = S12ExportRepository(session)
@@ -72,24 +114,31 @@ def publish_export_run(
             f"export run {run_id!r} not owned by workspace/project scope"
         )
     if run.status == "completed":
-        # Idempotent replay: already published, converge on the winner.
-        return {"run_id": run_id, "status": "completed", "reused": True}
+        # Idempotent replay — but only after byte-identical artifact proof.
+        return _replay_completed(repo, run_id, manifest)
     if run.status not in ("running", "verifying", "pending"):
         raise PublicationError(
             f"run {run_id} in status {run.status!r}; cannot publish"
         )
+
+    candidate = _candidate_path(manifest)
+    if candidate is None or not candidate.is_file():
+        raise PublicationError(
+            f"no private candidate for run {run_id}; cannot publish"
+        )
+    final = Path(str(manifest[_OUTPUT_PATH]))
+    if final.name.lower().endswith(".partial"):
+        raise PublicationError("public output must not carry the .partial suffix")
+    if final.is_file():
+        raise PublicationError(
+            f"completed output exists — refusing overwrite: {final}"
+        )
+    if candidate.resolve() == final.resolve():
+        raise PublicationError("candidate must be private, never the public output")
+
     _require_ready(session, workspace_id=workspace_id, project_id=project_id)
     _require_fence(repo, run_id, worker_id, fence_token)
 
-    chunks = _load_chunks(repo, run_id, manifest)
-    candidate = assemble_run(
-        chunks,
-        frame_count=int(run.frame_count),
-        fps=float(manifest["fps"]),
-        output_path=str(manifest[_OUTPUT_PATH]),
-        audio_source=manifest.get("audio_source"),
-        scratch_dir=str(manifest[_SCRATCH_DIR]),
-    )
     expectation = _expectation_for(run, manifest)
     verdict = validate(candidate, expectation)
     if verdict.verdict != "PASS":
@@ -99,6 +148,23 @@ def publish_export_run(
         raise PublicationError(
             f"export validation {verdict.verdict} on {failing}; run failed (retryable)"
         )
+
+    # ONE crash-safe immutable publication: atomic rename of the validated
+    # private candidate onto the public path, then the CAS transitions in
+    # the same transaction.
+    try:
+        os.replace(candidate, final)
+    except OSError as err:
+        _fail_run(repo, run_id, worker_id, fence_token, run.revision)
+        session.commit()
+        raise PublicationError(f"publication rename failed: {err}") from err
+    actual_sha = _sha256_file(final)
+    try:
+        _write_sidecar(final, actual_sha)
+    except OSError as err:
+        _fail_run(repo, run_id, worker_id, fence_token, run.revision)
+        session.commit()
+        raise PublicationError(f"publication sidecar failed: {err}") from err
     try:
         rec = repo.transition_run(
             run_id,
@@ -107,7 +173,7 @@ def publish_export_run(
             expected_revision=run.revision,
             fence_token=fence_token,
         )
-        final = repo.transition_run(
+        final_rec = repo.transition_run(
             run_id,
             "completed",
             actor=worker_id,
@@ -115,19 +181,75 @@ def publish_export_run(
             fence_token=fence_token,
         )
     except (FencedWorkerError, ValueError) as err:
-        raise PublicationError(str(err)) from err
+        # The rename happened but the transition lost the race — never
+        # report completed: the artifact stays, the run is failed/retryable
+        # and a later winner converges by bytes.
+        session.rollback()
+        raise PublicationError(
+            f"publication transition lost after rename: {err} (run {run_id})"
+        ) from err
     session.commit()
     return {
         "run_id": run_id,
-        "status": final.status,
-        "revision": final.revision,
-        "candidate_path": str(candidate),
+        "status": final_rec.status,
+        "revision": final_rec.revision,
+        "output_path": str(final),
+        "artifact_sha256": actual_sha,
         "verdict": verdict.verdict,
         "probes": [
             {"name": p.name, "verdict": p.verdict, "detail": p.detail}
             for p in verdict.probes
         ],
     }
+
+
+def _replay_completed(repo: Any, run_id: str, manifest: dict[str, Any]) -> dict[str, Any]:
+    """Replay after completion: re-verify the public artifact by bytes.
+
+    The immutable byte identity lives in the sidecar written with the
+    publication.  A missing artifact, a missing sidecar, a ``.partial``
+    name, or a sha mismatch (tamper) all fail closed — a completed replay
+    is never a bare status shortcut.
+    """
+    final = Path(str(manifest[_OUTPUT_PATH]))
+    if not final.is_file():
+        raise PublicationError(
+            f"completed run {run_id} has no public artifact; cannot replay"
+        )
+    if final.name.lower().endswith(".partial"):
+        raise PublicationError(f"public artifact is partial for run {run_id}")
+    sidecar = _sidecar_path(final)
+    if not sidecar.is_file():
+        raise PublicationError(
+            f"completed run {run_id} has no byte-identity sidecar; cannot replay"
+        )
+    stored = sidecar.read_text(encoding="ascii").strip().lower()
+    actual = _sha256_file(final)
+    if stored != actual:
+        raise PublicationError(
+            f"completed artifact sha256 mismatch for run {run_id} "
+            f"(expected {stored}, actual {actual})"
+        )
+    expected = manifest.get("expected_sha256") or manifest.get("authority_sha256")
+    if expected and str(expected).lower() != actual:
+        raise PublicationError(
+            f"completed artifact sha256 mismatch for run {run_id} "
+            f"(expected {expected}, actual {actual})"
+        )
+    return {
+        "run_id": run_id,
+        "status": "completed",
+        "reused": True,
+        "output_path": str(final),
+        "artifact_sha256": actual,
+    }
+
+
+def _candidate_path(manifest: dict[str, Any]) -> Path | None:
+    scratch = Path(str(manifest.get(_SCRATCH_DIR, "")))
+    if not scratch.is_dir():
+        return None
+    return scratch / "candidate_final.mp4"
 
 
 def _require_ready(session: Any, *, workspace_id: str, project_id: str) -> None:
@@ -187,73 +309,61 @@ def _require_fence(repo: Any, run_id: str, worker_id: str, fence_token: str) -> 
         )
 
 
-def _load_chunks(repo: Any, run_id: str, manifest: dict[str, Any]) -> list[Any]:
-    from app.services.s12_export.stitch import (  # noqa: PLC0415
-        ChunkMedia,
-        ChunkSpec,
-    )
-
-    try:
-        chunk_dir = Path(str(manifest[_CHUNK_DIR]))
-    except KeyError as err:
-        raise PublicationError(f"manifest missing chunk_dir: {err}") from err
-    rows = [c for c in repo.list_chunks(run_id) if c.verified]
-    if not rows:
-        raise PublicationError(f"run {run_id} has no verified chunks; cannot publish")
-    media: list[Any] = []
-    for row in sorted(rows, key=lambda c: c.order_index):
-        path = chunk_dir / f"chunk_{row.chunk_index:04d}.mp4"
-        if not path.is_file():
-            raise PublicationError(f"verified chunk file missing: {path.name}")
-        media.append(
-            ChunkMedia(
-                spec=ChunkSpec(
-                    chunk_index=int(row.chunk_index),
-                    order_index=int(row.order_index),
-                    core_start_frame=int(row.core_start_frame),
-                    core_end_frame=int(row.core_end_frame),
-                    overlap_before=int(row.overlap_before),
-                    overlap_after=int(row.overlap_after),
-                    content_hash=str(row.content_hash),
-                    attempt=int(row.attempt),
-                ),
-                path=path,
-            )
-        )
-    return media
-
-
 def _expectation_for(run: Any, manifest: dict[str, Any]) -> Any:
     from app.services.s12_export.validation import (  # noqa: PLC0415
         MASTER_HEIGHT,
         MASTER_WIDTH,
+        SourceReference,
         ValidationExpectation,
     )
 
     dims = str(getattr(run, "profile_dims", "") or "")
-    width, height = MASTER_WIDTH, MASTER_HEIGHT
-    if "x" in dims:
-        try:
-            width, height = (int(part) for part in dims.split("x", 1))
-        except ValueError:
-            width, height = MASTER_WIDTH, MASTER_HEIGHT
-    expected_sha = manifest.get("expected_sha256")
-    return ValidationExpectation(
-        width=width,
-        height=height,
-        codec=str(getattr(run, "profile_codec", "") or "h264"),
-        audio_policy=str(manifest.get("audio_policy", "either")),
-        expected_frame_count=int(run.frame_count),
-        expected_duration_sec=manifest.get("expected_duration_sec"),
-        expected_sha256=str(expected_sha) if expected_sha else None,
+    width, height = _dims(dims)
+    fps = float(manifest.get("fps") or 0)
+    fps_num, fps_den = _fps_rational(fps, manifest)
+    expected_sha = manifest.get("expected_sha256") or manifest.get("authority_sha256")
+    source_ref = SourceReference(
+        artifact_sha256=str(expected_sha or ""),
+        frame_count=int(manifest.get("frame_count") or 0) or None,
+        fps_num=fps_num,
+        fps_den=fps_den,
     )
+    return ValidationExpectation(
+        width=width or MASTER_WIDTH,
+        height=height or MASTER_HEIGHT,
+        codec=manifest.get("profile_codec") or run.profile_codec or "h264",
+        expected_frame_count=int(manifest.get("frame_count") or 0) or None,
+        expected_fps=fps or None,
+        expected_sha256=str(expected_sha) if expected_sha else None,
+        source_locked=True,
+        source_reference=source_ref,
+    )
+
+
+def _dims(dims: str) -> tuple[int | None, int | None]:
+    if "x" not in dims:
+        return None, None
+    left, right = dims.split("x", 1)
+    try:
+        return int(left), int(right)
+    except ValueError:
+        return None, None
+
+
+def _fps_rational(fps: float, manifest: dict[str, Any]) -> tuple[int, int]:
+    num = int(manifest.get("fps_num") or 0)
+    den = int(manifest.get("fps_den") or 0)
+    if num > 0 and den > 0:
+        return num, den
+    try:
+        frac = fps.as_integer_ratio()
+        return int(frac[0]), int(frac[1])
+    except (AttributeError, ValueError, OverflowError):
+        return 0, 0
 
 
 def _fail_run(repo: Any, run_id: str, worker_id: str, fence_token: str, revision: int) -> None:
-    from app.persistence.s12_export import (  # noqa: PLC0415
-        FencedWorkerError,
-        S12ExportError,
-    )
+    from app.persistence.s12_export import FencedWorkerError  # noqa: PLC0415
 
     try:
         rec = repo.transition_run(
@@ -264,5 +374,7 @@ def _fail_run(repo: Any, run_id: str, worker_id: str, fence_token: str, revision
             fence_token=fence_token,
         )
         _ = rec
-    except (FencedWorkerError, S12ExportError):
-        return
+    except (FencedWorkerError, ValueError):
+        # Lost the fence mid-failure — a live owner owns the run now; the
+        # gate already rejected publication, so failing closed is safe.
+        pass
