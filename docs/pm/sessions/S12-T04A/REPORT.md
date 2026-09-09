@@ -114,3 +114,25 @@ validation. T01/T02/T03A/T03B files untouched (FORBIDDEN list respected).
 
 Write-set C2 W2 (allowlist): app/services/s12_export/validation.py (M),
 tests/s12/s12-t04a/test_c2_source_locked.py (NEW), LOG.md/REPORT.md (M).
+
+## Interface-delta — measured PSNR tolerance (proposed contract delta ACCEPTED)
+
+Contract delta (validation.py only): `frame_match_mode` exact|psnr,
+`frame_psnr_min_db`, `SourceReference.reference_path`, `probe_frame_psnr`.
+Default exact = fail-closed (re-encode FAILs unless consumer opts into
+measured psnr at a documented per-profile threshold). Tamper cases
+(reorder/changed audio/timing/wrong reference/combined) still FAIL under
+psnr — proven by tests, assertions unchanged in spirit.
+
+## Gates delta (exact commands)
+
+- `python -m pytest tests/s12/s12-t04a/ -q --basetemp="$TEMP/s12t04a_full" -p no:cacheprovider`
+  → **73 passed in 10.54s** (64 prior + 9 delta tests)
+- `ruff check --select F app/services/s12_export/validation.py tests/s12/s12-t04a/`
+  → **All checks passed!**
+- `git diff --check` → 0
+- `python -m pytest tests/s12/s12-t03c/ -q --basetemp="$TEMP/s12t04a_t03c" -p no:cacheprovider`
+  → **19 passed in 20.47s** (T03C collection present on this branch)
+
+Write-set: app/services/s12_export/validation.py (M), tests/s12/s12-t04a/
+test_c2_source_locked.py (M, +9 delta tests), LOG.md/REPORT.md (M).
