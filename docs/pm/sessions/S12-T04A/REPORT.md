@@ -87,3 +87,30 @@ fresh isolated roots (`$TEMP/s12t04a_bt` basetemp ngắn):
 Consumer kế: T03C publication (requires validation PASS), T06A/B
 acceptance. `ValidationExpectation` nhận facts từ frozen manifest/run
 (T01/T03A authorities); `.partial` không bao giờ completed.
+
+## C2 W2 — source-locked validator (F07 validator part; C12/C19/C28 consumers)
+
+Production: only `app/services/s12_export/validation.py` changed (scope
+C2 W2 T04A). SourceReference/AudioReference/CutPoint + `source_locked`
+mode as described in LOG. Independent immutable reference evidence
+(frame digests / rational cuts / fps_num-den / approved-audio digest)
+now establishes exact frame count/order/cuts, rational timebase,
+inventory, audio content/mapping and start/end drift within the
+one-source-frame bound (1/fps). Monotonic PTS, codec keyframes, audio
+presence and candidate self-hash alone never PASS source-locked
+validation. T01/T02/T03A/T03B files untouched (FORBIDDEN list respected).
+
+## Gates C2 W2 (exact commands)
+
+- `python -m pytest tests/s12/s12-t04a/ -q --basetemp="$TEMP/s12t04a_full" -p no:cacheprovider`
+  → **64 passed in 14.62s** (48 prior + 16 test_c2_source_locked.py)
+- `python -m pytest tests/s12/s12-t04a/test_c2_source_locked.py -q --basetemp="$TEMP/s12t04a_c2" -p no:cacheprovider`
+  → **16 passed in 6.81s**
+- `ruff check --select F app/services/s12_export/validation.py tests/s12/s12-t04a/`
+  → **All checks passed!**
+- `git diff --check` → 0
+- `python -m pytest tests/s12/s12-t01/ -q --basetemp="$TEMP/s12t04a_t01c2" -p no:cacheprovider`
+  → **38 passed in 55.51s** (T01-C2 regression)
+
+Write-set C2 W2 (allowlist): app/services/s12_export/validation.py (M),
+tests/s12/s12-t04a/test_c2_source_locked.py (NEW), LOG.md/REPORT.md (M).

@@ -21,6 +21,14 @@ Pipeline (probes follow ``ValidationContract.required_probes`` order):
 Verdict vocabulary (frozen): ``PASS | FAIL | NOT_MEASURED``.
 Insufficient evidence → FAIL or NOT_MEASURED, never a fake PASS.
 
+Source-locked mode (C2 F07/C12/C19/C28): when ``ValidationExpectation``
+is built with ``source_locked=True`` plus a :class:`SourceReference`
+(independently supplied immutable evidence from the server-owned Full
+Apply authority / approved output), the candidate is compared against
+that reference — monotonic PTS, codec keyframes, audio presence and
+self-hashing the candidate are NOT source-truth proof on their own.
+Missing reference authority → FAIL/NOT_MEASURED, never a fake PASS.
+
 The validator never publishes and never touches the DB: :func:`validate`
 is a pure function returning a :class:`ValidationVerdict`.
 """
@@ -35,7 +43,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
-from app.services.ffmpeg_utils import find_ffprobe
+from app.services.ffmpeg_utils import find_ffmpeg, find_ffprobe
 
 __all__ = [
     "MASTER_WIDTH",
@@ -46,7 +54,12 @@ __all__ = [
     "ProbeVerdict",
     "ValidationExpectation",
     "ValidationVerdict",
+    "SourceReference",
+    "AudioReference",
+    "CutPoint",
     "sha256_file",
+    "probe_frame_digests",
+    "probe_audio_digest",
     "validate",
 ]
 
@@ -121,6 +134,69 @@ class ValidationExpectation:
     expected_cuts: tuple[float, ...] = ()
     # Cut match tolerance in frame durations (rational, CFR-derived).
     cut_tolerance_frames: float = 1.5
+    # C2 source-locked mode (F07): when True the validator compares the
+    # candidate against ``source_reference`` — independently supplied
+    # immutable evidence — instead of trusting candidate self-evidence
+    # (monotonic PTS/keyframes/audio presence/self-hash). Missing
+    # reference authority fails closed.
+    source_locked: bool = False
+    source_reference: SourceReference | None = None
+
+
+@dataclass(frozen=True)
+class CutPoint:
+    """One immutable source cut: frame index + exact rational seconds.
+
+    ``frame_index`` is the 0-based presentation-order frame where the cut
+    begins (the first frame of the new seam segment); ``pts_num/pts_den``
+    is that frame's exact rational timestamp in seconds (source timebase).
+    """
+
+    frame_index: int
+    pts_num: int
+    pts_den: int
+
+
+@dataclass(frozen=True)
+class AudioReference:
+    """Independently supplied approved-audio evidence (C28).
+
+    ``mode`` is explicit about how the candidate may carry the audio:
+    - ``remux``: byte-exact copy of the approved audio — decoded PCM
+      content must match ``digest`` (mapping + content proof).
+    - ``transcode``: audio may be re-encoded — only presence, mapping and
+      A/V start/end drift are asserted; content digest is NOT compared.
+    - ``absent``: candidate must carry no audio stream.
+    ``digest`` is the sha256 of the decoded s16le PCM of the approved
+    audio track (see :func:`probe_audio_digest`); required for ``remux``.
+    """
+
+    mode: Literal["remux", "transcode", "absent"]
+    digest: str | None = None
+    stream_index: int = 0
+
+
+@dataclass(frozen=True)
+class SourceReference:
+    """Immutable reference evidence for source-locked validation (C2 F07).
+
+    Every field is supplied independently (server-owned Full Apply
+    authority / approved output contract), never derived from the
+    candidate being validated. Absence of the authority fails closed.
+    """
+
+    artifact_sha256: str = ""
+    frame_count: int | None = None
+    fps_num: int = 0
+    fps_den: int = 0
+    # Per-frame decoded-content digests (presentation order). When
+    # non-empty it must have exactly ``frame_count`` entries and proves
+    # content order — equal-length reordered content FAILs.
+    frame_digests: tuple[str, ...] = ()
+    # Exact source cuts in frame index + rational seconds.
+    cuts: tuple[CutPoint, ...] = ()
+    # Approved audio evidence (``None`` = approved output has no audio).
+    audio: AudioReference | None = None
 
 
 @dataclass(frozen=True)
@@ -253,6 +329,202 @@ def _parse_rate(value: object) -> float | None:
     return rate
 
 
+def _read_exact(handle, size: int) -> bytes | None:
+    """Read exactly ``size`` bytes or return None on short read."""
+    chunks: list[bytes] = []
+    remaining = size
+    while remaining > 0:
+        chunk = handle.read(remaining)
+        if not chunk:
+            return None
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    return b"".join(chunks)
+
+
+def probe_frame_digests(
+    path: str | Path, width: int, height: int
+) -> tuple[str, ...] | None:
+    """Decode v:0 to raw yuv420p and sha256 each frame (presentation order).
+
+    One digest per decoded frame — independent content-order evidence the
+    validator can compare against a supplied :class:`SourceReference`.
+    Returns None when the media does not fully decode.
+    """
+    frame_size = width * height * 3 // 2
+    if frame_size <= 0:
+        return None
+    try:
+        proc = subprocess.Popen(
+            [
+                find_ffmpeg(),
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-i",
+                str(path),
+                "-map",
+                "0:v:0",
+                "-f",
+                "rawvideo",
+                "-pix_fmt",
+                "yuv420p",
+                "-",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError:
+        return None
+    assert proc.stdout is not None
+    digests: list[str] = []
+    try:
+        while True:
+            frame = _read_exact(proc.stdout, frame_size)
+            if frame is None:
+                break
+            digests.append(hashlib.sha256(frame).hexdigest())
+    finally:
+        try:
+            proc.stdout.close()
+        except OSError:
+            pass
+    rc = proc.wait(timeout=300)
+    if rc != 0:
+        return None
+    return tuple(digests) if digests else None
+
+
+def probe_audio_digest(
+    path: str | Path, stream_index: int = 0
+) -> str | None:
+    """Decode audio stream ``stream_index`` to s16le and sha256 the PCM.
+
+    Used to prove approved audio CONTENT (remux mode): a byte-exact copy
+    of the approved audio decodes to the same digest. Returns None when
+    the stream is absent or does not decode.
+    """
+    try:
+        proc = subprocess.Popen(
+            [
+                find_ffmpeg(),
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-i",
+                str(path),
+                "-map",
+                f"0:a:{stream_index}",
+                "-f",
+                "s16le",
+                "-",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError:
+        return None
+    assert proc.stdout is not None
+    digest = hashlib.sha256()
+    try:
+        while True:
+            chunk = proc.stdout.read(_HASH_CHUNK)
+            if not chunk:
+                break
+            digest.update(chunk)
+    finally:
+        try:
+            proc.stdout.close()
+        except OSError:
+            pass
+    rc = proc.wait(timeout=300)
+    if rc != 0:
+        return None
+    return digest.hexdigest()
+
+
+def _probe_av_bounds(
+    path: Path, video_index: int, audio_index: int
+) -> dict[str, float] | None:
+    """First/last packet pts (seconds) for the video and audio streams.
+
+    Returns ``{"v_first","v_last","a_first","a_last"}`` or None when the
+    packet table is unreadable. Drift checks compare these within the
+    one-source-frame bound (1/fps seconds).
+    """
+    try:
+        completed = subprocess.run(
+            [
+                find_ffprobe(),
+                "-hide_banner",
+                "-v",
+                "error",
+                "-show_entries",
+                "packet=stream_index,pts_time",
+                "-of",
+                "json",
+                str(path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if completed.returncode != 0:
+        return None
+    try:
+        payload = json.loads(completed.stdout)
+    except (ValueError, TypeError):
+        return None
+    packets = payload.get("packets") if isinstance(payload, dict) else None
+    if not isinstance(packets, list):
+        return None
+    v_first = v_last = a_first = a_last = None
+    v_pts: list[float] = []
+    a_pts: list[float] = []
+    for item in packets:
+        if not isinstance(item, dict):
+            return None
+        try:
+            idx = int(item.get("stream_index"))
+            pts = float(item.get("pts_time"))
+        except (TypeError, ValueError):
+            return None
+        if idx == video_index:
+            v_first = pts if v_first is None else min(v_first, pts)
+            v_last = pts if v_last is None else max(v_last, pts)
+            v_pts.append(pts)
+        elif idx == audio_index:
+            a_first = pts if a_first is None else min(a_first, pts)
+            a_last = pts if a_last is None else max(a_last, pts)
+            a_pts.append(pts)
+    if v_first is None or v_last is None:
+        return None
+    v_pts.sort()
+    a_pts.sort()
+
+    def _median_delta(values: list[float]) -> float:
+        deltas = sorted(
+            b - a for a, b in zip(values, values[1:]) if b - a > 1e-9
+        )
+        if not deltas:
+            return 0.0
+        mid = len(deltas) // 2
+        if len(deltas) % 2:
+            return deltas[mid]
+        return (deltas[mid - 1] + deltas[mid]) / 2.0
+
+    return {
+        "v_first": v_first,
+        "v_last": v_last,
+        "v_delta": _median_delta(v_pts),
+        "a_first": a_first if a_first is not None else float("nan"),
+        "a_last": a_last if a_last is not None else float("nan"),
+        "a_delta": _median_delta(a_pts),
+    }
+
+
 def _check_cuts(
     pts_values: list[int],
     key_pts: list[int],
@@ -292,6 +564,548 @@ def _check_cuts(
             )
         ]
     return [_pass("frame_order", f"{len(exp.expected_cuts)} cuts keyframe-locked")]
+
+
+def _replace_probes(
+    probes: list[ProbeVerdict], name: str, verdicts: list[ProbeVerdict]
+) -> list[ProbeVerdict]:
+    """Drop every earlier verdict for ``name`` and append fresh ones."""
+    return [item for item in probes if item.name != name] + verdicts
+
+
+def _source_locked_overrides(
+    probes: list[ProbeVerdict],
+    exp: ValidationExpectation,
+    path: Path,
+    inventory: dict,
+    streams: list,
+    video: list,
+    audio: list,
+    frames: list[dict] | None,
+) -> list[ProbeVerdict]:
+    """C2 F07: re-validate source-truth probes against the independent
+    :class:`SourceReference`. Candidate self-evidence (monotonic PTS,
+    keyframes, audio presence, self-hash) is NOT accepted as proof here;
+    missing reference authority fails closed.
+    """
+    ref = exp.source_reference
+    if ref is None:
+        probes.append(
+            ProbeVerdict(
+                name="reference",
+                verdict="FAIL",
+                detail="source-locked validation requires independent "
+                "SourceReference evidence",
+            )
+        )
+        return probes
+    if ref.fps_num <= 0 or ref.fps_den <= 0:
+        probes.append(
+            ProbeVerdict(
+                name="reference",
+                verdict="FAIL",
+                detail=f"reference fps invalid: {ref.fps_num}/{ref.fps_den}",
+            )
+        )
+        return probes
+    if ref.frame_count is None or ref.frame_count < 0:
+        probes.append(
+            ProbeVerdict(
+                name="reference",
+                verdict="FAIL",
+                detail="reference frame_count missing",
+            )
+        )
+        return probes
+    fps = Fraction(ref.fps_num, ref.fps_den)
+    one_frame = float(Fraction(ref.fps_den, ref.fps_num))  # 1/fps seconds
+    reference_ok = ProbeVerdict(
+        name="reference",
+        verdict="PASS",
+        detail=f"reference artifact {ref.artifact_sha256[:16]}… "
+        f"fps={ref.fps_num}/{ref.fps_den} frames={ref.frame_count}",
+    )
+    probes = [item for item in probes if item.name != "reference"]
+    probes.append(reference_ok)
+
+    if not video:
+        probes = _replace_probes(
+            probes,
+            "frame_count",
+            [_fail("frame_count", "no video stream")],
+        )
+        probes = _replace_probes(
+            probes,
+            "frame_order",
+            [_fail("frame_order", "no video stream")],
+        )
+        probes = _replace_probes(
+            probes,
+            "timebase",
+            [_fail("timebase", "no video stream")],
+        )
+        probes = _replace_probes(
+            probes,
+            "streams",
+            [_fail("streams", "no video stream present")],
+        )
+        probes = _replace_probes(
+            probes,
+            "duration",
+            [_fail("duration", "no video stream")],
+        )
+        probes = _replace_probes(
+            probes,
+            "av_policy",
+            [_fail("av_policy", "no video stream")],
+        )
+        return probes
+
+    # --- streams inventory vs approved output ---------------------------
+    audio_ref = ref.audio
+    expected_audio = 0 if (audio_ref is None or audio_ref.mode == "absent") else 1
+    foreign = [
+        s
+        for s in streams
+        if isinstance(s, dict) and s.get("codec_type") not in ("video", "audio")
+    ]
+    if foreign:
+        kinds = sorted({str(s.get("codec_type")) for s in foreign})
+        probes = _replace_probes(
+            probes, "streams", [_fail("streams", f"unexpected stream types: {kinds}")]
+        )
+    elif len(audio) != expected_audio:
+        probes = _replace_probes(
+            probes,
+            "streams",
+            [
+                _fail(
+                    "streams",
+                    f"audio streams={len(audio)} but approved output has "
+                    f"{expected_audio}",
+                )
+            ],
+        )
+    else:
+        probes = _replace_probes(
+            probes,
+            "streams",
+            [
+                _pass(
+                    "streams",
+                    f"video=1 audio={len(audio)} total={len(streams)} "
+                    "(approved inventory)",
+                )
+            ],
+        )
+
+    # --- frame_count ----------------------------------------------------
+    decoded = len(frames) if frames is not None else None
+    if frames is None:
+        probes = _replace_probes(
+            probes, "frame_count", [_fail("frame_count", "frames do not decode")]
+        )
+    elif decoded == ref.frame_count:
+        probes = _replace_probes(
+            probes,
+            "frame_count",
+            [_pass("frame_count", f"{decoded} frames == reference")],
+        )
+    else:
+        probes = _replace_probes(
+            probes,
+            "frame_count",
+            [
+                _fail(
+                    "frame_count",
+                    f"decoded={decoded}, reference={ref.frame_count}",
+                )
+            ],
+        )
+
+    # --- timebase: exact rational CFR vs reference -----------------------
+    avg_raw = video[0].get("avg_frame_rate")
+    rfr_raw = video[0].get("r_frame_rate")
+    avg_frac = _parse_rational(avg_raw)
+    rfr_frac = _parse_rational(rfr_raw)
+    if avg_frac is None:
+        probes = _replace_probes(
+            probes,
+            "timebase",
+            [_fail("timebase", "candidate avg_frame_rate unreadable")],
+        )
+    elif avg_frac != fps:
+        probes = _replace_probes(
+            probes,
+            "timebase",
+            [
+                _fail(
+                    "timebase",
+                    f"candidate fps={avg_raw} != reference {ref.fps_num}/{ref.fps_den}",
+                )
+            ],
+        )
+    elif rfr_frac is not None and rfr_frac != fps:
+        probes = _replace_probes(
+            probes,
+            "timebase",
+            [
+                _fail(
+                    "timebase",
+                    f"VFR rejected: r_frame_rate={rfr_raw} != reference "
+                    f"{ref.fps_num}/{ref.fps_den}",
+                )
+            ],
+        )
+    else:
+        probes = _replace_probes(
+            probes,
+            "timebase",
+            [
+                _pass(
+                    "timebase",
+                    f"time_base={video[0].get('time_base')} "
+                    f"fps={ref.fps_num}/{ref.fps_den} exact",
+                )
+            ],
+        )
+
+    # --- frame_order: content digests > rational cuts > not measured -----
+    if ref.frame_digests:
+        if len(ref.frame_digests) != ref.frame_count:
+            probes = _replace_probes(
+                probes,
+                "frame_order",
+                [
+                    _fail(
+                        "frame_order",
+                        "reference digest authority length "
+                        f"{len(ref.frame_digests)} != frame_count {ref.frame_count}",
+                    )
+                ],
+            )
+        else:
+            try:
+                width = int(video[0].get("width"))
+                height = int(video[0].get("height"))
+            except (TypeError, ValueError):
+                width = height = 0
+            candidate = probe_frame_digests(path, width, height) if width and height else None
+            if candidate is None:
+                probes = _replace_probes(
+                    probes,
+                    "frame_order",
+                    [
+                        _fail(
+                            "frame_order",
+                            "candidate content digests not measurable (decode fail)",
+                        )
+                    ],
+                )
+            elif len(candidate) != len(ref.frame_digests):
+                probes = _replace_probes(
+                    probes,
+                    "frame_order",
+                    [
+                        _fail(
+                            "frame_order",
+                            f"candidate frames={len(candidate)} != reference "
+                            f"digests={len(ref.frame_digests)}",
+                        )
+                    ],
+                )
+            else:
+                mismatch = next(
+                    (
+                        i
+                        for i, (got, want) in enumerate(
+                            zip(candidate, ref.frame_digests)
+                        )
+                        if got != want
+                    ),
+                    None,
+                )
+                if mismatch is None:
+                    probes = _replace_probes(
+                        probes,
+                        "frame_order",
+                        [
+                            _pass(
+                                "frame_order",
+                                f"decoded content order matches {len(candidate)} "
+                                "reference frame digests",
+                            )
+                        ],
+                    )
+                else:
+                    probes = _replace_probes(
+                        probes,
+                        "frame_order",
+                        [
+                            _fail(
+                                "frame_order",
+                                f"content order mismatch at frame {mismatch}: "
+                                f"got {candidate[mismatch][:12]}… expected "
+                                f"{ref.frame_digests[mismatch][:12]}…",
+                            )
+                        ],
+                    )
+    elif ref.cuts:
+        probes = _replace_probes(
+            probes,
+            "frame_order",
+            _check_rational_cuts(path, frames, video[0], ref, fps, one_frame),
+        )
+    else:
+        probes = _replace_probes(
+            probes,
+            "frame_order",
+            [
+                ProbeVerdict(
+                    name="frame_order",
+                    verdict="NOT_MEASURED",
+                    detail="no independent content-order/cut reference authority",
+                )
+            ],
+        )
+
+    # --- duration: one-source-frame bound (1/fps), not 2% + 50ms ---------
+    expected_duration = float(Fraction(ref.frame_count * ref.fps_den, ref.fps_num))
+    raw: object = inventory.get("format", {}).get("duration") if isinstance(
+        inventory.get("format"), dict
+    ) else None
+    if raw is None:
+        raw = video[0].get("duration")
+    try:
+        measured = float(raw) if raw is not None else None
+    except (TypeError, ValueError):
+        measured = None
+    if measured is None or measured <= 0:
+        probes = _replace_probes(
+            probes, "duration", [_fail("duration", "candidate duration unreadable")]
+        )
+    elif abs(measured - expected_duration) <= one_frame:
+        probes = _replace_probes(
+            probes,
+            "duration",
+            [
+                _pass(
+                    "duration",
+                    f"{measured:.3f}s vs reference {expected_duration:.3f}s "
+                    f"(<= {one_frame:.4f}s one-source-frame bound)",
+                )
+            ],
+        )
+    else:
+        probes = _replace_probes(
+            probes,
+            "duration",
+            [
+                _fail(
+                    "duration",
+                    f"{measured:.3f}s vs reference {expected_duration:.3f}s "
+                    f"(bound {one_frame:.4f}s = 1 source frame)",
+                )
+            ],
+        )
+
+    # --- av_policy: approved audio presence/mapping/content/drift ---------
+    probes = _replace_probes(
+        probes, "av_policy", _source_locked_audio(path, audio, video[0], audio_ref, fps, one_frame)
+    )
+
+    # --- provenance: server-owned output hash required --------------------
+    if exp.expected_sha256 is None:
+        probes = _replace_probes(
+            probes,
+            "provenance",
+            [
+                ProbeVerdict(
+                    name="provenance",
+                    verdict="FAIL",
+                    detail="source-locked validation requires server-owned "
+                    "output sha256 authority",
+                )
+            ],
+        )
+    else:
+        try:
+            actual = sha256_file(path)
+            ok = actual == exp.expected_sha256
+        except OSError:
+            actual = None
+            ok = False
+        probes = _replace_probes(
+            probes,
+            "provenance",
+            [
+                (
+                    _pass("provenance", f"sha256={actual[:16]}…")
+                    if ok
+                    else _fail(
+                        "provenance",
+                        "sha256 mismatch got="
+                        f"{(actual or '?')[:16]}… expected={exp.expected_sha256[:16]}…",
+                    )
+                )
+            ],
+        )
+    return probes
+
+
+def _parse_rational(value: object) -> Fraction | None:
+    if not isinstance(value, str) or "/" not in value:
+        return None
+    try:
+        num, den = value.split("/", 1)
+        frac = Fraction(int(num), int(den))
+    except (ValueError, ZeroDivisionError):
+        return None
+    if frac <= 0:
+        return None
+    return frac
+
+
+def _check_rational_cuts(
+    path: Path,
+    frames: list[dict] | None,
+    stream: dict,
+    ref: SourceReference,
+    fps: Fraction,
+    one_frame: float,
+) -> list[ProbeVerdict]:
+    """Placement of every reference cut on the candidate timeline.
+
+    Each cut frame must present at its exact rational timestamp within
+    the one-source-frame bound (1/fps). Candidate frame times are
+    pts x time_base — rational, never float seconds.
+    """
+    if not ref.cuts:
+        return [
+            ProbeVerdict(
+                name="frame_order",
+                verdict="NOT_MEASURED",
+                detail="no independent content-order/cut reference authority",
+            )
+        ]
+    try:
+        num, den = str(stream.get("time_base", "1/90000")).split("/", 1)
+        tb = Fraction(int(num), int(den))
+    except (ValueError, ZeroDivisionError):
+        return [_fail("frame_order", "candidate time_base unreadable")]
+    if frames is None:
+        return [_fail("frame_order", "frames do not decode")]
+    pts_sorted: list[Fraction] = []
+    for item in frames:
+        try:
+            pts_sorted.append(Fraction(int(item["pts"])) * tb)
+        except (KeyError, TypeError, ValueError):
+            continue
+    if not pts_sorted:
+        return [_fail("frame_order", "candidate pts unreadable")]
+    pts_sorted.sort()
+    pts_by_index = {index: pts for index, pts in enumerate(pts_sorted)}
+    missing: list[str] = []
+    for cut in ref.cuts:
+        frame_time = pts_by_index.get(cut.frame_index)
+        if frame_time is None:
+            missing.append(f"#{cut.frame_index}")
+            continue
+        want = Fraction(cut.pts_num, cut.pts_den)
+        if abs(float(frame_time - want)) > one_frame:
+            missing.append(
+                f"#{cut.frame_index}@{float(frame_time):.4f}s!={float(want):.4f}s"
+            )
+    if missing:
+        return [_fail("frame_order", f"cuts misplaced: {missing}")]
+    return [_pass("frame_order", f"{len(ref.cuts)} rational cuts placed in bound")]
+
+
+def _source_locked_audio(
+    path: Path,
+    audio: list,
+    video_stream: dict,
+    audio_ref: AudioReference | None,
+    fps: Fraction,
+    one_frame: float,
+) -> list[ProbeVerdict]:
+    """Approved-audio check: presence, mapping, remux content, A/V drift."""
+    absent = audio_ref is None or audio_ref.mode == "absent"
+    if absent:
+        if audio:
+            return [
+                _fail(
+                    "av_policy",
+                    f"audio present ({len(audio)} streams) but approved output is silent",
+                )
+            ]
+        return [_pass("av_policy", "no audio as approved (absent)")]
+    if not audio:
+        return [_fail("av_policy", f"approved audio missing (mode={audio_ref.mode})")]
+    ordinal = audio_ref.stream_index
+    if ordinal >= len(audio):
+        return [
+            _fail(
+                "av_policy",
+                f"approved audio mapping stream_index={ordinal} missing "
+                f"(candidate has {len(audio)})",
+            )
+        ]
+    audio_stream = audio[ordinal]
+    if audio_ref.mode == "remux":
+        if not audio_ref.digest:
+            return [
+                _fail("av_policy", "remux reference missing audio digest authority")
+            ]
+        got = probe_audio_digest(path, ordinal)
+        if got is None:
+            return [_fail("av_policy", "approved audio not decodable in candidate")]
+        if got != audio_ref.digest:
+            return [
+                _fail(
+                    "av_policy",
+                    f"audio content digest mismatch got={got[:12]}… "
+                    f"expected={audio_ref.digest[:12]}…",
+                )
+            ]
+    try:
+        video_index = int(video_stream.get("index"))
+    except (TypeError, ValueError):
+        return [_fail("av_policy", "candidate video stream index unreadable")]
+    try:
+        audio_index = int(audio_stream.get("index"))
+    except (TypeError, ValueError):
+        return [_fail("av_policy", "candidate audio stream index unreadable")]
+    bounds = _probe_av_bounds(path, video_index, audio_index)
+    if bounds is None:
+        return [_fail("av_policy", "A/V packet table unreadable")]
+    # End alignment accounts for the last packet's own duration (median
+    # packet spacing), so a video ending at v_last + v_delta and audio at
+    # a_last + a_delta must agree within the one-source-frame bound.
+    v_end = bounds["v_last"] + bounds["v_delta"]
+    a_end = bounds["a_last"] + bounds["a_delta"]
+    drift_start = abs(bounds["a_first"] - bounds["v_first"])
+    drift_end = abs(a_end - v_end)
+    if drift_start > one_frame or drift_end > one_frame:
+        return [
+            _fail(
+                "av_policy",
+                f"A/V drift start={drift_start:.4f}s end={drift_end:.4f}s "
+                f"> bound {one_frame:.4f}s (1 source frame)",
+            )
+        ]
+    mode_detail = {
+        "remux": "content digest match",
+        "transcode": "transcode explicit (content not compared)",
+    }.get(audio_ref.mode, "")
+    return [
+        _pass(
+            "av_policy",
+            f"approved audio mode={audio_ref.mode} mapping ok, "
+            f"{mode_detail}, drift start={drift_start:.4f}s end={drift_end:.4f}s "
+            f"<= {one_frame:.4f}s",
+        )
+    ]
 
 
 def validate(
@@ -536,6 +1350,13 @@ def validate(
                         f"sha256 mismatch got={actual[:16]}… expected={exp.expected_sha256[:16]}…",
                     )
                 )
+
+    # C2 source-locked mode (F07): re-validate against independent
+    # reference evidence; missing authority fails closed.
+    if exp.source_locked:
+        probes = _source_locked_overrides(
+            probes, exp, path, inventory, streams, video, audio, frames
+        )
 
     # Order probes per REQUIRED_PROBES for a stable verdict shape.
     order = {name: index for index, name in enumerate(REQUIRED_PROBES)}
