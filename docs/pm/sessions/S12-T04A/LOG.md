@@ -147,3 +147,39 @@ authority (PASS), missing both digests AND cuts is NOT_MEASURED.
 
 Gates C2 W2: full tests/s12/s12-t04a/ 64 passed (14.62s) + ruff F clean
 + git diff --check 0 + T01 regression 38 passed (55.51s).
+
+## Interface-delta (T03C findfix 47dae37) — measured PSNR tolerance (2026-09-10)
+
+T03C publication now supplies SourceReference/AudioReference/CutPoint from
+the approved artifact, but exact frame-digest comparison FAILs every real
+export job because re-encode (4K upscale/encode) is never byte-identical.
+Delta accepted WITHOUT relaxing tamper detection (only lossy re-encode of
+the SAME content at the approved raster is admitted):
+
+1. `ValidationExpectation.frame_match_mode` = "exact" (DEFAULT, fail-closed)
+   | "psnr"; `frame_psnr_min_db` documented per profile by the consumer.
+2. `SourceReference.reference_path` — immutable server-owned approved
+   artifact media path, used ONLY by psnr mode; absent → FAIL.
+3. `probe_frame_psnr(candidate, reference, width, height)` — per-frame PSNR
+   (dB) of decoded yuv420p frames at the approved raster, presentation
+   order; None on decode failure/length divergence.
+4. Source-locked `frame_order` order: psnr branch (every frame >= threshold)
+   → digests (exact) → rational cuts → NOT_MEASURED. Unknown mode FAILs.
+5. AudioReference transcode policy already present in prior C2 W2: presence/
+   mapping/A-V drift only, content digest NOT compared (T03C builds
+   transcode refs without digest — verified by test_c28_transcode_explicit).
+
+New tests (test_c2_source_locked.py delta section, 9): legit lossy
+re-encode PASS under psnr; EXACT default still FAILs re-encode
+(fail-closed); reorder FAILs under psnr; changed audio FAILs under psnr
+(video content PASSs but remux digest FAILs); timing drift FAILs; wrong
+reference FAILs; combined FAILs; missing threshold FAILs closed; missing
+reference_path FAILs closed.
+
+Pitfall: ffmpeg -shortest in a video+audio remap drops the final video
+frame (19/20) → removed -shortest in the changed-audio fixture so the test
+targets audio content, not frame trimming.
+
+Gates delta: tests/s12/s12-t04a/ 73 passed (10.54s) + ruff F clean +
+git diff --check 0 + T03C regression 19 passed (20.47s, collection present
+on this branch; manager runs the full 37 on the T03C branch).

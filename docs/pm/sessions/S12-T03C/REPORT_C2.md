@@ -25,6 +25,12 @@ Baseline `da7108b` | No push/merge | Model `ocg/deepseek-v4-flash` fallback OFF.
 | C16 | PASS (bounded) | real worker render + real publication + real validator: no TypeError, no double assembly, coherent `failed` on NOT_MEASURED; positive PASS depends on T04A digest authority (reported) |
 | C17/C18 (consumer) | PASS (bounded) | fence re-check mid-publication + atomic rename + sidecar bytes + partials never public + tampered replay fails |
 | C22-part (backend) | PASS | `GET /s12-exports/{run_id}/result` (metadata + server-owned media_url) + `GET /s12-exports/{run_id}/media` (stream/download): only completed + owned; pending → 409; cross-project/missing → 404; tampered (sidecar mismatch) → 403; paths derived server-side, never client/manifest-supplied |
+| F11-T06B-01 | FIXED (T03C side) | `_expectation_for` now supplies FULL server-owned authority from the CURRENT approved artifact (T04A helpers): per-frame content digests at the approved raster, exact fps/frame count, artifact sha256, `AudioReference` (transcode when audio present / absent when silent). REAL source-locked PASS proven end-to-end (identity copy + audio-transcode tests, validator unmocked). Residual: scaled/re-encoded candidates still fail honestly (digest mismatch) — T04A scale/lossy-tolerance delta proposed below. |
+| C28-F01 | FIXED (T03C side) | AudioReference attached (`transcode` — the assembly re-encodes audio per C28 evidence); audio-source candidate passes av_policy with the REAL validator (presence/mapping/A-V drift), digest NOT compared for transcode. |
+
+## Proposed T04A interface delta (NOT applied — owner T04A)
+
+For re-encoded/rescaled exports (real runner scale+pad), the frozen exact-frame-digest compare can never PASS (lossy x264). T03C proposes a bounded T04A option: `SourceReference.allow_lossy_identity: bool` — when set, frame_order compares against a `-vf scale=srcWxsrcH`-normalized candidate digest (content identity across resize) and/or a tiny per-pixel MD5-mean tolerance (PSNR-style) documented per profile. T03C keeps fail-closed default (False).
 
 ## Key artifacts
 

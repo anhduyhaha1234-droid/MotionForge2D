@@ -516,3 +516,230 @@ def test_c28_audio_start_drift_fails(
     assert verdict.probe("av_policy").verdict == "FAIL"
     assert "drift" in verdict.probe("av_policy").detail
     assert verdict.verdict == "FAIL"
+
+
+# ── C2 interface-delta (T03C findfix 47dae37): measured PSNR tolerance ──
+#
+# Re-encoded export output is never byte-identical to the approved
+# artifact, so source-locked frame comparison supports a measured
+# tolerance mode (frame_match_mode="psnr") documented per profile by the
+# consumer. Default stays EXACT/fail-closed; tamper cases below must
+# still FAIL under the tolerance — tolerance only admits lossy re-encode
+# of the SAME content at the approved raster.
+
+
+def _reencode(src: Path, dest: Path) -> Path:
+    """Lossy libx264 re-encode of the same content (legit profile case)."""
+    rc = subprocess.run(
+        [_ffmpeg(), "-hide_banner", "-loglevel", "error", "-y",
+         "-i", str(src),
+         "-c:v", "libx264", "-preset", "medium", "-crf", "23",
+         "-pix_fmt", "yuv420p", "-an", str(dest)],
+        capture_output=True, text=True, timeout=300,
+    )
+    assert rc.returncode == 0, rc.stderr[-400:]
+    return dest
+
+
+def _psnr_expectation(approved: Path, candidate: Path, **overrides) -> ValidationExpectation:
+    base: dict = {
+        "width": W,
+        "height": H,
+        "codec": "h264",
+        "source_locked": True,
+        "frame_match_mode": "psnr",
+        "frame_psnr_min_db": 30.0,
+        "source_reference": SourceReference(
+            artifact_sha256=sha256_file(approved),
+            frame_count=FRAMES,
+            fps_num=FPS,
+            fps_den=1,
+            reference_path=str(approved),
+            cuts=(CutPoint(0, 0, 1), CutPoint(FRAMES // 2, 1, 1)),
+            audio=AudioReference(mode="absent"),
+        ),
+        "expected_sha256": sha256_file(candidate),
+    }
+    base.update(overrides)
+    return ValidationExpectation(**base)
+
+
+def test_delta_psnr_legit_reencode_passes(approved_ab: Path, tmp_path: Path) -> None:
+    """Lossy re-encode of the same content passes measured tolerance."""
+    candidate = _reencode(approved_ab, tmp_path / "reencode.mp4")
+    verdict = validate(candidate, _psnr_expectation(approved_ab, candidate))
+    assert verdict.verdict == "PASS", [
+        (item.name, item.verdict, item.detail) for item in verdict.probes
+    ]
+    order = verdict.probe("frame_order")
+    assert order is not None and order.verdict == "PASS"
+    assert "PSNR" in order.detail
+
+
+def test_delta_exact_still_fail_closed_on_reencode(
+    approved_ab: Path, tmp_path: Path
+) -> None:
+    """Default exact mode must still FAIL a re-encoded candidate."""
+    candidate = _reencode(approved_ab, tmp_path / "reencode.mp4")
+    exp = ValidationExpectation(
+        width=W, height=H, source_locked=True,
+        source_reference=SourceReference(
+            artifact_sha256=sha256_file(approved_ab),
+            frame_count=FRAMES,
+            fps_num=FPS,
+            fps_den=1,
+            frame_digests=probe_frame_digests(approved_ab, W, H) or (),
+            audio=AudioReference(mode="absent"),
+        ),
+        audio_policy="absent",
+        expected_sha256=sha256_file(candidate),
+    )
+    verdict = validate(candidate, exp)
+    assert verdict.probe("frame_order").verdict == "FAIL"
+    assert verdict.verdict == "FAIL"
+
+
+def test_delta_psnr_reorder_still_fails(
+    ref_segments: dict, tmp_path: Path
+) -> None:
+    """Equal-length reordered content FAILs under PSNR tolerance."""
+    approved = tmp_path / "approved.mp4"
+    _concat([ref_segments["seg_a"], ref_segments["seg_b"]], approved)
+    candidate = tmp_path / "reordered.mp4"
+    _concat([ref_segments["seg_b"], ref_segments["seg_a"]], candidate)
+    verdict = validate(candidate, _psnr_expectation(approved, candidate))
+    assert verdict.probe("frame_order").verdict == "FAIL"
+    assert verdict.verdict == "FAIL"
+
+
+def test_delta_psnr_changed_audio_still_fails(
+    ref_segments: dict, tmp_path: Path
+) -> None:
+    """Changed audio FAILs under PSNR tolerance (remux digest check)."""
+    approved = tmp_path / "approved_av.mp4"
+    _concat([ref_segments["seg_a_440"], ref_segments["seg_a_440"]], approved)
+    digest = probe_audio_digest(approved, 0)
+    assert digest is not None
+    candidate = tmp_path / "changed_audio.mp4"
+    rc = subprocess.run(
+        [_ffmpeg(), "-hide_banner", "-loglevel", "error", "-y",
+         "-i", str(approved), "-i", str(ref_segments["seg_880_2s"]),
+         "-map", "0:v:0", "-map", "1:a:0",
+         "-c:v", "copy", "-c:a", "aac", str(candidate)],
+        capture_output=True, text=True, timeout=300,
+    )
+    assert rc.returncode == 0, rc.stderr[-400:]
+    exp = _psnr_expectation(approved, candidate)
+    exp = ValidationExpectation(
+        **{
+            **exp.__dict__,
+            "source_reference": SourceReference(
+                artifact_sha256=sha256_file(approved),
+                frame_count=FRAMES,
+                fps_num=FPS,
+                fps_den=1,
+                reference_path=str(approved),
+                audio=AudioReference(
+                    mode="remux", digest=digest, stream_index=0
+                ),
+            ),
+        }
+    )
+    verdict = validate(candidate, exp)
+    assert verdict.probe("frame_order").verdict == "PASS"  # video content ok
+    assert verdict.probe("av_policy").verdict == "FAIL"  # audio content not
+    assert verdict.verdict == "FAIL"
+
+
+def test_delta_psnr_timing_drift_still_fails(
+    ref_segments: dict, tmp_path: Path
+) -> None:
+    """Timing drift FAILs under PSNR tolerance (duration bound)."""
+    approved = tmp_path / "approved.mp4"
+    _concat([ref_segments["seg_a"], ref_segments["seg_b"]], approved)
+    candidate = tmp_path / "drifted.mp4"
+    _concat([approved, ref_segments["seg_c"]], candidate)
+    verdict = validate(candidate, _psnr_expectation(approved, candidate))
+    assert verdict.verdict == "FAIL", [
+        (item.name, item.verdict, item.detail) for item in verdict.probes
+    ]
+
+
+def test_delta_psnr_wrong_reference_still_fails(
+    approved_ab: Path, tmp_path: Path
+) -> None:
+    """Wrong reference artifact FAILs under PSNR tolerance."""
+    wrong = build_media(tmp_path / "wrong_ref.mp4", width=W, height=H)
+    candidate = tmp_path / "candidate.mp4"
+    shutil.copy(approved_ab, candidate)
+    exp = _psnr_expectation(wrong, candidate)
+    verdict = validate(candidate, exp)
+    assert verdict.probe("frame_order").verdict == "FAIL"
+    assert verdict.verdict == "FAIL"
+
+
+def test_delta_psnr_combined_still_fails(
+    ref_segments: dict, tmp_path: Path
+) -> None:
+    """Combined reorder + audio change FAILs under PSNR tolerance."""
+    approved = tmp_path / "approved_av.mp4"
+    _concat([ref_segments["seg_a_440"], ref_segments["seg_a_440"]], approved)
+    digest = probe_audio_digest(approved, 0)
+    assert digest is not None
+    candidate = tmp_path / "combined.mp4"
+    _concat([ref_segments["seg_b_880"], ref_segments["seg_a_440"]], candidate)
+    exp = _psnr_expectation(approved, candidate)
+    exp = ValidationExpectation(
+        **{
+            **exp.__dict__,
+            "source_reference": SourceReference(
+                artifact_sha256=sha256_file(approved),
+                frame_count=FRAMES,
+                fps_num=FPS,
+                fps_den=1,
+                reference_path=str(approved),
+                audio=AudioReference(
+                    mode="remux", digest=digest, stream_index=0
+                ),
+            ),
+        }
+    )
+    verdict = validate(candidate, exp)
+    assert verdict.probe("frame_order").verdict == "FAIL"
+    assert verdict.probe("av_policy").verdict == "FAIL"
+    assert verdict.verdict == "FAIL"
+
+
+def test_delta_psnr_missing_threshold_fails_closed(
+    approved_ab: Path, tmp_path: Path
+) -> None:
+    """psnr mode without documented threshold → FAIL (fail-closed)."""
+    candidate = tmp_path / "candidate.mp4"
+    shutil.copy(approved_ab, candidate)
+    exp = _psnr_expectation(approved_ab, candidate, frame_psnr_min_db=None)
+    verdict = validate(candidate, exp)
+    assert verdict.probe("frame_order").verdict == "FAIL"
+    assert verdict.verdict == "FAIL"
+
+
+def test_delta_psnr_missing_reference_path_fails_closed(
+    approved_ab: Path, tmp_path: Path
+) -> None:
+    """psnr mode without immutable reference_path → FAIL (fail-closed)."""
+    candidate = tmp_path / "candidate.mp4"
+    shutil.copy(approved_ab, candidate)
+    exp = _psnr_expectation(
+        approved_ab,
+        candidate,
+        source_reference=SourceReference(
+            artifact_sha256=sha256_file(approved_ab),
+            frame_count=FRAMES,
+            fps_num=FPS,
+            fps_den=1,
+            cuts=(CutPoint(0, 0, 1), CutPoint(FRAMES // 2, 1, 1)),
+            audio=AudioReference(mode="absent"),
+        ),
+    )
+    verdict = validate(candidate, exp)
+    assert verdict.probe("frame_order").verdict == "FAIL"
+    assert verdict.verdict == "FAIL"

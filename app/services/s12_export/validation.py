@@ -60,6 +60,7 @@ __all__ = [
     "sha256_file",
     "probe_frame_digests",
     "probe_audio_digest",
+    "probe_frame_psnr",
     "validate",
 ]
 
@@ -141,6 +142,20 @@ class ValidationExpectation:
     # reference authority fails closed.
     source_locked: bool = False
     source_reference: SourceReference | None = None
+    # C2 interface-delta (T03C findfix 47dae37): re-encoded export output
+    # is never byte-identical, so source-locked frame comparison supports
+    # a measured tolerance mode:
+    #   "exact" (default, fail-closed) — decoded frame digests must match
+    #     the reference exactly (tamper-proof, but rejects any lossy
+    #     re-encode, including legitimate profile upscale/encode).
+    #   "psnr" — decoded frames at the approved raster are compared with
+    #     PSNR per frame; every frame must be >= ``frame_psnr_min_db``.
+    #     The threshold is the CONSUMER's documented per-profile value
+    #     (e.g. master-4k >= 30dB); missing threshold or missing
+    #     reference_path fails closed. Reorder/content drift drops PSNR
+    #     far below any sane encode threshold, so tamper still FAILs.
+    frame_match_mode: str = "exact"
+    frame_psnr_min_db: float | None = None
 
 
 @dataclass(frozen=True)
@@ -193,6 +208,10 @@ class SourceReference:
     # non-empty it must have exactly ``frame_count`` entries and proves
     # content order — equal-length reordered content FAILs.
     frame_digests: tuple[str, ...] = ()
+    # Immutable server-owned approved-artifact media path used ONLY for
+    # measured PSNR comparison (``frame_match_mode="psnr"``). Never a
+    # client-supplied path; absent → PSNR probe fails closed.
+    reference_path: str | None = None
     # Exact source cuts in frame index + rational seconds.
     cuts: tuple[CutPoint, ...] = ()
     # Approved audio evidence (``None`` = approved output has no audio).
@@ -393,6 +412,79 @@ def probe_frame_digests(
     if rc != 0:
         return None
     return tuple(digests) if digests else None
+
+
+def _open_raw_pipe(path: str | Path) -> subprocess.Popen | None:
+    try:
+        return subprocess.Popen(
+            [
+                find_ffmpeg(),
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-i",
+                str(path),
+                "-map",
+                "0:v:0",
+                "-f",
+                "rawvideo",
+                "-pix_fmt",
+                "yuv420p",
+                "-",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError:
+        return None
+
+
+def probe_frame_psnr(
+    candidate: str | Path,
+    reference: str | Path,
+    width: int,
+    height: int,
+) -> tuple[float, ...] | None:
+    """Per-frame PSNR (dB) of decoded candidate vs reference, presentation
+    order, at the approved raster. None when either side fails to decode
+    or streams diverge. Used ONLY by the measured ``frame_match_mode="psnr"``
+    tolerance path — exact mode never calls this."""
+    import math  # noqa: PLC0415
+
+    frame_size = width * height * 3 // 2
+    if frame_size <= 0:
+        return None
+    cand = _open_raw_pipe(candidate)
+    ref = _open_raw_pipe(reference)
+    if cand is None or ref is None:
+        if cand is not None:
+            cand.kill()
+        if ref is not None:
+            ref.kill()
+        return None
+    values: list[float] = []
+    try:
+        assert cand.stdout is not None and ref.stdout is not None
+        while True:
+            ca = _read_exact(cand.stdout, frame_size)
+            rb = _read_exact(ref.stdout, frame_size)
+            if ca is None or rb is None:
+                break
+            if len(ca) != len(rb):
+                return None
+            mse = 0.0
+            for x, y in zip(ca, rb):
+                diff = x - y
+                mse += diff * diff
+            mse /= len(ca)
+            if mse <= 0.0:
+                values.append(float("inf"))
+            else:
+                values.append(10.0 * math.log10(255.0 * 255.0 / mse))
+    finally:
+        cand.kill()
+        ref.kill()
+    return tuple(99.0 if v == float("inf") else v for v in values) if values else None
 
 
 def probe_audio_digest(
@@ -770,8 +862,26 @@ def _source_locked_overrides(
             ],
         )
 
-    # --- frame_order: content digests > rational cuts > not measured -----
-    if ref.frame_digests:
+    # --- frame_order: psnr tolerance > content digests > cuts > unknown --
+    if exp.frame_match_mode not in ("exact", "psnr"):
+        probes = _replace_probes(
+            probes,
+            "frame_order",
+            [
+                _fail(
+                    "frame_order",
+                    f"unknown frame_match_mode={exp.frame_match_mode!r} "
+                    "(fail-closed)",
+                )
+            ],
+        )
+    elif exp.frame_match_mode == "psnr":
+        probes = _replace_probes(
+            probes,
+            "frame_order",
+            _measure_psnr_order(path, video[0], exp, ref),
+        )
+    elif ref.frame_digests:
         if len(ref.frame_digests) != ref.frame_count:
             probes = _replace_probes(
                 probes,
@@ -951,6 +1061,83 @@ def _source_locked_overrides(
             ],
         )
     return probes
+
+
+def _measure_psnr_order(
+    path: Path,
+    stream: dict,
+    exp: ValidationExpectation,
+    ref: SourceReference,
+) -> list[ProbeVerdict]:
+    """Measured tolerance frame-order check (interface-delta).
+
+    Decoded candidate frames are compared against the immutable
+    approved-artifact media at the approved raster; every frame must be
+    >= ``frame_psnr_min_db`` (documented per profile by the consumer).
+    Missing threshold or missing reference_path fails closed. Content
+    reorder/wrong-reference drops PSNR far below any sane profile
+    threshold, so tamper still FAILs under tolerance.
+    """
+    threshold = exp.frame_psnr_min_db
+    if threshold is None or threshold <= 0:
+        return [
+            _fail(
+                "frame_order",
+                "psnr mode requires documented frame_psnr_min_db (per profile)",
+            )
+        ]
+    reference_path = ref.reference_path
+    if not reference_path or not Path(reference_path).is_file():
+        return [
+            _fail(
+                "frame_order",
+                "psnr mode requires immutable reference_path (approved artifact)",
+            )
+        ]
+    try:
+        width = int(stream.get("width"))
+        height = int(stream.get("height"))
+    except (TypeError, ValueError):
+        width = height = 0
+    if not width or not height:
+        return [_fail("frame_order", "candidate raster unreadable for PSNR")]
+    values = probe_frame_psnr(path, reference_path, width, height)
+    if values is None:
+        return [
+            _fail(
+                "frame_order",
+                "candidate/reference PSNR not measurable (decode failure)",
+            )
+        ]
+    if len(values) != ref.frame_count:
+        return [
+            _fail(
+                "frame_order",
+                f"PSNR frames={len(values)} != reference frame_count "
+                f"{ref.frame_count}",
+            )
+        ]
+    low = [
+        (i, value)
+        for i, value in enumerate(values)
+        if value < threshold
+    ]
+    if low:
+        worst = min(low, key=lambda item: item[1])
+        return [
+            _fail(
+                "frame_order",
+                f"PSNR frame {worst[0]} = {worst[1]:.2f} dB < "
+                f"threshold {threshold:.1f} dB (tamper/content drift)",
+            )
+        ]
+    return [
+        _pass(
+            "frame_order",
+            f"{len(values)} frames PSNR >= {threshold:.1f} dB "
+            "(approved-raster measured tolerance)",
+        )
+    ]
 
 
 def _parse_rational(value: object) -> Fraction | None:
