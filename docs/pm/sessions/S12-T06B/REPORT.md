@@ -51,9 +51,12 @@ Baseline: `1c9cd07` | No merge/fetch/push.
 
 ## Routed findings
 
-- **F-OBS-01 -> owner T01**: `classify_source_kind` dims-only fallback
-  (`preflight.py`) classifies `native_4k` for >=3840x2160 dims without a
-  provenance flag. Repro in LOG. Verifier did not fix production.
+- **F-OBS-01 -> owner T01, CLOSED by T01-C1 `0d5bc77`**: bare
+  >=3840x2160 dims without proved provenance now classify `upscale_4k`.
+  T06B `test_f3` asserts the new behavior. This worktree still carries
+  pre-fix production (baseline `48bf514`), so updated `test_f3` FAILS
+  locally by design and PASSES on canonical merged with T01-C1. No prod
+  merge/rebase by verifier.
 
 ## Files (new)
 
