@@ -70,8 +70,16 @@ def _find_ffmpeg() -> str:
     raise FileNotFoundError("ffmpeg not found (needed for S12-T03B media)")
 
 
-def build_source(dest: Path, *, audio: bool = False) -> Path:
-    """Encode the validated source: testsrc 320x180 h264 @10fps x3s + opt sine."""
+def build_source(
+    dest: Path, *, audio: bool = False, width: int = WIDTH, height: int = HEIGHT,
+    duration: float = DURATION,
+) -> Path:
+    """Encode the validated source: testsrc h264 @10fps + opt sine.
+
+    Default 320x180; callers may request any real dims (C10 4K final is
+    produced by the RUNNER scale/pad — never by generating a 4K source).
+    """
+    src_tag = "smptebars" if width % 7 == 0 else "testsrc"
     cmd = [
         _find_ffmpeg(),
         "-hide_banner",
@@ -81,10 +89,10 @@ def build_source(dest: Path, *, audio: bool = False) -> Path:
         "-f",
         "lavfi",
         "-i",
-        f"testsrc=size={WIDTH}x{HEIGHT}:rate={FPS}:duration={DURATION}",
+        f"{src_tag}=size={width}x{height}:rate={FPS}:duration={duration}",
     ]
     if audio:
-        cmd += ["-f", "lavfi", "-i", f"sine=frequency=440:duration={DURATION}"]
+        cmd += ["-f", "lavfi", "-i", f"sine=frequency=440:duration={duration}"]
     cmd += ["-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p"]
     if audio:
         cmd += ["-c:a", "aac", "-shortest"]

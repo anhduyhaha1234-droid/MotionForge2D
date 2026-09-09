@@ -77,3 +77,21 @@ Branch: `codex/s12/s12-t03b-0907a`. Date: 2026-09-07 ~14:22 VN.
   scenario corrected to hash-identity proof (completed rows never rewrite).
 - Gates: 13 passed/19.06s, ruff F clean, diff-check 0.
 - Evidence: <C1-root>/s12-t03b/ + matrix/C10-C14 raw JSON (6 files).
+
+## C2 W3 closure (2026-09-09, owner 20260907_125027_0c90f3, base 66299ed1)
+
+- Review: C1 REVIEW.md F03/F06/F07 — T03B rows C10-C14 on product runner.
+- runner.py: chunk render now scales+pads to the SELECTED profile raster
+  (F03/M04: 4K selection on 320x180 source -> real 3840x2160 chunk/final,
+  raster verified post-render; substitution rejected). Chunk byte identity
+  persisted as `.sha256` sidecar at render finalize; `_chunk_usable`
+  requires sidecar SHA == actual file SHA + exact decode window (F06/M05:
+  equal-frame-count changed-bytes never reused).
+- stitch.py: `trim_core`/`assemble_run` take the selected `encoder`
+  (HEVC retained through trim/stitch/final; `_verify_codec` on the
+  candidate before atomic replace). Final output stays PRIVATE candidate;
+  existing good final never overwritten.
+- tests: 13 rows in test_c1_closure.py rewritten for the real runner path
+  (no standalone-FFmpeg 4K stand-in); conftest supports custom source dims.
+- Gates: T03B dir 32 passed/44.74s isolated; ruff --select F clean;
+  diff-check 0. Evidence: C2 root s12-t03b + matrix/C10-C14 raw JSON.

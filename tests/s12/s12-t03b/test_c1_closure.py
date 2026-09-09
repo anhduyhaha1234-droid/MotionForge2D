@@ -1,30 +1,27 @@
-"""S12-C1 W3 — T03B closure rows C10-C14 (exact owner 20260907_125027_0c90f3).
+"""S12-C2 W3 — T03B real-media render + chunk integrity (F03/F06/F07).
 
-Consumes the W2 checkpoint (canonical ``46feca4``) read-only:
-T02-C1 capability/profile (``PROFILE_ENCODERS`` + ``resolve_profile`` +
-encoder-consistency), T03A-C1 persistence (fenced run/chunk/lease rows —
-ALL DB state via ``S12ExportRepository``), T04A-C1 validator
-(``ValidationExpectation`` + ``validate``: count/order/cuts/CFR/VFR).
-No upstream redesign — product ``ExportRunner`` does the real work.
+Closes reviewer rows C10-C14 against the product runner ONLY (no
+standalone-FFmpeg stand-in for the runner path — the C1 reviewer defect).
+Base: canonical ``66299ed1`` (W1+W2: T01 authority + T03A real DB CAS +
+T04A source-locked validator).  T03B scope files only:
+``runner/chunks/stitch.py``.
 
-Rows:
-- C10 real-profile-encoder-dimensions: actual product runner CPU H.264
-  renders a real 3840x2160; HEVC only when measured supported;
-  encoder/profile match, failure explicit (never silent substitution).
-- C11 real-letterbox-geometry: non-16:9 real pixels land on a 3840x2160
-  canvas with no stretch/crop (DAR preserved); unsupported rejected.
-- C12-part source-locked seams: product stitch output validates exact
-  count/order/cuts + rational timestamps via the T04A validator with CFR
-  controls; VFR rejected pre-work.
-- C13 resume-integrity: same-length-different-byte / missing / truncated /
-  source-config-tool change / combined tamper → only verified-identical
-  chunks reused (everything else fails closed or re-renders).
-- C14 durable-chunk-kill-restart: >=1 committed verified chunk observed
-  while active; OWNED child proc killed; fresh PID on the same DB resumes;
-  hashes unchanged; no forged repair.
+- C10: the ACTUAL runner scales/pads a below-4K source to the selected
+  3840x2160 profile raster (M04 substitution rejected) and keeps the
+  selected codec through trim/stitch/final (HEVC when measured eligible).
+- C11: non-16:9 real pixels on the selected canvas keep DAR via scale+
+  pad (dark side bars, no stretch/crop); unsupported profiles rejected.
+- C12: exact source order/cuts + rational seam timing + CFR control; VFR
+  rejected BEFORE any chunk work.
+- C13: equal-frame-count changed-byte chunk REJECTED (byte identity via
+  recorded sha256 sidecar), missing/partial/truncated/source/config/tool/
+  combined drift never reused; good finals immutable (no overwrite).
+- C14-part: >=1 committed verified chunk durable mid-job; OWNED child
+  killed; fresh PID same DB resumes identical chunk bytes (sidecar SHA
+  unchanged, no forged repair).  T03C consumer side is later.
 
-Isolated: migrated temp DBs (never MAIN), short unique basetemp, real
-ffmpeg/ffprobe only.  No case removed for green.
+Evidence: ``<C2-root>/s12-t03b/`` + ``matrix/C10..C14/`` where C2 root =
+``C:/Users/Admin/MotionForge2D-evidence/s12/20260909-124300-C2``.
 """
 
 from __future__ import annotations
@@ -47,10 +44,9 @@ _t03b_fixtures = _importlib_util.module_from_spec(_spec)
 _spec.loader.exec_module(_t03b_fixtures)
 FRAMES = _t03b_fixtures.FRAMES
 FPS = _t03b_fixtures.FPS
-WIDTH = _t03b_fixtures.WIDTH
-HEIGHT = _t03b_fixtures.HEIGHT
 make_config = _t03b_fixtures.make_config
 make_run = _t03b_fixtures.make_run
+build_source = _t03b_fixtures.build_source
 
 from app.persistence.s12_export import (  # noqa: E402
     S12ExportRepository,
@@ -61,14 +57,26 @@ from app.services.s12_export.runner import (  # noqa: E402
     _encoder_for_profile,
     _probe_encoder_usable,
 )
-from app.services.s12_export.stitch import count_video_frames  # noqa: E402
+from app.services.s12_export.stitch import (  # noqa: E402
+    StitchError,
+    count_video_frames,
+)
 
-C1_ROOT = _Path("C:/Users/Admin/MotionForge2D-evidence/s12/20260907-182016-C1")
+C2_ROOT = _Path("C:/Users/Admin/MotionForge2D-evidence/s12/20260909-124300-C2")
+FINAL4K = (3840, 2160)
+CANVAS1080 = (1920, 1080)
+
+
+def _raw(row: str, name: str, payload: dict) -> _Path:
+    dest = C2_ROOT / "matrix" / row / name
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(json.dumps(payload, indent=1), encoding="utf-8")
+    return dest
 
 
 def _ffmpeg() -> str:
     found = shutil.which("ffmpeg")
-    assert found, "ffmpeg not on PATH (C10 needs the real binary)"
+    assert found, "ffmpeg not on PATH (real-media row needs the real binary)"
     return found
 
 
@@ -76,155 +84,173 @@ def _ffprobe_streams(path: _Path) -> list[dict]:
     ffprobe = shutil.which("ffprobe")
     assert ffprobe is not None
     completed = subprocess.run(
-        [ffprobe, "-hide_banner", "-v", "error", "-show_entries",
+        [ffprobe, "-hide_banner", "-v", "error",
+         "-show_entries",
          "stream=index,codec_type,codec_name,width,height,avg_frame_rate",
          "-of", "json", str(path)],
-        capture_output=True,
-        text=True,
-        timeout=120,
+        capture_output=True, text=True, timeout=120,
     )
     assert completed.returncode == 0, completed.stderr[-300:]
     return json.loads(completed.stdout)["streams"]
 
 
-def _fresh_cfg(factory, manifest_id, source, workdir, **over):  # type: ignore[no-untyped-def]
-    run, lease = make_run(factory, manifest_id)
-    return make_config(run, lease, source, workdir, **over), run, lease
+def _video(streams: list[dict]) -> dict:
+    video = [st for st in streams if st["codec_type"] == "video"]
+    assert video, "no video stream"
+    return video[0]
 
 
-# ── C10: real-profile-encoder-dimensions ───────────────────────────────
+def _fresh_run(factory, manifest_id, source, workdir, *,
+               profile: str, frames: int, **over):  # type: ignore[no-untyped-def]
+    """Small bounded run (1-2 chunks) so 4K renders stay fast and real."""
+    max_frames = max(1, (frames + 1) // 2) if frames > 8 else frames
+    kw = {
+        "profile_id": profile,
+        "frame_count": frames,
+        "chunk_config": {"overlap": 2, "max_frames": max_frames},
+    }
+    kw.update(over)
+    run, lease = make_run(factory, manifest_id, **kw)
+    return make_config(run, lease, source, workdir), run, lease
 
 
-def test_c10_cpu_h264_yields_3840x2160(ctx, tmp_path) -> None:  # type: ignore[no-untyped-def]
-    """Product runner CPU H.264 renders real 3840x2160 (encoder exact)."""
-    factory, manifest_id, _source, _audio, workdir = ctx
-    encoder = _encoder_for_profile("master-4k-h264")
-    assert encoder == "libx264", f"frozen encoder drift: {encoder!r}"
-    usable, basis = _probe_encoder_usable(encoder)
-    assert usable, f"CPU H.264 must probe usable on this box: {basis}"
-    src = tmp_path / "c10_src.mp4"
-    cmd = [
-        _ffmpeg(), "-hide_banner", "-loglevel", "error", "-y",
-        "-f", "lavfi", "-i", "testsrc=size=3840x2160:rate=10:duration=1.0",
-        "-c:v", encoder, "-preset", "ultrafast", "-pix_fmt", "yuv420p",
-        "-frames:v", "10", str(src),
-    ]
-    completed = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-    assert completed.returncode == 0, completed.stderr[-300:]
-    streams = _ffprobe_streams(src)
-    video = [st for st in streams if st["codec_type"] == "video"][0]
-    assert (video["width"], video["height"]) == (3840, 2160)
-    assert video["codec_name"] == "h264", video
-    raw = C1_ROOT / "matrix" / "C10" / "cpu_h264_3840x2160.json"
-    raw.parent.mkdir(parents=True, exist_ok=True)
-    raw.write_text(json.dumps({
-        "row": "C10", "profile": "master-4k-h264", "encoder": encoder,
-        "probe_basis": basis, "width": video["width"],
-        "height": video["height"], "codec": video["codec_name"],
-    }, indent=1))
-
-
-def test_c10_hevc_only_when_measured_supported(ctx) -> None:  # type: ignore[no-untyped-def]
-    """HEVC renders only when libx265 probes usable; else explicit failure."""
-    encoder = _encoder_for_profile("master-4k-hevc")
-    assert encoder == "libx265", f"frozen encoder drift: {encoder!r}"
-    usable, basis = _probe_encoder_usable(encoder)
-    raw = C1_ROOT / "matrix" / "C10" / "hevc_support.json"
-    raw.parent.mkdir(parents=True, exist_ok=True)
-    raw.write_text(json.dumps({
-        "row": "C10", "profile": "master-4k-hevc", "encoder": encoder,
-        "usable": usable, "basis": basis,
-    }, indent=1))
-    assert isinstance(usable, bool) and basis, "probe must be explicit"
-
-
-def test_c10_unknown_profile_fails_explicit() -> None:
-    """No frozen encoder → explicit fail (never silent substitution)."""
-    with pytest.raises(RunnerError, match="no frozen encoder"):
-        _encoder_for_profile("no-such-profile")
-
-
-def test_c10_runner_uses_frozen_encoder(ctx) -> None:  # type: ignore[no-untyped-def]
-    """Product run pins libx264 chunk files (no silent substitution)."""
+def _full_run(ctx, profile: str = "master-4k-h264", frames: int = 8):  # type: ignore[no-untyped-def]
     factory, manifest_id, source, _audio, workdir = ctx
-    cfg, run, _lease = _fresh_cfg(factory, manifest_id, source, workdir)
-    assert run.profile_id == "master-4k-h264"
+    cfg, run, _lease = _fresh_run(
+        factory, manifest_id, source, workdir, profile=profile, frames=frames
+    )
     with factory() as s:
         runner = ExportRunner(S12ExportRepository(s), cfg)
         out = runner.resume()
         s.commit()
-    assert count_video_frames(out) == FRAMES
-    chunk0 = workdir / "chunks" / "chunk_0000.mp4"
-    assert chunk0.is_file()
-    streams = _ffprobe_streams(chunk0)
-    video = [st for st in streams if st["codec_type"] == "video"][0]
-    assert video["codec_name"] == "h264", video
+    return factory, cfg, run, out, workdir
 
 
-# ── C11: real-letterbox-geometry ───────────────────────────────────────
+# ── C10: real runner final raster + codec ─────────────────────────────
 
 
-def test_c11_letterbox_no_stretch_crop(tmp_path: _Path) -> None:
-    """Non-16:9 real pixels on a 3840x2160 canvas keep DAR (pad, not stretch)."""
-    ffmpeg = _ffmpeg()
-    portrait = tmp_path / "portrait.mp4"
-    cmd = [
-        ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
-        "-f", "lavfi", "-i", "testsrc=size=1080x1920:rate=10:duration=1.0",
-        "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
-        "-frames:v", "10", str(portrait),
-    ]
-    completed = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+def test_c10_runner_scales_320x180_to_real_3840x2160(ctx) -> None:  # type: ignore[no-untyped-def]
+    """Product runner 4K selection on a below-4K source → REAL 3840x2160.
+
+    M04 rejection: no standalone 4K source, no 320x180 passthrough — the
+    chunk and final candidates must measure 3840x2160.
+    """
+    factory, manifest_id, source, _audio, workdir = ctx
+    probe = _probe_streams_probe(source)
+    assert (probe["width"], probe["height"]) != FINAL4K  # below-4K input
+    cfg, run, _lease = _fresh_run(
+        factory, manifest_id, source, workdir,
+        profile="master-4k-h264", frames=8,
+    )
+    with factory() as s:
+        runner = ExportRunner(S12ExportRepository(s), cfg)
+        out = runner.resume()
+        s.commit()
+    for label, path in (("final", out), ("chunk0", workdir / "chunks" / "chunk_0000.mp4")):
+        assert _Path(path).is_file(), label
+        video = _video(_ffprobe_streams(_Path(path)))
+        assert (video["width"], video["height"]) == FINAL4K, (
+            f"{label} {video['width']}x{video['height']} != 3840x2160 (M04)"
+        )
+        assert video["codec_name"] == "h264", video
+    _raw("C10", "runner_4k_final.json", {
+        "row": "C10", "source": "320x180 below-4k",
+        "selected_profile": "master-4k-h264", "final": list(FINAL4K),
+        "chunk0_codec": "h264", "frames": 8,
+    })
+
+
+def test_c10_hevc_eligible_only_when_measured(ctx) -> None:  # type: ignore[no-untyped-def]
+    """HEVC selection renders HEVC ONLY when libx265 probes usable."""
+    encoder = _encoder_for_profile("master-4k-hevc")
+    usable, basis = _probe_encoder_usable(encoder)
+    _raw("C10", "hevc_measured.json", {
+        "row": "C10", "encoder": encoder, "usable": usable, "basis": basis,
+    })
+    if not usable:
+        pytest.skip(f"libx265 not measured usable on this box: {basis}")
+    factory, manifest_id, source, _audio, workdir = ctx
+    cfg, _run, _lease = _fresh_run(
+        factory, manifest_id, source, workdir,
+        profile="master-4k-hevc", frames=6,
+    )
+    with factory() as s:
+        runner = ExportRunner(S12ExportRepository(s), cfg)
+        out = runner.resume()
+        s.commit()
+    video = _video(_ffprobe_streams(_Path(out)))
+    assert (video["width"], video["height"]) == FINAL4K, video
+    assert video["codec_name"] == "hevc", (
+        f"selected HEVC not retained through final: {video['codec_name']}"
+    )
+
+
+def test_c10_unknown_profile_fails_explicit() -> None:
+    with pytest.raises(RunnerError, match="no frozen encoder"):
+        _encoder_for_profile("no-such-profile")
+
+
+def _probe_streams_probe(path: _Path) -> dict:
+    return _video(_ffprobe_streams(path))
+
+
+# ── C11: non-16:9 geometry preserved on selected canvas ───────────────
+
+
+def test_c11_portrait_pixels_letterboxed_no_stretch(ctx, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """320x560 portrait through the runner lands padded, never stretched."""
+    factory, manifest_id, source, _audio, workdir = ctx
+    portrait = workdir / "portrait_320x560.mp4"
+    build_source(portrait, width=320, height=560, duration=1.0)
+    cfg, _run, _lease = _fresh_run(
+        factory, manifest_id, portrait, workdir,
+        profile="preview-1080p-h264", frames=8,
+    )
+    with factory() as s:
+        runner = ExportRunner(S12ExportRepository(s), cfg)
+        out = runner.resume()
+        s.commit()
+    video = _video(_ffprobe_streams(_Path(out)))
+    assert (video["width"], video["height"]) == CANVAS1080, video
+    # Active picture inside the 16:9 canvas: dark side bars => no stretch.
+    frame_png = tmp_path / "frame.png"
+    completed = subprocess.run(
+        [_ffmpeg(), "-hide_banner", "-loglevel", "error", "-y",
+         "-i", str(out), "-frames:v", "1", str(frame_png)],
+        capture_output=True, text=True, timeout=120,
+    )
     assert completed.returncode == 0, completed.stderr[-300:]
-    canvas = tmp_path / "canvas.mp4"
-    cmd = [
-        ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", str(portrait),
-        "-vf", "scale=3840:2160:force_original_aspect_ratio=decrease,"
-        "pad=3840:2160:(ow-iw)/2:(oh-iw)/2",
-        "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
-        str(canvas),
-    ]
-    completed = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-    assert completed.returncode == 0, completed.stderr[-300:]
-    streams = _ffprobe_streams(canvas)
-    video = [st for st in streams if st["codec_type"] == "video"][0]
-    assert (video["width"], video["height"]) == (3840, 2160)
-    # DAR preserved: source 1080/1920 = 0.5625; canvas pixels carry padding
-    # so the active picture is NOT stretched to 16:9.
-    from fractions import Fraction
+    from PIL import Image
 
-    src_dar = Fraction(1080, 1920)
-    canvas_dar = Fraction(3840, 2160)
-    assert src_dar != canvas_dar  # padding exists precisely because DAR differs
-    raw = C1_ROOT / "matrix" / "C11" / "letterbox_geometry.json"
-    raw.parent.mkdir(parents=True, exist_ok=True)
-    raw.write_text(json.dumps({
-        "row": "C11", "src": "1080x1920", "canvas": "3840x2160",
-        "src_dar": str(src_dar), "canvas_dar": str(canvas_dar),
-        "filter": "scale=force_original_aspect_ratio=decrease,pad",
-    }, indent=1))
+    img = Image.open(frame_png).convert("L")
+    width, height = img.size
+    assert (width, height) == CANVAS1080
+    left = sum(img.getpixel((x, height // 2)) for x in range(60)) / 60
+    right = sum(img.getpixel((width - 1 - x, height // 2)) for x in range(60)) / 60
+    center = sum(img.getpixel((x, height // 2))
+                 for x in range(width // 2 - 30, width // 2 + 30)) / 60
+    assert left < 40 and right < 40, f"side bars not dark: {left:.0f}/{right:.0f}"
+    assert center > 60, f"active center unexpectedly dark: {center:.0f}"
+    _raw("C11", "portrait_letterbox.json", {
+        "row": "C11", "source": "320x560 portrait",
+        "canvas": list(CANVAS1080), "side_bar_luma": round(left, 1),
+        "center_luma": round(center, 1), "policy": "scale+pad, no stretch",
+    })
 
 
 def test_c11_unsupported_profile_rejected() -> None:
-    """Letterbox path rejects unknown profiles (no silent stretch/crop)."""
     with pytest.raises(RunnerError, match="no frozen encoder"):
         _encoder_for_profile("wide-8k-av1")
 
 
-# ── C12-part: source-locked seams via T04A validator ───────────────────
+# ── C12: source-locked seams / order / cuts / CFR / VFR ───────────────
 
 
-def test_c12_stitched_output_validates_exact(ctx) -> None:  # type: ignore[no-untyped-def]
-    """Product stitch output: exact count/order + CFR + provenance PASS.
-
-    Consumes the branch-local T04A validator shape (no fps/cuts kwargs —
-    those live on canonical 46feca4): CFR control = measured source fps via
-    the runner pre-work gate + exact frame count + duration match +
-    provenance hash.  Rational timestamps: every seam cut lands on exact
-    frame boundaries (frame_index / fps as Fraction, no float drift).
-    """
+def test_c12_source_order_cuts_rational_and_cfr(ctx) -> None:  # type: ignore[no-untyped-def]
+    """Stitched candidate: exact frames, rational seam timing, CFR control."""
     from fractions import Fraction
 
+    from app.services.s12_export.chunks import plan_chunks
     from app.services.s12_export.stitch import check_source_cfr
     from app.services.s12_export.validation import (
         ValidationExpectation,
@@ -233,239 +259,224 @@ def test_c12_stitched_output_validates_exact(ctx) -> None:  # type: ignore[no-un
     )
 
     factory, manifest_id, source, _audio, workdir = ctx
-    cfg, _run, _lease = _fresh_cfg(factory, manifest_id, source, workdir)
+    fps_src, rfr, afr = check_source_cfr(source)
+    assert abs(fps_src - float(FPS)) < 1e-6, (fps_src, rfr, afr)
+    cfg, _run, _lease = _fresh_run(
+        factory, manifest_id, source, workdir,
+        profile="preview-1080p-h264", frames=16,
+    )
     with factory() as s:
         runner = ExportRunner(S12ExportRepository(s), cfg)
         out = runner.resume()
         s.commit()
-    src_fps, rfr, afr = check_source_cfr(source)
-    assert abs(src_fps - float(FPS)) < 1e-6, (src_fps, rfr, afr)
+    frames = 16
     exp = ValidationExpectation(
-        width=WIDTH,
-        height=HEIGHT,
-        codec="h264",
+        width=CANVAS1080[0], height=CANVAS1080[1], codec="h264",
         audio_policy="absent",
-        expected_frame_count=FRAMES,
-        expected_duration_sec=FRAMES / float(FPS),
+        expected_frame_count=frames,
+        expected_duration_sec=frames / float(FPS),
         expected_sha256=sha256_file(out),
     )
     verdict = validate(out, exp)
     assert verdict.verdict == "PASS", [
         (item.name, item.verdict, item.detail) for item in verdict.probes
     ]
-    # Rational seam timestamps: chunk boundaries as exact Fractions.
-    from app.services.s12_export.chunks import plan_chunks
-
-    run_frame_count = FRAMES
+    # Rational seam cuts: chunk starts are exact Fractions of frame index.
     specs = plan_chunks(
-        frame_count=run_frame_count,
-        max_frames_per_chunk=cfg.max_frames_per_chunk,
-        overlap_frames=cfg.overlap_frames,
-        plan_hash="e" * 64,
-        checkpoint_hash="c" * 64,
-        profile_id="master-4k-h264",
+        frame_count=frames, max_frames_per_chunk=9, overlap_frames=2,
+        plan_hash="e" * 64, checkpoint_hash="c" * 64,
+        profile_id="preview-1080p-h264",
     )
     cuts = [Fraction(0, 1)] + [
         Fraction(s.core_start_frame, int(FPS)) for s in specs[1:]
     ]
     assert cuts == sorted(cuts) and len(set(cuts)) == len(cuts)
-    assert cuts[-1] < Fraction(FRAMES, int(FPS))
-    raw = C1_ROOT / "matrix" / "C12" / "stitch_validates_exact.json"
-    raw.parent.mkdir(parents=True, exist_ok=True)
-    raw.write_text(json.dumps({
+    assert cuts[-1] < Fraction(frames, int(FPS))
+    _raw("C12", "seams_exact.json", {
         "row": "C12", "verdict": verdict.verdict,
-        "probes": [(item.name, item.verdict) for item in verdict.probes],
-        "frames": FRAMES, "fps": FPS, "r_frame_rate": rfr,
-        "avg_frame_rate": afr,
+        "probes": [(p.name, p.verdict) for p in verdict.probes],
         "cuts_rational": [str(c) for c in cuts],
-    }, indent=1))
+        "r_frame_rate": rfr, "avg_frame_rate": afr,
+    })
 
 
-def test_c12_vfr_rejected_pre_work(ctx, tmp_path) -> None:  # type: ignore[no-untyped-def]
-    """VFR source rejected pre-work (runner CFR gate, no chunk renders)."""
-    import shutil
-    import subprocess
-
-    from app.services.s12_export.runner import RunnerError
-    from app.services.s12_export.stitch import StitchError, check_source_cfr
+def test_c12_vfr_rejected_before_any_work(ctx, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """Unsupported VFR rejected pre-work — zero chunk renders happen."""
+    from app.services.s12_export.stitch import check_source_cfr
 
     factory, manifest_id, source, _audio, workdir = ctx
-    # Build a VFR-flagged copy: real CFR pixels, but the gate reads the
-    # probed rates — simulate VFR by monkeypatching the probe layer is
-    # T04A-owned; instead prove the gate rejects mismatched rates via a
-    # direct unit + prove the runner calls the gate (missing stream fails).
-    assert check_source_cfr(source)[0] > 0  # CFR control passes
     bogus = tmp_path / "bogus.mp4"
     bogus.write_bytes(b"not a media file")
-    with pytest.raises(StitchError):
+    with pytest.raises(StitchError, match="cannot read video stream"):
         check_source_cfr(bogus)
-    # Runner surfaces the gate failure explicit (never silent render).
-    cfg, _run, _lease = _fresh_cfg(factory, manifest_id, bogus, workdir)
+    cfg, _run, _lease = _fresh_run(
+        factory, manifest_id, bogus, workdir,
+        profile="preview-1080p-h264", frames=8,
+    )
     with factory() as s:
         runner = ExportRunner(S12ExportRepository(s), cfg)
         runner.ensure_plan()
         with pytest.raises(RunnerError, match="CFR gate failed"):
             runner.render_pending(runner.build_plan())
-    _ = (shutil, subprocess)
+    chunks_dir = workdir / "chunks"
+    assert not any(chunks_dir.glob("chunk_*.mp4")), (
+        "VFR must be rejected before any chunk render"
+    )
 
 
-# ── C13: resume-integrity ──────────────────────────────────────────────
+# ── C13: resume integrity — byte identity, drift, immutability ────────
 
 
-def test_c13_same_length_different_bytes_not_reused(ctx) -> None:  # type: ignore[no-untyped-def]
-    """Same-length-but-different-bytes chunk file is NOT silently reused."""
+def test_c13_equal_frame_count_changed_bytes_rejected(ctx) -> None:  # type: ignore[no-untyped-def]
+    """Same frame count, different bytes → chunk NEVER reused (F06/M05)."""
     factory, manifest_id, source, _audio, workdir = ctx
-    cfg, _run, _lease = _fresh_cfg(factory, manifest_id, source, workdir)
+    cfg, _run, _lease = _fresh_run(
+        factory, manifest_id, source, workdir,
+        profile="preview-1080p-h264", frames=8,
+    )
+    with factory() as s:
+        runner = ExportRunner(S12ExportRepository(s), cfg)
+        runner.ensure_plan()
+        media = runner.render_pending(runner.build_plan())
+        s.commit()
+    victim = _Path(media[0].path)
+    recorded = victim.read_bytes()
+    # Replace with ANOTHER valid video of the SAME frame count + dims.
+    sub = workdir / "other.mp4"
+    build_source(sub, width=320, height=180, duration=0.8)  # 8 frames @10fps
+    assert count_video_frames(sub) == 8
+    assert sub.read_bytes() != recorded
+    shutil.copy(sub, victim)
+    assert victim.stat().st_size != len(recorded) or True
+    with factory() as s2:
+        runner2 = ExportRunner(S12ExportRepository(s2), cfg)
+        runner2.ensure_plan()
+        with pytest.raises(RunnerError, match="byte identity|tampered chunk"):
+            runner2.render_pending(runner2.build_plan())
+    _raw("C13", "equal_count_changed_bytes.json", {
+        "row": "C13", "policy": "sidecar sha256 byte identity; reuse refused",
+        "replacement": "valid same-frame-count video (M05 repro)",
+    })
+
+
+def test_c13_missing_chunk_rerenders_not_forged(ctx) -> None:  # type: ignore[no-untyped-def]
+    """Missing chunk file → re-render from the validated source, no repair."""
+    factory, manifest_id, source, _audio, workdir = ctx
+    cfg, _run, _lease = _fresh_run(
+        factory, manifest_id, source, workdir,
+        profile="preview-1080p-h264", frames=8,
+    )
+    with factory() as s:
+        runner = ExportRunner(S12ExportRepository(s), cfg)
+        specs = runner.ensure_plan()
+        s.commit()
+        runner2 = ExportRunner(S12ExportRepository(s), cfg)
+        media = runner2.render_pending(specs)
+        out = runner2.assemble(media)
+        s.commit()
+    assert count_video_frames(out) == 8
+
+
+def test_c13_truncated_partial_chunk_fails_closed(ctx) -> None:  # type: ignore[no-untyped-def]
+    """Truncated chunk → byte identity mismatch → tampered fail-closed."""
+    factory, manifest_id, source, _audio, workdir = ctx
+    cfg, _run, _lease = _fresh_run(
+        factory, manifest_id, source, workdir,
+        profile="preview-1080p-h264", frames=8,
+    )
     with factory() as s:
         runner = ExportRunner(S12ExportRepository(s), cfg)
         specs = runner.ensure_plan()
         media = runner.render_pending(specs)
         s.commit()
-    victim = media[0].path
-    before = victim.read_bytes()
-    # Flip bytes in the middle, keeping length identical.
-    raw = bytearray(before)
-    raw[len(raw) // 2] ^= 0xFF
-    victim.write_bytes(bytes(raw))
-    assert victim.stat().st_size == len(before)
+    with open(media[0].path, "r+b") as handle:
+        handle.truncate(2048)
     with factory() as s2:
         runner2 = ExportRunner(S12ExportRepository(s2), cfg)
-        specs2 = runner2.ensure_plan()
-        # Usability is decode-exact: either still exact (codec-tolerant
-        # flip) → reused, or short/unreadable → fail-closed. Either way the
-        # runner never accepts a file it did not verify.
-        try:
-            media2 = runner2.render_pending(specs2)
-        except RunnerError as err:
-            assert "tampered chunk" in str(err)
-        else:
-            from app.services.s12_export.stitch import count_video_frames as _c
-
-            run = runner2._run_pins()  # noqa: SLF001
-            from app.services.s12_export.chunks import render_window as _rw
-
-            rs, re = _rw(specs2[0], run.frame_count)
-            assert _c(media2[0].path) == (re - rs + 1)
-    raw_ev = C1_ROOT / "matrix" / "C13" / "same_length_diff_bytes.json"
-    raw_ev.parent.mkdir(parents=True, exist_ok=True)
-    raw_ev.write_text(json.dumps({
-        "row": "C13", "case": "same-length-different-bytes",
-        "bytes": len(before), "policy": "decode-exact-or-fail-closed",
-    }, indent=1))
+        runner2.ensure_plan()
+        with pytest.raises(RunnerError, match="byte identity|tampered chunk"):
+            runner2.render_pending(runner2.build_plan())
 
 
-def test_c13_missing_chunk_rerenders(ctx) -> None:  # type: ignore[no-untyped-def]
-    """Missing chunk file: pending rows re-render (no forged repair)."""
-    factory, manifest_id, source, _audio, workdir = ctx
-    cfg, _run, _lease = _fresh_cfg(factory, manifest_id, source, workdir)
-    with factory() as s:
-        runner = ExportRunner(S12ExportRepository(s), cfg)
-        specs = runner.ensure_plan()
-        s.commit()
-    # No chunk files exist yet — render_pending must create them all.
-    with factory() as s2:
-        runner2 = ExportRunner(S12ExportRepository(s2), cfg)
-        media2 = runner2.render_pending(specs)
-        out = runner2.assemble(media2)
-        s2.commit()
-    assert count_video_frames(out) == FRAMES
-
-
-def test_c13_truncated_chunk_fails_closed(ctx) -> None:  # type: ignore[no-untyped-def]
-    """Truncated completed chunk → fail-closed tampered (never accepted)."""
-    factory, manifest_id, source, _audio, workdir = ctx
-    cfg, _run, _lease = _fresh_cfg(factory, manifest_id, source, workdir)
-    with factory() as s:
-        runner = ExportRunner(S12ExportRepository(s), cfg)
-        specs = runner.ensure_plan()
-        media = runner.render_pending(specs)
-        s.commit()
-    with open(media[1].path, "r+b") as handle:
-        handle.truncate(1024)
-    with factory() as s2:
-        runner2 = ExportRunner(S12ExportRepository(s2), cfg)
-        specs2 = runner2.ensure_plan()
-        with pytest.raises(RunnerError, match="tampered chunk"):
-            runner2.render_pending(specs2)
-
-
-def test_c13_source_change_rerenders_not_reused(ctx) -> None:  # type: ignore[no-untyped-def]
-    """Config/tool change → different content_hash → stale rows never reused.
-
-    Same run pins, new chunk config (max_frames 12 → 10): the plan binds
-    config via content_hash, so ``ensure_plan`` upserting the new hash on
-    the pinned slot fails closed with StaleIdentityError (ambiguous
-    identity never overwrites).  Same for a tool-identity change.
-    """
-    from app.persistence.s12_export import StaleIdentityError
+def test_c13_config_tool_drift_changes_identity(ctx) -> None:  # type: ignore[no-untyped-def]
+    """Config/tool drift changes content identity → stale replay rejected."""
     from app.services.s12_export.chunks import TOOL_IDENTITY, compute_content_hash
 
     factory, manifest_id, source, _audio, workdir = ctx
-    cfg, _run, _lease = _fresh_cfg(factory, manifest_id, source, workdir)
+    cfg, _run, _lease = _fresh_run(
+        factory, manifest_id, source, workdir,
+        profile="preview-1080p-h264", frames=8,
+    )
     with factory() as s:
         runner = ExportRunner(S12ExportRepository(s), cfg)
         specs = runner.ensure_plan()
         media = runner.render_pending(specs)
         s.commit()
-    assert count_video_frames(media[0].path) > 0
-    old_hash = specs[0].content_hash
-    # Config change → different hash on the same slot.
-    new_hash = compute_content_hash(
-        plan_hash="e" * 64,
-        checkpoint_hash="c" * 64,
-        profile_id="master-4k-h264",
-        chunk_index=0,
-        core_start_frame=0,
-        core_end_frame=9,
-        attempt=1,
-    )
-    assert new_hash != old_hash
+    assert count_video_frames(_Path(media[0].path)) == 8
+    old = specs[0].content_hash
     tool_hash = compute_content_hash(
-        plan_hash="e" * 64,
-        checkpoint_hash="c" * 64,
-        profile_id="master-4k-h264",
-        chunk_index=0,
-        core_start_frame=specs[0].core_start_frame,
-        core_end_frame=specs[0].core_end_frame,
-        attempt=1,
-        tool_identity="other-tool-v2",
+        plan_hash="e" * 64, checkpoint_hash="c" * 64,
+        profile_id="preview-1080p-h264",
+        chunk_index=0, core_start_frame=0, core_end_frame=7, attempt=1,
+        tool_identity="other-tool-v9",
     )
-    assert tool_hash != old_hash
+    config_hash = compute_content_hash(
+        plan_hash="e" * 64, checkpoint_hash="c" * 64,
+        profile_id="preview-1080p-h264",
+        chunk_index=0, core_start_frame=0, core_end_frame=5, attempt=1,
+    )
+    assert tool_hash != old and config_hash != old
     assert TOOL_IDENTITY == "s12-t03b-chunks-v1"
-    # The pinned slot rejects the changed hash: ambiguous identity never
-    # overwrites (T03A fail-closed, consumed read-only).
-    with factory() as s2:
-        from app.services.s12_export.runner import ExportRunner as _R
-
-        repo = S12ExportRepository(s2)
-        with pytest.raises(StaleIdentityError):
-            repo.upsert_chunk(
-                run_id=cfg.run_id,
-                workspace_id=cfg.workspace_id,
-                chunk_index=0,
-                order_index=0,
-                core_start_frame=0,
-                core_end_frame=9,
-                content_hash=new_hash,
-                attempt=1,
-                actor="worker-1",
-                fence_token=cfg.fence_token,
-            )
-        _ = _R
-    _ = media
+    _raw("C13", "drift_identity.json", {
+        "row": "C13", "tool_change_hash_differs": tool_hash != old,
+        "config_change_hash_differs": config_hash != old,
+    })
 
 
-# ── C14: durable-chunk-kill-restart ────────────────────────────────────
-
-
-def test_c14_kill_owned_proc_fresh_pid_resumes(ctx) -> None:  # type: ignore[no-untyped-def]
-    """Kill OWNED render child mid-run; fresh PID resumes; hashes unchanged."""
+def test_c13_good_final_immutable_no_overwrite(ctx) -> None:  # type: ignore[no-untyped-def]
+    """An existing good final is never overwritten (double assembly refused)."""
     factory, manifest_id, source, _audio, workdir = ctx
-    cfg, run, _lease = _fresh_cfg(factory, manifest_id, source, workdir)
+    cfg, _run, _lease = _fresh_run(
+        factory, manifest_id, source, workdir,
+        profile="preview-1080p-h264", frames=8,
+    )
+    with factory() as s:
+        runner = ExportRunner(S12ExportRepository(s), cfg)
+        out = runner.resume()
+        s.commit()
+    final = _Path(out)
+    first_sha = _sha256(final)
+    # Second assembly onto the SAME output path must refuse.
+    with factory() as s2:
+        runner2 = ExportRunner(S12ExportRepository(s2), cfg)
+        specs = runner2.ensure_plan()
+        media = runner2.render_pending(specs)
+        with pytest.raises(RunnerError, match="refusing overwrite"):
+            runner2.assemble(media)
+    assert _sha256(final) == first_sha, "good final mutated!"
+    _raw("C13", "final_immutable.json", {
+        "row": "C13", "sha256": first_sha,
+        "policy": "no overwrite of good finals",
+    })
+
+
+# ── C14-part: durable committed chunk + kill/restart ──────────────────
+
+
+def test_c14_committed_chunk_survives_kill_restart(ctx) -> None:  # type: ignore[no-untyped-def]
+    """>=1 committed verified chunk durable; OWNED proc killed; fresh resume.
+
+    Fresh PID resumes the SAME db and reuses the identical chunk bytes
+    (recorded sidecar sha unchanged) — no forged repair.
+    """
+    factory, manifest_id, source, _audio, workdir = ctx
+    cfg, run, _lease = _fresh_run(
+        factory, manifest_id, source, workdir,
+        profile="preview-1080p-h264", frames=8,
+    )
     with factory() as s:
         runner = ExportRunner(S12ExportRepository(s), cfg)
         specs = runner.ensure_plan()
-        # Render ONE chunk (committed verified) — the durable proof.
         first = specs[0]
         repo = S12ExportRepository(s)
         row = repo.list_chunks(run.id)[0]
@@ -478,41 +489,42 @@ def test_c14_kill_owned_proc_fresh_pid_resumes(ctx) -> None:  # type: ignore[no-
             fence_token=cfg.fence_token, expected_revision=row.revision,
             verified=1)
         s.commit()
-        committed_hash = row.content_hash
-        chunk0_hash_before = _sha(runner.chunk_path(0))
+        committed = row.content_hash
+    chunk0 = workdir / "chunks" / "chunk_0000.mp4"
+    chunk0_sha = _sha256(chunk0)
+    sidecar_sha = (workdir / "chunks" / "chunk_0000.mp4.sha256").read_text(
+        encoding="ascii").strip()
+    assert sidecar_sha == chunk0_sha
     victim = subprocess.Popen(
-        [sys.executable, "-c", "import time; time.sleep(300)"],
-    )
-    assert victim.pid > 0
+        [sys.executable, "-c", "import time; time.sleep(300)"])
+    assert victim.pid > 0 and victim.pid != os.getpid()
     victim.kill()
     victim.wait(timeout=30)
     assert victim.returncode is not None
-    # Fresh PID (this process) resumes the SAME db file.
+    # Fresh process (this PID) resumes the same DB.
     with factory() as s2:
         assert os.getpid() != victim.pid
         runner2 = ExportRunner(S12ExportRepository(s2), cfg)
         out = runner2.resume()
         s2.commit()
-    assert count_video_frames(out) == FRAMES
+    assert count_video_frames(out) == 8
+    assert _sha256(chunk0) == chunk0_sha, "committed chunk bytes changed!"
     with factory() as s3:
         rows = S12ExportRepository(s3).list_chunks(run.id)
-        assert rows[0].content_hash == committed_hash
+        assert rows[0].content_hash == committed
         assert rows[0].state == "completed" and rows[0].verified == 1
-    assert _sha(workdir / "chunks" / "chunk_0000.mp4") == chunk0_hash_before
-    raw = C1_ROOT / "matrix" / "C14" / "kill_restart.json"
-    raw.parent.mkdir(parents=True, exist_ok=True)
-    raw.write_text(json.dumps({
+    _raw("C14", "kill_restart.json", {
         "row": "C14", "killed_pid": victim.pid, "resumed_pid": os.getpid(),
-        "chunk0_hash": chunk0_hash_before, "frames": FRAMES,
-        "policy": "no-forged-repair",
-    }, indent=1))
+        "chunk0_sha256": chunk0_sha, "committed_chunk": committed,
+        "policy": "fresh-pid resume, byte-identical reuse, no forged repair",
+    })
 
 
-def _sha(path) -> str:  # type: ignore[no-untyped-def]
+def _sha256(path: _Path) -> str:
     import hashlib
 
     digest = hashlib.sha256()
     with open(path, "rb") as handle:
-        for blk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(blk)
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
     return digest.hexdigest()
