@@ -35,3 +35,9 @@ PATCH: app/api/app.py (+5).
 - C03 5 provenance cases; C04 T01-part current-authority cases with 0 runs/Jobs/outputs on every invalid path.
 - Tests: 31 passed (15 contract + 16 closure: C02 x5, C03 x6, C04 x5).
 - TASK_SUBMITTED (transport checkpoint, local branch — không phải APPROVED).
+
+## C2 W1 correction (F02 server-owned authority) — TASK_SUBMITTED
+- F02 preflight part closed: server resolves immutable current completed Full Apply artifact (S10 run+publication+artifact), binds checkpoint/config-pack/structural-lock/project/video/workspace; native only when proved (4K canvas + Full Apply authority + measured timing); import-only video refused (FULL_APPLY_MISSING).
+- C03 through server route (native/1080p-upscale/already-upscaled-4K/non-16:9/missing) — 5 new tests.
+- C04 T01 part: zero-mutation on invalid/missing/stale/config paths (jobs/runs/publications unchanged); preflight never creates a job (job_id=null contract; submit returns JobInfo.job_id per doc §8).
+- 38 passed (15 contract + 23 closure); ruff --select F clean; git diff --check 0.

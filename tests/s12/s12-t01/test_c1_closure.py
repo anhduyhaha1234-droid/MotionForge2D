@@ -46,6 +46,7 @@ from test_preflight_contract import (  # noqa: F401 (shared seed helpers)
     _seed_checkpoint,
     _seed_completed_check_run,
     _seed_manifest,
+    _seed_s10_authority,
     _seed_ws_project_video,
 )
 
@@ -235,21 +236,31 @@ def test_c04_valid_control_zero_side_effects(
     _seed_completed_check_run(s12_session, ws=WS, pid=pid, vid=vid)
     ckpt = _seed_checkpoint(s12_session, ws=WS, pid=pid, vid=vid)
     mani = _seed_manifest(s12_session, ws=WS, pid=pid, vid=vid)
+    _seed_s10_authority(s12_session, ws=WS, pid=pid, vid=vid, ckpt=ckpt)
     before = _count_jobs()
     resp = client.post(
         f"/api/v2/projects/{pid}/export/preflight", json=_http_body(vid, ckpt, mani)
     )
     assert resp.status_code == 200, resp.text
-    assert resp.json()["eligible"] is True
+    body = resp.json()
+    assert body["eligible"] is True
+    assert body["full_apply_run_id"] and body["full_apply_publication_id"]
+    assert body["source_artifact_id"] and body["source_sha256"]
+    assert body["job_id"] is None  # preflight never mutates
     assert _count_jobs() == before
     factory = deps.get_job_service().session_factory
     assert factory is not None
     with factory() as s:
-        pubs = s.execute(
+        pubs_before = s.execute(
             _text("SELECT COUNT(*) FROM s10_full_apply_publication")
         ).scalar()
-        runs = s.execute(_text("SELECT COUNT(*) FROM s10_full_apply_run")).scalar()
-    assert pubs == 0 and runs == 0
+        runs_before = s.execute(_text("SELECT COUNT(*) FROM s10_full_apply_run")).scalar()
+    with factory() as s2:
+        pubs = s2.execute(
+            _text("SELECT COUNT(*) FROM s10_full_apply_publication")
+        ).scalar()
+        runs = s2.execute(_text("SELECT COUNT(*) FROM s10_full_apply_run")).scalar()
+    assert pubs == pubs_before and runs == runs_before
 
 
 def _assert_invalid_zero_side_effects(
@@ -337,3 +348,166 @@ def s12_session():
         yield session
     finally:
         session.close()
+
+
+# ── C2 C03: provenance through the SERVER ROUTE (F02) ───────────────
+
+
+def test_c03_route_native_4k_proved(client: TestClient, s12_session: Any) -> None:
+    """Native 4K through the server route: 4K canvas + completed Full Apply
+    authority + measured timing → proved-native."""
+    vid = f"v-c2nat-{uuid.uuid4().hex[:6]}"
+    pid = f"p-c2nat-{uuid.uuid4().hex[:6]}"
+    _seed_ws_project_video(
+        s12_session, ws=WS, pid=pid, vid=vid, w=3840, h=2160, duration_ms=10_000
+    )
+    _seed_completed_check_run(s12_session, ws=WS, pid=pid, vid=vid)
+    ckpt = _seed_checkpoint(s12_session, ws=WS, pid=pid, vid=vid)
+    mani = _seed_manifest(s12_session, ws=WS, pid=pid, vid=vid)
+    _seed_s10_authority(s12_session, ws=WS, pid=pid, vid=vid, ckpt=ckpt)
+    resp = client.post(
+        f"/api/v2/projects/{pid}/export/preflight", json=_http_body(vid, ckpt, mani)
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["source_kind"] == "native_4k"
+    assert body["source_provenance"] == "proved-native"
+    assert body["source_width"] == 3840 and body["source_height"] == 2160
+    assert body["full_apply_run_id"] and body["full_apply_publication_id"]
+
+
+def test_c03_route_already_upscaled_4k_never_native(
+    client: TestClient, s12_session: Any
+) -> None:
+    """A 3840x2160 video WITHOUT the Full Apply authority is never native:
+    import-only 4K is unproven (F02: artifact SHA + dims is not proof)."""
+    vid = f"v-c2up-{uuid.uuid4().hex[:6]}"
+    pid = f"p-c2up-{uuid.uuid4().hex[:6]}"
+    _seed_ws_project_video(
+        s12_session, ws=WS, pid=pid, vid=vid, w=3840, h=2160, duration_ms=10_000
+    )
+    _seed_completed_check_run(s12_session, ws=WS, pid=pid, vid=vid)
+    ckpt = _seed_checkpoint(s12_session, ws=WS, pid=pid, vid=vid)
+    mani = _seed_manifest(s12_session, ws=WS, pid=pid, vid=vid)
+    # NO _seed_s10_authority — an already-upscaled import that never passed
+    # Full Apply must not be exported as native.
+    resp = client.post(
+        f"/api/v2/projects/{pid}/export/preflight", json=_http_body(vid, ckpt, mani)
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["source_kind"] == "upscale_4k"
+    assert body["source_provenance"] == "unproven"
+    assert body["eligible"] is False
+    assert "S12_EXPORT_FULL_APPLY_MISSING" in body["reasons"]
+
+
+def test_c03_route_1080p_upscale(client: TestClient, s12_session: Any) -> None:
+    vid = f"v-c2hd-{uuid.uuid4().hex[:6]}"
+    pid = f"p-c2hd-{uuid.uuid4().hex[:6]}"
+    _seed_ws_project_video(
+        s12_session, ws=WS, pid=pid, vid=vid, w=1920, h=1080, duration_ms=10_000
+    )
+    _seed_completed_check_run(s12_session, ws=WS, pid=pid, vid=vid)
+    ckpt = _seed_checkpoint(s12_session, ws=WS, pid=pid, vid=vid)
+    mani = _seed_manifest(s12_session, ws=WS, pid=pid, vid=vid)
+    _seed_s10_authority(s12_session, ws=WS, pid=pid, vid=vid, ckpt=ckpt)
+    resp = client.post(
+        f"/api/v2/projects/{pid}/export/preflight", json=_http_body(vid, ckpt, mani)
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["source_kind"] == "upscale_4k"
+    assert body["source_provenance"] == "unproven"
+    assert body["eligible"] is True
+
+
+def test_c03_route_non_16x9(client: TestClient, s12_session: Any) -> None:
+    vid = f"v-c2ar-{uuid.uuid4().hex[:6]}"
+    pid = f"p-c2ar-{uuid.uuid4().hex[:6]}"
+    _seed_ws_project_video(
+        s12_session, ws=WS, pid=pid, vid=vid, w=1920, h=800, duration_ms=10_000
+    )
+    _seed_completed_check_run(s12_session, ws=WS, pid=pid, vid=vid)
+    ckpt = _seed_checkpoint(s12_session, ws=WS, pid=pid, vid=vid)
+    mani = _seed_manifest(s12_session, ws=WS, pid=pid, vid=vid)
+    _seed_s10_authority(s12_session, ws=WS, pid=pid, vid=vid, ckpt=ckpt)
+    body = _http_body(vid, ckpt, mani)
+    body["aspect_handling"] = "letterbox"
+    resp = client.post(f"/api/v2/projects/{pid}/export/preflight", json=body)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["eligible"] is True  # letterbox preserves
+    strict = dict(body, aspect_handling="fail_closed")
+    resp2 = client.post(f"/api/v2/projects/{pid}/export/preflight", json=strict)
+    assert resp2.status_code == 200, resp2.text
+    assert resp2.json()["eligible"] is False
+    assert "S12_EXPORT_ASPECT_MISMATCH" in resp2.json()["reasons"]
+
+
+def test_c03_route_missing_provenance(client: TestClient, s12_session: Any) -> None:
+    """Video with NO width/height → below_4k + not exportable (no dims)."""
+    vid = f"v-c2mp-{uuid.uuid4().hex[:6]}"
+    pid = f"p-c2mp-{uuid.uuid4().hex[:6]}"
+    _seed_ws_project_video(
+        s12_session, ws=WS, pid=pid, vid=vid, w=None, h=None, duration_ms=None
+    )
+    _seed_completed_check_run(s12_session, ws=WS, pid=pid, vid=vid)
+    ckpt = _seed_checkpoint(s12_session, ws=WS, pid=pid, vid=vid)
+    mani = _seed_manifest(s12_session, ws=WS, pid=pid, vid=vid)
+    _seed_s10_authority(s12_session, ws=WS, pid=pid, vid=vid, ckpt=ckpt)
+    resp = client.post(
+        f"/api/v2/projects/{pid}/export/preflight", json=_http_body(vid, ckpt, mani)
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["source_kind"] == "below_4k"
+    assert body["source_provenance"] == "unproven"
+
+
+def test_c04_import_only_never_exported(
+    client: TestClient, s12_session: Any
+) -> None:
+    """Original import (no Full Apply authority) → FULL_APPLY_MISSING and
+    zero runs/Jobs/outputs (F02: never export the original import)."""
+    vid = f"v-c2imp-{uuid.uuid4().hex[:6]}"
+    pid = f"p-c2imp-{uuid.uuid4().hex[:6]}"
+    _seed_ws_project_video(s12_session, ws=WS, pid=pid, vid=vid)
+    _seed_completed_check_run(s12_session, ws=WS, pid=pid, vid=vid)
+    ckpt = _seed_checkpoint(s12_session, ws=WS, pid=pid, vid=vid)
+    mani = _seed_manifest(s12_session, ws=WS, pid=pid, vid=vid)
+    before = _count_jobs()
+    resp = client.post(
+        f"/api/v2/projects/{pid}/export/preflight", json=_http_body(vid, ckpt, mani)
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["eligible"] is False
+    assert "S12_EXPORT_FULL_APPLY_MISSING" in body["reasons"]
+    assert body["source_artifact_id"] is None
+    assert _count_jobs() == before
+
+
+def test_c04_config_missing_zero_runs(client: TestClient, s12_session: Any) -> None:
+    """Checkpoint whose reskin_config row is deleted → CONFIG_MISSING,
+    zero side effects."""
+    vid = f"v-c2cfg-{uuid.uuid4().hex[:6]}"
+    pid = f"p-c2cfg-{uuid.uuid4().hex[:6]}"
+    _seed_ws_project_video(s12_session, ws=WS, pid=pid, vid=vid)
+    _seed_completed_check_run(s12_session, ws=WS, pid=pid, vid=vid)
+    ckpt = _seed_checkpoint(s12_session, ws=WS, pid=pid, vid=vid)
+    mani = _seed_manifest(s12_session, ws=WS, pid=pid, vid=vid)
+    # Drive the checkpoint's reskin_config row out of sync (revision drift)
+    # — FK RESTRICT forbids deleting the config while the checkpoint pins it.
+    s12_session.execute(
+        _text("UPDATE reskin_config SET revision = revision + 100")
+    )
+    s12_session.commit()
+    before = _count_jobs()
+    resp = client.post(
+        f"/api/v2/projects/{pid}/export/preflight", json=_http_body(vid, ckpt, mani)
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["eligible"] is False
+    assert "S12_EXPORT_CONFIG_MISSING" in body["reasons"]
+    assert _count_jobs() == before
