@@ -240,3 +240,26 @@ test_pf_letterbox_30_missing_raster_fails.
 
 Gates: tests/s12/s12-t04a/ 81 passed (14.78s) + ruff F clean +
 git diff --check 0 + T03C regression 19 passed (20.30s local collection).
+
+## Candidate-pipe fix (F11-T06B-02 rv-4: 7/30 ~7.6dB van con) — 2026-09-10
+
+T06B rv-4: pipe-fix b6d174c chi chuyen REFERENCE sang temp raw file;
+CANDIDATE van _open_raw_pipe -> probe van 7/30 frames ~7.6dB (same-raster
+59-71dB chung minh pipe OK khi KHONG co scale filter).
+
+Fix (bounded, probe_frame_psnr trong validation.py):
+- CROSS-RASTER path (ref_vf set): CANDIDATE cung decode sang temp raw
+  FILE (`_decode_raw_to_file(candidate, None, ...)`, %TEMP%, validate
+  size % frame_size == 0, xoa finally) — ca 2 ben doc frame-by-frame tu
+  DISK, khong pipe rawvideo nao.
+- Same-raster path (ref_vf None): giu pipe nhu da chung minh 30/30.
+- `_decode_raw_to_file` vf tham so optional (None = decode khong filter).
+
+Xac nhan: test_pf_upscale_letterbox_30_of_30_frames_pass van PASS voi
+detail "30 frames PSNR" — ca candidate lan reference deu du 30/30 frames
+o upscale 4:3 -> 16:9 + letterbox. Reorder 30-frame FAIL, missing-raster
+30-frame FAIL, same-raster 30/30 PASS (tests giu nguyen, khong doi
+assertion).
+
+Gates: tests/s12/s12-t04a/ 81 passed (15.12s) + ruff F clean +
+git diff --check 0 + T03C regression 19 passed (20.46s local collection).

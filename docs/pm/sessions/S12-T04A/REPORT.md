@@ -179,3 +179,23 @@ reorder and missing-raster still FAIL; same-raster path unchanged.
 
 Write-set: app/services/s12_export/validation.py (M), tests/s12/s12-t04a/
 test_c2_source_locked.py (M, +3), LOG.md/REPORT.md (M).
+
+## Candidate-pipe fix (F11-T06B-02 rv-4)
+
+Cross-raster PSNR now decodes BOTH candidate and scaled reference into
+temp raw files (%TEMP%, validated whole-frame, deleted in finally) — no
+rawvideo pipe at scale, both sides measured 30/30. Same-raster path
+unchanged (pipes, proven 30/30). Guards: reorder FAIL, missing raster
+FAIL, same-raster PASS.
+
+## Gates candidate-pipe (exact commands)
+
+- `python -m pytest tests/s12/s12-t04a/ -q --basetemp="$TEMP/s12t04a_cpreg" -p no:cacheprovider`
+  → **81 passed in 15.12s**
+- `ruff check --select F app/services/s12_export/validation.py tests/s12/s12-t04a/`
+  → **All checks passed!**
+- `git diff --check` → 0
+- `python -m pytest tests/s12/s12-t03c/ -q --basetemp="$TEMP/s12t04a_t03ccp" -p no:cacheprovider`
+  → **19 passed in 20.46s**
+
+Write-set: app/services/s12_export/validation.py (M), LOG.md/REPORT.md (M).
