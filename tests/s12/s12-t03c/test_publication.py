@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import test_export_jobs_api as base
 from alembic import command
 from sqlalchemy import text
 
@@ -25,8 +26,6 @@ from app.persistence.structural_lock import StructuralLockRepository
 from app.services.s12_export import publication as pub
 from app.workflow.job_service import JobService
 from app.workflow.s12_export_jobs import submit_export_job
-
-import test_export_jobs_api as base
 
 PROJECT_ROOT = base.PROJECT_ROOT
 WS = base.WS
@@ -205,8 +204,8 @@ def test_publish_fence_lost_before_rename_cleans_candidate(
     env, monkeypatch: pytest.MonkeyPatch
 ) -> None:  # type: ignore[no-untyped-def]
     """C17: a fence loss after validation cannot trigger the rename."""
-    from app.persistence.s12_export import FencedWorkerError
     import app.services.s12_export.publication as pubmod
+    from app.persistence.s12_export import FencedWorkerError
 
     _patch(monkeypatch, "PASS")
     factory, kw = _submit(env, monkeypatch)
@@ -413,9 +412,9 @@ def test_publish_real_source_locked_pass_identity_copy(env, tmp_path: Path) -> N
     """REAL source-locked PASS: candidate is a byte-identical copy of the
     approved artifact — every T04A probe (dims/fps/frames/digests/audio/
     provenance) is measured and PASSes; publication completes once."""
-    import app.services.s12_export.publication as pubmod
     import shutil
 
+    import app.services.s12_export.publication as pubmod
     from app.services.s12_export.validation import sha256_file  # noqa: PLC0415
 
     factory, svc, manifest_id, dirs = env
@@ -491,8 +490,9 @@ def _reencode_for(src: Path, dst: Path, *, reverse: bool = False) -> Path:
 def test_publish_psnr_legit_reencode_passes(env, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
     """C26 lan cuoi: legit re-encoded export → frame_match_mode=psnr with the
     documented per-profile threshold → REAL validator PASSes."""
-    import app.services.s12_export.publication as pubmod
     import shutil
+
+    import app.services.s12_export.publication as pubmod
 
     factory, svc, manifest_id, dirs = env
     source = _real_source(tmp_path)
@@ -623,8 +623,9 @@ def test_publish_real_wrong_audio_fails_and_cleans_private_candidate(
 def test_publish_psnr_reorder_tamper_fails(env, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
     """Reordered content drops PSNR below any sane threshold → FAIL closed,
     run failed, no public artifact."""
-    import app.services.s12_export.publication as pubmod
     import shutil
+
+    import app.services.s12_export.publication as pubmod
 
     factory, svc, manifest_id, dirs = env
     source = _real_source(tmp_path)
@@ -751,8 +752,9 @@ def test_publish_psnr_upscale_letterbox_30of30_passes(env, tmp_path: Path) -> No
     """F11-T06B-02 final: cross-raster upscale + letterbox candidate PASSes
     30/30 frames — reference raster (server-probed) drives the product
     letterbox compare in the REAL validator."""
-    import app.services.s12_export.publication as pubmod
     import shutil
+
+    import app.services.s12_export.publication as pubmod
 
     factory, svc, manifest_id, dirs = env
     source = _letterbox_source(tmp_path)  # 320x240 4:3, 30 frames
@@ -810,8 +812,9 @@ def test_publish_psnr_upscale_letterbox_30of30_passes(env, tmp_path: Path) -> No
 def test_publish_psnr_upscale_reorder_fails(env, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
     """Reordered upscale candidate FAILs under the same cross-raster PSNR
     path — content authority is real, tolerance never waives tamper."""
-    import app.services.s12_export.publication as pubmod
     import shutil
+
+    import app.services.s12_export.publication as pubmod
 
     factory, svc, manifest_id, dirs = env
     source = _letterbox_source(tmp_path)

@@ -20,10 +20,9 @@ TEST03C = Path(__file__).resolve().parents[1] / "s12-t03c"
 sys.path.insert(0, str(TEST03C))
 import test_publication as publication_base  # noqa: E402
 
-from app.persistence.s12_export import S12ExportRepository  # noqa: E402
 from app.persistence.jobs import JobRepository  # noqa: E402
+from app.persistence.s12_export import S12ExportRepository  # noqa: E402
 from app.services.s12_export import publication as pub  # noqa: E402
-
 
 env = publication_base.env
 
