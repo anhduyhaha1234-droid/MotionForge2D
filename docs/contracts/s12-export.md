@@ -142,3 +142,19 @@ frame_count), `artifact` (state=ready, sha256), `apply_checkpoint`,
 
 Uncertainty is fail-closed: absence of any bind (or of measured timing)
 refuses the preflight — readiness is never lowered, no auto-approval.
+
+## Normal Export context (S12-LC3-UI)
+
+The project/video Export entry point reads the server-owned snapshot from
+`GET /api/v2/projects/{project_id}/export/context?video_item_id={video_item_id}`.
+The response returns the scoped checkpoint, structural-lock, plan, supported
+profiles, current durable S12 run pointer, and `context_revision`. It never
+returns client filesystem paths. The browser may display these identities and
+send the returned `context_revision` when submitting, but users do not type
+checkpoint, manifest, plan, frame, fps, or path fields.
+
+Submit and retry re-resolve the current authority and reject a stale
+`context_revision` or lineage with `409`; a successful response returns the
+actual durable run pointer. The UI stores only that pointer under the scoped
+workspace/project/video key and refetches server truth after navigation,
+refresh, retry, or recovery.

@@ -12,36 +12,29 @@
  * (text-gray-400, 11px+). Responsive: flex-wrap, no overflow at 390px.
  */
 
-import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ExportPanel } from "@/components/export/ExportPanel";
 
-const STORAGE_RUN_ID = "s12:export:lastRunId";
-const STORAGE_PROJECT_ID = "s12:export:lastProjectId";
-const STORAGE_VIDEO_ID = "s12:export:lastVideoItemId";
+function scopedStorageKey(workspaceId: string, projectId: string, videoItemId: string): string {
+  return `s12:export:${workspaceId}:${projectId}:${videoItemId}:run`;
+}
 
-function readStorage(): { runId: string | null; projectId: string | null; videoItemId: string | null } {
-  if (typeof window === "undefined") return { runId: null, projectId: null, videoItemId: null };
+function readStorage(workspaceId: string, projectId: string, videoItemId: string): string | null {
+  if (typeof window === "undefined") return null;
   try {
-    return {
-      runId: localStorage.getItem(STORAGE_RUN_ID),
-      projectId: localStorage.getItem(STORAGE_PROJECT_ID),
-      videoItemId: localStorage.getItem(STORAGE_VIDEO_ID),
-    };
+    return localStorage.getItem(scopedStorageKey(workspaceId, projectId, videoItemId));
   } catch {
-    return { runId: null, projectId: null, videoItemId: null };
+    return null;
   }
 }
 
-function writeStorage(runId: string | null, projectId: string | null, videoItemId: string | null) {
+function writeStorage(runId: string | null, workspaceId: string, projectId: string, videoItemId: string) {
   if (typeof window === "undefined") return;
   try {
-    if (runId) localStorage.setItem(STORAGE_RUN_ID, runId);
-    else localStorage.removeItem(STORAGE_RUN_ID);
-    if (projectId) localStorage.setItem(STORAGE_PROJECT_ID, projectId);
-    else localStorage.removeItem(STORAGE_PROJECT_ID);
-    if (videoItemId) localStorage.setItem(STORAGE_VIDEO_ID, videoItemId);
-    else localStorage.removeItem(STORAGE_VIDEO_ID);
+    const key = scopedStorageKey(workspaceId, projectId, videoItemId);
+    if (runId) localStorage.setItem(key, runId);
+    else localStorage.removeItem(key);
   } catch {
     // ignore
   }
@@ -57,16 +50,27 @@ export default function ExportPage() {
 
 function ExportRoute() {
   const params = useSearchParams();
-  const [stored] = useState<{ runId: string | null; projectId: string | null; videoItemId: string | null }>(() => readStorage());
+  const router = useRouter();
 
-  const projectId = params.get("project") ?? stored.projectId ?? "";
-  const videoItemId = params.get("video") ?? stored.videoItemId ?? "";
+  const projectId = params.get("project") ?? "";
+  const videoItemId = params.get("video") ?? "";
   const workspaceId = params.get("workspace") ?? "default";
-  const initialRunId = params.get("run") ?? stored.runId;
+  const initialRunId = params.get("run") ?? (projectId && videoItemId ? readStorage(workspaceId, projectId, videoItemId) : null);
+  const scopeKey = `${workspaceId}:${projectId}:${videoItemId}`;
 
   useEffect(() => {
-    writeStorage(initialRunId, projectId || null, videoItemId || null);
-  }, [initialRunId, projectId, videoItemId]);
+    if (initialRunId && projectId && videoItemId) writeStorage(initialRunId, workspaceId, projectId, videoItemId);
+  }, [initialRunId, workspaceId, projectId, videoItemId]);
+
+  const updateRunPointer = useCallback((runId: string) => {
+    writeStorage(runId, workspaceId, projectId, videoItemId);
+    const next = new URLSearchParams(params.toString());
+    next.set("project", projectId);
+    next.set("video", videoItemId);
+    next.set("workspace", workspaceId);
+    next.set("run", runId);
+    router.replace(`/export?${next.toString()}`, { scroll: false });
+  }, [params, router, workspaceId, projectId, videoItemId]);
 
   if (!projectId || !videoItemId) {
     return (
@@ -82,7 +86,7 @@ function ExportRoute() {
   return (
     <div className="min-h-full p-4 sm:p-6">
       <h1 data-testid="export-title" className="sr-only">Export video</h1>
-      <ExportPanel projectId={projectId} videoItemId={videoItemId} workspaceId={workspaceId} initialRunId={initialRunId} />
+      <ExportPanel key={scopeKey} projectId={projectId} videoItemId={videoItemId} workspaceId={workspaceId} initialRunId={initialRunId} onRunPointerChange={updateRunPointer} />
     </div>
   );
 }

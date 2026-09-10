@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type APIRequestContext } from "@playwright/test";
 
 /**
  * S12-T05 Export UI — real-backend E2E (no route mocks anywhere).
@@ -54,32 +54,31 @@ interface SeedResult {
   tampered_run_id: string;
 }
 
-function submitBody(seed: SeedResult, idem: string, salt?: string) {
+async function submitBody(request: APIRequestContext, seed: SeedResult, idem: string) {
   // Unique idempotency per spec run (boot reseeds fresh DB each Playwright
   // invocation, but retries/tests within one run must not collide).
   const stamp = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   const unique = `${idem}-${stamp}`;
-  // Per-test plan lineage: T03A natural-key dedupes identical pins, so
-  // parallel projects (desktop + mobile share one backend/DB) must submit
-  // distinct plans or they converge on one run and cancel/retry collide.
-  const hex = "0123456789abcdef";
-  const tag = (salt ?? idem).padEnd(8, "0").slice(0, 8);
-  const planTail = [...tag].map((c) => hex[c.charCodeAt(0) % 16]).join("");
+  const contextResponse = await request.get(
+    `${API}/api/v2/projects/${seed.project_id}/export/context?video_item_id=${seed.video_ready}`,
+  );
+  expect(contextResponse.status()).toBe(200);
+  const context = await contextResponse.json();
   return {
     workspace_id: "default",
     project_id: seed.project_id,
     video_item_id: seed.video_ready,
     profile_id: "master-4k-h264",
-    checkpoint_id: seed.checkpoint_id,
-    checkpoint_hash: seed.checkpoint_hash,
-    checkpoint_revision: seed.checkpoint_revision,
-    manifest_id: seed.manifest_id,
-    manifest_hash: seed.manifest_hash,
-    manifest_generation: seed.manifest_generation,
-    plan_id: `${seed.plan_id.slice(0, 56)}${planTail}`,
-    plan_hash: `${seed.plan_hash.slice(0, 56)}${planTail}`,
-    frame_count: 100,
-    chunk_config: { overlap: 5, max_frames: 50 },
+    checkpoint_id: context.checkpoint.checkpoint_id,
+    checkpoint_hash: context.checkpoint.checkpoint_hash,
+    checkpoint_revision: context.checkpoint.checkpoint_revision,
+    manifest_id: context.lock.manifest_id,
+    manifest_hash: context.lock.manifest_hash,
+    manifest_generation: context.lock.source_generation,
+    plan_id: context.plan.plan_id,
+    plan_hash: context.plan.plan_hash,
+    frame_count: context.plan.frame_count,
+    context_revision: context.context_revision,
     idempotency_key: unique,
   };
 }
@@ -114,6 +113,26 @@ test("trang trong hien trang thai rong tieng Viet", async ({ page }) => {
   await page.goto(`${FE}/export`);
   await expect(page.getByTestId("export-empty")).toBeVisible();
   await expect(page.getByTestId("export-panel")).toBeHidden();
+});
+
+test("C20/C21: project-video entry point -> context -> submit updates scoped run pointer", async ({ page, isMobile }) => {
+  await page.goto(`${FE}/object-gallery?project=${seed.project_id}&video=${seed.video_ready}`);
+  const exportLink = page.getByRole("link", { name: /Xuất 4K|Xuat 4K|Export/i }).first();
+  if (!isMobile) await exportLink.click();
+  else await page.goto(`${FE}/export?project=${seed.project_id}&video=${seed.video_ready}`);
+  await expect(page).toHaveURL(/\/export\?[^#]*(project|video)/);
+  await expect(page.getByTestId("export-context")).toBeVisible();
+  await expect(page.getByTestId("export-server-authority")).toBeVisible();
+  await expect(page.locator('input[name="checkpoint_hash"], input[name="manifest_hash"], input[name="plan_hash"], input[name="source_path"]')).toHaveCount(0);
+  await page.getByTestId("export-preflight").click();
+  await expect(page.getByTestId("export-preflight-result")).toBeVisible();
+  await expect(page.getByTestId("export-submit")).toBeEnabled();
+  await page.getByTestId("export-submit").click();
+  await expect(page).toHaveURL(new RegExp(`project=${seed.project_id}.*video=${seed.video_ready}.*run=`));
+  const runText = await page.getByTestId("export-run-id").textContent();
+  expect(runText).toContain("run ");
+  await page.reload();
+  await expect(page.getByTestId("export-run-id")).toContainText(runText?.replace("run ", "") ?? "run");
 });
 
 test("preflight that: video blocked tra SOURCE_MISSING", async ({ request }) => {
@@ -178,11 +197,11 @@ test("preflight that: video ready eligible that (authority + readiness real)", a
 test("submit that -> 202 real (readiness+authority ready)", async ({
   request,
   page,
-}, testInfo) => {
+}) => {
   // C2 base fb59215: T03G band + Full Apply authority đều sẵn sàng, submit
   // qua API THẬT phải 202 và run pending/running (worker real có thể claim).
   const res = await request.post(`${API}/s12-exports/submit`, {
-    data: submitBody(seed, "s12t05-ui-submit", `${testInfo.project.name}:${testInfo.title}`),
+    data: await submitBody(request, seed, "s12t05-ui-submit"),
   });
   expect(res.status()).toBe(202);
   const created = await res.json();

@@ -55,7 +55,7 @@ export default defineConfig({
       cwd: "..",
       env: {
         S12T05_QA_ROOT: "C:/Users/Admin/AppData/Local/Temp/s12t05_root",
-        MF_BACKEND_ROOT: "C:/Users/Admin/MotionForge2D-worktrees/s12-s12-t05-0907a",
+        MF_BACKEND_ROOT: "C:/Users/Admin/MotionForge2D-worktrees/s12-lc3-luna-ui",
       },
       url: "http://localhost:8415/docs",
       timeout: 300_000,

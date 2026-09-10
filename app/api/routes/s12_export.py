@@ -42,15 +42,18 @@ JOB_KEY_PREFIX = "s12_export_job:"
 class S12ExportSubmitRequest(BaseModel):
     project_id: str = Field(min_length=1)
     video_item_id: str = Field(min_length=1)
-    checkpoint_id: str = Field(min_length=1)
-    checkpoint_hash: str = Field(min_length=1)
-    checkpoint_revision: int = Field(ge=1)
-    manifest_id: str = Field(min_length=1)
-    manifest_hash: str = Field(min_length=64, max_length=64)
-    manifest_generation: str = Field(min_length=1)
+    # Optional for the normal product flow: the route resolves these pins
+    # from the current Full Apply/lock context.  Keeping them accepted is a
+    # backwards-compatible API bridge for existing internal callers.
+    checkpoint_id: str | None = Field(default=None, min_length=1)
+    checkpoint_hash: str | None = Field(default=None, min_length=1)
+    checkpoint_revision: int | None = Field(default=None, ge=1)
+    manifest_id: str | None = Field(default=None, min_length=1)
+    manifest_hash: str | None = Field(default=None, min_length=64, max_length=64)
+    manifest_generation: str | None = Field(default=None, min_length=1)
     profile_id: str = Field(min_length=1)
-    plan_id: str = Field(min_length=1)
-    plan_hash: str = Field(min_length=1)
+    plan_id: str | None = Field(default=None, min_length=1)
+    plan_hash: str | None = Field(default=None, min_length=1)
     # Server-derived (C2 F02): accepted for backward compatibility only —
     # the route resolves source/frame/fps from the T01 authority and
     # derives every filesystem path under the server managed root.
@@ -63,6 +66,7 @@ class S12ExportSubmitRequest(BaseModel):
     output_path: str | None = Field(default=None)
     audio_source: str | None = None
     idempotency_key: str | None = None
+    context_revision: str | None = Field(default=None, min_length=64, max_length=64)
 
 
 def _job_key(run_id: str) -> str:
@@ -206,21 +210,79 @@ def submit_export(
     from app.persistence.readiness import compute_project_readiness  # noqa: PLC0415
     from app.services.s12_export.authority import (  # noqa: PLC0415
         resolve_export_authority,
+        resolve_export_context,
     )
 
     if workspace_id != DEFAULT_WORKSPACE_ID:
         raise HTTPException(status_code=404, detail="unknown export workspace")
+    context = resolve_export_context(
+        session,
+        workspace_id=workspace_id,
+        project_id=body.project_id,
+        video_item_id=body.video_item_id,
+    )
+    if context.reasons:
+        session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=f"export context not current: {list(context.reasons)}",
+        )
+    if body.context_revision is not None and body.context_revision != context.context_revision:
+        session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="S12_EXPORT_STALE_CHECKPOINT: export context is stale; reload and preflight again",
+        )
+    resolved_checkpoint_id = body.checkpoint_id or context.checkpoint_id
+    resolved_checkpoint_hash = body.checkpoint_hash or context.checkpoint_hash
+    resolved_checkpoint_revision = body.checkpoint_revision or context.checkpoint_revision
+    resolved_manifest_id = body.manifest_id or context.manifest_id
+    resolved_manifest_hash = body.manifest_hash or context.manifest_hash
+    resolved_manifest_generation = body.manifest_generation or context.manifest_generation
+    resolved_plan_id = body.plan_id or context.plan_id
+    resolved_plan_hash = body.plan_hash or context.plan_hash
+    if not all(
+        (
+            resolved_checkpoint_id,
+            resolved_checkpoint_hash,
+            resolved_checkpoint_revision,
+            resolved_manifest_id,
+            resolved_manifest_hash,
+            resolved_manifest_generation,
+            resolved_plan_id,
+            resolved_plan_hash,
+            context.frame_count,
+        )
+    ):
+        session.rollback()
+        raise HTTPException(status_code=409, detail="export authority context is incomplete")
+    # A caller may replay the legacy fields, but cannot replace the current
+    # server-owned plan or pins with an arbitrary identity.
+    if any(
+        (
+            body.checkpoint_id and body.checkpoint_id != resolved_checkpoint_id,
+            body.checkpoint_hash and body.checkpoint_hash.lower() != str(resolved_checkpoint_hash).lower(),
+            body.checkpoint_revision and body.checkpoint_revision != resolved_checkpoint_revision,
+            body.manifest_id and body.manifest_id != resolved_manifest_id,
+            body.manifest_hash and body.manifest_hash.lower() != str(resolved_manifest_hash).lower(),
+            body.manifest_generation and body.manifest_generation != resolved_manifest_generation,
+            body.plan_id and body.plan_id != resolved_plan_id,
+            body.plan_hash and body.plan_hash.lower() != str(resolved_plan_hash).lower(),
+        )
+    ):
+        session.rollback()
+        raise HTTPException(status_code=409, detail="S12_EXPORT_STALE_CHECKPOINT: export context changed")
     authority = resolve_export_authority(
         session,
         workspace_id=workspace_id,
         project_id=body.project_id,
         video_item_id=body.video_item_id,
-        checkpoint_id=body.checkpoint_id,
-        checkpoint_hash=body.checkpoint_hash,
-        checkpoint_revision=body.checkpoint_revision,
-        manifest_id=body.manifest_id,
-        manifest_hash=body.manifest_hash,
-        manifest_generation=body.manifest_generation,
+        checkpoint_id=str(resolved_checkpoint_id),
+        checkpoint_hash=str(resolved_checkpoint_hash),
+        checkpoint_revision=int(resolved_checkpoint_revision),
+        manifest_id=str(resolved_manifest_id),
+        manifest_hash=str(resolved_manifest_hash),
+        manifest_generation=str(resolved_manifest_generation),
     )
     if not authority.resolved:
         session.rollback()
@@ -246,7 +308,7 @@ def submit_export(
             detail=f"project readiness {readiness.status!r}; export requires ready",
         )
 
-    frame_count = authority.source_frame_count
+    frame_count = authority.source_frame_count or context.frame_count
     fps_num = authority.source_fps_num or 30
     fps_den = authority.source_fps_den or 1
     fps = float(fps_num) / float(fps_den) if fps_den else 30.0
@@ -270,12 +332,12 @@ def submit_export(
             checkpoint_revision=int(authority.checkpoint_revision or 1),
             manifest_id=str(authority.lock_manifest_id),
             manifest_hash=str(authority.lock_manifest_hash),
-            manifest_generation=body.manifest_generation,
+            manifest_generation=str(resolved_manifest_generation),
             profile_id=body.profile_id,
-            plan_id=body.plan_id,
-            plan_hash=body.plan_hash,
+            plan_id=str(resolved_plan_id),
+            plan_hash=str(resolved_plan_hash),
             frame_count=int(frame_count),
-            chunk_config=dict(body.chunk_config),
+            chunk_config=dict(body.chunk_config or context.chunk_config),
             source_path=str(source_path),
             fps=fps,
             fps_num=int(fps_num),
@@ -304,6 +366,7 @@ def submit_export(
         "job_state": job_state,
         "created": created,
         "output_path": paths["output_path"],
+        "context_revision": context.context_revision,
     }
 
 
@@ -415,6 +478,59 @@ def retry_export(
             status_code=409,
             detail="predecessor run has an active export job; retry would create competing work — reject",
         )
+    from app.services.s12_export.authority import (  # noqa: PLC0415
+        resolve_export_authority,
+        resolve_export_context,
+    )
+
+    context = resolve_export_context(
+        session,
+        workspace_id=workspace_id,
+        project_id=rec.project_id,
+        video_item_id=rec.video_item_id,
+    )
+    if context.reasons:
+        session.rollback()
+        raise HTTPException(status_code=409, detail="export context is not current; retry rejected")
+    current_values = (
+        rec.checkpoint_id == context.checkpoint_id,
+        rec.checkpoint_hash.lower() == str(context.checkpoint_hash).lower(),
+        rec.checkpoint_revision == context.checkpoint_revision,
+        rec.manifest_id == context.manifest_id,
+        rec.manifest_hash.lower() == str(context.manifest_hash).lower(),
+        rec.manifest_generation == context.manifest_generation,
+        rec.plan_id == context.plan_id,
+        rec.plan_hash.lower() == str(context.plan_hash).lower(),
+        rec.frame_count == context.frame_count,
+    )
+    if not all(current_values):
+        session.rollback()
+        raise HTTPException(status_code=409, detail="S12_EXPORT_STALE_CHECKPOINT: retry context changed")
+    authority = resolve_export_authority(
+        session,
+        workspace_id=workspace_id,
+        project_id=rec.project_id,
+        video_item_id=rec.video_item_id,
+        checkpoint_id=rec.checkpoint_id,
+        checkpoint_hash=rec.checkpoint_hash,
+        checkpoint_revision=rec.checkpoint_revision,
+        manifest_id=rec.manifest_id,
+        manifest_hash=rec.manifest_hash,
+        manifest_generation=rec.manifest_generation,
+    )
+    if not authority.resolved:
+        session.rollback()
+        raise HTTPException(status_code=409, detail=f"export authority not resolved: {authority.failed_reasons}")
+    source_path = _source_artifact_path(session, authority)
+    if source_path is None:
+        session.rollback()
+        raise HTTPException(status_code=409, detail="export source artifact missing; retry rejected")
+    _check_source_media(source_path)
+    _check_no_partial(authority, source_path)
+    paths = _server_paths(get_managed_root(), rec.project_id, rec.video_item_id)
+    if paths is None:
+        session.rollback()
+        raise HTTPException(status_code=409, detail="export identity invalid; retry rejected")
     pins = {
         "checkpoint_id": rec.checkpoint_id,
         "checkpoint_hash": rec.checkpoint_hash,
@@ -427,7 +543,17 @@ def retry_export(
         "plan_hash": rec.plan_hash,
         "frame_count": rec.frame_count,
     }
-    manifest, job_state = _retry_manifest(session, rec, pins)
+    manifest = {
+        "chunk_config": context.chunk_config,
+        "source_path": source_path,
+        "fps": (context.fps_num or 30) / (context.fps_den or 1),
+        "fps_num": context.fps_num or 30,
+        "fps_den": context.fps_den or 1,
+        "chunk_dir": paths["chunk_dir"],
+        "scratch_dir": paths["scratch_dir"],
+        "output_path": paths["output_path"],
+        "expected_sha256": authority.source_sha256,
+    }
     try:
         new_run, job, created = submit_export_job(
             get_job_service(),
@@ -436,7 +562,7 @@ def retry_export(
             video_item_id=rec.video_item_id,
             idempotency_key=f"s12_retry:{run_id}",
             chunk_config=dict(manifest.get("chunk_config") or {}),
-            source_path=str(manifest.get("source_path") or ""),
+            source_path=str(manifest["source_path"]),
             fps=float(manifest.get("fps") or 0) or 30.0,
             chunk_dir=str(manifest.get("chunk_dir") or ""),
             scratch_dir=str(manifest.get("scratch_dir") or ""),
@@ -453,7 +579,6 @@ def retry_export(
     except Exception as err:
         session.rollback()
         raise HTTPException(status_code=500, detail=f"retry enqueue failed: {err}") from err
-    _ = job_state
     return {
         "run_id": new_run.id,
         "predecessor_run_id": run_id,

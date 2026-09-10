@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Boxes, Clapperboard, FolderOpen, Home, Play, Radio, Sparkles, UploadCloud, Users } from "lucide-react";
 import { api } from "@/lib/api";
@@ -20,6 +20,9 @@ const items = [
 
 export function AppNav() {
   const pathname = usePathname();
+  const params = useSearchParams();
+  const projectId = params.get("project");
+  const videoItemId = params.get("video");
   const { data: gpu } = useQuery({ queryKey: ["gpu-info"], queryFn: () => api.getGpuInfo(), staleTime: 60_000 });
 
   return (
@@ -31,8 +34,11 @@ export function AppNav() {
       <nav aria-label="Điều hướng chính" className="p-3">
         <ul className="space-y-1">
           {items.map(({ href, label, icon: Icon }) => {
+            const targetHref = href === "/export" && projectId && videoItemId
+              ? `/export?project=${encodeURIComponent(projectId)}&video=${encodeURIComponent(videoItemId)}`
+              : href;
             const active = href === "/" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
-            return <li key={href}><Link href={href} aria-current={active ? "page" : undefined} className={`flex min-h-10 items-center gap-3 rounded-lg border-l-2 px-3 text-sm transition-colors ${active ? "border-[var(--primary-500)] bg-[color-mix(in_srgb,var(--primary-600)_15%,transparent)] text-[var(--primary-300)]" : "border-transparent text-[var(--text-secondary)] hover:bg-[var(--surface-800)] hover:text-[var(--text-primary)]"}`}><Icon aria-hidden="true" size={18} />{label}</Link></li>;
+            return <li key={href}><Link href={targetHref} aria-current={active ? "page" : undefined} className={`flex min-h-10 items-center gap-3 rounded-lg border-l-2 px-3 text-sm transition-colors ${active ? "border-[var(--primary-500)] bg-[color-mix(in_srgb,var(--primary-600)_15%,transparent)] text-[var(--primary-300)]" : "border-transparent text-[var(--text-secondary)] hover:bg-[var(--surface-800)] hover:text-[var(--text-primary)]"}`}><Icon aria-hidden="true" size={18} />{label}</Link></li>;
           })}
         </ul>
       </nav>

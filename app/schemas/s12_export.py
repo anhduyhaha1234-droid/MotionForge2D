@@ -30,6 +30,7 @@ __all__ = [
     "PreflightCheck",
     "ExportPreflightRequest",
     "ExportPreflightResponse",
+    "ExportContextResponse",
     "ValidationContract",
     "PublicationContract",
     "S12_EXPORT_CONTRACT_VERSION",
@@ -192,6 +193,50 @@ class ExportPreflightResponse(_StrictBase):
     estimate_basis: str = Field(default="", max_length=512)
     readiness_status: str = Field(default="")
     readiness_policy: str = Field(default="")
+
+
+class ExportContextPlan(_StrictBase):
+    """Server-owned plan identity used to submit a current export."""
+
+    plan_id: str = Field(min_length=64, max_length=64)
+    plan_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    frame_count: int = Field(ge=1)
+    fps_num: int | None = Field(default=None, ge=1)
+    fps_den: int | None = Field(default=None, ge=1)
+    chunk_config: dict[str, Any] = Field(default_factory=dict)
+
+
+class ExportContextRun(_StrictBase):
+    """Scoped pointer to the latest durable S12 run, if one exists."""
+
+    run_id: str
+    status: str
+    attempt: int = Field(ge=1)
+
+
+class ExportContextResponse(_StrictBase):
+    """Read-only backend-owned project/video context for the Export UI."""
+
+    contract_version: str = Field(default=S12_EXPORT_CONTRACT_VERSION)
+    workspace_id: str = Field(min_length=1)
+    project_id: str = Field(min_length=1)
+    project_name: str | None = None
+    video_item_id: str = Field(min_length=1)
+    video_title: str | None = None
+    video_status: str | None = None
+    video_width: int | None = Field(default=None, ge=1)
+    video_height: int | None = Field(default=None, ge=1)
+    video_duration_ms: int | None = Field(default=None, ge=0)
+    video_fps_num: int | None = Field(default=None, ge=1)
+    video_fps_den: int | None = Field(default=None, ge=1)
+    checkpoint: CheckpointPin | None = None
+    lock: LockPin | None = None
+    plan: ExportContextPlan | None = None
+    profiles: list[ExportProfile] = Field(default_factory=list)
+    current_run: ExportContextRun | None = None
+    full_apply_run_id: str | None = None
+    context_revision: str = Field(pattern=r"^[0-9a-f]{64}$")
+    reasons: list[PreflightReason] = Field(default_factory=list)
 
 
 class ValidationContract(_StrictBase):
