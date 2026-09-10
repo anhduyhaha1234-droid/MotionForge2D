@@ -126,3 +126,76 @@ under the top-level cleanup helper. The correction moved only that method back
 inside the class. The four reported T03B nodes passed, `hasattr(ExportRunner,
 "code_for")` passed, the VAL focused suite passed, and the correction evidence
 is [20260910T075450Z-code-for-correction.md](evidence/20260910T075450Z-code-for-correction.md).
+
+## C3 R1 exact-owner continuation
+
+This continuation started from `91bf577a2706a3351f7a72f9142fbd7b9c5671c3`
+in the same worktree. The only additional production correction was to pass
+the attempt/fence-owned scratch child into `RunnerConfig`; assembly
+temporaries therefore remain under the current owner root. No persistence
+file was changed. The new regression file is
+`tests/s12/s12-lc3-val/test_r1_correction_boundaries.py`.
+
+The first three R1 reproductions were intentionally run before the repair and
+are retained as red evidence: `R01_STALE_CLEANUP` reported
+`candidate_exists:false`, `R02_COMMIT_GAP` reported a public file but retry
+refused overwrite, and `R03_AUDIO_DEADLINE` took `2.031s` for a `0.1s`
+deadline; that run was `3 failed, 4 warnings` in `6.81s`. After the repair,
+the same three nodes passed with the current-owner candidate preserved,
+commit-gap reconciliation to `completed`, and deadline completion in about
+`0.125s`. The expanded R1 micro set passed all `10` nodes, including the
+actual broadband-plus-tone AAC control, tampered receipt preservation,
+stderr-pressure/nonzero decoder, cancel, and deadline controls.
+
+The explicit correction command passed `21` nodes (`4` T03B nodes plus all
+`17` VAL nodes) with `18` warnings in `21.72s`; `hasattr(ExportRunner,
+"code_for")` returned `HAS_CODE_FOR=1`. Its envelope was:
+
+```text
+start_utc=2026-09-10T10:51:53.8761151Z
+end_utc=2026-09-10T10:52:17.8332407Z
+duration_sec=23.954662 pytest=0 code_for=0
+```
+
+The full scope-qualified gate also passed all `102` nodes with `92` warnings
+in `96.08s`; the corrected rerun envelope was:
+
+```text
+start_utc=2026-09-10T10:50:02.3699793Z
+end_utc=2026-09-10T10:51:40.1403402Z
+duration_sec=97.7677313 exit=0
+```
+
+The ambient affected command was run separately and remains `174 passed,
+2 failed, 141 warnings in 135.81s`. The two preserved red nodes are
+`tests/s12/s12-t03c/test_export_jobs_api.py::test_retry_after_cancel_converges`
+(`export context is not current; retry rejected`) and
+`tests/s12/s12-t03c/test_s12_t03c_c1_closure.py::test_c15_retry_converges_no_duplicate_successor`
+(`S12_EXPORT_STALE_CHECKPOINT: retry context changed`). Both are outside
+the VAL-owned write set; no QA-owned file was changed.
+
+The owned resource root was
+`C:\\Users\\Admin\\mfqa\\s12-lc3-r1\\20260910T101656Z\\VAL`. The latest
+native ffmpeg validator scaling sample covered every frame at `4`, `8`, and
+`16` frames using `96x54` candidate versus `64x36` reference. It measured
+peak stats scratch `1788` bytes and peak validator ffmpeg RSS `32841728`
+bytes, with zero scratch bytes after each sample. The free-disk readings
+were `535401996288 -> 535401992192`, unchanged for the 8-frame sample, and
+`535401975808 -> 535401955328` bytes for the 16-frame sample. The ffmpeg
+version was `8.1.2-full_build-www.gyan.dev`. These are bounded small-sample
+measurements; any 30-minute arithmetic is extrapolation only.
+
+The publication receipt records run lineage, attempt, fence,
+checkpoint/manifest/plan/profile identity, candidate/artifact SHA-256, PASS
+probe names, and sidecar identity. A fresh session adopts only a receipt
+whose bytes, sidecar, current readiness, current raw lease, and fresh
+source-locked validation all match. Rename, sidecar, SQLite commit, lost
+acknowledgement, authority handoff, and tampered-output paths preserve the
+immutable winner and never perform an unchecked overwrite. Filesystem
+operations and SQLite commit are intentionally documented as a boundary, not
+falsely described as one transaction.
+
+The complete command envelopes and raw repro summaries are in
+[20260910T1052Z-r1.md](evidence/20260910T1052Z-r1.md) and the mirrored
+external evidence set. The post-write-set guard is [20260910T1057Z-post-guard-r1.json](evidence/20260910T1057Z-post-guard-r1.json).
+This is a transport checkpoint only, not an approval or closure claim.

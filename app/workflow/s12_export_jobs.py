@@ -204,6 +204,7 @@ def _s12_export_handler(ctx: Any) -> dict[str, Any]:
     """
     from app.persistence.s12_export import S12ExportRepository  # noqa: PLC0415
     from app.services.s12_export.publication import (  # noqa: PLC0415
+        _publication_receipt_path,
         publish_export_run,
     )
     from app.services.s12_export.runner import (  # noqa: PLC0415
@@ -224,9 +225,18 @@ def _s12_export_handler(ctx: Any) -> dict[str, Any]:
         repo = S12ExportRepository(session)
         lease = repo.claim_run(run_id, ctx.worker_id)
         session.commit()
+        claimed_run = repo.get_run(run_id)
+        owner_scratch = (
+            Path(str(manifest["scratch_dir"]))
+            / f"attempt-{claimed_run.attempt}-fence-{lease.fence_token}"
+        )
+        owned_manifest = dict(manifest)
+        owned_manifest["scratch_dir"] = str(owner_scratch)
+        owned_manifest["candidate_path"] = str(owner_scratch / "candidate_final.mp4")
+        owned_manifest["attempt"] = int(claimed_run.attempt)
         # The runner writes its assembly to a PRIVATE candidate under the
         # server-owned scratch dir — never to the public output (C2 F07).
-        candidate_path = _candidate_for(manifest)
+        candidate_path = _candidate_for(owned_manifest)
         cfg = RunnerConfig(
             run_id=run_id,
             workspace_id=workspace_id,
@@ -235,11 +245,15 @@ def _s12_export_handler(ctx: Any) -> dict[str, Any]:
             source_path=str(manifest["source_path"]),
             fps=float(manifest["fps"]),
             chunk_dir=str(manifest["chunk_dir"]),
-            scratch_dir=str(manifest["scratch_dir"]),
+            scratch_dir=str(owner_scratch),
             output_path=str(candidate_path),
             audio_source=manifest.get("audio_source"),
             max_frames_per_chunk=int(manifest.get("max_frames_per_chunk", 120)),
             overlap_frames=int(manifest.get("overlap_frames", 4)),
+            extra={
+                "fence_token": lease.fence_token,
+                "attempt": str(claimed_run.attempt),
+            },
         )
         try:
             ExportRunner(repo, cfg).resume()
@@ -251,30 +265,47 @@ def _s12_export_handler(ctx: Any) -> dict[str, Any]:
                 project_id=project_id,
                 worker_id=ctx.worker_id,
                 fence_token=lease.fence_token,
-                manifest=manifest,
+                manifest=owned_manifest,
             )
             session.commit()
         except Exception:
-            # Coherent states: any render/publication failure lands the run
-            # ``failed`` (retryable) under the fence; the durable job records
-            # the failure by re-raising.  Never a fake ``running`` leftover.
+            # Coherent states: ordinary render/publication failure lands the
+            # run ``failed`` (retryable) under the fence.  An uncertain
+            # filesystem/SQLite boundary deliberately remains resumable.
             try:
                 rec = repo.get_run(run_id)
-                repo.transition_run(
-                    run_id,
-                    "failed",
-                    actor=ctx.worker_id,
-                    expected_revision=rec.revision,
-                    fence_token=lease.fence_token,
+                # A rename + receipt followed by a DB commit exception is an
+                # uncertain filesystem/SQLite boundary.  Keep the run
+                # resumable so a fresh owner can revalidate and reconcile it;
+                # never downgrade a recoverable publication to failed and
+                # strand an immutable-looking public file.
+                final = Path(str(owned_manifest.get("output_path") or ""))
+                uncertain_publication = (
+                    rec.status in ("running", "verifying")
+                    and final.is_file()
+                    and _publication_receipt_path(final).is_file()
                 )
-                session.commit()
+                if not uncertain_publication:
+                    repo.transition_run(
+                        run_id,
+                        "failed",
+                        actor=ctx.worker_id,
+                        expected_revision=rec.revision,
+                        fence_token=lease.fence_token,
+                    )
+                    session.commit()
             except Exception:
                 # Lost the fence mid-failure (fresh owner reclaimed): the
                 # run is owned elsewhere; nothing more to mutate.
                 session.rollback()
             cleanup_owned_export_artifacts(
-                scratch_dir=manifest.get("scratch_dir"),
-                chunk_dir=manifest.get("chunk_dir"),
+                scratch_dir=owned_manifest.get("scratch_dir"),
+                chunk_dir=owned_manifest.get("chunk_dir"),
+                candidate_path=owned_manifest.get("candidate_path"),
+                repository=repo,
+                owner_run_id=run_id,
+                owner_worker_id=ctx.worker_id,
+                owner_fence_token=lease.fence_token,
             )
             raise
     return {
@@ -291,7 +322,10 @@ def _candidate_for(manifest: dict[str, Any]) -> Path:
     """Private candidate path for the runner's assembly (never public)."""
     scratch = Path(str(manifest["scratch_dir"]))
     scratch.mkdir(parents=True, exist_ok=True)
-    return scratch / "candidate_final.mp4"
+    candidate = Path(str(manifest.get("candidate_path") or scratch / "candidate_final.mp4"))
+    if candidate.resolve().parent != scratch.resolve():
+        raise RuntimeError("candidate path must be a direct child of owned scratch")
+    return candidate
 
 
 def register_s12_export_handler(worker: Any) -> None:

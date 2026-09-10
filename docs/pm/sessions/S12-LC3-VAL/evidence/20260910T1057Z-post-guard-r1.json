@@ -1,0 +1,56 @@
+{
+  "generated_utc": "2026-09-10T10:59:08.351969+00:00",
+  "baseline": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\baseline-val-dispatch.json",
+  "root": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-val",
+  "missing": [],
+  "shrink": [],
+  "unexpected_drift": [],
+  "expected_allowlist_changes": [
+    "app/services/s12_export/publication.py",
+    "app/services/s12_export/runner.py",
+    "app/services/s12_export/validation.py",
+    "app/workflow/s12_export_jobs.py",
+    "docs/pm/sessions/S12-LC3-VAL/REPORT.md"
+  ],
+  "protected_unchanged": [
+    "app/persistence/s12_export.py",
+    "app/services/s12_export/stitch.py",
+    "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T051228Z-r01-r03-r04-micro.md",
+    "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T071125Z-post-guard.json",
+    "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T075450Z-code-for-correction.md",
+    "tests/s12/s12-t03c/test_publication.py",
+    "tests/s12/s12-t04a/test_c2_source_locked.py",
+    "tests/s12/s12-t03a/test_s12_export_c1_closure.py",
+    "tests/s12/s12-t06b/test_c28_audio_mapping.py",
+    "docs/contracts/s12-export.md"
+  ],
+  "protected_changed": [],
+  "expected_absent": ["scripts/s12/s12_lc3_probe.py"],
+  "new_allowed": [
+    "docs/pm/sessions/S12-LC3-VAL/LOG.md",
+    "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T1052Z-r1.md",
+    "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T1057Z-post-guard-r1.json",
+    "tests/s12/s12-lc3-val/test_r1_correction_boundaries.py",
+    "work/"
+  ],
+  "baseline_measurements": {
+    "app/persistence/s12_export.py": {"size": 42780, "lines": 1066, "sha256": "847B4FDA7311E04D482DDE0C3DD71AB853CB8B385AA10CCB6EB0A528CF3E4CFC", "changed": false},
+    "app/services/s12_export/publication.py": {"size": 32628, "lines": 881, "sha256": "6F27B6D9F4A9339133C87AC593BC4C8CA33C636AE2AB3971CD8D3C29FB30F6A6", "changed": true},
+    "app/services/s12_export/runner.py": {"size": 37998, "lines": 964, "sha256": "ADBF98D7E6BC24E8B09D940FC6A14C69AD659DF12FB2E3B6F3AE6E838B1FD000", "changed": true},
+    "app/services/s12_export/stitch.py": {"size": 17407, "lines": 520, "sha256": "FDEDED5652F89FC231D488569C7014E4BB3F781F2202D6C30980CF1D95F40D1D", "changed": false},
+    "app/services/s12_export/validation.py": {"size": 76395, "lines": 2081, "sha256": "999B0C500F706A81AE0479691FE72A291B5C93BA1A9A2D691A012AE5B71B17F7", "changed": true},
+    "app/workflow/s12_export_jobs.py": {"size": 16313, "lines": 395, "sha256": "34F7A8672E0CED50ABBBF75EFA22D85579399C91FD98D12C3D0DAFFAD4B0F276", "changed": true},
+    "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T051228Z-r01-r03-r04-micro.md": {"size": 3321, "lines": 40, "sha256": "C0C197284584221EE941EBA9CAD9FB355BD497742169C001BBE4B826CA493764", "changed": false},
+    "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T071125Z-post-guard.json": {"size": 5005, "lines": 28, "sha256": "605806D25D9D9A460ACEECC59077F187F4D0AFE57527A43E984D48C8E5B911A3", "changed": false},
+    "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T075450Z-code-for-correction.md": {"size": 2199, "lines": 53, "sha256": "65A128DC9EDD4FE3ECF9C653B75F85504F1AB0E3CC43294C609FD1A695994A21", "changed": false},
+    "docs/pm/sessions/S12-LC3-VAL/REPORT.md": {"size": 9890, "lines": 201, "sha256": "D70D6CC05BE5AA744B078622A61327C939F3F212EDC9F6DB5FD25707FA61B068", "changed": true},
+    "tests/s12/s12-lc3-val/test_r01_r03_r04_boundaries.py": {"size": 12247, "lines": 282, "sha256": "A907599499EDB01AA9985A754217E7A036B41A71021BB9A2380597922CD31400", "changed": false},
+    "tests/s12/s12-t03c/test_publication.py": {"size": 33905, "lines": 857, "sha256": "A53889AF0944F45F1F67CCD0660A1750B8D27DAC34F5267434E8323043081087", "changed": false},
+    "tests/s12/s12-t04a/test_c2_source_locked.py": {"size": 38741, "lines": 996, "sha256": "F0452D62FB4C49D9EC3703BF902DB13382B0B7B41E22C0C9B159B95EA8AA2C96", "changed": false},
+    "tests/s12/s12-t03a/test_s12_export_c1_closure.py": {"size": 20776, "lines": 524, "sha256": "CE3F8F4ED7CF75690C3ED0D30A1B2580A0818D6D478561591564D81A9837192A", "changed": false},
+    "tests/s12/s12-t06b/test_c28_audio_mapping.py": {"size": 7121, "lines": 185, "sha256": "9214850BBCAF77A283A5AFA86F03D0582C697E5E2328D53B9A7D5BD99EC9A933", "changed": false},
+    "scripts/s12/s12_lc3_probe.py": {"exists": false},
+    "docs/contracts/s12-export.md": {"size": 8579, "lines": 160, "sha256": "833F038BD917EB5E58D1A0685AC44CB292691D495FD1DCF4E3BA1C92412B6806", "changed": false}
+  },
+  "result": "PASS"
+}
