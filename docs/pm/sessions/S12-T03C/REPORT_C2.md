@@ -42,6 +42,12 @@ Canonical `f25f56c` (T04A-C2-delta: `frame_match_mode` + `frame_psnr_min_db` + `
 
 Tests (real ffmpeg, validator unmocked): legit re-encode 4K PSNR PASS; reorder tamper PSNR FAIL (run failed, no public artifact); identity-copy exact PASS (existing); threshold-missing FAIL-closed wire. Gates: t03c **39 passed**, t04a regression **73 passed**, ruff F clean, diff-check 0.
 
+## REF-DIMS (F11-T06B-02 final root cause)
+
+Canonical `be8287b` (T04A-C2-candpipe: `SourceReference.reference_width/reference_height` + cross-raster PSNR scale+pad temp-raw decode). `publication._build_source_reference` now populates the approved artifact raster from `_probe_source_dims` (server-probed, current artifact): the validator letterbox-scale+pad's the reference to the candidate raster — same geometry the runner produces, never stretch. Probe dims failure → raster stays None → fail-closed (same-raster path measures low PSNR on a real cross-raster case; no fabricated raster, no fake PASS).
+
+Tests (real ffmpeg, validator unmocked): 4:3 320x240 30-frame source → real 4K scale+pad letterbox candidate → **30/30 frames PASS** (frame_order PSNR detail asserts 30 frames); reorder tamper on the same upscale path → **FAIL**, run failed, no public artifact; reference raster assert (320,240) probed server-side. Gates: t03c **41 passed**, t04a regression **81 passed**, ruff F clean, diff-check 0.
+
 ## Key artifacts
 
 `app/workflow/s12_export_jobs.py` handler→publish real caller + failure coherence; `publication.py` candidate boundary + byte sidecar + single-winner CAS; `routes/s12_export.py` F02 authority-gated submit + real job_id + server paths; `lifecycle.py` startup reconcile caller. Evidence: `<C2-root>/s12-t03c/{pytest_t03c.txt,ruff_F.txt,diff_check.txt,porcelain.txt}`.

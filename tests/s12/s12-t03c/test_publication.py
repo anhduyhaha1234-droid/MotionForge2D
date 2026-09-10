@@ -533,3 +533,161 @@ def test_frame_match_threshold_missing_fails_closed() -> None:  # type: ignore[n
     expectation = pub._expectation_for(run, manifest, candidate_sha="a" * 64)
     assert expectation.frame_match_mode == "psnr"
     assert expectation.frame_psnr_min_db is None
+
+
+def _upscale_candidate(src: Path, dst: Path, *, reverse: bool = False) -> Path:
+    """Real scale+pad letterbox re-encode to 4K (the product upscale path)."""
+    import shutil
+    import subprocess
+
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        pytest.skip("ffmpeg not on PATH (upscale row needs the real binary)")
+    vf = (
+        "scale=3840:2160:force_original_aspect_ratio=decrease,"
+        "pad=3840:2160:(ow-iw)/2:(oh-ih)/2,reverse"
+        if reverse
+        else "scale=3840:2160:force_original_aspect_ratio=decrease,"
+        "pad=3840:2160:(ow-iw)/2:(oh-ih)/2"
+    )
+    cmd = [
+        ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+        "-i", str(src), "-vf", vf,
+        "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-an",
+        str(dst),
+    ]
+    subprocess.run(cmd, capture_output=True, text=True, timeout=300, check=True)
+    return dst
+
+
+def _letterbox_source(tmp_path: Path) -> Path:
+    """Real 4:3 320x240 source, 30 frames @ 10fps (non-16:9 letterbox case)."""
+    import shutil
+    import subprocess
+
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        pytest.skip("ffmpeg not on PATH (letterbox row needs the real binary)")
+    source = tmp_path / "src_43.mp4"
+    cmd = [
+        ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+        "-f", "lavfi", "-i", "testsrc=size=320x240:rate=10:duration=3.0",
+        "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-an",
+        str(source),
+    ]
+    subprocess.run(cmd, capture_output=True, text=True, timeout=300, check=True)
+    return source
+
+
+def test_publish_psnr_upscale_letterbox_30of30_passes(env, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
+    """F11-T06B-02 final: cross-raster upscale + letterbox candidate PASSes
+    30/30 frames — reference raster (server-probed) drives the product
+    letterbox compare in the REAL validator."""
+    import app.services.s12_export.publication as pubmod
+    import shutil
+
+    factory, svc, manifest_id, dirs = env
+    source = _letterbox_source(tmp_path)  # 320x240 4:3, 30 frames
+    candidate_file = _upscale_candidate(source, tmp_path / "cand_4k.mp4")
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(pubmod, "_require_ready", lambda session, **kw: None)
+    run, _job, _ = submit_export_job(
+        svc,
+        **base._submit_kwargs(
+            factory, manifest_id, dirs,
+            source_path=str(source),
+            fps=10.0, fps_num=10, fps_den=1, frame_count=30,
+        ),
+    )
+    with factory() as s:
+        lease = S12ExportRepository(s).claim_run(run.id, "worker-upscale")
+        s.commit()
+    scratch = Path(dirs["scratch"])
+    scratch.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(candidate_file, scratch / "candidate_final.mp4")
+    manifest = {
+        "fps": 10.0,
+        "fps_num": 10,
+        "fps_den": 1,
+        "frame_count": 30,
+        "chunk_dir": dirs["chunk"],
+        "scratch_dir": dirs["scratch"],
+        "output_path": dirs["output"],
+        "profile_codec": "h264",
+        "source_path": str(source),
+    }
+    # Reference raster must be server-probed from the approved artifact.
+    exp_ref = pub._build_source_reference(manifest, 10, 1)
+    assert (exp_ref.reference_width, exp_ref.reference_height) == (320, 240)
+    with factory() as s:
+        out = pubmod.publish_export_run(
+            s,
+            run_id=run.id,
+            workspace_id=WS,
+            project_id=f"p-{WS}",
+            worker_id="worker-upscale",
+            fence_token=lease.fence_token,
+            manifest=manifest,
+        )
+        s.commit()
+    assert out["status"] == "completed"
+    assert out["verdict"] == "PASS"
+    order = next(p for p in out["probes"] if p["name"] == "frame_order")
+    assert "30 frames" in order["detail"] or "PSNR" in order["detail"], order
+    with factory() as s:
+        assert S12ExportRepository(s).get_run(run.id).status == "completed"
+    monkeypatch.undo()
+
+
+def test_publish_psnr_upscale_reorder_fails(env, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
+    """Reordered upscale candidate FAILs under the same cross-raster PSNR
+    path — content authority is real, tolerance never waives tamper."""
+    import app.services.s12_export.publication as pubmod
+    import shutil
+
+    factory, svc, manifest_id, dirs = env
+    source = _letterbox_source(tmp_path)
+    tampered = _upscale_candidate(source, tmp_path / "tamper_4k.mp4", reverse=True)
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(pubmod, "_require_ready", lambda session, **kw: None)
+    run, _job, _ = submit_export_job(
+        svc,
+        **base._submit_kwargs(
+            factory, manifest_id, dirs,
+            source_path=str(source),
+            fps=10.0, fps_num=10, fps_den=1, frame_count=30,
+        ),
+    )
+    with factory() as s:
+        lease = S12ExportRepository(s).claim_run(run.id, "worker-upscale")
+        s.commit()
+    scratch = Path(dirs["scratch"])
+    scratch.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(tampered, scratch / "candidate_final.mp4")
+    manifest = {
+        "fps": 10.0,
+        "fps_num": 10,
+        "fps_den": 1,
+        "frame_count": 30,
+        "chunk_dir": dirs["chunk"],
+        "scratch_dir": dirs["scratch"],
+        "output_path": dirs["output"],
+        "profile_codec": "h264",
+        "source_path": str(source),
+    }
+    with factory() as s:
+        with pytest.raises(pub.PublicationError):
+            pubmod.publish_export_run(
+                s,
+                run_id=run.id,
+                workspace_id=WS,
+                project_id=f"p-{WS}",
+                worker_id="worker-upscale",
+                fence_token=lease.fence_token,
+                manifest=manifest,
+            )
+        s.rollback()
+    with factory() as s:
+        assert S12ExportRepository(s).get_run(run.id).status == "failed"
+    assert not Path(dirs["output"]).exists()
+    monkeypatch.undo()
