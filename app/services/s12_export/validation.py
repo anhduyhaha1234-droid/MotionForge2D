@@ -486,34 +486,48 @@ def probe_frame_psnr(
         and reference_height > 0
     ):
         ref_vf = _fit_filter(width, height)
-    # Windows rawvideo PIPE drops frames when the filter graph scales up
-    # (F11-T06B-02 follow-up: 7/30 frames read). The scaled reference is
-    # therefore decoded into a temp raw FILE (outside the repo) and read
-    # frame-by-frame from disk; the unscaled candidate keeps its pipe
-    # (proven 30/30 for the same-raster path).
+    # Windows rawvideo PIPE drops frames at scale (F11-T06B-02 follow-up:
+    # 7/30 frames, ~7.6dB). The CROSS-RASTER path therefore decodes BOTH
+    # the candidate and the scaled reference into temp raw FILES (outside
+    # the repo) and reads them frame-by-frame from disk. The same-raster
+    # path keeps its pipes (proven 30/30 for native 4K).
+    cross_raster = ref_vf is not None
+    cand_file: Path | None = None
+    cand_pipe = None
     ref_file: Path | None = None
     ref_pipe = None
-    if ref_vf is None:
-        ref_pipe = _open_raw_pipe(reference)
-    else:
+    if cross_raster:
+        cand_file = _decode_raw_to_file(candidate, None, width, height)
         ref_file = _decode_raw_to_file(reference, ref_vf, width, height)
-    cand = _open_raw_pipe(candidate)
-    if cand is None or (ref_pipe is None and ref_file is None):
-        if cand is not None:
-            cand.kill()
+    else:
+        cand_pipe = _open_raw_pipe(candidate)
+        ref_pipe = _open_raw_pipe(reference)
+    if (cand_file is None and cand_pipe is None) or (
+        ref_file is None and ref_pipe is None
+    ):
+        if cand_pipe is not None:
+            cand_pipe.kill()
         if ref_pipe is not None:
             ref_pipe.kill()
+        if cand_file is not None:
+            cand_file.unlink(missing_ok=True)
         if ref_file is not None:
             ref_file.unlink(missing_ok=True)
         return None
     values: list[float] = []
+    cand_handle = None
     ref_handle = None
     try:
-        assert cand.stdout is not None
+        if cand_file is not None:
+            cand_handle = open(cand_file, "rb")
         if ref_file is not None:
             ref_handle = open(ref_file, "rb")
         while True:
-            ca = _read_exact(cand.stdout, frame_size)
+            if cand_handle is not None:
+                ca = _read_exact(cand_handle, frame_size)
+            else:
+                assert cand_pipe is not None and cand_pipe.stdout is not None
+                ca = _read_exact(cand_pipe.stdout, frame_size)
             if ref_handle is not None:
                 rb = _read_exact(ref_handle, frame_size)
             else:
@@ -533,23 +547,28 @@ def probe_frame_psnr(
             else:
                 values.append(10.0 * math.log10(255.0 * 255.0 / mse))
     finally:
-        cand.kill()
+        if cand_pipe is not None:
+            cand_pipe.kill()
         if ref_pipe is not None:
             ref_pipe.kill()
+        if cand_handle is not None:
+            cand_handle.close()
         if ref_handle is not None:
             ref_handle.close()
+        if cand_file is not None:
+            cand_file.unlink(missing_ok=True)
         if ref_file is not None:
             ref_file.unlink(missing_ok=True)
     return tuple(99.0 if v == float("inf") else v for v in values) if values else None
 
 
 def _decode_raw_to_file(
-    path: str | Path, vf: str, width: int, height: int
+    path: str | Path, vf: str | None, width: int, height: int
 ) -> Path | None:
-    # Decode the reference (with the fit filter) into a temp raw file so
-    # scaled frames are never lost on the Windows pipe. The raw file is
-    # validated to be a whole number of WxH yuv420p frames; garbage or a
-    # truncated decode returns None (fail-closed).
+    # Decode into a temp raw file (optional fit filter) so scaled frames
+    # are never lost on the Windows pipe. The raw file is validated to be
+    # a whole number of WxH yuv420p frames; garbage or a truncated decode
+    # returns None (fail-closed).
     frame_size = width * height * 3 // 2
     if frame_size <= 0:
         return None
@@ -557,25 +576,20 @@ def _decode_raw_to_file(
     os.close(fd)
     out = Path(tmp_name)
     try:
+        argv = [
+            find_ffmpeg(),
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-i",
+            str(path),
+        ]
+        if vf:
+            argv += ["-vf", vf]
+        argv += ["-map", "0:v:0", "-f", "rawvideo", "-pix_fmt", "yuv420p", str(out)]
         completed = subprocess.run(
-            [
-                find_ffmpeg(),
-                "-hide_banner",
-                "-loglevel",
-                "error",
-                "-y",
-                "-i",
-                str(path),
-                "-vf",
-                vf,
-                "-map",
-                "0:v:0",
-                "-f",
-                "rawvideo",
-                "-pix_fmt",
-                "yuv420p",
-                str(out),
-            ],
+            argv,
             capture_output=True,
             text=True,
             timeout=600,
