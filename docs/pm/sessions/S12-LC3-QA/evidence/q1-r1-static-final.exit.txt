@@ -1,0 +1,4 @@
+ruff_all_f=0
+ruff_allowed=0
+git_diff_check=0
+overall=0

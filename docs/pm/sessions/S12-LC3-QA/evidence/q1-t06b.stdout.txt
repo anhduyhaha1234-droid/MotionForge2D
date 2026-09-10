@@ -1,0 +1,26 @@
+............s........                                                    [100%]
+============================== warnings summary ===============================
+tests/s12/s12-t06b/test_c26_normal_product.py::test_c26_upscale_1080p_to_4k_real_render
+tests/s12/s12-t06b/test_c26_normal_product.py::test_c26_native_4k_control
+tests/s12/s12-t06b/test_c26_normal_product.py::test_c26_non_16_9_control
+tests/s12/s12-t06b/test_c26_normal_product.py::test_c26_positive_result_media_playable
+tests/s12/s12-t06b/test_c26_normal_product.py::test_c26_tamper_reorder_and_audio_still_fail_under_psnr
+tests/s12/s12-t06b/test_c27_same_job_fresh_process.py::test_c27_same_job_kill_stage1_fresh_pid_resume_and_publish
+tests/s12/s12-t06b/test_scenario_g_resume.py::test_g2_relaunch_reuses_verified_chunks
+tests/s12/s12-t06b/test_scenario_g_resume.py::test_g3_missing_chunk_fail_closed_then_recover
+  C:\Users\Admin\AppData\Local\Programs\Python\Python311\Lib\contextlib.py:144: SAWarning: Skipped unsupported reflection of expression-based index uq_character_active_workspace_code
+    next(self.gen)
+
+tests/s12/s12-t06b/test_c26_normal_product.py::test_c26_upscale_1080p_to_4k_real_render
+tests/s12/s12-t06b/test_c26_normal_product.py::test_c26_native_4k_control
+tests/s12/s12-t06b/test_c26_normal_product.py::test_c26_non_16_9_control
+tests/s12/s12-t06b/test_c26_normal_product.py::test_c26_positive_result_media_playable
+tests/s12/s12-t06b/test_c26_normal_product.py::test_c26_tamper_reorder_and_audio_still_fail_under_psnr
+tests/s12/s12-t06b/test_c27_same_job_fresh_process.py::test_c27_same_job_kill_stage1_fresh_pid_resume_and_publish
+tests/s12/s12-t06b/test_scenario_g_resume.py::test_g2_relaunch_reuses_verified_chunks
+tests/s12/s12-t06b/test_scenario_g_resume.py::test_g3_missing_chunk_fail_closed_then_recover
+  C:\Users\Admin\AppData\Local\Programs\Python\Python311\Lib\contextlib.py:144: SAWarning: Skipped unsupported reflection of expression-based index uq_channel_active_workspace_role_name
+    next(self.gen)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+20 passed, 1 skipped, 16 warnings in 56.99s

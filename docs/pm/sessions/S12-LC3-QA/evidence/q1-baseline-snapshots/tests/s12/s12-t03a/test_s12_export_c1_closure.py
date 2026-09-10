@@ -399,7 +399,6 @@ def test_c08_barrier_exactly_one_winner(c1db) -> None:  # type: ignore[no-untype
         run_id = rec.id
     barrier = threading.Barrier(2)
     outcomes: dict[str, str] = {}
-    loser_errors: dict[str, str] = {}
 
     def _racer(name: str) -> None:
         with factory() as s:
@@ -409,14 +408,12 @@ def test_c08_barrier_exactly_one_winner(c1db) -> None:  # type: ignore[no-untype
                 repo.claim_run(run_id, name)
                 s.commit()
                 outcomes[name] = "won"
-            except LeaseConflictError as err:
+            except LeaseConflictError:
                 s.rollback()
-                outcomes[name] = "lost:LeaseConflictError"
-                loser_errors[name] = type(err).__name__
+                outcomes[name] = "lost"
             except Exception:  # noqa: BLE001 - any other error is also a loss
                 s.rollback()
-                outcomes[name] = "lost:unexpected"
-                loser_errors[name] = "unexpected"
+                outcomes[name] = "lost"
 
     threads = [
         threading.Thread(target=_racer, args=(n,), name=f"c08-{n}")
@@ -427,8 +424,7 @@ def test_c08_barrier_exactly_one_winner(c1db) -> None:  # type: ignore[no-untype
     for t in threads:
         t.join(timeout=60)
     assert all(not t.is_alive() for t in threads), "bounded joins exceeded"
-    assert sorted(outcomes.values()) == ["lost:LeaseConflictError", "won"], outcomes
-    assert list(loser_errors.values()) == ["LeaseConflictError"], loser_errors
+    assert sorted(outcomes.values()) == ["lost", "won"], outcomes
     with factory() as s:
         leases = s.scalars(select(S12ExportLease)).all()
         assert len(leases) == 1

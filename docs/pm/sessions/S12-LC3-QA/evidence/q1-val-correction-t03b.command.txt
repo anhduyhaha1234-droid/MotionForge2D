@@ -1,0 +1,1 @@
+python -m pytest tests/s12/s12-t03b/test_runner_resume.py::test_expired_lease_fails_closed tests/s12/s12-t03b/test_runner_resume.py::test_cancel_flag_stops_run tests/s12/s12-t03b/test_runner_resume.py::test_tampered_chunk_hash_replay_fails tests/s12/s12-t03b/test_runner_resume.py::test_audio_mapping_exact_not_looped -vv -p no:cacheprovider

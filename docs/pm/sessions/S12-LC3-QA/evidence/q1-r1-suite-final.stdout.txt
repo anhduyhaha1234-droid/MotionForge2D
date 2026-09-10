@@ -1,0 +1,314 @@
+........................................................................ [ 21%]
+........................................................................ [ 42%]
+............................................F........................... [ 63%]
+....F................................................................... [ 84%]
+............................................s........                    [100%]
+================================== FAILURES ===================================
+______________________ test_retry_after_cancel_converges ______________________
+
+env = (sessionmaker(class_='Session', bind=Engine(sqlite:///C:/Users/Admin/AppData/Local/Temp/pytest-of-Admin/pytest-7/test_...utput': 'C:\\Users\\Admin\\AppData\\Local\\Temp\\pytest-of-Admin\\pytest-7\\test_retry_after_cancel_conver0\\out.mp4'})
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001F363927590>
+
+    def test_retry_after_cancel_converges(env, monkeypatch: pytest.MonkeyPatch) -> None:  # type: ignore[no-untyped-def]
+        factory, svc, manifest_id, dirs = env
+        run, _job, _ = submit_export_job(svc, **_submit_kwargs(factory, manifest_id, dirs))
+        monkeypatch.setattr(route, "get_job_service", lambda: svc)
+        with factory() as s:
+            route.cancel_export(run.id, s, workspace_id=WS, project_id=None)
+            s.commit()
+        with factory() as s:
+>           first = route.retry_export(run.id, s, workspace_id=WS, project_id=None)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\s12\s12-t03c\test_export_jobs_api.py:239: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+run_id = 'b4ba47e9-a193-41b4-a3eb-e191ccd816eb'
+session = <sqlalchemy.orm.session.Session object at 0x000001F3668AA2D0>
+workspace_id = 'ws-s12t03c', project_id = None
+
+    @router.post("/s12-exports/{run_id}/retry", status_code=status.HTTP_202_ACCEPTED)
+    def retry_export(
+        run_id: str,
+        session: SessionDep,
+        workspace_id: str = Query(default=WORKSPACE_ID, min_length=1),
+        project_id: str | None = Query(default=None),
+    ) -> dict[str, Any]:
+        """Retry a failed/cancelled run: re-submit the same lineage pins.
+    
+        The T03A natural-key backstop dedupes a repeat retry onto the winner
+        (``created=False``) — never a duplicate successor.  An active
+        predecessor job fails closed with 409 (no competing work).
+        """
+        repo = S12ExportRepository(session)
+        try:
+            rec = repo.get_run(run_id)
+        except RunNotFoundError as err:
+            session.rollback()
+            raise HTTPException(status_code=404, detail=str(err)) from err
+        if rec.workspace_id != workspace_id or (project_id is not None and rec.project_id != project_id):
+            session.rollback()
+            raise HTTPException(status_code=404, detail=f"export run {run_id!r} not found")
+        if rec.status not in ("failed", "cancelled"):
+            session.rollback()
+            raise HTTPException(
+                status_code=409,
+                detail=f"run {run_id} in status {rec.status!r}; only failed/cancelled runs can be retried",
+            )
+        _, seen = _job_state_in(session, _job_key(run_id))
+        # A cancelled run's own job lingering in ``cancelling`` is NOT competing
+        # work — the run is terminal and the retry creates a NEW run + NEW job.
+        # Only a genuinely active (queued/running) job blocks the retry.
+        if seen in ("queued", "running"):
+            session.rollback()
+            raise HTTPException(
+                status_code=409,
+                detail="predecessor run has an active export job; retry would create competing work — reject",
+            )
+        from app.services.s12_export.authority import (  # noqa: PLC0415
+            resolve_export_authority,
+            resolve_export_context,
+        )
+    
+        context = resolve_export_context(
+            session,
+            workspace_id=workspace_id,
+            project_id=rec.project_id,
+            video_item_id=rec.video_item_id,
+        )
+        if context.reasons:
+            session.rollback()
+>           raise HTTPException(status_code=409, detail="export context is not current; retry rejected")
+E           fastapi.exceptions.HTTPException: 409: export context is not current; retry rejected
+
+app\api\routes\s12_export.py:494: HTTPException
+---------------------------- Captured stderr setup ----------------------------
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> a1b2c3d4e5f6, initial S01 persistence schema
+INFO  [alembic.runtime.migration] Running upgrade a1b2c3d4e5f6 -> 23b308b1fd0b, durable job schema (S02-T02)
+INFO  [alembic.runtime.migration] Running upgrade 23b308b1fd0b -> 1c9f2a4b7d8e, active-only case-insensitive channel name uniqueness (S03-T01)
+INFO  [alembic.runtime.migration] Running upgrade 1c9f2a4b7d8e -> d5e6f7a8b9c0, Add character library schema (S06-T01)
+INFO  [alembic.runtime.migration] Running upgrade d5e6f7a8b9c0 -> e7f8a9b0c1d2, Add durable object intelligence schema (S08-T01).
+INFO  [alembic.runtime.migration] Running upgrade e7f8a9b0c1d2 -> f2a3b4c5d6e7, Add extraction surfaces for durable object candidate discovery (S08-T02).
+INFO  [alembic.runtime.migration] Running upgrade f2a3b4c5d6e7 -> f3a4b5c6d7e8, Add cross-scene grouping and curation surfaces (S08-T03).
+INFO  [alembic.runtime.migration] Running upgrade f3a4b5c6d7e8 -> f4a5b6c7d8e9, Add the durable targeted-correction surface (S08-T05).
+INFO  [alembic.runtime.migration] Running upgrade f4a5b6c7d8e9 -> f5a6b7c8d9e0, Add durable ObjectRole->Artifact association (S08-T02 correction round).
+INFO  [alembic.runtime.migration] Running upgrade f5a6b7c8d9e0 -> f6a7b8c9d0e1, Add durable media supersession for corrected objects (S08-T05-C1, finding D).
+INFO  [alembic.runtime.migration] Running upgrade f6a7b8c9d0e1 -> f7a8b9c0d1e2, Widen ObjectRole.kind to the canonical seven Source-Locked 2D kinds (S08-A01).
+INFO  [alembic.runtime.migration] Running upgrade f7a8b9c0d1e2 -> a0b1c2d3e4f5, Add S08-A02 structural evidence bridge schema (occurrence segments,
+segment motion, scene-graph occlusion/contact edges).
+INFO  [alembic.runtime.migration] Running upgrade a0b1c2d3e4f5 -> b2c3d4e5f6a7b, Add S07-T01 Project Cast Mapping schema (project_cast_mapping).
+INFO  [alembic.runtime.migration] Running upgrade b2c3d4e5f6a7b -> c9d0e1f2a3b4, S09-T01: add reskin_config + apply_checkpoint schema (SOLE S09 migration).
+INFO  [alembic.runtime.migration] Running upgrade c9d0e1f2a3b4 -> d8e9f0a1b2c3, S09-T00-I01: structural lock + renderer route schema (additive).
+INFO  [alembic.runtime.migration] Running upgrade d8e9f0a1b2c3 -> b3c4d5e6f7a9, S09-T05A: targeted correction archive schema (additive).
+INFO  [alembic.runtime.migration] Running upgrade b3c4d5e6f7a9 -> a10b11c12d3e, S10-T01A: durable FullApply domain — run/chunk/publication + checkpoint contract.
+INFO  [alembic.runtime.migration] Running upgrade a10b11c12d3e -> e11a02a2026f, S11-T02A: QCItem persistence — fail-closed QC freeze at DB level.
+INFO  [alembic.runtime.migration] Running upgrade e11a02a2026f -> f9a0b1c2d3e4, S11-T02A-C1: QCItem category/reason-code enum correction (Decision B + D).
+INFO  [alembic.runtime.migration] Running upgrade f9a0b1c2d3e4 -> c3d4e5f6a7b8, S12-T03A: durable export domain — run/chunk/lease + checkpoint contract.
+_______________ test_c15_retry_converges_no_duplicate_successor _______________
+
+env = (sessionmaker(class_='Session', bind=Engine(sqlite:///C:/Users/Admin/AppData/Local/Temp/pytest-of-Admin/pytest-7/test_...4'}, WindowsPath('C:/Users/Admin/AppData/Local/Temp/pytest-of-Admin/pytest-7/test_c15_retry_converges_no_du0/managed'))
+
+    def test_c15_retry_converges_no_duplicate_successor(env) -> None:  # type: ignore[no-untyped-def]
+        """Cancel \u2192 retry converges on the lineage; \u22641 successor, states agree."""
+        factory, svc, manifest_id, auth, dirs, managed = env
+        kw = {
+            "workspace_id": WS,
+            "project_id": f"p-{WS}",
+            "video_item_id": f"v-{WS}",
+            "checkpoint_id": "ac-a",
+            "checkpoint_hash": CHK_HASH,
+            "checkpoint_revision": 1,
+            "manifest_id": manifest_id,
+            "manifest_hash": _real_manifest_hash(factory, manifest_id),
+            "manifest_generation": "gen1",
+            "profile_id": "master-4k-h264",
+            "plan_id": PLAN_ID,
+            "plan_hash": PLAN_HASH,
+            "frame_count": FRAMES,
+            "chunk_config": {"overlap": 1, "max_frames": 4},
+            "source_path": str(managed / "apply" / "x.mp4"),
+            "fps": float(FPS),
+            "fps_num": FPS,
+            "fps_den": 1,
+            "chunk_dir": dirs["chunk"],
+            "scratch_dir": dirs["scratch"],
+            "output_path": dirs["output"],
+            "expected_sha256": "a" * 64,
+        }
+        run, job, _ = submit_export_job(svc, **kw)
+        with factory() as s:
+            assert S12ExportRepository(s).get_run(run.id).status == "pending"
+            from app.persistence.jobs import JobRepository as JR
+    
+            jrow = JR(s).list_jobs(WS, limit=10)[0]
+            assert jrow.state in ("queued", "running")
+            assert jrow.id == job.job_id
+        # Two callers cancel concurrently-shaped path: first wins, second 409.
+        monkeypatch = pytest.MonkeyPatch()
+        monkeypatch.setattr(route, "get_job_service", lambda: svc)
+        with factory() as s:
+            out = route.cancel_export(run.id, s, workspace_id=WS, project_id=None)
+            s.commit()
+        assert out["cancelled"] is True
+        from fastapi import HTTPException
+    
+        with factory() as s:
+            with pytest.raises(HTTPException) as exc:
+                route.cancel_export(run.id, s, workspace_id=WS, project_id=None)
+            s.rollback()
+        assert exc.value.status_code == 409
+        # Retry: converges (created False, same run) — no successor rows.
+        with factory() as s:
+>           r = route.retry_export(run.id, s, workspace_id=WS, project_id=None)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\s12\s12-t03c\test_s12_t03c_c1_closure.py:503: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+run_id = 'b65cb13f-bb46-4803-b034-32bf72b8be0d'
+session = <sqlalchemy.orm.session.Session object at 0x000001F367900F90>
+workspace_id = 'default', project_id = None
+
+    @router.post("/s12-exports/{run_id}/retry", status_code=status.HTTP_202_ACCEPTED)
+    def retry_export(
+        run_id: str,
+        session: SessionDep,
+        workspace_id: str = Query(default=WORKSPACE_ID, min_length=1),
+        project_id: str | None = Query(default=None),
+    ) -> dict[str, Any]:
+        """Retry a failed/cancelled run: re-submit the same lineage pins.
+    
+        The T03A natural-key backstop dedupes a repeat retry onto the winner
+        (``created=False``) — never a duplicate successor.  An active
+        predecessor job fails closed with 409 (no competing work).
+        """
+        repo = S12ExportRepository(session)
+        try:
+            rec = repo.get_run(run_id)
+        except RunNotFoundError as err:
+            session.rollback()
+            raise HTTPException(status_code=404, detail=str(err)) from err
+        if rec.workspace_id != workspace_id or (project_id is not None and rec.project_id != project_id):
+            session.rollback()
+            raise HTTPException(status_code=404, detail=f"export run {run_id!r} not found")
+        if rec.status not in ("failed", "cancelled"):
+            session.rollback()
+            raise HTTPException(
+                status_code=409,
+                detail=f"run {run_id} in status {rec.status!r}; only failed/cancelled runs can be retried",
+            )
+        _, seen = _job_state_in(session, _job_key(run_id))
+        # A cancelled run's own job lingering in ``cancelling`` is NOT competing
+        # work — the run is terminal and the retry creates a NEW run + NEW job.
+        # Only a genuinely active (queued/running) job blocks the retry.
+        if seen in ("queued", "running"):
+            session.rollback()
+            raise HTTPException(
+                status_code=409,
+                detail="predecessor run has an active export job; retry would create competing work — reject",
+            )
+        from app.services.s12_export.authority import (  # noqa: PLC0415
+            resolve_export_authority,
+            resolve_export_context,
+        )
+    
+        context = resolve_export_context(
+            session,
+            workspace_id=workspace_id,
+            project_id=rec.project_id,
+            video_item_id=rec.video_item_id,
+        )
+        if context.reasons:
+            session.rollback()
+            raise HTTPException(status_code=409, detail="export context is not current; retry rejected")
+        current_values = (
+            rec.checkpoint_id == context.checkpoint_id,
+            rec.checkpoint_hash.lower() == str(context.checkpoint_hash).lower(),
+            rec.checkpoint_revision == context.checkpoint_revision,
+            rec.manifest_id == context.manifest_id,
+            rec.manifest_hash.lower() == str(context.manifest_hash).lower(),
+            rec.manifest_generation == context.manifest_generation,
+            rec.plan_id == context.plan_id,
+            rec.plan_hash.lower() == str(context.plan_hash).lower(),
+            rec.frame_count == context.frame_count,
+        )
+        if not all(current_values):
+            session.rollback()
+>           raise HTTPException(status_code=409, detail="S12_EXPORT_STALE_CHECKPOINT: retry context changed")
+E           fastapi.exceptions.HTTPException: 409: S12_EXPORT_STALE_CHECKPOINT: retry context changed
+
+app\api\routes\s12_export.py:508: HTTPException
+---------------------------- Captured stderr setup ----------------------------
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> a1b2c3d4e5f6, initial S01 persistence schema
+INFO  [alembic.runtime.migration] Running upgrade a1b2c3d4e5f6 -> 23b308b1fd0b, durable job schema (S02-T02)
+INFO  [alembic.runtime.migration] Running upgrade 23b308b1fd0b -> 1c9f2a4b7d8e, active-only case-insensitive channel name uniqueness (S03-T01)
+INFO  [alembic.runtime.migration] Running upgrade 1c9f2a4b7d8e -> d5e6f7a8b9c0, Add character library schema (S06-T01)
+INFO  [alembic.runtime.migration] Running upgrade d5e6f7a8b9c0 -> e7f8a9b0c1d2, Add durable object intelligence schema (S08-T01).
+INFO  [alembic.runtime.migration] Running upgrade e7f8a9b0c1d2 -> f2a3b4c5d6e7, Add extraction surfaces for durable object candidate discovery (S08-T02).
+INFO  [alembic.runtime.migration] Running upgrade f2a3b4c5d6e7 -> f3a4b5c6d7e8, Add cross-scene grouping and curation surfaces (S08-T03).
+INFO  [alembic.runtime.migration] Running upgrade f3a4b5c6d7e8 -> f4a5b6c7d8e9, Add the durable targeted-correction surface (S08-T05).
+INFO  [alembic.runtime.migration] Running upgrade f4a5b6c7d8e9 -> f5a6b7c8d9e0, Add durable ObjectRole->Artifact association (S08-T02 correction round).
+INFO  [alembic.runtime.migration] Running upgrade f5a6b7c8d9e0 -> f6a7b8c9d0e1, Add durable media supersession for corrected objects (S08-T05-C1, finding D).
+INFO  [alembic.runtime.migration] Running upgrade f6a7b8c9d0e1 -> f7a8b9c0d1e2, Widen ObjectRole.kind to the canonical seven Source-Locked 2D kinds (S08-A01).
+INFO  [alembic.runtime.migration] Running upgrade f7a8b9c0d1e2 -> a0b1c2d3e4f5, Add S08-A02 structural evidence bridge schema (occurrence segments,
+segment motion, scene-graph occlusion/contact edges).
+INFO  [alembic.runtime.migration] Running upgrade a0b1c2d3e4f5 -> b2c3d4e5f6a7b, Add S07-T01 Project Cast Mapping schema (project_cast_mapping).
+INFO  [alembic.runtime.migration] Running upgrade b2c3d4e5f6a7b -> c9d0e1f2a3b4, S09-T01: add reskin_config + apply_checkpoint schema (SOLE S09 migration).
+INFO  [alembic.runtime.migration] Running upgrade c9d0e1f2a3b4 -> d8e9f0a1b2c3, S09-T00-I01: structural lock + renderer route schema (additive).
+INFO  [alembic.runtime.migration] Running upgrade d8e9f0a1b2c3 -> b3c4d5e6f7a9, S09-T05A: targeted correction archive schema (additive).
+INFO  [alembic.runtime.migration] Running upgrade b3c4d5e6f7a9 -> a10b11c12d3e, S10-T01A: durable FullApply domain — run/chunk/publication + checkpoint contract.
+INFO  [alembic.runtime.migration] Running upgrade a10b11c12d3e -> e11a02a2026f, S11-T02A: QCItem persistence — fail-closed QC freeze at DB level.
+INFO  [alembic.runtime.migration] Running upgrade e11a02a2026f -> f9a0b1c2d3e4, S11-T02A-C1: QCItem category/reason-code enum correction (Decision B + D).
+INFO  [alembic.runtime.migration] Running upgrade f9a0b1c2d3e4 -> c3d4e5f6a7b8, S12-T03A: durable export domain — run/chunk/lease + checkpoint contract.
+============================== warnings summary ===============================
+..\..\AppData\Local\Programs\Python\Python311\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\Admin\AppData\Local\Programs\Python\Python311\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/s12/s12-t01/test_preflight_contract.py: 11 warnings
+tests/s12/s12-t01/test_s12_t01_c1_closure.py: 14 warnings
+tests/s12/s12-t03a/test_s12_export_c1_closure.py: 14 warnings
+tests/s12/s12-t03a/test_s12_export_c2_integrity.py: 16 warnings
+tests/s12/s12-t03a/test_s12_export_domain.py: 24 warnings
+tests/s12/s12-t03a/test_s12_export_migration.py: 4 warnings
+tests/s12/s12-t03b/test_runner_resume.py: 11 warnings
+tests/s12/s12-t03b/test_s12_t03b_c1_closure.py: 11 warnings
+tests/s12/s12-t03c/test_c1_closure_c22.py: 5 warnings
+tests/s12/s12-t03c/test_c1_repro_typeerrors.py: 1 warning
+tests/s12/s12-t03c/test_export_jobs_api.py: 9 warnings
+tests/s12/s12-t03c/test_publication.py: 19 warnings
+tests/s12/s12-t03c/test_s12_t03c_c1_closure.py: 9 warnings
+tests/s12/s12-t06b/test_c26_normal_product.py: 5 warnings
+tests/s12/s12-t06b/test_c27_same_job_fresh_process.py: 1 warning
+tests/s12/s12-t06b/test_scenario_g_resume.py: 2 warnings
+  C:\Users\Admin\AppData\Local\Programs\Python\Python311\Lib\contextlib.py:144: SAWarning: Skipped unsupported reflection of expression-based index uq_character_active_workspace_code
+    next(self.gen)
+
+tests/s12/s12-t01/test_preflight_contract.py: 11 warnings
+tests/s12/s12-t01/test_s12_t01_c1_closure.py: 14 warnings
+tests/s12/s12-t03a/test_s12_export_c1_closure.py: 14 warnings
+tests/s12/s12-t03a/test_s12_export_c2_integrity.py: 16 warnings
+tests/s12/s12-t03a/test_s12_export_domain.py: 24 warnings
+tests/s12/s12-t03a/test_s12_export_migration.py: 4 warnings
+tests/s12/s12-t03b/test_runner_resume.py: 11 warnings
+tests/s12/s12-t03b/test_s12_t03b_c1_closure.py: 11 warnings
+tests/s12/s12-t03c/test_c1_closure_c22.py: 5 warnings
+tests/s12/s12-t03c/test_c1_repro_typeerrors.py: 1 warning
+tests/s12/s12-t03c/test_export_jobs_api.py: 9 warnings
+tests/s12/s12-t03c/test_publication.py: 19 warnings
+tests/s12/s12-t03c/test_s12_t03c_c1_closure.py: 9 warnings
+tests/s12/s12-t06b/test_c26_normal_product.py: 5 warnings
+tests/s12/s12-t06b/test_c27_same_job_fresh_process.py: 1 warning
+tests/s12/s12-t06b/test_scenario_g_resume.py: 2 warnings
+  C:\Users\Admin\AppData\Local\Programs\Python\Python311\Lib\contextlib.py:144: SAWarning: Skipped unsupported reflection of expression-based index uq_channel_active_workspace_role_name
+    next(self.gen)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/s12/s12-t03c/test_export_jobs_api.py::test_retry_after_cancel_converges
+FAILED tests/s12/s12-t03c/test_s12_t03c_c1_closure.py::test_c15_retry_converges_no_duplicate_successor
+2 failed, 338 passed, 1 skipped, 313 warnings in 316.51s (0:05:16)

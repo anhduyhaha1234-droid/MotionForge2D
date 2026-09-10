@@ -1,0 +1,326 @@
+{
+  "assertions": [
+    "public durable project created",
+    "public durable video created",
+    "export context remained server-owned and non-ready",
+    "export submit was rejected before durable mutation",
+    "s12_export_runs == 0 after rejected submit",
+    "the rejected submit did not change the pre-submit job count"
+  ],
+  "database": "C:\\Users\\Admin\\mfqa\\s12-lc3-r1\\20260910T101832Z\\QA\\data\\probe.db",
+  "legacy_project_id": "b51fdf513472",
+  "managed_root": "C:\\Users\\Admin\\mfqa\\s12-lc3-r1\\20260910T101832Z\\QA\\artifacts",
+  "manual_sql_used": false,
+  "post_submit_counts": {
+    "jobs": 1,
+    "s12_export_runs": 0
+  },
+  "project_id": "3c98ffc7-d219-4095-8b76-60e07382b452",
+  "status": "BLOCKED_EXTERNAL_AUTHORITY_FIXTURE",
+  "steps": {
+    "authority_attempt": {
+      "durable_import": {
+        "body": {
+          "detail": "Not Found"
+        },
+        "status_code": 404
+      },
+      "durable_video_import_paths": [],
+      "fixture": "C:\\Users\\Admin\\mfqa\\s12-lc3-r1\\20260910T101832Z\\QA\\upload-fixture.mp4",
+      "legacy_upload": {
+        "body": {
+          "detail": "Project not found"
+        },
+        "status_code": 404
+      }
+    },
+    "before_s12_export_submit_counts": {
+      "artifacts": 0,
+      "jobs": 1,
+      "projects": 2,
+      "s12_export_runs": 0,
+      "video_items": 2
+    },
+    "create_project": {
+      "body": {
+        "archived_at": null,
+        "created_at": "2026-09-10T10:18:44.226103+00:00",
+        "default_output_profile": null,
+        "description": "",
+        "name": "S12-LC3-Q1-public-probe",
+        "production_channel_id": null,
+        "project_id": "3c98ffc7-d219-4095-8b76-60e07382b452",
+        "resume_step": null,
+        "revision": 1,
+        "source_channel_id": null,
+        "status": "active",
+        "updated_at": "2026-09-10T10:18:44.226103+00:00",
+        "workspace_id": "default"
+      },
+      "status_code": 201
+    },
+    "create_project_mutation_counts": {
+      "artifacts": 0,
+      "jobs": 0,
+      "projects": 1,
+      "s12_export_runs": 0,
+      "video_items": 0
+    },
+    "create_video": {
+      "body": {
+        "archived_at": null,
+        "created_at": "2026-09-10T10:18:44.246134+00:00",
+        "duration_ms": null,
+        "fps_den": null,
+        "fps_num": null,
+        "height": null,
+        "position": 0,
+        "project_id": "3c98ffc7-d219-4095-8b76-60e07382b452",
+        "resume_step": null,
+        "revision": 1,
+        "source_artifact_id": null,
+        "source_channel_id": null,
+        "status": "imported",
+        "title": "S12-LC3-Q1-public-probe-video",
+        "updated_at": "2026-09-10T10:18:44.246134+00:00",
+        "video_item_id": "88de9298-d23e-47e7-854d-1c03f1536888",
+        "width": null,
+        "workspace_id": "default"
+      },
+      "status_code": 201
+    },
+    "create_video_mutation_counts": {
+      "artifacts": 0,
+      "jobs": 0,
+      "projects": 1,
+      "s12_export_runs": 0,
+      "video_items": 1
+    },
+    "export_context": {
+      "body": {
+        "checkpoint": null,
+        "context_revision": "75a4c97b87148cefbbf0fbc461b10dcf335b718f567dad284d6bd72ede301f2e",
+        "contract_version": "s12-export-v1",
+        "current_run": null,
+        "full_apply_run_id": null,
+        "lock": null,
+        "plan": null,
+        "profiles": [
+          {
+            "codec": "h264",
+            "height": 2160,
+            "profile_id": "master-4k-h264",
+            "support_basis": "probed libx264 via ffmpeg -encoders + 1-frame smoke (rc=0)",
+            "supported": true,
+            "upscale_method": null,
+            "width": 3840
+          },
+          {
+            "codec": "hevc",
+            "height": 2160,
+            "profile_id": "master-4k-hevc",
+            "support_basis": "probed libx265 via ffmpeg -encoders + 1-frame smoke (rc=0)",
+            "supported": true,
+            "upscale_method": null,
+            "width": 3840
+          },
+          {
+            "codec": "h264",
+            "height": 1080,
+            "profile_id": "preview-1080p-h264",
+            "support_basis": "probed libx264 via ffmpeg -encoders + 1-frame smoke (rc=0)",
+            "supported": true,
+            "upscale_method": null,
+            "width": 1920
+          }
+        ],
+        "project_id": "3c98ffc7-d219-4095-8b76-60e07382b452",
+        "project_name": "S12-LC3-Q1-public-probe",
+        "reasons": [
+          "S12_EXPORT_FULL_APPLY_MISSING",
+          "S12_EXPORT_LOCK_MISSING"
+        ],
+        "video_duration_ms": null,
+        "video_fps_den": null,
+        "video_fps_num": null,
+        "video_height": null,
+        "video_item_id": "88de9298-d23e-47e7-854d-1c03f1536888",
+        "video_status": "imported",
+        "video_title": "S12-LC3-Q1-public-probe-video",
+        "video_width": null,
+        "workspace_id": "default"
+      },
+      "status_code": 200
+    },
+    "export_submit": {
+      "body": {
+        "detail": "export context not current: ['S12_EXPORT_FULL_APPLY_MISSING', 'S12_EXPORT_LOCK_MISSING']"
+      },
+      "status_code": 409
+    },
+    "legacy_analyze_chain_read": {
+      "body": {
+        "active_step": "import",
+        "chain_status": "running",
+        "generation": "1",
+        "progress": 0.0,
+        "project_id": "b51fdf513472",
+        "proxy_artifact_id": null,
+        "scenes_count": 0,
+        "source_artifact_id": null,
+        "source_name": "legacy probe video",
+        "source_sha256": "bce0018453ff8594a4c1f4bd8287fc5cf84b980b1a713a795fabec5a77096977",
+        "steps": {
+          "import": {
+            "error": null,
+            "error_code": null,
+            "job_id": "7960944c-a62b-4a18-991e-c455d7d2d997",
+            "message": "\u0110ang ch\u1edd x\u1eed l\u00fd",
+            "predecessor_job_id": null,
+            "progress": 0.0,
+            "status": "queued",
+            "step": "import"
+          },
+          "proxy": {
+            "error": null,
+            "error_code": null,
+            "job_id": null,
+            "message": "Ch\u01b0a t\u1ea1o",
+            "predecessor_job_id": null,
+            "progress": 0.0,
+            "status": "not_created",
+            "step": "proxy"
+          },
+          "scene_detect": {
+            "error": null,
+            "error_code": null,
+            "job_id": null,
+            "message": "Ch\u01b0a t\u1ea1o",
+            "predecessor_job_id": null,
+            "progress": 0.0,
+            "status": "not_created",
+            "step": "scene_detect"
+          }
+        },
+        "video_item_id": "0de19195-3a38-4a63-8855-277ec8f7fdb4"
+      },
+      "status_code": 200
+    },
+    "legacy_analyze_chain_read_mutation_counts": {
+      "artifacts": 0,
+      "jobs": 1,
+      "projects": 2,
+      "s12_export_runs": 0,
+      "video_items": 2
+    },
+    "legacy_analyze_submit": {
+      "body": {
+        "active_step": "import",
+        "chain_status": "running",
+        "generation": "1",
+        "progress": 0.0,
+        "project_id": "b51fdf513472",
+        "proxy_artifact_id": null,
+        "scenes_count": 0,
+        "source_artifact_id": null,
+        "source_name": "legacy probe video",
+        "source_sha256": "bce0018453ff8594a4c1f4bd8287fc5cf84b980b1a713a795fabec5a77096977",
+        "steps": {
+          "import": {
+            "error": null,
+            "error_code": null,
+            "job_id": "7960944c-a62b-4a18-991e-c455d7d2d997",
+            "message": "\u0110ang ch\u1edd x\u1eed l\u00fd",
+            "predecessor_job_id": null,
+            "progress": 0.0,
+            "status": "queued",
+            "step": "import"
+          },
+          "proxy": {
+            "error": null,
+            "error_code": null,
+            "job_id": null,
+            "message": "Ch\u01b0a t\u1ea1o",
+            "predecessor_job_id": null,
+            "progress": 0.0,
+            "status": "not_created",
+            "step": "proxy"
+          },
+          "scene_detect": {
+            "error": null,
+            "error_code": null,
+            "job_id": null,
+            "message": "Ch\u01b0a t\u1ea1o",
+            "predecessor_job_id": null,
+            "progress": 0.0,
+            "status": "not_created",
+            "step": "scene_detect"
+          }
+        },
+        "video_item_id": "0de19195-3a38-4a63-8855-277ec8f7fdb4"
+      },
+      "status_code": 200
+    },
+    "legacy_analyze_submit_mutation_counts": {
+      "artifacts": 0,
+      "jobs": 1,
+      "projects": 2,
+      "s12_export_runs": 0,
+      "video_items": 2
+    },
+    "legacy_create_project": {
+      "body": {
+        "project": {
+          "channel_id": "",
+          "created_at": "2026-09-10T10:18:45.090757+00:00",
+          "name": "S12-LC3-Q1-legacy-public-probe",
+          "objects": [],
+          "scene_details": [],
+          "scenes": [],
+          "source_video": "",
+          "task_status": "draft",
+          "updated_at": "2026-09-10T10:18:45.090757+00:00",
+          "version": "2.0.0",
+          "video_metadata": null
+        },
+        "project_id": "b51fdf513472"
+      },
+      "status_code": 201
+    },
+    "legacy_create_project_mutation_counts": {
+      "artifacts": 0,
+      "jobs": 0,
+      "projects": 1,
+      "s12_export_runs": 0,
+      "video_items": 1
+    },
+    "legacy_upload_mutation_counts": {
+      "artifacts": 0,
+      "jobs": 0,
+      "projects": 1,
+      "s12_export_runs": 0,
+      "video_items": 1
+    },
+    "legacy_upload_real": {
+      "body": {
+        "filename": "source_2980b6c211cc46c996e96e081226a944.mp4",
+        "original_filename": "upload-fixture.mp4",
+        "status": "ok"
+      },
+      "status_code": 200
+    },
+    "s09_reapprove": {
+      "body": {
+        "detail": "ReskinConfig 'missing-public-config' not found in workspace"
+      },
+      "status_code": 404
+    },
+    "s10_full_apply_submit": {
+      "body": {
+        "detail": "ApplyCheckpoint 'missing-public-checkpoint' not found in workspace"
+      },
+      "status_code": 404
+    }
+  },
+  "video_item_id": "88de9298-d23e-47e7-854d-1c03f1536888"
+}

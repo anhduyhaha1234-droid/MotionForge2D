@@ -1,0 +1,153 @@
+{
+  "assertions": [
+    "public durable project created",
+    "public durable video created",
+    "export context remained server-owned and non-ready",
+    "export submit was rejected before durable mutation",
+    "s12_export_runs == 0 after rejected submit",
+    "jobs == 0 after rejected submit"
+  ],
+  "database": "C:\\Users\\Admin\\AppData\\Local\\Temp\\s12_lc3_q1_public_probe_h81iv80u\\data\\probe.db",
+  "managed_root": "C:\\Users\\Admin\\AppData\\Local\\Temp\\s12_lc3_q1_public_probe_h81iv80u\\artifacts",
+  "manual_sql_used": false,
+  "post_submit_counts": {
+    "jobs": 0,
+    "s12_export_runs": 0
+  },
+  "project_id": "17205df2-bb94-4311-8d61-6522e24fdd2d",
+  "status": "BLOCKED_EXTERNAL_AUTHORITY_FIXTURE",
+  "steps": {
+    "authority_attempt": {
+      "durable_import": {
+        "body": {
+          "detail": "Not Found"
+        },
+        "status_code": 404
+      },
+      "durable_video_import_paths": [],
+      "fixture": "C:\\Users\\Admin\\AppData\\Local\\Temp\\s12_lc3_q1_public_probe_h81iv80u\\upload-fixture.mp4",
+      "legacy_upload": {
+        "body": {
+          "detail": "Project not found"
+        },
+        "status_code": 404
+      }
+    },
+    "create_project": {
+      "body": {
+        "archived_at": null,
+        "created_at": "2026-09-10T08:09:03.014286+00:00",
+        "default_output_profile": null,
+        "description": "",
+        "name": "S12-LC3-Q1-public-probe",
+        "production_channel_id": null,
+        "project_id": "17205df2-bb94-4311-8d61-6522e24fdd2d",
+        "resume_step": null,
+        "revision": 1,
+        "source_channel_id": null,
+        "status": "active",
+        "updated_at": "2026-09-10T08:09:03.014286+00:00",
+        "workspace_id": "default"
+      },
+      "status_code": 201
+    },
+    "create_video": {
+      "body": {
+        "archived_at": null,
+        "created_at": "2026-09-10T08:09:03.032226+00:00",
+        "duration_ms": null,
+        "fps_den": null,
+        "fps_num": null,
+        "height": null,
+        "position": 0,
+        "project_id": "17205df2-bb94-4311-8d61-6522e24fdd2d",
+        "resume_step": null,
+        "revision": 1,
+        "source_artifact_id": null,
+        "source_channel_id": null,
+        "status": "imported",
+        "title": "S12-LC3-Q1-public-probe-video",
+        "updated_at": "2026-09-10T08:09:03.032226+00:00",
+        "video_item_id": "8fccf83b-0d45-410f-814b-7ce0c8505b8f",
+        "width": null,
+        "workspace_id": "default"
+      },
+      "status_code": 201
+    },
+    "export_context": {
+      "body": {
+        "checkpoint": null,
+        "context_revision": "d1bf7a66dc402b26095d28f16b7f6b9299d7778a7aa99569552e44b6acd889e3",
+        "contract_version": "s12-export-v1",
+        "current_run": null,
+        "full_apply_run_id": null,
+        "lock": null,
+        "plan": null,
+        "profiles": [
+          {
+            "codec": "h264",
+            "height": 2160,
+            "profile_id": "master-4k-h264",
+            "support_basis": "probed libx264 via ffmpeg -encoders + 1-frame smoke (rc=0)",
+            "supported": true,
+            "upscale_method": null,
+            "width": 3840
+          },
+          {
+            "codec": "hevc",
+            "height": 2160,
+            "profile_id": "master-4k-hevc",
+            "support_basis": "probed libx265 via ffmpeg -encoders + 1-frame smoke (rc=0)",
+            "supported": true,
+            "upscale_method": null,
+            "width": 3840
+          },
+          {
+            "codec": "h264",
+            "height": 1080,
+            "profile_id": "preview-1080p-h264",
+            "support_basis": "probed libx264 via ffmpeg -encoders + 1-frame smoke (rc=0)",
+            "supported": true,
+            "upscale_method": null,
+            "width": 1920
+          }
+        ],
+        "project_id": "17205df2-bb94-4311-8d61-6522e24fdd2d",
+        "project_name": "S12-LC3-Q1-public-probe",
+        "reasons": [
+          "S12_EXPORT_FULL_APPLY_MISSING",
+          "S12_EXPORT_LOCK_MISSING"
+        ],
+        "video_duration_ms": null,
+        "video_fps_den": null,
+        "video_fps_num": null,
+        "video_height": null,
+        "video_item_id": "8fccf83b-0d45-410f-814b-7ce0c8505b8f",
+        "video_status": "imported",
+        "video_title": "S12-LC3-Q1-public-probe-video",
+        "video_width": null,
+        "workspace_id": "default"
+      },
+      "status_code": 200
+    },
+    "export_submit": {
+      "body": {
+        "detail": "export context not current: ['S12_EXPORT_FULL_APPLY_MISSING', 'S12_EXPORT_LOCK_MISSING']"
+      },
+      "status_code": 409
+    },
+    "s09_reapprove": {
+      "body": {
+        "detail": "ReskinConfig 'missing-public-config' not found in workspace"
+      },
+      "status_code": 404
+    },
+    "s10_full_apply_submit": {
+      "body": {
+        "detail": "ApplyCheckpoint 'missing-public-checkpoint' not found in workspace"
+      },
+      "status_code": 404
+    }
+  },
+  "video_item_id": "8fccf83b-0d45-410f-814b-7ce0c8505b8f"
+}
