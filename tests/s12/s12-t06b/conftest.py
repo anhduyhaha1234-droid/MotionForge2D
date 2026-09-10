@@ -385,6 +385,67 @@ def seed_lineage(factory: Any, frame_count: int = 30) -> str:
             return str(m1.id)
 
 
+def build_media_silent(dest: Path, *, width: int, height: int, duration: float) -> Path:
+    """Real h264 @10fps source WITHOUT audio (publication paths assert absent)."""
+    cmd = [
+        _find_ffmpeg(),
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-f",
+        "lavfi",
+        "-i",
+        f"testsrc=size={width}x{height}:rate={FPS}:duration={duration}",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "ultrafast",
+        "-pix_fmt",
+        "yuv420p",
+        "-an",
+        str(dest),
+    ]
+    completed = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    assert completed.returncode == 0, f"ffmpeg failed: {completed.stderr[:500]}"
+    assert dest.is_file()
+    return dest
+
+
+def decode_wav_pcm(wav: Path) -> tuple[list[int], int]:
+    """Read mono s16le PCM samples from a decoded wav (stdlib only)."""
+    import wave
+
+    with wave.open(str(wav), "rb") as handle:
+        nch = handle.getnchannels()
+        sw = handle.getsampwidth()
+        rate = handle.getframerate()
+        raw = handle.readframes(handle.getnframes())
+    if sw != 2:
+        raise AssertionError(f"unexpected sample width {sw}")
+    import array
+
+    samples = array.array("h", raw)
+    if nch > 1:
+        samples = samples[::nch]
+    return list(samples), rate
+
+
+def audio_dominant_freq(wav: Path, *, win_sec: float = 1.0) -> tuple[float, float]:
+    """Zero-crossing frequency estimate (mid window); (freq_hz, samples)."""
+    samples, rate = decode_wav_pcm(wav)
+    if not samples:
+        return 0.0, 0.0
+    n_mid = int(win_sec * rate)
+    start = max(0, (len(samples) - n_mid) // 2)
+    mid = samples[start : start + n_mid]
+    crossings = 0
+    for a, b in zip(mid, mid[1:]):
+        if (a < 0 <= b) or (b < 0 <= a):
+            crossings += 1
+    return (crossings / 2) / (len(mid) / rate), float(len(mid))
+
+
 @pytest.fixture()
 def db_factory(tmp_path: Path):  # type: ignore[no-untyped-def]
     """Fresh migrated temp DB factory + manifest_id (isolated, per-test)."""
@@ -394,7 +455,7 @@ def db_factory(tmp_path: Path):  # type: ignore[no-untyped-def]
     command.upgrade(_config(db), "head")
     factory = create_session_factory(create_engine_for_path(db))
     manifest_id = seed_lineage(factory)
-    yield factory, manifest_id
+    yield factory, manifest_id, db
     create_engine_for_path(db).dispose()
 
 

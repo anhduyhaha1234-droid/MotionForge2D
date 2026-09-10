@@ -191,7 +191,7 @@ def test_g1_kill_owned_render_process_only(tmp_path: Path) -> None:
 
 @pytest.mark.measured
 def test_g2_relaunch_reuses_verified_chunks(db_factory: Any, tmp_path: Path) -> None:
-    factory, manifest_id = db_factory
+    factory, manifest_id, _db = db_factory
     workdir = tmp_path / "work"
     workdir.mkdir()
     src = build_small_source(workdir / "src.mp4")
@@ -265,7 +265,7 @@ def test_g2_relaunch_reuses_verified_chunks(db_factory: Any, tmp_path: Path) -> 
 def test_g3_missing_chunk_fail_closed_then_recover(
     db_factory: Any, tmp_path: Path
 ) -> None:
-    factory, manifest_id = db_factory
+    factory, manifest_id, _db = db_factory
     workdir = tmp_path / "work"
     workdir.mkdir()
     src = build_small_source(workdir / "src.mp4")
