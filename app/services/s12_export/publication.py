@@ -123,27 +123,40 @@ def publish_export_run(
 
     candidate = _candidate_path(manifest)
     if candidate is None or not candidate.is_file():
+        _cleanup_publication_scratch(manifest)
         raise PublicationError(
             f"no private candidate for run {run_id}; cannot publish"
         )
     final = Path(str(manifest[_OUTPUT_PATH]))
     if final.name.lower().endswith(".partial"):
+        _cleanup_publication_scratch(manifest)
         raise PublicationError("public output must not carry the .partial suffix")
     if final.is_file():
+        _cleanup_publication_scratch(manifest)
         raise PublicationError(
             f"completed output exists — refusing overwrite: {final}"
         )
     if candidate.resolve() == final.resolve():
+        _cleanup_publication_scratch(manifest)
         raise PublicationError("candidate must be private, never the public output")
 
-    _require_ready(session, workspace_id=workspace_id, project_id=project_id)
-    _require_fence(repo, run_id, worker_id, fence_token)
+    try:
+        _require_ready(session, workspace_id=workspace_id, project_id=project_id)
+        _require_fence(repo, run_id, worker_id, fence_token)
+    except BaseException:
+        _cleanup_publication_scratch(manifest)
+        raise
 
-    expectation = _expectation_for(run, manifest, candidate_sha=_sha256_file(candidate))
-    verdict = validate(candidate, expectation)
+    try:
+        expectation = _expectation_for(run, manifest, candidate_sha=_sha256_file(candidate))
+        verdict = validate(candidate, expectation)
+    except BaseException:
+        _cleanup_publication_scratch(manifest)
+        raise
     if verdict.verdict != "PASS":
         _fail_run(repo, run_id, worker_id, fence_token, run.revision)
         session.commit()
+        _cleanup_publication_scratch(manifest)
         failing = [p.name for p in verdict.probes if p.verdict != "PASS"]
         raise PublicationError(
             f"export validation {verdict.verdict} on {failing}; run failed (retryable)"
@@ -153,15 +166,24 @@ def publish_export_run(
     # private candidate onto the public path, then the CAS transitions in
     # the same transaction.
     try:
+        # Re-read authority immediately before the irreversible filesystem
+        # mutation; a stale worker must not publish after validation.
+        _require_fence(repo, run_id, worker_id, fence_token)
         os.replace(candidate, final)
     except OSError as err:
+        _cleanup_publication_scratch(manifest)
         _fail_run(repo, run_id, worker_id, fence_token, run.revision)
         session.commit()
         raise PublicationError(f"publication rename failed: {err}") from err
+    except FencedWorkerError as err:
+        _cleanup_publication_scratch(manifest)
+        raise PublicationError(f"publication fence lost before rename: {err}") from err
     actual_sha = _sha256_file(final)
     try:
         _write_sidecar(final, actual_sha)
     except OSError as err:
+        _remove_unpublished_output(final)
+        _cleanup_publication_scratch(manifest)
         _fail_run(repo, run_id, worker_id, fence_token, run.revision)
         session.commit()
         raise PublicationError(f"publication sidecar failed: {err}") from err
@@ -185,6 +207,8 @@ def publish_export_run(
         # report completed: the artifact stays, the run is failed/retryable
         # and a later winner converges by bytes.
         session.rollback()
+        _remove_unpublished_output(final)
+        _cleanup_publication_scratch(manifest)
         raise PublicationError(
             f"publication transition lost after rename: {err} (run {run_id})"
         ) from err
@@ -250,6 +274,16 @@ def _candidate_path(manifest: dict[str, Any]) -> Path | None:
     if not scratch.is_dir():
         return None
     return scratch / "candidate_final.mp4"
+
+
+def _cleanup_publication_scratch(manifest: dict[str, Any]) -> None:
+    """Clean private VAL scratch without touching an existing public file."""
+    from app.services.s12_export.runner import cleanup_owned_export_artifacts
+
+    cleanup_owned_export_artifacts(
+        scratch_dir=manifest.get(_SCRATCH_DIR),
+        chunk_dir=manifest.get(_CHUNK_DIR),
+    )
 
 
 def _require_ready(session: Any, *, workspace_id: str, project_id: str) -> None:
@@ -356,6 +390,8 @@ def _expectation_for(run: Any, manifest: dict[str, Any], candidate_sha: str | No
         frame_psnr_min_db=psnr_min_db,
         source_locked=True,
         source_reference=source,
+        scratch_dir=str(manifest.get(_SCRATCH_DIR) or "") or None,
+        cancel_flag=manifest.get("cancel_flag"),
     )
 
 
@@ -406,6 +442,7 @@ def _build_source_reference(
         AudioReference,
         SourceReference,
         probe_audio_digest,
+        probe_audio_shape,
         probe_frame_digests,
     )
 
@@ -433,9 +470,18 @@ def _build_source_reference(
         # scores low PSNR and FAILs). Never a fabricated raster.
         audio_digest = probe_audio_digest(source, 0)
         if audio_digest is not None:
-            # The assembly layer re-encodes audio (AAC) — content digest is
-            # NOT compared for transcode; mapping + A/V drift still are.
-            audio = AudioReference(mode="transcode", stream_index=0)
+            shape = probe_audio_shape(source, 0)
+            channels, sample_rate = shape if shape is not None else (None, None)
+            # The assembly layer re-encodes audio (AAC).  Content is compared
+            # against this immutable source with bounded vectorized windows;
+            # digest equality remains reserved for remux/copy.
+            audio = AudioReference(
+                mode="transcode",
+                stream_index=0,
+                reference_path=source,
+                channels=channels,
+                sample_rate=sample_rate,
+            )
         else:
             audio = AudioReference(mode="absent", stream_index=0)
     return SourceReference(
@@ -526,3 +572,17 @@ def _fail_run(repo: Any, run_id: str, worker_id: str, fence_token: str, revision
         # Lost the fence mid-failure — a live owner owns the run now; the
         # gate already rejected publication, so failing closed is safe.
         pass
+
+
+def _remove_unpublished_output(final: Path) -> None:
+    """Remove an output that never reached a durable completed state."""
+    sidecar = _sidecar_path(final)
+    for path in (
+        final,
+        sidecar,
+        sidecar.with_name(f"{sidecar.name}.tmp"),
+    ):
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            pass

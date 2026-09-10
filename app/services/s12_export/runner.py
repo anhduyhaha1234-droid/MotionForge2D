@@ -40,7 +40,9 @@ from __future__ import annotations
 import errno
 import hashlib
 import os
+import shutil
 import subprocess
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -76,6 +78,7 @@ __all__ = [
     "DiskFullError",
     "RunnerConfig",
     "ExportRunner",
+    "cleanup_owned_export_artifacts",
 ]
 
 #: Chunk artifact filename pattern inside the run chunk directory.
@@ -224,6 +227,60 @@ class ExportRunner:
     def __init__(self, repo: S12ExportRepository, config: RunnerConfig) -> None:
         self._repo = repo
         self._cfg = config
+        self.resource_metrics: dict[str, int | str] = {}
+
+    def _run_render_process(self, argv: list[str]) -> subprocess.CompletedProcess[str]:
+        """Run ffmpeg with a bounded deadline and cooperative cancellation."""
+        try:
+            process = subprocess.Popen(
+                argv,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+        except OSError as err:
+            raise RunnerError(f"ffmpeg spawn failed: {err}") from err
+        deadline = time.monotonic() + 600.0
+        peak_rss = 0
+        try:
+            import psutil  # noqa: PLC0415
+        except ImportError:
+            psutil = None  # type: ignore[assignment]
+            process_info = None
+        else:
+            try:
+                process_info = psutil.Process(process.pid)
+            except psutil.Error:
+                process_info = None
+        try:
+            while process.poll() is None:
+                if process_info is not None:
+                    try:
+                        peak_rss = max(peak_rss, process_info.memory_info().rss)
+                    except psutil.Error:  # type: ignore[name-defined]
+                        pass
+                if self._cfg.cancel_flag is not None and Path(self._cfg.cancel_flag).exists():
+                    process.kill()
+                    process.wait()
+                    raise CancelledError("cancel flag present during ffmpeg render")
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    process.kill()
+                    process.wait()
+                    raise RunnerError("ffmpeg render timed out after 600s")
+                try:
+                    process.wait(timeout=min(0.2, remaining))
+                except subprocess.TimeoutExpired:
+                    continue
+            stderr = process.stderr.read() if process.stderr is not None else ""
+            return subprocess.CompletedProcess(argv, process.returncode, "", stderr)
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait()
+            self.resource_metrics["peak_ffmpeg_rss_bytes"] = peak_rss
+            if process.stderr is not None:
+                process.stderr.close()
 
     # ── guards ──────────────────────────────────────────────────────────
 
@@ -350,7 +407,7 @@ class ExportRunner:
         # candidate carries the frozen .partial name (see stitch.assemble_run).
         scratch = dest_final.parent / f"{dest_final.stem}.tmp-render.mp4"
         try:
-            completed = subprocess.run(
+            completed = self._run_render_process(
                 [
                     find_ffmpeg(),
                     "-hide_banner",
@@ -369,15 +426,12 @@ class ExportRunner:
                     "-pix_fmt",
                     "yuv420p",
                     str(scratch),
-                ],
-                capture_output=True,
-                text=True,
-                timeout=600,
+                ]
             )
         except OSError as err:
             if err.errno == errno.ENOSPC:
                 raise DiskFullError(f"disk full rendering chunk {spec.chunk_index}") from err
-            raise RunnerError(f"ffmpeg spawn failed: {err}") from err
+            raise RunnerError(f"ffmpeg render failed: {err}") from err
         if completed.returncode != 0:
             stderr = completed.stderr.strip()
             if "No space left on device" in stderr:
@@ -468,14 +522,28 @@ class ExportRunner:
         chunk_dir = Path(self._cfg.chunk_dir)
         chunk_dir.mkdir(parents=True, exist_ok=True)
         Path(self._cfg.scratch_dir).mkdir(parents=True, exist_ok=True)
+        self._record_resource_snapshot()
         try:
-            dims_w, dims_h = _probe_dims(Path(self._cfg.source_path))
-            check_disk_for_run(
+            target_w, target_h = _parse_profile_dims(run.profile_dims)
+            chunk_estimate = check_disk_for_run(
                 chunk_dir,
-                width=dims_w,
-                height=dims_h,
+                width=target_w,
+                height=target_h,
                 total_frames=run.frame_count,
             )
+            scratch_estimate = check_disk_for_run(
+                self._cfg.scratch_dir,
+                width=target_w,
+                height=target_h,
+                total_frames=run.frame_count,
+            )
+            self.resource_metrics = {
+                "profile_width": target_w,
+                "profile_height": target_h,
+                "estimated_chunk_bytes": chunk_estimate,
+                "estimated_scratch_bytes": scratch_estimate,
+                "frame_count": run.frame_count,
+            }
         except DiskInsufficientError as err:
             raise DiskFullError(str(err)) from err
         rows = {c.chunk_index: c for c in self._repo.list_chunks(run.id)}
@@ -549,6 +617,7 @@ class ExportRunner:
             )
             _ = row
             media.append(ChunkMedia(spec=spec, path=path))
+            self._record_resource_snapshot()
         return media
 
     # ── resume + assemble ───────────────────────────────────────────────
@@ -560,11 +629,18 @@ class ExportRunner:
         exact window size; re-renders everything else; assembles the
         candidate.  No DB repair, no in-memory ownership carried over.
         """
-        self._require_live_lease()
-        self._require_not_cancelled()
-        specs = self.ensure_plan()
-        media = self.render_pending(specs)
-        return self.assemble(media)
+        try:
+            self._require_live_lease()
+            self._require_not_cancelled()
+            specs = self.ensure_plan()
+            media = self.render_pending(specs)
+            return self.assemble(media)
+        except BaseException:
+            cleanup_owned_export_artifacts(
+                scratch_dir=self._cfg.scratch_dir,
+                chunk_dir=self._cfg.chunk_dir,
+            )
+            raise
 
     def assemble(self, media: list[ChunkMedia]) -> Path:
         """Stitch verified chunk media into the atomic candidate."""
@@ -578,7 +654,7 @@ class ExportRunner:
                 f"{run.frame_count}-frame plan (incomplete?)"
             )
         try:
-            return assemble_run(
+            output = assemble_run(
                 media,
                 frame_count=run.frame_count,
                 fps=self._cfg.fps,
@@ -587,12 +663,79 @@ class ExportRunner:
                 scratch_dir=Path(self._cfg.scratch_dir),
                 encoder=encoder,
             )
+            self._record_resource_snapshot()
+            return output
         except StitchError as err:
             raise RunnerError(f"assemble failed: {err}") from err
         except OSError as err:
             if err.errno == errno.ENOSPC:
                 raise DiskFullError("disk full during assemble") from err
             raise
+
+    def _record_resource_snapshot(self) -> None:
+        """Record bounded owned-root bytes and actual free disk space."""
+        scratch = Path(self._cfg.scratch_dir)
+        chunk = Path(self._cfg.chunk_dir)
+        for label, root in (("scratch", scratch), ("chunk", chunk)):
+            try:
+                used = sum(
+                    child.stat().st_size
+                    for child in root.iterdir()
+                    if child.is_file() and not child.is_symlink()
+                )
+                free = shutil.disk_usage(root).free
+            except OSError:
+                continue
+            self.resource_metrics[f"{label}_bytes"] = used
+            self.resource_metrics[f"{label}_free_bytes"] = free
+            peak_key = f"peak_{label}_bytes"
+            self.resource_metrics[peak_key] = max(
+                int(self.resource_metrics.get(peak_key, 0)), used
+            )
+
+
+def cleanup_owned_export_artifacts(
+    *, scratch_dir: str | Path | None, chunk_dir: str | Path | None = None
+) -> None:
+    """Remove only known private/partial children from owned job roots.
+
+    Completed chunk files and successful public output are intentionally left
+    untouched.  No recursive traversal or path-derived broad deletion is
+    used; every removed child is a known temporary naming family.
+    """
+    roots = [Path(value) for value in (scratch_dir, chunk_dir) if value]
+    for root in roots:
+        if not root.is_dir():
+            continue
+        try:
+            children = list(root.iterdir())
+        except OSError:
+            continue
+        for child in children:
+            if child.is_symlink() or not child.is_file():
+                continue
+            name = child.name.lower()
+            removable = (
+                name in {
+                    "candidate_final.mp4",
+                    "candidate.tmp-finalize.mp4",
+                    "stitched_video.mp4",
+                    "_s12_t03b_concat.txt",
+                }
+                or name.startswith("core_") and name.endswith(".mp4")
+                or ".tmp-render." in name
+                or name.endswith(".partial")
+                or name.endswith(".raw")
+                or name.endswith(".raw.partial")
+                or name.endswith(".tmp")
+                or name.endswith(".sha256.tmp")
+                or name.startswith(".s12-psnr-")
+            )
+            if removable:
+                try:
+                    child.unlink()
+                except OSError:
+                    pass
 
     # ── error-code surface consumed by T03C/Manager ─────────────────────
 

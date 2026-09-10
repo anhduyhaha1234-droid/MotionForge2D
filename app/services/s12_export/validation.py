@@ -37,9 +37,9 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
+import re
 import subprocess
-import tempfile
+import time
 from fractions import Fraction
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -62,6 +62,7 @@ __all__ = [
     "sha256_file",
     "probe_frame_digests",
     "probe_audio_digest",
+    "probe_audio_content",
     "probe_frame_psnr",
     "validate",
 ]
@@ -158,6 +159,11 @@ class ValidationExpectation:
     #     far below any sane encode threshold, so tamper still FAILs.
     frame_match_mode: str = "exact"
     frame_psnr_min_db: float | None = None
+    # Server-owned job scratch for bounded statistics only; decoded raw media
+    # is never materialized here.
+    scratch_dir: str | Path | None = None
+    cancel_flag: str | Path | None = None
+    validation_timeout_sec: float = 600.0
 
 
 @dataclass(frozen=True)
@@ -181,8 +187,8 @@ class AudioReference:
     ``mode`` is explicit about how the candidate may carry the audio:
     - ``remux``: byte-exact copy of the approved audio — decoded PCM
       content must match ``digest`` (mapping + content proof).
-    - ``transcode``: audio may be re-encoded — only presence, mapping and
-      A/V start/end drift are asserted; content digest is NOT compared.
+    - ``transcode``: audio may be re-encoded, but independent bounded
+      source-referenced content, mapping, and A/V start/end drift are asserted.
     - ``absent``: candidate must carry no audio stream.
     ``digest`` is the sha256 of the decoded s16le PCM of the approved
     audio track (see :func:`probe_audio_digest`); required for ``remux``.
@@ -191,6 +197,10 @@ class AudioReference:
     mode: Literal["remux", "transcode", "absent"]
     digest: str | None = None
     stream_index: int = 0
+    # Transcode mode still requires independent source-referenced proof.
+    reference_path: str | None = None
+    channels: int | None = None
+    sample_rate: int | None = None
 
 
 @dataclass(frozen=True)
@@ -263,7 +273,7 @@ def _ffprobe_json(path: Path) -> dict | None:
                 "-show_entries",
                 (
                     "stream=index,codec_type,codec_name,width,height,r_frame_rate,"
-                    "avg_frame_rate,time_base,duration,nb_frames"
+                    "avg_frame_rate,time_base,duration,nb_frames,channels,sample_rate"
                 ),
                 "-show_entries",
                 "format=duration,nb_streams,size",
@@ -433,28 +443,6 @@ def _fit_filter(width: int, height: int) -> str:
     )
 
 
-def _open_raw_pipe(
-    path: str | Path, vf: str | None = None
-) -> subprocess.Popen | None:
-    try:
-        argv = [
-            find_ffmpeg(),
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-i",
-            str(path),
-        ]
-        if vf:
-            argv += ["-vf", vf]
-        argv += ["-map", "0:v:0", "-f", "rawvideo", "-pix_fmt", "yuv420p", "-"]
-        return subprocess.Popen(
-            argv, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
-        )
-    except OSError:
-        return None
-
-
 def probe_frame_psnr(
     candidate: str | Path,
     reference: str | Path,
@@ -462,22 +450,24 @@ def probe_frame_psnr(
     height: int,
     reference_width: int | None = None,
     reference_height: int | None = None,
+    scratch_dir: str | Path | None = None,
+    cancel_flag: str | Path | None = None,
+    timeout_sec: float = 600.0,
 ) -> tuple[float, ...] | None:
-    # Per-frame PSNR (dB) of decoded candidate vs reference at the
-    # candidate raster. Cross-raster (F11-T06B-02): when the immutable
-    # reference artifact's raster (server-probed) differs from the
-    # candidate raster, the reference is scale+pad'ed to the candidate
-    # raster with the product letterbox policy BEFORE decoding — same
-    # geometry the runner produces, never stretch. Missing raster keeps
-    # the same-raster path (fail-closed: a real cross-raster case then
-    # measures low PSNR and FAILs). None on decode failure/divergence.
-    # Used ONLY by frame_match_mode="psnr"; exact mode never calls this.
-    import math  # noqa: PLC0415
+    """Measure every aligned frame with ffmpeg's native PSNR filter.
 
-    frame_size = width * height * 3 // 2
-    if frame_size <= 0:
+    Only one small text line per decoded frame is retained.  No full-clip raw
+    file is created, and pixel arithmetic stays in ffmpeg's native filter.
+    """
+    if width <= 0 or height <= 0 or timeout_sec <= 0:
         return None
-    ref_vf: str | None = None
+    root = Path(scratch_dir) if scratch_dir else Path(candidate).resolve().parent
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+        stats = root / f".s12-psnr-{time.monotonic_ns()}.log"
+        stats.unlink(missing_ok=True)
+    except OSError:
+        return None
     if (
         reference_width is not None
         and reference_height is not None
@@ -485,126 +475,71 @@ def probe_frame_psnr(
         and reference_width > 0
         and reference_height > 0
     ):
-        ref_vf = _fit_filter(width, height)
-    # Windows rawvideo PIPE drops frames at scale (F11-T06B-02 follow-up:
-    # 7/30 frames, ~7.6dB). The CROSS-RASTER path therefore decodes BOTH
-    # the candidate and the scaled reference into temp raw FILES (outside
-    # the repo) and reads them frame-by-frame from disk. The same-raster
-    # path keeps its pipes (proven 30/30 for native 4K).
-    cross_raster = ref_vf is not None
-    cand_file: Path | None = None
-    cand_pipe = None
-    ref_file: Path | None = None
-    ref_pipe = None
-    if cross_raster:
-        cand_file = _decode_raw_to_file(candidate, None, width, height)
-        ref_file = _decode_raw_to_file(reference, ref_vf, width, height)
+        reference_filter = _fit_filter(width, height)
     else:
-        cand_pipe = _open_raw_pipe(candidate)
-        ref_pipe = _open_raw_pipe(reference)
-    if (cand_file is None and cand_pipe is None) or (
-        ref_file is None and ref_pipe is None
-    ):
-        if cand_pipe is not None:
-            cand_pipe.kill()
-        if ref_pipe is not None:
-            ref_pipe.kill()
-        if cand_file is not None:
-            cand_file.unlink(missing_ok=True)
-        if ref_file is not None:
-            ref_file.unlink(missing_ok=True)
-        return None
-    values: list[float] = []
-    cand_handle = None
-    ref_handle = None
+        reference_filter = "format=yuv420p"
+    filter_graph = (
+        f"[1:v]{reference_filter}[reference];"
+        f"[0:v][reference]psnr=stats_file={stats.name}:stats_version=2"
+    )
+    proc: subprocess.Popen[str] | None = None
     try:
-        if cand_file is not None:
-            cand_handle = open(cand_file, "rb")
-        if ref_file is not None:
-            ref_handle = open(ref_file, "rb")
-        while True:
-            if cand_handle is not None:
-                ca = _read_exact(cand_handle, frame_size)
-            else:
-                assert cand_pipe is not None and cand_pipe.stdout is not None
-                ca = _read_exact(cand_pipe.stdout, frame_size)
-            if ref_handle is not None:
-                rb = _read_exact(ref_handle, frame_size)
-            else:
-                assert ref_pipe is not None and ref_pipe.stdout is not None
-                rb = _read_exact(ref_pipe.stdout, frame_size)
-            if ca is None or rb is None:
-                break
-            if len(ca) != len(rb):
-                return None
-            mse = 0.0
-            for x, y in zip(ca, rb):
-                diff = x - y
-                mse += diff * diff
-            mse /= len(ca)
-            if mse <= 0.0:
-                values.append(float("inf"))
-            else:
-                values.append(10.0 * math.log10(255.0 * 255.0 / mse))
-    finally:
-        if cand_pipe is not None:
-            cand_pipe.kill()
-        if ref_pipe is not None:
-            ref_pipe.kill()
-        if cand_handle is not None:
-            cand_handle.close()
-        if ref_handle is not None:
-            ref_handle.close()
-        if cand_file is not None:
-            cand_file.unlink(missing_ok=True)
-        if ref_file is not None:
-            ref_file.unlink(missing_ok=True)
-    return tuple(99.0 if v == float("inf") else v for v in values) if values else None
-
-
-def _decode_raw_to_file(
-    path: str | Path, vf: str | None, width: int, height: int
-) -> Path | None:
-    # Decode into a temp raw file (optional fit filter) so scaled frames
-    # are never lost on the Windows pipe. The raw file is validated to be
-    # a whole number of WxH yuv420p frames; garbage or a truncated decode
-    # returns None (fail-closed).
-    frame_size = width * height * 3 // 2
-    if frame_size <= 0:
-        return None
-    fd, tmp_name = tempfile.mkstemp(prefix="s12psnr_ref_", suffix=".raw")
-    os.close(fd)
-    out = Path(tmp_name)
-    try:
-        argv = [
-            find_ffmpeg(),
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-y",
-            "-i",
-            str(path),
-        ]
-        if vf:
-            argv += ["-vf", vf]
-        argv += ["-map", "0:v:0", "-f", "rawvideo", "-pix_fmt", "yuv420p", str(out)]
-        completed = subprocess.run(
-            argv,
-            capture_output=True,
+        proc = subprocess.Popen(
+            [
+                find_ffmpeg(), "-hide_banner", "-loglevel", "error", "-y",
+                "-reinit_filter", "0", "-i", str(Path(candidate).resolve()),
+                "-reinit_filter", "0", "-i", str(Path(reference).resolve()),
+                "-filter_complex", filter_graph,
+                "-an", "-f", "null", "-",
+            ],
+            cwd=str(root),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=600,
         )
-        if completed.returncode != 0:
+        deadline = time.monotonic() + timeout_sec
+        while proc.poll() is None:
+            if cancel_flag is not None and Path(cancel_flag).exists():
+                proc.kill()
+                proc.wait()
+                return None
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                proc.kill()
+                proc.wait()
+                return None
+            try:
+                proc.wait(timeout=min(0.2, remaining))
+            except subprocess.TimeoutExpired:
+                continue
+        stderr = proc.stderr.read() if proc.stderr is not None else ""
+        if proc.returncode != 0 or stderr:
             return None
-        size = out.stat().st_size
-        if size <= 0 or size % frame_size != 0:
-            return None
-        return out
-    except (OSError, subprocess.SubprocessError):
+        values: list[float] = []
+        expected_n = 1
+        for line in stats.read_text(encoding="ascii").splitlines():
+            if not line.strip() or line.startswith("psnr_log_version:"):
+                continue
+            match = re.search(r"\bn:(\d+)\b.*\bpsnr_avg:([^\s]+)", line)
+            if not match or int(match.group(1)) != expected_n:
+                return None
+            raw = match.group(2).lower()
+            values.append(99.0 if raw in {"inf", "infinity"} else float(raw))
+            expected_n += 1
+        return tuple(values) if values else None
+    except (OSError, ValueError, subprocess.SubprocessError):
+        if proc is not None and proc.poll() is None:
+            proc.kill()
+            proc.wait()
         return None
     finally:
-        if not out.is_file():
-            out.unlink(missing_ok=True)
+        if proc is not None and proc.poll() is None:
+            proc.kill()
+            proc.wait()
+        try:
+            stats.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def probe_audio_digest(
@@ -653,6 +588,175 @@ def probe_audio_digest(
     if rc != 0:
         return None
     return digest.hexdigest()
+
+
+def probe_audio_shape(path: str | Path, stream_index: int = 0) -> tuple[int, int] | None:
+    """Return ``(channels, sample_rate)`` for an audio ordinal."""
+    inventory = _ffprobe_json(Path(path))
+    if inventory is None:
+        return None
+    streams = inventory.get("streams")
+    audio = [
+        item for item in streams or []
+        if isinstance(item, dict) and item.get("codec_type") == "audio"
+    ]
+    if stream_index < 0 or stream_index >= len(audio):
+        return None
+    try:
+        channels = int(audio[stream_index]["channels"])
+        sample_rate = int(audio[stream_index]["sample_rate"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if channels < 1 or sample_rate < 1:
+        return None
+    return channels, sample_rate
+
+
+def probe_audio_content(
+    reference: str | Path,
+    candidate: str | Path,
+    *,
+    reference_stream_index: int = 0,
+    candidate_stream_index: int = 0,
+    channels: int,
+    sample_rate: int,
+    max_drift_sec: float,
+    timeout_sec: float = 600.0,
+    cancel_flag: str | Path | None = None,
+) -> dict[str, float] | None:
+    """Compare source-referenced audio in bounded vectorized windows.
+
+    Both streams are decoded by ffmpeg to bounded PCM chunks.  Numpy then
+    measures channel-preserving waveform correlation, relative level error,
+    and broadband spectral cosine similarity for every chunk.  This is a
+    source-referenced content comparison, not a dominant-frequency test;
+    the conservative AAC tolerance is correlation >= 0.80, spectral cosine
+    >= 0.85, and relative RMS error <= 40% in every content-bearing window.
+    A silent/reference-energy mismatch always fails.  A/V packet timing is
+    checked separately against the one-source-frame bound.
+    """
+    if channels < 1 or sample_rate < 1 or max_drift_sec < 0 or timeout_sec <= 0:
+        return None
+    try:
+        import numpy as np  # noqa: PLC0415
+    except ImportError:
+        return None
+    chunk_samples = 8192
+    chunk_bytes = chunk_samples * channels * 4
+    commands = []
+    for path, ordinal in (
+        (reference, reference_stream_index),
+        (candidate, candidate_stream_index),
+    ):
+        commands.append(
+            [
+                find_ffmpeg(), "-hide_banner", "-loglevel", "error",
+                "-i", str(Path(path).resolve()), "-map", f"0:a:{ordinal}",
+                "-ac", str(channels), "-ar", str(sample_rate),
+                "-f", "f32le", "-acodec", "pcm_f32le", "-",
+            ]
+        )
+    processes: list[subprocess.Popen[bytes]] = []
+    try:
+        for argv in commands:
+            processes.append(
+                subprocess.Popen(
+                    argv,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+            )
+        deadline = time.monotonic() + timeout_sec
+        counts = [0, 0]
+        mins: list[float] = []
+        spectral_mins: list[float] = []
+        level_maxes: list[float] = []
+        active = [True, True]
+        while any(active):
+            if cancel_flag is not None and Path(cancel_flag).exists():
+                return None
+            if time.monotonic() >= deadline:
+                return None
+            blocks: list[bytes] = []
+            for index, process in enumerate(processes):
+                if not active[index]:
+                    blocks.append(b"")
+                    continue
+                assert process.stdout is not None
+                block = process.stdout.read(chunk_bytes)
+                blocks.append(block)
+                if not block:
+                    active[index] = False
+                if len(block) % (channels * 4):
+                    return None
+                counts[index] += len(block) // (channels * 4)
+            if not blocks[0] or not blocks[1]:
+                continue
+            left = np.frombuffer(blocks[0], dtype="<f4").reshape(-1, channels)
+            right = np.frombuffer(blocks[1], dtype="<f4").reshape(-1, channels)
+            size = min(len(left), len(right))
+            if size == 0:
+                continue
+            left = left[:size]
+            right = right[:size]
+            for channel in range(channels):
+                x = left[:, channel].astype(np.float64, copy=False)
+                y = right[:, channel].astype(np.float64, copy=False)
+                rms_x = float(np.sqrt(np.mean(x * x)))
+                rms_y = float(np.sqrt(np.mean(y * y)))
+                if rms_x <= 1e-5:
+                    if rms_y > 1e-5:
+                        return None
+                    mins.append(1.0)
+                    spectral_mins.append(1.0)
+                    level_maxes.append(0.0)
+                    continue
+                if rms_y <= 1e-5:
+                    return None
+                centered_x = x - np.mean(x)
+                centered_y = y - np.mean(y)
+                denominator = float(np.linalg.norm(centered_x) * np.linalg.norm(centered_y))
+                correlation = float(np.dot(centered_x, centered_y) / denominator) if denominator else 0.0
+                spectrum_x = np.abs(np.fft.rfft(centered_x)) ** 2
+                spectrum_y = np.abs(np.fft.rfft(centered_y)) ** 2
+                spectrum_den = float(np.linalg.norm(spectrum_x) * np.linalg.norm(spectrum_y))
+                spectral = float(np.dot(spectrum_x, spectrum_y) / spectrum_den) if spectrum_den else 0.0
+                mins.append(correlation)
+                spectral_mins.append(spectral)
+                level_maxes.append(abs(rms_y - rms_x) / max(rms_x, 1e-5))
+        for process in processes:
+            if process.poll() is None:
+                process.wait(timeout=1)
+            if process.returncode != 0:
+                return None
+        if not mins:
+            return None
+        sample_delta = abs(counts[0] - counts[1])
+        return {
+            "windows": float(len(mins)),
+            "reference_samples": float(counts[0]),
+            "candidate_samples": float(counts[1]),
+            "sample_delta": float(sample_delta),
+            "max_allowed_sample_delta": float(sample_rate * max_drift_sec),
+            "min_correlation": min(mins),
+            "min_spectral_cosine": min(spectral_mins),
+            "max_relative_rms_error": max(level_maxes),
+        }
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+    finally:
+        for process in processes:
+            if process.poll() is None:
+                process.kill()
+            try:
+                process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
+            if process.stdout is not None:
+                process.stdout.close()
+            if process.stderr is not None:
+                process.stderr.close()
 
 
 def _probe_av_bounds(
@@ -1141,7 +1245,18 @@ def _source_locked_overrides(
 
     # --- av_policy: approved audio presence/mapping/content/drift ---------
     probes = _replace_probes(
-        probes, "av_policy", _source_locked_audio(path, audio, video[0], audio_ref, fps, one_frame)
+        probes,
+        "av_policy",
+        _source_locked_audio(
+            path,
+            audio,
+            video[0],
+            audio_ref,
+            fps,
+            one_frame,
+            cancel_flag=exp.cancel_flag,
+            timeout_sec=exp.validation_timeout_sec,
+        ),
     )
 
     # --- provenance: server-owned output hash required --------------------
@@ -1228,6 +1343,9 @@ def _measure_psnr_order(
         height,
         ref.reference_width,
         ref.reference_height,
+        exp.scratch_dir,
+        exp.cancel_flag,
+        exp.validation_timeout_sec,
     )
     if values is None:
         return [
@@ -1351,6 +1469,9 @@ def _source_locked_audio(
     audio_ref: AudioReference | None,
     fps: Fraction,
     one_frame: float,
+    *,
+    cancel_flag: str | Path | None = None,
+    timeout_sec: float = 600.0,
 ) -> list[ProbeVerdict]:
     """Approved-audio check: presence, mapping, remux content, A/V drift."""
     absent = audio_ref is None or audio_ref.mode == "absent"
@@ -1375,6 +1496,33 @@ def _source_locked_audio(
             )
         ]
     audio_stream = audio[ordinal]
+    content_detail = ""
+    if audio_ref.channels is not None:
+        try:
+            candidate_channels = int(audio_stream.get("channels"))
+        except (TypeError, ValueError):
+            return [_fail("av_policy", "candidate audio channel count unreadable")]
+        if candidate_channels != audio_ref.channels:
+            return [
+                _fail(
+                    "av_policy",
+                    f"audio channels={candidate_channels} != approved "
+                    f"{audio_ref.channels}",
+                )
+            ]
+    if audio_ref.sample_rate is not None:
+        try:
+            candidate_rate = int(audio_stream.get("sample_rate"))
+        except (TypeError, ValueError):
+            return [_fail("av_policy", "candidate audio sample rate unreadable")]
+        if candidate_rate != audio_ref.sample_rate:
+            return [
+                _fail(
+                    "av_policy",
+                    f"audio sample_rate={candidate_rate} != approved "
+                    f"{audio_ref.sample_rate}",
+                )
+            ]
     if audio_ref.mode == "remux":
         if not audio_ref.digest:
             return [
@@ -1391,6 +1539,55 @@ def _source_locked_audio(
                     f"expected={audio_ref.digest[:12]}…",
                 )
             ]
+    elif audio_ref.mode == "transcode":
+        if not audio_ref.reference_path or not Path(audio_ref.reference_path).is_file():
+            return [
+                _fail(
+                    "av_policy",
+                    "transcode reference requires immutable approved audio path",
+                )
+            ]
+        shape = probe_audio_content(
+            audio_ref.reference_path,
+            path,
+            reference_stream_index=audio_ref.stream_index,
+            candidate_stream_index=ordinal,
+            channels=audio_ref.channels or 0,
+            sample_rate=audio_ref.sample_rate or 0,
+            max_drift_sec=one_frame,
+            timeout_sec=timeout_sec,
+            cancel_flag=cancel_flag,
+        )
+        if shape is None:
+            return [_fail("av_policy", "transcoded audio content not measurable")]
+        if shape["sample_delta"] > shape["max_allowed_sample_delta"]:
+            return [
+                _fail(
+                    "av_policy",
+                    f"audio decoded sample length drift={shape['sample_delta']:.0f} "
+                    f"> {shape['max_allowed_sample_delta']:.0f} bound",
+                )
+            ]
+        if (
+            shape["min_correlation"] < 0.80
+            or shape["min_spectral_cosine"] < 0.85
+            or shape["max_relative_rms_error"] > 0.40
+        ):
+            return [
+                _fail(
+                    "av_policy",
+                    "transcoded audio content differs: "
+                    f"corr>={shape['min_correlation']:.3f}, "
+                    f"spectral>={shape['min_spectral_cosine']:.3f}, "
+                    f"rms_error<={shape['max_relative_rms_error']:.3f}",
+                )
+            ]
+        content_detail = (
+            f"content windows={shape['windows']:.0f}, "
+            f"corr>={shape['min_correlation']:.3f}, "
+            f"spectral>={shape['min_spectral_cosine']:.3f}, "
+            f"rms_error<={shape['max_relative_rms_error']:.3f}"
+        )
     try:
         video_index = int(video_stream.get("index"))
     except (TypeError, ValueError):
@@ -1419,7 +1616,7 @@ def _source_locked_audio(
         ]
     mode_detail = {
         "remux": "content digest match",
-        "transcode": "transcode explicit (content not compared)",
+        "transcode": content_detail,
     }.get(audio_ref.mode, "")
     return [
         _pass(

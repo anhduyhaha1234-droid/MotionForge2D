@@ -201,6 +201,95 @@ def test_publish_fence_mismatch_fails_closed(env, monkeypatch: pytest.MonkeyPatc
     assert not Path(kw["manifest"]["output_path"]).exists()
 
 
+def test_publish_fence_lost_before_rename_cleans_candidate(
+    env, monkeypatch: pytest.MonkeyPatch
+) -> None:  # type: ignore[no-untyped-def]
+    """C17: a fence loss after validation cannot trigger the rename."""
+    from app.persistence.s12_export import FencedWorkerError
+    import app.services.s12_export.publication as pubmod
+
+    _patch(monkeypatch, "PASS")
+    factory, kw = _submit(env, monkeypatch)
+    original = pubmod._require_fence
+    calls = 0
+
+    def _fence(repo, run_id, worker_id, fence_token):  # type: ignore[no-untyped-def]
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise FencedWorkerError("fence lost", run_id=run_id)
+        return original(repo, run_id, worker_id, fence_token)
+
+    monkeypatch.setattr(pubmod, "_require_fence", _fence)
+    with factory() as s:
+        with pytest.raises(pub.PublicationError, match="fence lost"):
+            pub.publish_export_run(s, **kw)
+        s.rollback()
+    assert calls == 2
+    assert not Path(kw["manifest"]["output_path"]).exists()
+    assert not list(Path(kw["manifest"]["scratch_dir"]).iterdir())
+
+
+def test_publish_rename_fault_cleans_private_candidate(
+    env, monkeypatch: pytest.MonkeyPatch
+) -> None:  # type: ignore[no-untyped-def]
+    """C18: atomic rename failure leaves no candidate or public artifact."""
+    import app.services.s12_export.publication as pubmod
+
+    _patch(monkeypatch, "PASS")
+    factory, kw = _submit(env, monkeypatch)
+    monkeypatch.setattr(pubmod.os, "replace", lambda *args: (_ for _ in ()).throw(OSError("rename fault")))
+    with factory() as s:
+        with pytest.raises(pub.PublicationError, match="rename failed"):
+            pub.publish_export_run(s, **kw)
+        s.rollback()
+    assert not Path(kw["manifest"]["output_path"]).exists()
+    assert not list(Path(kw["manifest"]["scratch_dir"]).iterdir())
+
+
+def test_publish_sidecar_fault_removes_unpublished_output(
+    env, monkeypatch: pytest.MonkeyPatch
+) -> None:  # type: ignore[no-untyped-def]
+    """C18: sidecar failure cannot strand an output that blocks retry."""
+    import app.services.s12_export.publication as pubmod
+
+    _patch(monkeypatch, "PASS")
+    factory, kw = _submit(env, monkeypatch)
+    monkeypatch.setattr(pubmod, "_write_sidecar", lambda *args: (_ for _ in ()).throw(OSError("sidecar fault")))
+    with factory() as s:
+        with pytest.raises(pub.PublicationError, match="sidecar failed"):
+            pub.publish_export_run(s, **kw)
+        s.rollback()
+    assert not Path(kw["manifest"]["output_path"]).exists()
+    assert not Path(f"{kw['manifest']['output_path']}.sha256").exists()
+    assert not list(Path(kw["manifest"]["scratch_dir"]).iterdir())
+
+
+def test_publish_transition_fault_removes_unpublished_output(
+    env, monkeypatch: pytest.MonkeyPatch
+) -> None:  # type: ignore[no-untyped-def]
+    """C18: a CAS transition fault removes the not-yet-completed artifact."""
+    from app.persistence.s12_export import S12ExportRepository
+
+    _patch(monkeypatch, "PASS")
+    factory, kw = _submit(env, monkeypatch)
+    original = S12ExportRepository.transition_run
+
+    def _transition(self, run_id, status, **kwargs):  # type: ignore[no-untyped-def]
+        if status == "completed":
+            raise ValueError("commit transition fault")
+        return original(self, run_id, status, **kwargs)
+
+    monkeypatch.setattr(S12ExportRepository, "transition_run", _transition)
+    with factory() as s:
+        with pytest.raises(pub.PublicationError, match="transition lost"):
+            pub.publish_export_run(s, **kw)
+        s.rollback()
+    assert not Path(kw["manifest"]["output_path"]).exists()
+    assert not Path(f"{kw['manifest']['output_path']}.sha256").exists()
+    assert not list(Path(kw["manifest"]["scratch_dir"]).iterdir())
+
+
 def test_publish_not_ready_fails_closed(env, monkeypatch: pytest.MonkeyPatch) -> None:  # type: ignore[no-untyped-def]
     _patch(monkeypatch, "PASS")
     factory, kw = _submit(env, monkeypatch)
@@ -449,6 +538,81 @@ def test_publish_psnr_legit_reencode_passes(env, tmp_path: Path) -> None:  # typ
     assert all(v == "PASS" for v in checks.values()), checks
     with factory() as s:
         assert S12ExportRepository(s).get_run(run.id).status == "completed"
+    monkeypatch.undo()
+
+
+def test_publish_real_wrong_audio_fails_and_cleans_private_candidate(
+    env, tmp_path: Path
+) -> None:  # type: ignore[no-untyped-def]
+    """A real equal-duration wrong-tone candidate cannot complete publication."""
+    import shutil
+    import subprocess
+
+    import app.services.s12_export.publication as pubmod
+
+    factory, svc, manifest_id, dirs = env
+    source = _real_source(tmp_path, audio=True)
+    wrong = tmp_path / "wrong_audio.mp4"
+    ffmpeg = shutil.which("ffmpeg")
+    assert ffmpeg is not None
+    completed = subprocess.run(
+        [
+            ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+            "-i", str(source),
+            "-f", "lavfi", "-i", "sine=frequency=880:sample_rate=44100:duration=0.8",
+            "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy",
+            "-c:a", "aac", "-shortest", str(wrong),
+        ],
+        capture_output=True, text=True, timeout=300,
+    )
+    assert completed.returncode == 0, completed.stderr[-400:]
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(pubmod, "_require_ready", lambda session, **kw: None)
+    run, _job, _ = submit_export_job(
+        svc,
+        **base._submit_kwargs(
+            factory, manifest_id, dirs,
+            source_path=str(source), fps=10.0, fps_num=10, fps_den=1,
+            frame_count=8,
+        ),
+    )
+    with factory() as s:
+        lease = S12ExportRepository(s).claim_run(run.id, "worker-wrong-audio")
+        s.commit()
+    scratch = Path(dirs["scratch"])
+    scratch.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(wrong, scratch / "candidate_final.mp4")
+    manifest = {
+        "fps": 10.0, "fps_num": 10, "fps_den": 1, "frame_count": 8,
+        "chunk_dir": dirs["chunk"], "scratch_dir": dirs["scratch"],
+        "output_path": dirs["output"], "profile_codec": "h264",
+        "source_path": str(source),
+    }
+    with factory() as s:
+        with pytest.raises(pub.PublicationError):
+            pubmod.publish_export_run(
+                s, run_id=run.id, workspace_id=WS, project_id=f"p-{WS}",
+                worker_id="worker-wrong-audio", fence_token=lease.fence_token,
+                manifest=manifest,
+            )
+        s.rollback()
+    with factory() as s:
+        assert S12ExportRepository(s).get_run(run.id).status == "failed"
+    assert not Path(dirs["output"]).exists()
+    assert not list(scratch.iterdir())
+    print(
+        "S12_PUBLICATION_R01_ROOT",
+        tmp_path,
+        "source=",
+        source,
+        "wrong=",
+        wrong,
+        "scratch=",
+        scratch,
+        "output=",
+        dirs["output"],
+    )
     monkeypatch.undo()
 
 

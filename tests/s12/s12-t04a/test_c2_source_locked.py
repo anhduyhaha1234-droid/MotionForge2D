@@ -444,10 +444,10 @@ def test_c28_remux_matching_audio_passes(approved_audio_ab: Path) -> None:
     ]
 
 
-def test_c28_transcode_explicit_not_content_compared(
+def test_c28_transcode_explicit_content_comparison_passes(
     approved_audio_ab: Path, ref_segments: dict, tmp_path: Path
 ) -> None:
-    """Transcode mode asserts mapping/drift only — re-encode may differ."""
+    """Valid AAC transcode passes independent source-referenced comparison."""
     video = approved_audio_ab
     transcoded = tmp_path / "transcoded.mp4"
     rc = subprocess.run(
@@ -469,7 +469,8 @@ def test_c28_transcode_explicit_not_content_compared(
             fps_den=1,
             cuts=(CutPoint(0, 0, 1), CutPoint(FRAMES // 2, 1, 1)),
             audio=AudioReference(
-                mode="transcode", digest=ref_digest, stream_index=0
+                mode="transcode", digest=ref_digest, stream_index=0,
+                reference_path=str(video), channels=1, sample_rate=44100,
             ),
         ),
         expected_sha256=sha256_file(transcoded),
@@ -506,9 +507,10 @@ def test_c28_audio_start_drift_fails(
             fps_num=FPS,
             fps_den=1,
             frame_digests=probe_frame_digests(video, W, H) or (),
-            audio=AudioReference(
-                mode="transcode", digest=digest, stream_index=0
-            ),
+                audio=AudioReference(
+                    mode="transcode", digest=digest, stream_index=0,
+                    reference_path=str(video), channels=1, sample_rate=44100,
+                ),
         ),
         expected_sha256=sha256_file(delayed),
     )
@@ -916,8 +918,8 @@ def test_xr_no_reference_raster_is_same_raster_path(
 # ── Pipe-fix verification (F11-T06B-02): 30/30 frames decoded at scale ──
 #
 # Regression guard for the Windows rawvideo pipe dropping frames when the
-# filter graph scales up: the cross-raster reference is now decoded to a
-# temp raw FILE (never piped), so ALL 30 frames must be measured.
+# filter graph scales up: native ffmpeg PSNR stats are streamed to bounded
+# scratch metadata (never a raw frame file), so ALL 30 frames must be measured.
 
 
 def _letterbox_segments_30(tmp_path_factory: pytest.TempPathFactory) -> dict:
