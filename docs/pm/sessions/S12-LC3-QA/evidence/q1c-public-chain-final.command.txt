@@ -1,0 +1,5 @@
+cwd=C:\Users\Admin\MotionForge2D-worktrees\s12-lc3-luna-integration
+utc=20260910T111607Z
+argv=python -c <candidate-import wrapper>
+wrapper=sys.path.insert(0,C:\Users\Admin\MotionForge2D-worktrees\s12-lc3-luna-integration); import app; assert app.__file__ is under the frozen candidate; sys.argv=[probe,--work-root,C:\Users\Admin\mfqa\s12-lc3-r1\20260910T111607Z\Q1C,--evidence,C:\Users\Admin\MotionForge2D-worktrees\s12-lc3-luna-qa\docs\pm\sessions\S12-LC3-QA\evidence\q1c-public-chain-final.json]; runpy.run_path(C:\Users\Admin\MotionForge2D-worktrees\s12-lc3-luna-qa\scripts\s12\s12_lc3_probe.py,run_name=__main__)
+result_json=q1c-public-chain-final.json
