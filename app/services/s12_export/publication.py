@@ -726,8 +726,9 @@ def _owner_is_live(repo: Any, run_id: str, worker_id: str, fence_token: str) -> 
 
 
 def _require_fence(repo: Any, run_id: str, worker_id: str, fence_token: str) -> None:
-    from app.persistence.s12_export import FencedWorkerError  # noqa: PLC0415
     from datetime import UTC, datetime
+
+    from app.persistence.s12_export import FencedWorkerError  # noqa: PLC0415
 
     try:
         live = repo._lease_live_sql(  # noqa: SLF001

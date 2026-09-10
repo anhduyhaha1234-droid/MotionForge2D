@@ -24,3 +24,9 @@ The exact raw commands, outputs, resource record, and cleanup boundary are in
 | 2026-09-10T13:05:17Z | R2 baseline-val-r2 pre-commit guard | PASS; no missing/shrink/protected change |
 
 The complete R2 envelopes and raw summaries are in `evidence/20260910T1305Z-r2.md`.
+
+| 2026-09-10T13:34:22Z–13:36:08Z | R2 static correction micros and exploratory exact-tree I001 scan | micros passed; four incidental older-test edits reverted |
+| 2026-09-10T13:38:16Z–13:38:24Z | R2 static-correction final three micros | 3 passed, 6 warnings, exit 0 |
+| 2026-09-10T13:38:34Z–13:38:35Z | Exact four-file compileall, Ruff F/I, diff-check | all exit 0 |
+
+The correction evidence is `evidence/20260910T1339Z-static-correction.md`.

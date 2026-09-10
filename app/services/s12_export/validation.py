@@ -42,8 +42,8 @@ import re
 import subprocess
 import threading
 import time
-from fractions import Fraction
 from dataclasses import dataclass, field
+from fractions import Fraction
 from pathlib import Path
 from typing import Any, Literal
 
