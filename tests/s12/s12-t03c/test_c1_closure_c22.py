@@ -19,7 +19,7 @@ from app.api.routes import s12_export as route
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import test_c1_closure as t1c  # noqa: E402
+import test_s12_t03c_c1_closure as t1c  # noqa: E402
 
 WS = t1c.WS
 FPS = t1c.FPS
