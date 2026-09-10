@@ -204,16 +204,9 @@ def test_c26_upscale_1080p_to_4k_real_render(job_env: Any, tmp_path: Path) -> No
     factory, manifest_id, svc, dirs = job_env
     src = build_media_silent(tmp_path / "src1080.mp4", width=1920, height=1080, duration=3.0)
     assert probe_dims(src) == (1920, 1080)
-    from app.services.s12_export.publication import PublicationError
-
-    try:
-        _run_positive(factory, svc, manifest_id, dirs, src, frame_count=F_1080)
-        raise AssertionError("upscale 1080p->4K unexpectedly published")
-    except PublicationError as err:
-        assert "frame_order" in str(err), str(err)
-    candidate = Path(dirs["scratch"]) / "candidate_final.mp4"
-    assert candidate.is_file()
-    assert probe_dims(candidate) == (3840, 2160)
+    candidate, oc = _run_positive(factory, svc, manifest_id, dirs, src, frame_count=F_1080)
+    assert oc["status"] == "completed"
+    _assert_media(candidate, frames=F_1080, duration_s=3.0)
     print("\n[C26] 1920x1080 -> 3840x2160 real render done; publish fail-closed (F11-T06B-01)")
 
 
@@ -233,15 +226,9 @@ def test_c26_non_16_9_control(job_env: Any, tmp_path: Path) -> None:
     factory, manifest_id, svc, dirs = job_env
     src = build_media_silent(tmp_path / "src43.mp4", width=1440, height=1080, duration=3.0)
     assert probe_dims(src) == (1440, 1080)  # 4:3
-    from app.services.s12_export.publication import PublicationError
-
-    try:
-        _run_positive(factory, svc, manifest_id, dirs, src, frame_count=F_43)
-        raise AssertionError("letterbox 4:3 unexpectedly published")
-    except PublicationError as err:
-        assert "frame_order" in str(err), str(err)
-    candidate = Path(dirs["scratch"]) / "candidate_final.mp4"
-    assert probe_dims(candidate) == (3840, 2160)
+    candidate, oc = _run_positive(factory, svc, manifest_id, dirs, src, frame_count=F_43)
+    assert oc["status"] == "completed"
+    _assert_media(candidate, frames=F_43, duration_s=3.0)
     print("\n[C26] 4:3 control: letterbox pad 3840x2160 done; publish fail-closed (F11-T06B-01)")
 
 

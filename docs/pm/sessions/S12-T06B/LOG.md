@@ -92,6 +92,20 @@ SHA-256 `c9b068b2195461b1f867a5ec95714cea3ab09881757f5607094574d15dda428f`,
   one candidate frame). Normal render pipeline only publishes when the
   candidate raster equals the source raster. Verifier does not fix.
 
+## REVERIFY-6 FINAL on base 30d51e5 (T03C REF-DIMS) — C26 FULL POSITIVE
+
+- **C26 FULL: PASS (positive closure, ALL THREE legs)**:
+  - native-4K re-encode -> publish COMPLETED (psnr same-raster);
+  - upscale 1920x1080 -> 3840x2160 -> publish COMPLETED;
+  - 4:3 letterbox (pad to 3840x2160) -> publish COMPLETED;
+  - GET result/media 200 + playable decode (frames counted);
+  - zero .partial as final; sha256 sidecar present.
+- F11-T06B-02 CLOSED by T03C REF-DIMS `a48e3eb`: reference_width/height
+  populated from the server-probed approved artifact raster.
+- C27 kill/restart positive PASS; C28 audio PASS; tamper reorder still
+  FAILs under PSNR (no tolerance leak).
+- Full suite: **20 passed, 1 skipped** (skip = C29 clean-machine NOT_RUN).
+
 ## REVERIFY-5 FINAL on base c9fdbf0 (T04A candidate-pipe fix)
 
 - Full T06B suite: **20 passed, 1 skipped in 90.37s**; ruff F clean.
