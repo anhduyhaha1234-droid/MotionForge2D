@@ -414,13 +414,23 @@ def _build_source_reference(
     source = str(manifest.get("source_path") or "")
     digests: tuple[str, ...] = ()
     audio: Any = None
+    reference_width: int | None = None
+    reference_height: int | None = None
     if source and Path(source).is_file():
         dims = _probe_source_dims(source)
         if dims is not None:
             width, height = dims
+            # Raster of the immutable approved artifact (F11-T06B-02): the
+            # validator scale+pad's the reference to the candidate raster
+            # with the product letterbox policy — same geometry the runner
+            # produces, never stretch.
+            reference_width, reference_height = width, height
             probed = probe_frame_digests(source, width, height)
             if probed:
                 digests = probed
+        # else: fail-closed — reference raster unknown stays None; the
+        # validator then measures same-raster (a real cross-raster case
+        # scores low PSNR and FAILs). Never a fabricated raster.
         audio_digest = probe_audio_digest(source, 0)
         if audio_digest is not None:
             # The assembly layer re-encodes audio (AAC) — content digest is
@@ -435,6 +445,8 @@ def _build_source_reference(
         fps_den=fps_den if fps_den > 0 else 0,
         frame_digests=digests,
         audio=audio,
+        reference_width=reference_width,
+        reference_height=reference_height,
         # Immutable approved-artifact media path for measured PSNR mode
         # (server-derived; never client-supplied). Absent → PSNR fails
         # closed; exact mode never opens it.
