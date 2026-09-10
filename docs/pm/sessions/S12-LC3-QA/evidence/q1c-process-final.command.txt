@@ -1,0 +1,2 @@
+cwd=C:\Users\Admin\MotionForge2D-worktrees\s12-lc3-luna-qa
+Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and ($_.CommandLine -like '*s12-lc3-luna*' -or $_.CommandLine -like '*q1c*' -or $_.CommandLine -like '*mfqa\s12-lc3-r1*') -and ($_.Name -match 'python|ffmpeg|node|uvicorn') }

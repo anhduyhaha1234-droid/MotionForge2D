@@ -1,0 +1,2 @@
+cwd=C:\Users\Admin\MotionForge2D-worktrees\s12-lc3-luna-integration
+$candidate='C:\Users\Admin\MotionForge2D-worktrees\s12-lc3-luna-integration'; Test-Path frontend; Test-Path frontend\node_modules; Test-Path frontend\playwright.s12-export.config.ts; Test-Path frontend\package.json; node --version; npm --version; Get-Content frontend\package.json
