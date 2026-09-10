@@ -693,6 +693,24 @@ class ExportRunner:
                 int(self.resource_metrics.get(peak_key, 0)), used
             )
 
+    # ── error-code surface consumed by T03C/Manager ─────────────────────
+
+    @staticmethod
+    def code_for(err: BaseException) -> str:
+        if isinstance(err, StaleLeaseError):
+            return "S12_T03B_STALE_LEASE"
+        if isinstance(err, CancelledError):
+            return "S12_T03B_CANCELLED"
+        if isinstance(err, DiskFullError):
+            return "S12_T03B_DISK_FULL"
+        if isinstance(err, StaleIdentityError):
+            return "S12_T03B_STALE_IDENTITY"
+        if isinstance(err, FencedWorkerError):
+            return "FENCED_WORKER"
+        if isinstance(err, LeaseConflictError):
+            return "LEASE_CONFLICT"
+        return "S12_T03B_RUNNER_ERROR"
+
 
 def cleanup_owned_export_artifacts(
     *, scratch_dir: str | Path | None, chunk_dir: str | Path | None = None
@@ -736,25 +754,6 @@ def cleanup_owned_export_artifacts(
                     child.unlink()
                 except OSError:
                     pass
-
-    # ── error-code surface consumed by T03C/Manager ─────────────────────
-
-    @staticmethod
-    def code_for(err: BaseException) -> str:
-        if isinstance(err, StaleLeaseError):
-            return "S12_T03B_STALE_LEASE"
-        if isinstance(err, CancelledError):
-            return "S12_T03B_CANCELLED"
-        if isinstance(err, DiskFullError):
-            return "S12_T03B_DISK_FULL"
-        if isinstance(err, StaleIdentityError):
-            return "S12_T03B_STALE_IDENTITY"
-        if isinstance(err, FencedWorkerError):
-            return "FENCED_WORKER"
-        if isinstance(err, LeaseConflictError):
-            return "LEASE_CONFLICT"
-        return "S12_T03B_RUNNER_ERROR"
-
 
 def _probe_dims(path: Path) -> tuple[int, int]:
     """Measured source dims (real ffprobe); fallback keeps disk gate safe."""
