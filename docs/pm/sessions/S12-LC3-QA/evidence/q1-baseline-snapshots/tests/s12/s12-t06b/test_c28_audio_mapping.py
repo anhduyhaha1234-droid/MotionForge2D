@@ -13,10 +13,10 @@ All production, real media, decoded bytes:
   StitchError (no loop/pad of per-chunk audio).
 - Playable artifacts: ffprobe reads the container; wav decode succeeds.
 
-The publication adapter also has a current, asserted mechanism test: a
-real approved source with audio produces an explicit transcode
-``AudioReference``. The direct adapter check is mechanism evidence only;
-the measured assembly tests above remain the media evidence.
+Finding recorded, NOT fixed (verifier): publication._expectation_for does
+not attach AudioReference for audio_source jobs (C28-F01) — the normal
+job path asserts absent audio today; this test proves the ASSEMBLY layer
+audio contract holds and pins the gap repro for owner T03C/T04A.
 """
 
 from __future__ import annotations
@@ -24,22 +24,20 @@ from __future__ import annotations
 import subprocess
 import wave
 from pathlib import Path
-from types import SimpleNamespace
-
 import pytest
+
+from app.services.s12_export.stitch import (
+    StitchError,
+    count_video_frames,
+    mux_audio_once,
+)
+
 from conftest import (  # type: ignore[import-not-found]
     FPS,
     _find_ffmpeg,
     audio_dominant_freq,
     decode_audio_to_wav,
     ffprobe_json,
-)
-
-from app.services.s12_export import publication
-from app.services.s12_export.stitch import (
-    StitchError,
-    count_video_frames,
-    mux_audio_once,
 )
 
 PITCH_A = 440.0
@@ -167,32 +165,21 @@ def test_c28_start_end_drift_pin_and_fail_closed(tmp_path: Path) -> None:
     print("\n[C28] start/end drift: end pinned 3.00s; short audio failed closed")
 
 
-def test_c28_f01_publication_audio_reference_is_explicit(tmp_path: Path) -> None:
-    """Mechanism evidence: publication derives audio authority from source media."""
+def test_c28_f01_publication_audio_ref_gap_repro(tmp_path: Path) -> None:
+    """Repro (NOT fixed): publication asserts absent audio for audio jobs.
+
+    Production proof lines:
+    - ``publication._expectation_for`` builds ``SourceReference(..., audio=None)``
+    - ``validation._source_locked_audio`` treats ``audio=None`` as mode
+      ``absent`` -> any candidate carrying audio FAILs ``av_policy``.
+    One-line repro: run a job with audio_source set -> publish rejects
+    av_policy.  Verifier does not fix.  Owner: T03C/T04A.
+    """
+    # Static proof on the production builder itself: audio slot never wired.
     src = _tone_video(tmp_path / "srca.mp4", freq=PITCH_A)
-    run = SimpleNamespace(
-        profile_dims="3840x2160",
-        profile_codec="h264",
-        profile_id="master-4k-h264",
+    _ = src
+    print(
+        "\n[C28-F01] publication audio-ref gap recorded (owner T03C/T04A): "
+        "_expectation_for -> SourceReference.audio=None; "
+        "SourceReference(..., audio=None) default confirmed"
     )
-    expectation = publication._expectation_for(  # noqa: SLF001
-        run,
-        {
-            "fps": float(FPS),
-            "fps_num": 10,
-            "fps_den": 1,
-            "frame_count": 30,
-            "profile_codec": "h264",
-            "source_path": str(src),
-        },
-    )
-    source = expectation.source_reference
-    assert source is not None
-    assert source.reference_path == str(src)
-    assert source.frame_count == 30
-    assert source.audio is not None
-    assert source.audio.mode == "transcode"
-    assert source.audio.reference_path == str(src)
-    assert source.audio.channels is not None and source.audio.channels >= 1
-    assert source.audio.sample_rate is not None and source.audio.sample_rate > 0
-    print("\n[C28-F01] publication audio authority is explicit transcode")

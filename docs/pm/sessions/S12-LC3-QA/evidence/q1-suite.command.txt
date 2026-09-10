@@ -1,0 +1,1 @@
+python -m pytest tests/s12 -q -p no:cacheprovider

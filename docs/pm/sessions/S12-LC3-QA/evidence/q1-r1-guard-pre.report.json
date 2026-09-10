@@ -1,0 +1,2968 @@
+{
+  "failures": [],
+  "manifest": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\baseline-qa-pre.json",
+  "max_shrink_percent": 20.0,
+  "results": [
+    {
+      "after": {
+        "exists": true,
+        "lines": 484,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/baseline-q1-guard.json",
+        "sha256": "9814A4D155EEA3726EC08D524BFD0F7E3B7563CEB09535E5DED3EDD477023914",
+        "size": 27391
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 484,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/baseline-q1-guard.json",
+        "sha256": "9814A4D155EEA3726EC08D524BFD0F7E3B7563CEB09535E5DED3EDD477023914",
+        "size": 27391,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\baseline-q1-guard.json",
+        "snapshot_sha256": "9814A4D155EEA3726EC08D524BFD0F7E3B7563CEB09535E5DED3EDD477023914"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/baseline-q1-guard.json"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 950,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/post-qa-q0-guard-report.json",
+        "sha256": "E301A2E3AF7CCEB99DEF3843D9D79087655C35C93084EE1EB6E591040F3B0849",
+        "size": 40985
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 950,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/post-qa-q0-guard-report.json",
+        "sha256": "E301A2E3AF7CCEB99DEF3843D9D79087655C35C93084EE1EB6E591040F3B0849",
+        "size": 40985,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\post-qa-q0-guard-report.json",
+        "snapshot_sha256": "E301A2E3AF7CCEB99DEF3843D9D79087655C35C93084EE1EB6E591040F3B0849"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/post-qa-q0-guard-report.json"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 408,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/post-qa-q0-guard.json",
+        "sha256": "6F92C540D4806A6ACCEEE5161A28AD32FA86273C97CCCE2F866D0AAB905A19D7",
+        "size": 22413
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 408,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/post-qa-q0-guard.json",
+        "sha256": "6F92C540D4806A6ACCEEE5161A28AD32FA86273C97CCCE2F866D0AAB905A19D7",
+        "size": 22413,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\post-qa-q0-guard.json",
+        "snapshot_sha256": "6F92C540D4806A6ACCEEE5161A28AD32FA86273C97CCCE2F866D0AAB905A19D7"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/post-qa-q0-guard.json"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1122,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/post-qa-q1-guard-final-report.json",
+        "sha256": "C99145DE5C211F4A42F1FF60C0E76B8653F67FA6FF39C50DE4422F759AC950D6",
+        "size": 49227
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1122,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/post-qa-q1-guard-final-report.json",
+        "sha256": "C99145DE5C211F4A42F1FF60C0E76B8653F67FA6FF39C50DE4422F759AC950D6",
+        "size": 49227,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\post-qa-q1-guard-final-report.json",
+        "snapshot_sha256": "C99145DE5C211F4A42F1FF60C0E76B8653F67FA6FF39C50DE4422F759AC950D6"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/post-qa-q1-guard-final-report.json"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1122,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/post-qa-q1-guard-report.json",
+        "sha256": "DF4D03EDAD12223A19598F73008548AF87E46845D5DC49EFCD7327EAB38A61BD",
+        "size": 49227
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1122,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/post-qa-q1-guard-report.json",
+        "sha256": "DF4D03EDAD12223A19598F73008548AF87E46845D5DC49EFCD7327EAB38A61BD",
+        "size": 49227,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\post-qa-q1-guard-report.json",
+        "snapshot_sha256": "DF4D03EDAD12223A19598F73008548AF87E46845D5DC49EFCD7327EAB38A61BD"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/post-qa-q1-guard-report.json"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/post-qa-q1-guard.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/post-qa-q1-guard.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\post-qa-q1-guard.exit.txt",
+        "snapshot_sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/post-qa-q1-guard.exit.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 2,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q0-collect-green.stderr.txt",
+        "sha256": "75A11DA44C802486BC6F65640AA48A730F0F684C5C07A42BA3CD1735EB3FB070",
+        "size": 2
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 2,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q0-collect-green.stderr.txt",
+        "sha256": "75A11DA44C802486BC6F65640AA48A730F0F684C5C07A42BA3CD1735EB3FB070",
+        "size": 2,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q0-collect-green.stderr.txt",
+        "snapshot_sha256": "75A11DA44C802486BC6F65640AA48A730F0F684C5C07A42BA3CD1735EB3FB070"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q0-collect-green.stderr.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 334,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q0-collect-green.stdout.txt",
+        "sha256": "474DAC7C59389418789178B240DBD48296EEA9C56CF72408A1817577E564A15B",
+        "size": 28274
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 334,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q0-collect-green.stdout.txt",
+        "sha256": "474DAC7C59389418789178B240DBD48296EEA9C56CF72408A1817577E564A15B",
+        "size": 28274,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q0-collect-green.stdout.txt",
+        "snapshot_sha256": "474DAC7C59389418789178B240DBD48296EEA9C56CF72408A1817577E564A15B"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q0-collect-green.stdout.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 39,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q0-collection-audit.md",
+        "sha256": "067B9E5B2192C9C783E86E2B281544E4EC31550193DEB6FB6B4590B2C05D00A3",
+        "size": 1847
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 39,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q0-collection-audit.md",
+        "sha256": "067B9E5B2192C9C783E86E2B281544E4EC31550193DEB6FB6B4590B2C05D00A3",
+        "size": 1847,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q0-collection-audit.md",
+        "snapshot_sha256": "067B9E5B2192C9C783E86E2B281544E4EC31550193DEB6FB6B4590B2C05D00A3"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q0-collection-audit.md"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 326,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q0-node-id-manifest.txt",
+        "sha256": "CEADE9324C0258AE5BFEB5A039868436B970BEC00D7609B6FCF222BCA1893CF6",
+        "size": 27721
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 326,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q0-node-id-manifest.txt",
+        "sha256": "CEADE9324C0258AE5BFEB5A039868436B970BEC00D7609B6FCF222BCA1893CF6",
+        "size": 27721,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q0-node-id-manifest.txt",
+        "snapshot_sha256": "CEADE9324C0258AE5BFEB5A039868436B970BEC00D7609B6FCF222BCA1893CF6"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q0-node-id-manifest.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 950,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/docs/pm/sessions/S12-LC3-QA/evidence/post-qa-q0-guard-report.json",
+        "sha256": "E301A2E3AF7CCEB99DEF3843D9D79087655C35C93084EE1EB6E591040F3B0849",
+        "size": 40985
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 950,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/docs/pm/sessions/S12-LC3-QA/evidence/post-qa-q0-guard-report.json",
+        "sha256": "E301A2E3AF7CCEB99DEF3843D9D79087655C35C93084EE1EB6E591040F3B0849",
+        "size": 40985,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\post-qa-q0-guard-report.json",
+        "snapshot_sha256": "E301A2E3AF7CCEB99DEF3843D9D79087655C35C93084EE1EB6E591040F3B0849"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/docs/pm/sessions/S12-LC3-QA/evidence/post-qa-q0-guard-report.json"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 408,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/docs/pm/sessions/S12-LC3-QA/evidence/post-qa-q0-guard.json",
+        "sha256": "6F92C540D4806A6ACCEEE5161A28AD32FA86273C97CCCE2F866D0AAB905A19D7",
+        "size": 22413
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 408,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/docs/pm/sessions/S12-LC3-QA/evidence/post-qa-q0-guard.json",
+        "sha256": "6F92C540D4806A6ACCEEE5161A28AD32FA86273C97CCCE2F866D0AAB905A19D7",
+        "size": 22413,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\post-qa-q0-guard.json",
+        "snapshot_sha256": "6F92C540D4806A6ACCEEE5161A28AD32FA86273C97CCCE2F866D0AAB905A19D7"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/docs/pm/sessions/S12-LC3-QA/evidence/post-qa-q0-guard.json"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 2,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/docs/pm/sessions/S12-LC3-QA/evidence/q0-collect-green.stderr.txt",
+        "sha256": "75A11DA44C802486BC6F65640AA48A730F0F684C5C07A42BA3CD1735EB3FB070",
+        "size": 2
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 2,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/docs/pm/sessions/S12-LC3-QA/evidence/q0-collect-green.stderr.txt",
+        "sha256": "75A11DA44C802486BC6F65640AA48A730F0F684C5C07A42BA3CD1735EB3FB070",
+        "size": 2,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q0-collect-green.stderr.txt",
+        "snapshot_sha256": "75A11DA44C802486BC6F65640AA48A730F0F684C5C07A42BA3CD1735EB3FB070"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/docs/pm/sessions/S12-LC3-QA/evidence/q0-collect-green.stderr.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 334,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/docs/pm/sessions/S12-LC3-QA/evidence/q0-collect-green.stdout.txt",
+        "sha256": "474DAC7C59389418789178B240DBD48296EEA9C56CF72408A1817577E564A15B",
+        "size": 28274
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 334,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/docs/pm/sessions/S12-LC3-QA/evidence/q0-collect-green.stdout.txt",
+        "sha256": "474DAC7C59389418789178B240DBD48296EEA9C56CF72408A1817577E564A15B",
+        "size": 28274,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q0-collect-green.stdout.txt",
+        "snapshot_sha256": "474DAC7C59389418789178B240DBD48296EEA9C56CF72408A1817577E564A15B"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/docs/pm/sessions/S12-LC3-QA/evidence/q0-collect-green.stdout.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 39,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/docs/pm/sessions/S12-LC3-QA/evidence/q0-collection-audit.md",
+        "sha256": "067B9E5B2192C9C783E86E2B281544E4EC31550193DEB6FB6B4590B2C05D00A3",
+        "size": 1847
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 39,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/docs/pm/sessions/S12-LC3-QA/evidence/q0-collection-audit.md",
+        "sha256": "067B9E5B2192C9C783E86E2B281544E4EC31550193DEB6FB6B4590B2C05D00A3",
+        "size": 1847,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q0-collection-audit.md",
+        "snapshot_sha256": "067B9E5B2192C9C783E86E2B281544E4EC31550193DEB6FB6B4590B2C05D00A3"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/docs/pm/sessions/S12-LC3-QA/evidence/q0-collection-audit.md"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 326,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/docs/pm/sessions/S12-LC3-QA/evidence/q0-node-id-manifest.txt",
+        "sha256": "CEADE9324C0258AE5BFEB5A039868436B970BEC00D7609B6FCF222BCA1893CF6",
+        "size": 27721
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 326,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/docs/pm/sessions/S12-LC3-QA/evidence/q0-node-id-manifest.txt",
+        "sha256": "CEADE9324C0258AE5BFEB5A039868436B970BEC00D7609B6FCF222BCA1893CF6",
+        "size": 27721,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q0-node-id-manifest.txt",
+        "snapshot_sha256": "CEADE9324C0258AE5BFEB5A039868436B970BEC00D7609B6FCF222BCA1893CF6"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/docs/pm/sessions/S12-LC3-QA/evidence/q0-node-id-manifest.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 109,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/docs/pm/sessions/S12-LC3-QA/LOG.md",
+        "sha256": "888877B6AC09F538DBDEB2D01DC0245CCE980C682E06C661FF1CF90EB3915A48",
+        "size": 4490
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 109,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/docs/pm/sessions/S12-LC3-QA/LOG.md",
+        "sha256": "888877B6AC09F538DBDEB2D01DC0245CCE980C682E06C661FF1CF90EB3915A48",
+        "size": 4490,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\docs\\pm\\sessions\\S12-LC3-QA\\LOG.md",
+        "snapshot_sha256": "888877B6AC09F538DBDEB2D01DC0245CCE980C682E06C661FF1CF90EB3915A48"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/docs/pm/sessions/S12-LC3-QA/LOG.md"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 58,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/docs/pm/sessions/S12-LC3-QA/REPORT.md",
+        "sha256": "FE7F8B6CB6D8A077973D5FF3EAAAB0917C02092FC8ED73E8086D301AE5981238",
+        "size": 2534
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 58,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/docs/pm/sessions/S12-LC3-QA/REPORT.md",
+        "sha256": "FE7F8B6CB6D8A077973D5FF3EAAAB0917C02092FC8ED73E8086D301AE5981238",
+        "size": 2534,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\docs\\pm\\sessions\\S12-LC3-QA\\REPORT.md",
+        "snapshot_sha256": "FE7F8B6CB6D8A077973D5FF3EAAAB0917C02092FC8ED73E8086D301AE5981238"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/docs/pm/sessions/S12-LC3-QA/REPORT.md"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 195,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/frontend/e2e/s12-export-boot.py",
+        "sha256": "4C208E45FBEFF0984D0E06872D32041D0146867DEA5525A98B1F662F6E4CA698",
+        "size": 7226
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 195,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/frontend/e2e/s12-export-boot.py",
+        "sha256": "4C208E45FBEFF0984D0E06872D32041D0146867DEA5525A98B1F662F6E4CA698",
+        "size": 7226,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\frontend\\e2e\\s12-export-boot.py",
+        "snapshot_sha256": "4C208E45FBEFF0984D0E06872D32041D0146867DEA5525A98B1F662F6E4CA698"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/frontend/e2e/s12-export-boot.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 20,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/frontend/e2e/s12-export-harness.py",
+        "sha256": "1AB687CB0B9BE67D86E3ED3E2F81ED5BBAA3D51DE51C5F4C12454484653CA603",
+        "size": 598
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 20,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/frontend/e2e/s12-export-harness.py",
+        "sha256": "1AB687CB0B9BE67D86E3ED3E2F81ED5BBAA3D51DE51C5F4C12454484653CA603",
+        "size": 598,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\frontend\\e2e\\s12-export-harness.py",
+        "snapshot_sha256": "1AB687CB0B9BE67D86E3ED3E2F81ED5BBAA3D51DE51C5F4C12454484653CA603"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/frontend/e2e/s12-export-harness.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 691,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/frontend/e2e/s12-export-seed.py",
+        "sha256": "29324683B02EF40975BDBAC14DD1D5474EC5F4445059F17CBD29445CA5CB0107",
+        "size": 27878
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 691,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/frontend/e2e/s12-export-seed.py",
+        "sha256": "29324683B02EF40975BDBAC14DD1D5474EC5F4445059F17CBD29445CA5CB0107",
+        "size": 27878,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\frontend\\e2e\\s12-export-seed.py",
+        "snapshot_sha256": "29324683B02EF40975BDBAC14DD1D5474EC5F4445059F17CBD29445CA5CB0107"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/frontend/e2e/s12-export-seed.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 414,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/frontend/e2e/s12-export.spec.ts",
+        "sha256": "756DEA72B75B71CABEC32C9818801E83A83A83E4C0590CA3B8815803CADCBFD0",
+        "size": 17735
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 414,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/frontend/e2e/s12-export.spec.ts",
+        "sha256": "756DEA72B75B71CABEC32C9818801E83A83A83E4C0590CA3B8815803CADCBFD0",
+        "size": 17735,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\frontend\\e2e\\s12-export.spec.ts",
+        "snapshot_sha256": "756DEA72B75B71CABEC32C9818801E83A83A83E4C0590CA3B8815803CADCBFD0"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/frontend/e2e/s12-export.spec.ts"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 78,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/frontend/playwright.s12-export.config.ts",
+        "sha256": "E8F74D0075CDCACC702A01007ED5819C87A7ABA7B5E1847593DFEF6266FABCFD",
+        "size": 2812
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 78,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/frontend/playwright.s12-export.config.ts",
+        "sha256": "E8F74D0075CDCACC702A01007ED5819C87A7ABA7B5E1847593DFEF6266FABCFD",
+        "size": 2812,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\frontend\\playwright.s12-export.config.ts",
+        "snapshot_sha256": "E8F74D0075CDCACC702A01007ED5819C87A7ABA7B5E1847593DFEF6266FABCFD"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/frontend/playwright.s12-export.config.ts"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 57,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-lc3-ui/test_export_context_contract.py",
+        "sha256": "5DE429F770EF1D2FADC04A2A078AEC3FA803312A190B6E6160B6FFB6D4A713AF",
+        "size": 1920
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 57,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-lc3-ui/test_export_context_contract.py",
+        "sha256": "5DE429F770EF1D2FADC04A2A078AEC3FA803312A190B6E6160B6FFB6D4A713AF",
+        "size": 1920,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-lc3-ui\\test_export_context_contract.py",
+        "snapshot_sha256": "5DE429F770EF1D2FADC04A2A078AEC3FA803312A190B6E6160B6FFB6D4A713AF"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-lc3-ui/test_export_context_contract.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 282,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-lc3-val/test_r01_r03_r04_boundaries.py",
+        "sha256": "18F008A358445768CED6584B11985EA8E3D530132D9CEEEB5AC0F523A4B14401",
+        "size": 12529
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 282,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-lc3-val/test_r01_r03_r04_boundaries.py",
+        "sha256": "18F008A358445768CED6584B11985EA8E3D530132D9CEEEB5AC0F523A4B14401",
+        "size": 12529,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-lc3-val\\test_r01_r03_r04_boundaries.py",
+        "snapshot_sha256": "18F008A358445768CED6584B11985EA8E3D530132D9CEEEB5AC0F523A4B14401"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-lc3-val/test_r01_r03_r04_boundaries.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 712,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t01/test_preflight_contract.py",
+        "sha256": "C82F7F98C3E506CC46220E9590D2E6BCEA37DE9D7666518B88A8FB58D6F3C36C",
+        "size": 27822
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 712,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t01/test_preflight_contract.py",
+        "sha256": "C82F7F98C3E506CC46220E9590D2E6BCEA37DE9D7666518B88A8FB58D6F3C36C",
+        "size": 27822,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t01\\test_preflight_contract.py",
+        "snapshot_sha256": "C82F7F98C3E506CC46220E9590D2E6BCEA37DE9D7666518B88A8FB58D6F3C36C"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t01/test_preflight_contract.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 513,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t01/test_s12_t01_c1_closure.py",
+        "sha256": "5AC17C5E22982992528CFB1363355FB4164B9E31CF1DD390CC3CE3772CCD07CC",
+        "size": 21298
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 513,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t01/test_s12_t01_c1_closure.py",
+        "sha256": "5AC17C5E22982992528CFB1363355FB4164B9E31CF1DD390CC3CE3772CCD07CC",
+        "size": 21298,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t01\\test_s12_t01_c1_closure.py",
+        "snapshot_sha256": "5AC17C5E22982992528CFB1363355FB4164B9E31CF1DD390CC3CE3772CCD07CC"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t01/test_s12_t01_c1_closure.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 154,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t02/test_capabilities.py",
+        "sha256": "BD4415401D8F3CF33909958E9EDE7B954DBF622A5E7707EA1B3B524D833F4A61",
+        "size": 5866
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 154,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t02/test_capabilities.py",
+        "sha256": "BD4415401D8F3CF33909958E9EDE7B954DBF622A5E7707EA1B3B524D833F4A61",
+        "size": 5866,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t02\\test_capabilities.py",
+        "snapshot_sha256": "BD4415401D8F3CF33909958E9EDE7B954DBF622A5E7707EA1B3B524D833F4A61"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t02/test_capabilities.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 182,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t02/test_profiles.py",
+        "sha256": "10652B79533CBA122D68EAB859507458AC2E39EE89F2A362680E93DA12ED4AA2",
+        "size": 7766
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 182,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t02/test_profiles.py",
+        "sha256": "10652B79533CBA122D68EAB859507458AC2E39EE89F2A362680E93DA12ED4AA2",
+        "size": 7766,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t02\\test_profiles.py",
+        "snapshot_sha256": "10652B79533CBA122D68EAB859507458AC2E39EE89F2A362680E93DA12ED4AA2"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t02/test_profiles.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 141,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t02/test_s12_t02_c1_closure.py",
+        "sha256": "6E7835629E38481F4ABA33274DAB3953CF5E381A4689A6AAF0BA16D475ECF110",
+        "size": 5582
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 141,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t02/test_s12_t02_c1_closure.py",
+        "sha256": "6E7835629E38481F4ABA33274DAB3953CF5E381A4689A6AAF0BA16D475ECF110",
+        "size": 5582,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t02\\test_s12_t02_c1_closure.py",
+        "snapshot_sha256": "6E7835629E38481F4ABA33274DAB3953CF5E381A4689A6AAF0BA16D475ECF110"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t02/test_s12_t02_c1_closure.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03a/__init__.py",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03a/__init__.py",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03a\\__init__.py",
+        "snapshot_sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03a/__init__.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 524,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03a/test_s12_export_c1_closure.py",
+        "sha256": "CE3F8F4ED7CF75690C3ED0D30A1B2580A0818D6D478561591564D81A9837192A",
+        "size": 20776
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 524,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03a/test_s12_export_c1_closure.py",
+        "sha256": "CE3F8F4ED7CF75690C3ED0D30A1B2580A0818D6D478561591564D81A9837192A",
+        "size": 20776,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03a\\test_s12_export_c1_closure.py",
+        "snapshot_sha256": "CE3F8F4ED7CF75690C3ED0D30A1B2580A0818D6D478561591564D81A9837192A"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03a/test_s12_export_c1_closure.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 712,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03a/test_s12_export_c2_integrity.py",
+        "sha256": "E082C8BE51C71551B6AE7C26C3D2AB7D452B12D0649C4CAE086E92BA086B9D96",
+        "size": 28622
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 712,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03a/test_s12_export_c2_integrity.py",
+        "sha256": "E082C8BE51C71551B6AE7C26C3D2AB7D452B12D0649C4CAE086E92BA086B9D96",
+        "size": 28622,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03a\\test_s12_export_c2_integrity.py",
+        "snapshot_sha256": "E082C8BE51C71551B6AE7C26C3D2AB7D452B12D0649C4CAE086E92BA086B9D96"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03a/test_s12_export_c2_integrity.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 631,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03a/test_s12_export_domain.py",
+        "sha256": "5BB2250CF7EA67F023722D6B4F350280D826C491843A01103155E0E7F2222405",
+        "size": 24254
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 631,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03a/test_s12_export_domain.py",
+        "sha256": "5BB2250CF7EA67F023722D6B4F350280D826C491843A01103155E0E7F2222405",
+        "size": 24254,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03a\\test_s12_export_domain.py",
+        "snapshot_sha256": "5BB2250CF7EA67F023722D6B4F350280D826C491843A01103155E0E7F2222405"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03a/test_s12_export_domain.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 251,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03a/test_s12_export_migration.py",
+        "sha256": "0B13E58D3B4A06D443B4A381CB1E36D5AAF046819E9503DE1FA5C38633E1D0EF",
+        "size": 10812
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 251,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03a/test_s12_export_migration.py",
+        "sha256": "0B13E58D3B4A06D443B4A381CB1E36D5AAF046819E9503DE1FA5C38633E1D0EF",
+        "size": 10812,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03a\\test_s12_export_migration.py",
+        "snapshot_sha256": "0B13E58D3B4A06D443B4A381CB1E36D5AAF046819E9503DE1FA5C38633E1D0EF"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03a/test_s12_export_migration.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03b/__init__.py",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03b/__init__.py",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03b\\__init__.py",
+        "snapshot_sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03b/__init__.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 223,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03b/conftest.py",
+        "sha256": "1EF6E4A9BCF37D4BCA12F1FA93297F8BE8AC0FFD4EF4E0B01F1DF0185F0BD64F",
+        "size": 8079
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 223,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03b/conftest.py",
+        "sha256": "1EF6E4A9BCF37D4BCA12F1FA93297F8BE8AC0FFD4EF4E0B01F1DF0185F0BD64F",
+        "size": 8079,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03b\\conftest.py",
+        "snapshot_sha256": "1EF6E4A9BCF37D4BCA12F1FA93297F8BE8AC0FFD4EF4E0B01F1DF0185F0BD64F"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03b/conftest.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 289,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03b/test_plan_stitch.py",
+        "sha256": "83B17E9B8D7D5B0473A31BFD43DA70158C5A1B49BE9418C12A8DC50DD0FA7DC7",
+        "size": 9250
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 289,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03b/test_plan_stitch.py",
+        "sha256": "83B17E9B8D7D5B0473A31BFD43DA70158C5A1B49BE9418C12A8DC50DD0FA7DC7",
+        "size": 9250,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03b\\test_plan_stitch.py",
+        "snapshot_sha256": "83B17E9B8D7D5B0473A31BFD43DA70158C5A1B49BE9418C12A8DC50DD0FA7DC7"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03b/test_plan_stitch.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 306,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03b/test_runner_resume.py",
+        "sha256": "B88EFFCD7CD73A909FAC916E8718F0E73C928142DD76D04C02F57C63ECA954C5",
+        "size": 11929
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 306,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03b/test_runner_resume.py",
+        "sha256": "B88EFFCD7CD73A909FAC916E8718F0E73C928142DD76D04C02F57C63ECA954C5",
+        "size": 11929,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03b\\test_runner_resume.py",
+        "snapshot_sha256": "B88EFFCD7CD73A909FAC916E8718F0E73C928142DD76D04C02F57C63ECA954C5"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03b/test_runner_resume.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 530,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03b/test_s12_t03b_c1_closure.py",
+        "sha256": "F7B50E1A5B3DAEFE53F9BFBCBE5A86D901C90BB699E01FDF3D910233CF6C367C",
+        "size": 21898
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 530,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03b/test_s12_t03b_c1_closure.py",
+        "sha256": "F7B50E1A5B3DAEFE53F9BFBCBE5A86D901C90BB699E01FDF3D910233CF6C367C",
+        "size": 21898,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03b\\test_s12_t03b_c1_closure.py",
+        "snapshot_sha256": "F7B50E1A5B3DAEFE53F9BFBCBE5A86D901C90BB699E01FDF3D910233CF6C367C"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03b/test_s12_t03b_c1_closure.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03c/__init__.py",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03c/__init__.py",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03c\\__init__.py",
+        "snapshot_sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03c/__init__.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 306,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03c/test_c1_closure_c22.py",
+        "sha256": "192ED45B0BCD8B0833D91BFC0C87D7F1A53CCE8B78C41575410554931C0B3ACD",
+        "size": 12174
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 306,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03c/test_c1_closure_c22.py",
+        "sha256": "192ED45B0BCD8B0833D91BFC0C87D7F1A53CCE8B78C41575410554931C0B3ACD",
+        "size": 12174,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03c\\test_c1_closure_c22.py",
+        "snapshot_sha256": "192ED45B0BCD8B0833D91BFC0C87D7F1A53CCE8B78C41575410554931C0B3ACD"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03c/test_c1_closure_c22.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 77,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03c/test_c1_repro_typeerrors.py",
+        "sha256": "BFD722FFCFD77A6EB4E2872D76CCFD8542DE365D01F331E4262025DE1E5E573B",
+        "size": 2954
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 77,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03c/test_c1_repro_typeerrors.py",
+        "sha256": "BFD722FFCFD77A6EB4E2872D76CCFD8542DE365D01F331E4262025DE1E5E573B",
+        "size": 2954,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03c\\test_c1_repro_typeerrors.py",
+        "snapshot_sha256": "BFD722FFCFD77A6EB4E2872D76CCFD8542DE365D01F331E4262025DE1E5E573B"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03c/test_c1_repro_typeerrors.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 320,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03c/test_export_jobs_api.py",
+        "sha256": "754CBAEC2F83F7AA8DC73B4CE6CEE2C937285A5DCB1597BFD87E66F030C3C29E",
+        "size": 13351
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 320,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03c/test_export_jobs_api.py",
+        "sha256": "754CBAEC2F83F7AA8DC73B4CE6CEE2C937285A5DCB1597BFD87E66F030C3C29E",
+        "size": 13351,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03c\\test_export_jobs_api.py",
+        "snapshot_sha256": "754CBAEC2F83F7AA8DC73B4CE6CEE2C937285A5DCB1597BFD87E66F030C3C29E"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03c/test_export_jobs_api.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 857,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03c/test_publication.py",
+        "sha256": "1C884143697A4B920D42E9CE8C76D56D82B4E447941832A9018224C93E28EEA5",
+        "size": 34079
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 857,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03c/test_publication.py",
+        "sha256": "1C884143697A4B920D42E9CE8C76D56D82B4E447941832A9018224C93E28EEA5",
+        "size": 34079,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03c\\test_publication.py",
+        "snapshot_sha256": "1C884143697A4B920D42E9CE8C76D56D82B4E447941832A9018224C93E28EEA5"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03c/test_publication.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 580,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03c/test_s12_t03c_c1_closure.py",
+        "sha256": "571B21CED1EF79028A47368832D616BA857E3B6895A88AD9555C2C533D42F87C",
+        "size": 23858
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 580,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03c/test_s12_t03c_c1_closure.py",
+        "sha256": "571B21CED1EF79028A47368832D616BA857E3B6895A88AD9555C2C533D42F87C",
+        "size": 23858,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03c\\test_s12_t03c_c1_closure.py",
+        "snapshot_sha256": "571B21CED1EF79028A47368832D616BA857E3B6895A88AD9555C2C533D42F87C"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t03c/test_s12_t03c_c1_closure.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 108,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t04a/conftest.py",
+        "sha256": "6304A673EAE326C64DF4D3D591A3F7706913BDC047BF3DBED5DFE8E9A4EF6606",
+        "size": 3265
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 108,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t04a/conftest.py",
+        "sha256": "6304A673EAE326C64DF4D3D591A3F7706913BDC047BF3DBED5DFE8E9A4EF6606",
+        "size": 3265,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t04a\\conftest.py",
+        "snapshot_sha256": "6304A673EAE326C64DF4D3D591A3F7706913BDC047BF3DBED5DFE8E9A4EF6606"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t04a/conftest.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 996,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t04a/test_c2_source_locked.py",
+        "sha256": "EBBAD80A73270D0CDAAC498AD8A9828EC1EF25B46F16C6733CE3E836BB5065B8",
+        "size": 38754
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 996,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t04a/test_c2_source_locked.py",
+        "sha256": "EBBAD80A73270D0CDAAC498AD8A9828EC1EF25B46F16C6733CE3E836BB5065B8",
+        "size": 38754,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t04a\\test_c2_source_locked.py",
+        "snapshot_sha256": "EBBAD80A73270D0CDAAC498AD8A9828EC1EF25B46F16C6733CE3E836BB5065B8"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t04a/test_c2_source_locked.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 372,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t04a/test_s12_t04a_c1_closure.py",
+        "sha256": "E38A62537CC158B29B2999A74FF297098DC7D5B6DE13F3FE79AE3B64B836E5B4",
+        "size": 13664
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 372,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t04a/test_s12_t04a_c1_closure.py",
+        "sha256": "E38A62537CC158B29B2999A74FF297098DC7D5B6DE13F3FE79AE3B64B836E5B4",
+        "size": 13664,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t04a\\test_s12_t04a_c1_closure.py",
+        "snapshot_sha256": "E38A62537CC158B29B2999A74FF297098DC7D5B6DE13F3FE79AE3B64B836E5B4"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t04a/test_s12_t04a_c1_closure.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 163,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t04a/test_validation_negatives.py",
+        "sha256": "99CF75EAE521609D8BE1AAEA5F559725541708B2EFD8BADF9290EAEE9AB5C616",
+        "size": 5398
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 163,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t04a/test_validation_negatives.py",
+        "sha256": "99CF75EAE521609D8BE1AAEA5F559725541708B2EFD8BADF9290EAEE9AB5C616",
+        "size": 5398,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t04a\\test_validation_negatives.py",
+        "snapshot_sha256": "99CF75EAE521609D8BE1AAEA5F559725541708B2EFD8BADF9290EAEE9AB5C616"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t04a/test_validation_negatives.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 98,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t04a/test_validation_pass.py",
+        "sha256": "7E0B9CF8036A500C3A5DC5B9F0E0579FF878FB00DFDA00BAF91E53B390D81126",
+        "size": 3718
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 98,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t04a/test_validation_pass.py",
+        "sha256": "7E0B9CF8036A500C3A5DC5B9F0E0579FF878FB00DFDA00BAF91E53B390D81126",
+        "size": 3718,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t04a\\test_validation_pass.py",
+        "snapshot_sha256": "7E0B9CF8036A500C3A5DC5B9F0E0579FF878FB00DFDA00BAF91E53B390D81126"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t04a/test_validation_pass.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 67,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t04a/test_validation_units.py",
+        "sha256": "5225953495B7E862D7914169EC6AC425CD6B2F612B8F5D909CA97A32A50D5D6A",
+        "size": 2051
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 67,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t04a/test_validation_units.py",
+        "sha256": "5225953495B7E862D7914169EC6AC425CD6B2F612B8F5D909CA97A32A50D5D6A",
+        "size": 2051,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t04a\\test_validation_units.py",
+        "snapshot_sha256": "5225953495B7E862D7914169EC6AC425CD6B2F612B8F5D909CA97A32A50D5D6A"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t04a/test_validation_units.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 82,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06a/test_manifest_integrity.py",
+        "sha256": "4B28EB795770702504E3819A2AA72B79B06A7F841616A44897F6B6330DF74A64",
+        "size": 3309
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 82,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06a/test_manifest_integrity.py",
+        "sha256": "4B28EB795770702504E3819A2AA72B79B06A7F841616A44897F6B6330DF74A64",
+        "size": 3309,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t06a\\test_manifest_integrity.py",
+        "snapshot_sha256": "4B28EB795770702504E3819A2AA72B79B06A7F841616A44897F6B6330DF74A64"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06a/test_manifest_integrity.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 224,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06a/test_process_identity.py",
+        "sha256": "F865DA2FECDDC2015A390600B94115C455E2D86E61B2F3D6DFE72046BA1EE536",
+        "size": 9612
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 224,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06a/test_process_identity.py",
+        "sha256": "F865DA2FECDDC2015A390600B94115C455E2D86E61B2F3D6DFE72046BA1EE536",
+        "size": 9612,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t06a\\test_process_identity.py",
+        "snapshot_sha256": "F865DA2FECDDC2015A390600B94115C455E2D86E61B2F3D6DFE72046BA1EE536"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06a/test_process_identity.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06b/__init__.py",
+        "sha256": "00C8145B3734B3DA78069F3205E70372092F1D8617E2CCA5AA5EEB201675B305",
+        "size": 60
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06b/__init__.py",
+        "sha256": "00C8145B3734B3DA78069F3205E70372092F1D8617E2CCA5AA5EEB201675B305",
+        "size": 60,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t06b\\__init__.py",
+        "snapshot_sha256": "00C8145B3734B3DA78069F3205E70372092F1D8617E2CCA5AA5EEB201675B305"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06b/__init__.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 66,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06b/c27_stage1_worker.py",
+        "sha256": "5E186CA33769108B77C9BC62A7D301D7E9D21DD3EA5FFE87EF2A97AE557EC76F",
+        "size": 2428
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 66,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06b/c27_stage1_worker.py",
+        "sha256": "5E186CA33769108B77C9BC62A7D301D7E9D21DD3EA5FFE87EF2A97AE557EC76F",
+        "size": 2428,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t06b\\c27_stage1_worker.py",
+        "snapshot_sha256": "5E186CA33769108B77C9BC62A7D301D7E9D21DD3EA5FFE87EF2A97AE557EC76F"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06b/c27_stage1_worker.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 516,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06b/conftest.py",
+        "sha256": "DD4C275217D7A4C04DA04B34DA8B62B804F60BE6F846EE91D1D5A149036C1CA1",
+        "size": 16843
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 516,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06b/conftest.py",
+        "sha256": "DD4C275217D7A4C04DA04B34DA8B62B804F60BE6F846EE91D1D5A149036C1CA1",
+        "size": 16843,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t06b\\conftest.py",
+        "snapshot_sha256": "DD4C275217D7A4C04DA04B34DA8B62B804F60BE6F846EE91D1D5A149036C1CA1"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06b/conftest.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 338,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06b/test_c26_normal_product.py",
+        "sha256": "DD7AA9D77FB2A5D3ED25DD6CDAE7ED9D6D3F959EFD083602F41BA4E27D150194",
+        "size": 13547
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 338,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06b/test_c26_normal_product.py",
+        "sha256": "DD7AA9D77FB2A5D3ED25DD6CDAE7ED9D6D3F959EFD083602F41BA4E27D150194",
+        "size": 13547,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t06b\\test_c26_normal_product.py",
+        "snapshot_sha256": "DD7AA9D77FB2A5D3ED25DD6CDAE7ED9D6D3F959EFD083602F41BA4E27D150194"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06b/test_c26_normal_product.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 240,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06b/test_c27_same_job_fresh_process.py",
+        "sha256": "063907E3EF456AD94ACAB36AF3EB311CC03B5F8EF75C210C7BDF003A13453E3D",
+        "size": 9083
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 240,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06b/test_c27_same_job_fresh_process.py",
+        "sha256": "063907E3EF456AD94ACAB36AF3EB311CC03B5F8EF75C210C7BDF003A13453E3D",
+        "size": 9083,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t06b\\test_c27_same_job_fresh_process.py",
+        "snapshot_sha256": "063907E3EF456AD94ACAB36AF3EB311CC03B5F8EF75C210C7BDF003A13453E3D"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06b/test_c27_same_job_fresh_process.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 185,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06b/test_c28_audio_mapping.py",
+        "sha256": "9214850BBCAF77A283A5AFA86F03D0582C697E5E2328D53B9A7D5BD99EC9A933",
+        "size": 7121
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 185,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06b/test_c28_audio_mapping.py",
+        "sha256": "9214850BBCAF77A283A5AFA86F03D0582C697E5E2328D53B9A7D5BD99EC9A933",
+        "size": 7121,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t06b\\test_c28_audio_mapping.py",
+        "snapshot_sha256": "9214850BBCAF77A283A5AFA86F03D0582C697E5E2328D53B9A7D5BD99EC9A933"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06b/test_c28_audio_mapping.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 110,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06b/test_hardware_matrix.py",
+        "sha256": "FA8DBC024C5D8F1B4F522CD242137EDD8E5466B15E0A852883E7EDC765DC46C9",
+        "size": 3922
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 110,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06b/test_hardware_matrix.py",
+        "sha256": "FA8DBC024C5D8F1B4F522CD242137EDD8E5466B15E0A852883E7EDC765DC46C9",
+        "size": 3922,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t06b\\test_hardware_matrix.py",
+        "snapshot_sha256": "FA8DBC024C5D8F1B4F522CD242137EDD8E5466B15E0A852883E7EDC765DC46C9"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06b/test_hardware_matrix.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 192,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06b/test_scenario_f_4k.py",
+        "sha256": "8A6FED3DCD9101FBDF32062EC35B214CE75C1C8298D0D784947B2A93A456099B",
+        "size": 7012
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 192,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06b/test_scenario_f_4k.py",
+        "sha256": "8A6FED3DCD9101FBDF32062EC35B214CE75C1C8298D0D784947B2A93A456099B",
+        "size": 7012,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t06b\\test_scenario_f_4k.py",
+        "snapshot_sha256": "8A6FED3DCD9101FBDF32062EC35B214CE75C1C8298D0D784947B2A93A456099B"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06b/test_scenario_f_4k.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 320,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06b/test_scenario_g_resume.py",
+        "sha256": "439DCB708E028D05D74B361398E48A061B187458ECC22020CA68355994B6FA1A",
+        "size": 10501
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 320,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06b/test_scenario_g_resume.py",
+        "sha256": "439DCB708E028D05D74B361398E48A061B187458ECC22020CA68355994B6FA1A",
+        "size": 10501,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t06b\\test_scenario_g_resume.py",
+        "snapshot_sha256": "439DCB708E028D05D74B361398E48A061B187458ECC22020CA68355994B6FA1A"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-baseline-snapshots/tests/s12/s12-t06b/test_scenario_g_resume.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 150,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-blocked-status.md",
+        "sha256": "EBC0EB898929C49BDF6F8809FB455A352A07E5ECA7AFCC26236A0EF661DF66C4",
+        "size": 7438
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 150,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-blocked-status.md",
+        "sha256": "EBC0EB898929C49BDF6F8809FB455A352A07E5ECA7AFCC26236A0EF661DF66C4",
+        "size": 7438,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-blocked-status.md",
+        "snapshot_sha256": "EBC0EB898929C49BDF6F8809FB455A352A07E5ECA7AFCC26236A0EF661DF66C4"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-blocked-status.md"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-collect-final.command.txt",
+        "sha256": "ABED4E768C99CC47F22BAC0F6BEE57EBE088F8FD4D6A9B37B2129B8B7BD7B88C",
+        "size": 66
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-collect-final.command.txt",
+        "sha256": "ABED4E768C99CC47F22BAC0F6BEE57EBE088F8FD4D6A9B37B2129B8B7BD7B88C",
+        "size": 66,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-collect-final.command.txt",
+        "snapshot_sha256": "ABED4E768C99CC47F22BAC0F6BEE57EBE088F8FD4D6A9B37B2129B8B7BD7B88C"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-collect-final.command.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-collect-final.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-collect-final.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-collect-final.exit.txt",
+        "snapshot_sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-collect-final.exit.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-collect-final.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-collect-final.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-collect-final.stderr.txt",
+        "snapshot_sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-collect-final.stderr.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 349,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-collect-final.stdout.txt",
+        "sha256": "F0E36182BCDE2CEED2C95B2D1F272BEA65453D56B21ABCFBD43F6B3E238DEBE6",
+        "size": 30219
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 349,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-collect-final.stdout.txt",
+        "sha256": "F0E36182BCDE2CEED2C95B2D1F272BEA65453D56B21ABCFBD43F6B3E238DEBE6",
+        "size": 30219,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-collect-final.stdout.txt",
+        "snapshot_sha256": "F0E36182BCDE2CEED2C95B2D1F272BEA65453D56B21ABCFBD43F6B3E238DEBE6"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-collect-final.stdout.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-collect-full.command.txt",
+        "sha256": "ABED4E768C99CC47F22BAC0F6BEE57EBE088F8FD4D6A9B37B2129B8B7BD7B88C",
+        "size": 66
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-collect-full.command.txt",
+        "sha256": "ABED4E768C99CC47F22BAC0F6BEE57EBE088F8FD4D6A9B37B2129B8B7BD7B88C",
+        "size": 66,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-collect-full.command.txt",
+        "snapshot_sha256": "ABED4E768C99CC47F22BAC0F6BEE57EBE088F8FD4D6A9B37B2129B8B7BD7B88C"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-collect-full.command.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-collect-full.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-collect-full.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-collect-full.exit.txt",
+        "snapshot_sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-collect-full.exit.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-collect-full.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-collect-full.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-collect-full.stderr.txt",
+        "snapshot_sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-collect-full.stderr.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 349,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-collect-full.stdout.txt",
+        "sha256": "9288C519B66C1190404DD9260B27F21D767FA1F5650DB63B0340FA8061960546",
+        "size": 30211
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 349,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-collect-full.stdout.txt",
+        "sha256": "9288C519B66C1190404DD9260B27F21D767FA1F5650DB63B0340FA8061960546",
+        "size": 30211,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-collect-full.stdout.txt",
+        "snapshot_sha256": "9288C519B66C1190404DD9260B27F21D767FA1F5650DB63B0340FA8061960546"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-collect-full.stdout.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-correction-focused.command.txt",
+        "sha256": "E073037B57D27753983693747AE609DC4D1C028F51EDC7C72AA0C2BB2F08001B",
+        "size": 517
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-correction-focused.command.txt",
+        "sha256": "E073037B57D27753983693747AE609DC4D1C028F51EDC7C72AA0C2BB2F08001B",
+        "size": 517,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-correction-focused.command.txt",
+        "snapshot_sha256": "E073037B57D27753983693747AE609DC4D1C028F51EDC7C72AA0C2BB2F08001B"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-correction-focused.command.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-correction-focused.exit.txt",
+        "sha256": "F1B2F662800122BED0FF255693DF89C4487FBDCF453D3524A42D4EC20C3D9C04",
+        "size": 3
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-correction-focused.exit.txt",
+        "sha256": "F1B2F662800122BED0FF255693DF89C4487FBDCF453D3524A42D4EC20C3D9C04",
+        "size": 3,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-correction-focused.exit.txt",
+        "snapshot_sha256": "F1B2F662800122BED0FF255693DF89C4487FBDCF453D3524A42D4EC20C3D9C04"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-correction-focused.exit.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-correction-focused.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-correction-focused.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-correction-focused.stderr.txt",
+        "snapshot_sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-correction-focused.stderr.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 529,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-correction-focused.stdout.txt",
+        "sha256": "EDC8B9D45A47BFAACD5D660541CCBEF017C73DEE236A4DF83FCBF570086E4B16",
+        "size": 39784
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 529,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-correction-focused.stdout.txt",
+        "sha256": "EDC8B9D45A47BFAACD5D660541CCBEF017C73DEE236A4DF83FCBF570086E4B16",
+        "size": 39784,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-correction-focused.stdout.txt",
+        "snapshot_sha256": "EDC8B9D45A47BFAACD5D660541CCBEF017C73DEE236A4DF83FCBF570086E4B16"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-correction-focused.stdout.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-final-ruff.command.txt",
+        "sha256": "9441D4E7D02E1E611B671405C063FDC8521B20CDC920C810ACBEBF65FB6AB06B",
+        "size": 203
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-final-ruff.command.txt",
+        "sha256": "9441D4E7D02E1E611B671405C063FDC8521B20CDC920C810ACBEBF65FB6AB06B",
+        "size": 203,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-final-ruff.command.txt",
+        "snapshot_sha256": "9441D4E7D02E1E611B671405C063FDC8521B20CDC920C810ACBEBF65FB6AB06B"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-final-ruff.command.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-final-ruff.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-final-ruff.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-final-ruff.exit.txt",
+        "snapshot_sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-final-ruff.exit.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-final-ruff.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-final-ruff.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-final-ruff.stderr.txt",
+        "snapshot_sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-final-ruff.stderr.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 2,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-final-ruff.stdout.txt",
+        "sha256": "D63AB3DF51A50C66F9C57056288C7D4FAF9DCE413552D89215714320AC2B748E",
+        "size": 38
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 2,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-final-ruff.stdout.txt",
+        "sha256": "D63AB3DF51A50C66F9C57056288C7D4FAF9DCE413552D89215714320AC2B748E",
+        "size": 38,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-final-ruff.stdout.txt",
+        "snapshot_sha256": "D63AB3DF51A50C66F9C57056288C7D4FAF9DCE413552D89215714320AC2B748E"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-final-ruff.stdout.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1122,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-final-write-set-report.json",
+        "sha256": "C99145DE5C211F4A42F1FF60C0E76B8653F67FA6FF39C50DE4422F759AC950D6",
+        "size": 49227
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1122,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-final-write-set-report.json",
+        "sha256": "C99145DE5C211F4A42F1FF60C0E76B8653F67FA6FF39C50DE4422F759AC950D6",
+        "size": 49227,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-final-write-set-report.json",
+        "snapshot_sha256": "C99145DE5C211F4A42F1FF60C0E76B8653F67FA6FF39C50DE4422F759AC950D6"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-final-write-set-report.json"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-final-write-set.command.txt",
+        "sha256": "2A052CC5710454FCB63DAD3A832F6EBB4CA07C7A4981E03C35498F0F89596ECA",
+        "size": 402
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-final-write-set.command.txt",
+        "sha256": "2A052CC5710454FCB63DAD3A832F6EBB4CA07C7A4981E03C35498F0F89596ECA",
+        "size": 402,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-final-write-set.command.txt",
+        "snapshot_sha256": "2A052CC5710454FCB63DAD3A832F6EBB4CA07C7A4981E03C35498F0F89596ECA"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-final-write-set.command.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-final-write-set.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-final-write-set.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-final-write-set.exit.txt",
+        "snapshot_sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-final-write-set.exit.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-final-write-set.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-final-write-set.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-final-write-set.stderr.txt",
+        "snapshot_sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-final-write-set.stderr.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-final-write-set.stdout.txt",
+        "sha256": "514F1A61FEAAF8FFEA498C917C62C8B9E47877E6F381B7386F63E65394FE6EBF",
+        "size": 54
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-final-write-set.stdout.txt",
+        "sha256": "514F1A61FEAAF8FFEA498C917C62C8B9E47877E6F381B7386F63E65394FE6EBF",
+        "size": 54,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-final-write-set.stdout.txt",
+        "snapshot_sha256": "514F1A61FEAAF8FFEA498C917C62C8B9E47877E6F381B7386F63E65394FE6EBF"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-final-write-set.stdout.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-final.command.txt",
+        "sha256": "E96514B135E91198AADF0CAC8ED8F7E11121BF30259B534E5F8A1E0CF5741C4A",
+        "size": 282
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-final.command.txt",
+        "sha256": "E96514B135E91198AADF0CAC8ED8F7E11121BF30259B534E5F8A1E0CF5741C4A",
+        "size": 282,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-focused-final.command.txt",
+        "snapshot_sha256": "E96514B135E91198AADF0CAC8ED8F7E11121BF30259B534E5F8A1E0CF5741C4A"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-final.command.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-final.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-final.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-focused-final.exit.txt",
+        "snapshot_sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-final.exit.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-final.stdout.txt",
+        "sha256": "3BB85B68836A9ADF047C1A3CF8F3118FCF8E414DAD941EFC386FFC054DB5A10D",
+        "size": 25
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-final.stdout.txt",
+        "sha256": "3BB85B68836A9ADF047C1A3CF8F3118FCF8E414DAD941EFC386FFC054DB5A10D",
+        "size": 25,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-focused-final.stdout.txt",
+        "snapshot_sha256": "3BB85B68836A9ADF047C1A3CF8F3118FCF8E414DAD941EFC386FFC054DB5A10D"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-final.stdout.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c08-c1.command.txt",
+        "sha256": "B31A3A1B2AE6DACEDCA2D5F83E42D9D813E46A2BCA8BFB02783A66317658CF93",
+        "size": 97
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c08-c1.command.txt",
+        "sha256": "B31A3A1B2AE6DACEDCA2D5F83E42D9D813E46A2BCA8BFB02783A66317658CF93",
+        "size": 97,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-focused-green-c08-c1.command.txt",
+        "snapshot_sha256": "B31A3A1B2AE6DACEDCA2D5F83E42D9D813E46A2BCA8BFB02783A66317658CF93"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c08-c1.command.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c08-c1.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c08-c1.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-focused-green-c08-c1.exit.txt",
+        "snapshot_sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c08-c1.exit.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c08-c1.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c08-c1.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-focused-green-c08-c1.stderr.txt",
+        "snapshot_sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c08-c1.stderr.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 14,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c08-c1.stdout.txt",
+        "sha256": "1D0E831138B508ADC83378D7A39BADF4CEF461A70657FBFEBD01309F524B41B5",
+        "size": 1048
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 14,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c08-c1.stdout.txt",
+        "sha256": "1D0E831138B508ADC83378D7A39BADF4CEF461A70657FBFEBD01309F524B41B5",
+        "size": 1048,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-focused-green-c08-c1.stdout.txt",
+        "snapshot_sha256": "1D0E831138B508ADC83378D7A39BADF4CEF461A70657FBFEBD01309F524B41B5"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c08-c1.stdout.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c08-c2.command.txt",
+        "sha256": "9300963C7950CBF75C867ABF9BD1F1B75EF2EB44EC6DAFFF3237D9E39323616C",
+        "size": 99
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c08-c2.command.txt",
+        "sha256": "9300963C7950CBF75C867ABF9BD1F1B75EF2EB44EC6DAFFF3237D9E39323616C",
+        "size": 99,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-focused-green-c08-c2.command.txt",
+        "snapshot_sha256": "9300963C7950CBF75C867ABF9BD1F1B75EF2EB44EC6DAFFF3237D9E39323616C"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c08-c2.command.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c08-c2.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c08-c2.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-focused-green-c08-c2.exit.txt",
+        "snapshot_sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c08-c2.exit.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c08-c2.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c08-c2.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-focused-green-c08-c2.stderr.txt",
+        "snapshot_sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c08-c2.stderr.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 14,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c08-c2.stdout.txt",
+        "sha256": "23780B13C644681897F67185FA227FF069F99637CA3CE55061EFCA900B8CA9F3",
+        "size": 1078
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 14,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c08-c2.stdout.txt",
+        "sha256": "23780B13C644681897F67185FA227FF069F99637CA3CE55061EFCA900B8CA9F3",
+        "size": 1078,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-focused-green-c08-c2.stdout.txt",
+        "snapshot_sha256": "23780B13C644681897F67185FA227FF069F99637CA3CE55061EFCA900B8CA9F3"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c08-c2.stdout.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c28.command.txt",
+        "sha256": "FA05BF424E1AC2BFDE54599098477EE6407AA96F813C8B6600CC41999E9503E3",
+        "size": 86
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c28.command.txt",
+        "sha256": "FA05BF424E1AC2BFDE54599098477EE6407AA96F813C8B6600CC41999E9503E3",
+        "size": 86,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-focused-green-c28.command.txt",
+        "snapshot_sha256": "FA05BF424E1AC2BFDE54599098477EE6407AA96F813C8B6600CC41999E9503E3"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c28.command.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c28.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c28.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-focused-green-c28.exit.txt",
+        "snapshot_sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c28.exit.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c28.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c28.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-focused-green-c28.stderr.txt",
+        "snapshot_sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c28.stderr.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 2,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c28.stdout.txt",
+        "sha256": "503ED5B8EBB68C213E6EAC9BAC84EC734C42B760E3D1091F8B986C5133EF97B4",
+        "size": 100
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 2,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c28.stdout.txt",
+        "sha256": "503ED5B8EBB68C213E6EAC9BAC84EC734C42B760E3D1091F8B986C5133EF97B4",
+        "size": 100,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-focused-green-c28.stdout.txt",
+        "snapshot_sha256": "503ED5B8EBB68C213E6EAC9BAC84EC734C42B760E3D1091F8B986C5133EF97B4"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green-c28.stdout.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green.command.txt",
+        "sha256": "7AE798CC68645843C54F4A513285086490DF9BFC63716D8F875B75B5D4A10F01",
+        "size": 200
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green.command.txt",
+        "sha256": "7AE798CC68645843C54F4A513285086490DF9BFC63716D8F875B75B5D4A10F01",
+        "size": 200,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-focused-green.command.txt",
+        "snapshot_sha256": "7AE798CC68645843C54F4A513285086490DF9BFC63716D8F875B75B5D4A10F01"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green.command.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-focused-green.exit.txt",
+        "snapshot_sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green.exit.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-focused-green.stderr.txt",
+        "snapshot_sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green.stderr.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 18,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green.stdout.txt",
+        "sha256": "E2AE8A990E13E19D9EFC4CFA15BE786E22A75C80F55D135F3F07A37EE87D5B46",
+        "size": 1430
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 18,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green.stdout.txt",
+        "sha256": "E2AE8A990E13E19D9EFC4CFA15BE786E22A75C80F55D135F3F07A37EE87D5B46",
+        "size": 1430,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-focused-green.stdout.txt",
+        "snapshot_sha256": "E2AE8A990E13E19D9EFC4CFA15BE786E22A75C80F55D135F3F07A37EE87D5B46"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-focused-green.stdout.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-public-api-probe.command.txt",
+        "sha256": "588B14F16E7FC6A0C87BEBB9043FE53D0AE9506302A1E00A9C1E636F7A038AD8",
+        "size": 110
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-public-api-probe.command.txt",
+        "sha256": "588B14F16E7FC6A0C87BEBB9043FE53D0AE9506302A1E00A9C1E636F7A038AD8",
+        "size": 110,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-public-api-probe.command.txt",
+        "snapshot_sha256": "588B14F16E7FC6A0C87BEBB9043FE53D0AE9506302A1E00A9C1E636F7A038AD8"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-public-api-probe.command.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-public-api-probe.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-public-api-probe.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-public-api-probe.exit.txt",
+        "snapshot_sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-public-api-probe.exit.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 153,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-public-api-probe.json",
+        "sha256": "50B739DA6FC0550AD79991F30319CF7ABFF25B10004D2D6EF17BE00B2CEC73BD",
+        "size": 5130
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 153,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-public-api-probe.json",
+        "sha256": "50B739DA6FC0550AD79991F30319CF7ABFF25B10004D2D6EF17BE00B2CEC73BD",
+        "size": 5130,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-public-api-probe.json",
+        "snapshot_sha256": "50B739DA6FC0550AD79991F30319CF7ABFF25B10004D2D6EF17BE00B2CEC73BD"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-public-api-probe.json"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 29,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-public-api-probe.stderr.txt",
+        "sha256": "E674F914FF4F05EF17BCF62D2F7C3B1E8EF92F83CCD6D7735248693441259B1F",
+        "size": 3738
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 29,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-public-api-probe.stderr.txt",
+        "sha256": "E674F914FF4F05EF17BCF62D2F7C3B1E8EF92F83CCD6D7735248693441259B1F",
+        "size": 3738,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-public-api-probe.stderr.txt",
+        "snapshot_sha256": "E674F914FF4F05EF17BCF62D2F7C3B1E8EF92F83CCD6D7735248693441259B1F"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-public-api-probe.stderr.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 153,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-public-api-probe.stdout.txt",
+        "sha256": "50B739DA6FC0550AD79991F30319CF7ABFF25B10004D2D6EF17BE00B2CEC73BD",
+        "size": 5130
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 153,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-public-api-probe.stdout.txt",
+        "sha256": "50B739DA6FC0550AD79991F30319CF7ABFF25B10004D2D6EF17BE00B2CEC73BD",
+        "size": 5130,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-public-api-probe.stdout.txt",
+        "snapshot_sha256": "50B739DA6FC0550AD79991F30319CF7ABFF25B10004D2D6EF17BE00B2CEC73BD"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-public-api-probe.stdout.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-retry-current.command.txt",
+        "sha256": "DCDF29AFA6FFDE0BE151C9518CA8471535C8EFD0C080BF3F256A8E73498C0474",
+        "size": 216
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-retry-current.command.txt",
+        "sha256": "DCDF29AFA6FFDE0BE151C9518CA8471535C8EFD0C080BF3F256A8E73498C0474",
+        "size": 216,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-retry-current.command.txt",
+        "snapshot_sha256": "DCDF29AFA6FFDE0BE151C9518CA8471535C8EFD0C080BF3F256A8E73498C0474"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-retry-current.command.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-retry-current.exit.txt",
+        "sha256": "F1B2F662800122BED0FF255693DF89C4487FBDCF453D3524A42D4EC20C3D9C04",
+        "size": 3
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-retry-current.exit.txt",
+        "sha256": "F1B2F662800122BED0FF255693DF89C4487FBDCF453D3524A42D4EC20C3D9C04",
+        "size": 3,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-retry-current.exit.txt",
+        "snapshot_sha256": "F1B2F662800122BED0FF255693DF89C4487FBDCF453D3524A42D4EC20C3D9C04"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-retry-current.exit.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-retry-current.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-retry-current.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-retry-current.stderr.txt",
+        "snapshot_sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-retry-current.stderr.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 292,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-retry-current.stdout.txt",
+        "sha256": "91D2CF29670052B04E0E7825E5E86C63075EE8B70B952DDB111DF7035EB0F34E",
+        "size": 19505
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 292,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-retry-current.stdout.txt",
+        "sha256": "91D2CF29670052B04E0E7825E5E86C63075EE8B70B952DDB111DF7035EB0F34E",
+        "size": 19505,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-retry-current.stdout.txt",
+        "snapshot_sha256": "91D2CF29670052B04E0E7825E5E86C63075EE8B70B952DDB111DF7035EB0F34E"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-retry-current.stdout.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-ruff.command.txt",
+        "sha256": "0392A1A4205E0ED8CA1D356ADD2C6A13756ED5784E969FDC3D8BF4DC0EA194BB",
+        "size": 154
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-ruff.command.txt",
+        "sha256": "0392A1A4205E0ED8CA1D356ADD2C6A13756ED5784E969FDC3D8BF4DC0EA194BB",
+        "size": 154,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-ruff.command.txt",
+        "snapshot_sha256": "0392A1A4205E0ED8CA1D356ADD2C6A13756ED5784E969FDC3D8BF4DC0EA194BB"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-ruff.command.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-ruff.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-ruff.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-ruff.exit.txt",
+        "snapshot_sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-ruff.exit.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-ruff.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-ruff.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-ruff.stderr.txt",
+        "snapshot_sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-ruff.stderr.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 2,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-ruff.stdout.txt",
+        "sha256": "D63AB3DF51A50C66F9C57056288C7D4FAF9DCE413552D89215714320AC2B748E",
+        "size": 38
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 2,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-ruff.stdout.txt",
+        "sha256": "D63AB3DF51A50C66F9C57056288C7D4FAF9DCE413552D89215714320AC2B748E",
+        "size": 38,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-ruff.stdout.txt",
+        "snapshot_sha256": "D63AB3DF51A50C66F9C57056288C7D4FAF9DCE413552D89215714320AC2B748E"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-ruff.stdout.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-suite.command.txt",
+        "sha256": "F2271F6B184136AF1372D49CA6A4C5CE36C11B00F2B4FC99522DAFCDF000F68C",
+        "size": 51
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-suite.command.txt",
+        "sha256": "F2271F6B184136AF1372D49CA6A4C5CE36C11B00F2B4FC99522DAFCDF000F68C",
+        "size": 51,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-suite.command.txt",
+        "snapshot_sha256": "F2271F6B184136AF1372D49CA6A4C5CE36C11B00F2B4FC99522DAFCDF000F68C"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-suite.command.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-suite.exit.txt",
+        "sha256": "F1B2F662800122BED0FF255693DF89C4487FBDCF453D3524A42D4EC20C3D9C04",
+        "size": 3
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-suite.exit.txt",
+        "sha256": "F1B2F662800122BED0FF255693DF89C4487FBDCF453D3524A42D4EC20C3D9C04",
+        "size": 3,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-suite.exit.txt",
+        "snapshot_sha256": "F1B2F662800122BED0FF255693DF89C4487FBDCF453D3524A42D4EC20C3D9C04"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-suite.exit.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-suite.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-suite.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-suite.stderr.txt",
+        "snapshot_sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-suite.stderr.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 539,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-suite.stdout.txt",
+        "sha256": "EE9F6DA29170E3776A53BC4479928022C16E2C2BC1DA80F206E88BAACD3D9508",
+        "size": 39555
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 539,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-suite.stdout.txt",
+        "sha256": "EE9F6DA29170E3776A53BC4479928022C16E2C2BC1DA80F206E88BAACD3D9508",
+        "size": 39555,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-suite.stdout.txt",
+        "snapshot_sha256": "EE9F6DA29170E3776A53BC4479928022C16E2C2BC1DA80F206E88BAACD3D9508"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-suite.stdout.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-t06b.command.txt",
+        "sha256": "2331A8DE2531936BD4422F34B21978FE50A780AE3CDD51A0527896109900256D",
+        "size": 60
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-t06b.command.txt",
+        "sha256": "2331A8DE2531936BD4422F34B21978FE50A780AE3CDD51A0527896109900256D",
+        "size": 60,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-t06b.command.txt",
+        "snapshot_sha256": "2331A8DE2531936BD4422F34B21978FE50A780AE3CDD51A0527896109900256D"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-t06b.command.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-t06b.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-t06b.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-t06b.exit.txt",
+        "snapshot_sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-t06b.exit.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-t06b.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-t06b.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-t06b.stderr.txt",
+        "snapshot_sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-t06b.stderr.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 26,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-t06b.stdout.txt",
+        "sha256": "A672C61641C1510E409F2D53AFE97C17ECD79DBFA4345AE20EDBECC96B931E18",
+        "size": 2147
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 26,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-t06b.stdout.txt",
+        "sha256": "A672C61641C1510E409F2D53AFE97C17ECD79DBFA4345AE20EDBECC96B931E18",
+        "size": 2147,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-t06b.stdout.txt",
+        "snapshot_sha256": "A672C61641C1510E409F2D53AFE97C17ECD79DBFA4345AE20EDBECC96B931E18"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-t06b.stdout.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-val-correction-t03b.command.txt",
+        "sha256": "DF6E4718DDF9E8F1C422EB81B759D4BDE41E18CF8E811DD09CEAEBFB5700C4AA",
+        "size": 343
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-val-correction-t03b.command.txt",
+        "sha256": "DF6E4718DDF9E8F1C422EB81B759D4BDE41E18CF8E811DD09CEAEBFB5700C4AA",
+        "size": 343,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-val-correction-t03b.command.txt",
+        "snapshot_sha256": "DF6E4718DDF9E8F1C422EB81B759D4BDE41E18CF8E811DD09CEAEBFB5700C4AA"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-val-correction-t03b.command.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-val-correction-t03b.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-val-correction-t03b.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-val-correction-t03b.exit.txt",
+        "snapshot_sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-val-correction-t03b.exit.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-val-correction-t03b.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-val-correction-t03b.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-val-correction-t03b.stderr.txt",
+        "snapshot_sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-val-correction-t03b.stderr.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 30,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-val-correction-t03b.stdout.txt",
+        "sha256": "9549D4AD3F4C3425BAF605707414D779891FB2A76CFE722EE7197BA18A1801B2",
+        "size": 2140
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 30,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-val-correction-t03b.stdout.txt",
+        "sha256": "9549D4AD3F4C3425BAF605707414D779891FB2A76CFE722EE7197BA18A1801B2",
+        "size": 2140,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-val-correction-t03b.stdout.txt",
+        "snapshot_sha256": "9549D4AD3F4C3425BAF605707414D779891FB2A76CFE722EE7197BA18A1801B2"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-val-correction-t03b.stdout.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-write-set-final.command.txt",
+        "sha256": "28A51E000B14802DF5FA0A8B5C86D46C30792F53126475EE1C27D5FB6D44CE03",
+        "size": 406
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-write-set-final.command.txt",
+        "sha256": "28A51E000B14802DF5FA0A8B5C86D46C30792F53126475EE1C27D5FB6D44CE03",
+        "size": 406,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-write-set-final.command.txt",
+        "snapshot_sha256": "28A51E000B14802DF5FA0A8B5C86D46C30792F53126475EE1C27D5FB6D44CE03"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-write-set-final.command.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-write-set-final.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-write-set-final.exit.txt",
+        "sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354",
+        "size": 3,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-write-set-final.exit.txt",
+        "snapshot_sha256": "13BF7B3039C63BF5A50491FA3CFD8EB4E699D1BA1436315AEF9CBE5711530354"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-write-set-final.exit.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-write-set-final.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 0,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-write-set-final.stderr.txt",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-write-set-final.stderr.txt",
+        "snapshot_sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-write-set-final.stderr.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-write-set-final.stdout.txt",
+        "sha256": "514F1A61FEAAF8FFEA498C917C62C8B9E47877E6F381B7386F63E65394FE6EBF",
+        "size": 54
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-write-set-final.stdout.txt",
+        "sha256": "514F1A61FEAAF8FFEA498C917C62C8B9E47877E6F381B7386F63E65394FE6EBF",
+        "size": 54,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-write-set-final.stdout.txt",
+        "snapshot_sha256": "514F1A61FEAAF8FFEA498C917C62C8B9E47877E6F381B7386F63E65394FE6EBF"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q1-write-set-final.stdout.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 109,
+        "path": "docs/pm/sessions/S12-LC3-QA/LOG.md",
+        "sha256": "888877B6AC09F538DBDEB2D01DC0245CCE980C682E06C661FF1CF90EB3915A48",
+        "size": 4490
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 109,
+        "path": "docs/pm/sessions/S12-LC3-QA/LOG.md",
+        "sha256": "888877B6AC09F538DBDEB2D01DC0245CCE980C682E06C661FF1CF90EB3915A48",
+        "size": 4490,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\LOG.md",
+        "snapshot_sha256": "888877B6AC09F538DBDEB2D01DC0245CCE980C682E06C661FF1CF90EB3915A48"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/LOG.md"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 58,
+        "path": "docs/pm/sessions/S12-LC3-QA/REPORT.md",
+        "sha256": "FE7F8B6CB6D8A077973D5FF3EAAAB0917C02092FC8ED73E8086D301AE5981238",
+        "size": 2534
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 58,
+        "path": "docs/pm/sessions/S12-LC3-QA/REPORT.md",
+        "sha256": "FE7F8B6CB6D8A077973D5FF3EAAAB0917C02092FC8ED73E8086D301AE5981238",
+        "size": 2534,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\docs\\pm\\sessions\\S12-LC3-QA\\REPORT.md",
+        "snapshot_sha256": "FE7F8B6CB6D8A077973D5FF3EAAAB0917C02092FC8ED73E8086D301AE5981238"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/REPORT.md"
+    },
+    {
+      "after": {
+        "exists": false,
+        "lines": null,
+        "path": "scripts/s12/s12_lc3_acceptance.py",
+        "sha256": null,
+        "size": null
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": false,
+        "lines": null,
+        "path": "scripts/s12/s12_lc3_acceptance.py",
+        "sha256": null,
+        "size": null
+      },
+      "changed": false,
+      "path": "scripts/s12/s12_lc3_acceptance.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 403,
+        "path": "scripts/s12/s12_lc3_probe.py",
+        "sha256": "C862C3DA670E70577B7034C2DAA4EA6DDC5E3980E9111002A69CA7EBB9908D58",
+        "size": 17803
+      },
+      "allowed_change": true,
+      "before": {
+        "exists": true,
+        "lines": 261,
+        "path": "scripts/s12/s12_lc3_probe.py",
+        "sha256": "13F3276A6C64A2A16529D17206CFA5B3955B5F5A611FF8C4F25BF190CE4EFD73",
+        "size": 10478,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\scripts\\s12\\s12_lc3_probe.py",
+        "snapshot_sha256": "13F3276A6C64A2A16529D17206CFA5B3955B5F5A611FF8C4F25BF190CE4EFD73"
+      },
+      "changed": true,
+      "path": "scripts/s12/s12_lc3_probe.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 528,
+        "path": "tests/s12/s12-t03a/test_s12_export_c1_closure.py",
+        "sha256": "900D7B37167A8AD9EE29FDD480FD9BF85B845EF14ECD14C3311FDED5EC0E340E",
+        "size": 21047
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 528,
+        "path": "tests/s12/s12-t03a/test_s12_export_c1_closure.py",
+        "sha256": "900D7B37167A8AD9EE29FDD480FD9BF85B845EF14ECD14C3311FDED5EC0E340E",
+        "size": 21047,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\tests\\s12\\s12-t03a\\test_s12_export_c1_closure.py",
+        "snapshot_sha256": "900D7B37167A8AD9EE29FDD480FD9BF85B845EF14ECD14C3311FDED5EC0E340E"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t03a/test_s12_export_c1_closure.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 320,
+        "path": "tests/s12/s12-t03c/test_export_jobs_api.py",
+        "sha256": "754CBAEC2F83F7AA8DC73B4CE6CEE2C937285A5DCB1597BFD87E66F030C3C29E",
+        "size": 13351
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 320,
+        "path": "tests/s12/s12-t03c/test_export_jobs_api.py",
+        "sha256": "754CBAEC2F83F7AA8DC73B4CE6CEE2C937285A5DCB1597BFD87E66F030C3C29E",
+        "size": 13351,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\tests\\s12\\s12-t03c\\test_export_jobs_api.py",
+        "snapshot_sha256": "754CBAEC2F83F7AA8DC73B4CE6CEE2C937285A5DCB1597BFD87E66F030C3C29E"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t03c/test_export_jobs_api.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 580,
+        "path": "tests/s12/s12-t03c/test_s12_t03c_c1_closure.py",
+        "sha256": "571B21CED1EF79028A47368832D616BA857E3B6895A88AD9555C2C533D42F87C",
+        "size": 23858
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 580,
+        "path": "tests/s12/s12-t03c/test_s12_t03c_c1_closure.py",
+        "sha256": "571B21CED1EF79028A47368832D616BA857E3B6895A88AD9555C2C533D42F87C",
+        "size": 23858,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\tests\\s12\\s12-t03c\\test_s12_t03c_c1_closure.py",
+        "snapshot_sha256": "571B21CED1EF79028A47368832D616BA857E3B6895A88AD9555C2C533D42F87C"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t03c/test_s12_t03c_c1_closure.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 198,
+        "path": "tests/s12/s12-t06b/test_c28_audio_mapping.py",
+        "sha256": "8094223C8E3FE93701A5C1F0DE4A869F0F86BDAB61D63D78FA661CABCA2551A1",
+        "size": 7415
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 198,
+        "path": "tests/s12/s12-t06b/test_c28_audio_mapping.py",
+        "sha256": "8094223C8E3FE93701A5C1F0DE4A869F0F86BDAB61D63D78FA661CABCA2551A1",
+        "size": 7415,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-dirty\\tests\\s12\\s12-t06b\\test_c28_audio_mapping.py",
+        "snapshot_sha256": "8094223C8E3FE93701A5C1F0DE4A869F0F86BDAB61D63D78FA661CABCA2551A1"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t06b/test_c28_audio_mapping.py"
+    }
+  ],
+  "root": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa",
+  "status": "VERIFIED"
+}

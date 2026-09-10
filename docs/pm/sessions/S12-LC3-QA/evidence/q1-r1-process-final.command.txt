@@ -1,0 +1,1 @@
+$p = Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and ($_.CommandLine -like '*s12-lc3-luna-qa*' -or $_.CommandLine -like '*q1-r1*' -or $_.CommandLine -like '*mfqa\s12-lc3-r1*') -and ($_.Name -match 'python|ffmpeg|node|uvicorn') }; if ($null -eq $p) { 'NO_QA_OWNED_PROCESS_FOUND' } else { $p | Select-Object ProcessId,Name,CommandLine | Format-List }

@@ -1,0 +1,1 @@
+python scripts/s12/s12_lc3_probe.py --work-root C:\Users\Admin\mfqa\s12-lc3-r1\20260910T102047Z\QA --evidence docs\pm\sessions\S12-LC3-QA\evidence\q1-r1-public-legacy-worker.json

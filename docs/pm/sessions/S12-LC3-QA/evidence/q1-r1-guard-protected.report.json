@@ -1,0 +1,324 @@
+{
+  "failures": [],
+  "manifest": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\baseline-qa-protected.json",
+  "max_shrink_percent": 20.0,
+  "results": [
+    {
+      "after": {
+        "exists": true,
+        "lines": 1886,
+        "path": "app/services/s12_export/validation.py",
+        "sha256": "278615269B676C48DCC4A98B446DB2D366E9148B7C08E6D5977857B7BCAF4D46",
+        "size": 69420
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1886,
+        "path": "app/services/s12_export/validation.py",
+        "sha256": "278615269B676C48DCC4A98B446DB2D366E9148B7C08E6D5977857B7BCAF4D46",
+        "size": 69420,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-protected\\app\\services\\s12_export\\validation.py",
+        "snapshot_sha256": "278615269B676C48DCC4A98B446DB2D366E9148B7C08E6D5977857B7BCAF4D46"
+      },
+      "changed": false,
+      "path": "app/services/s12_export/validation.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 588,
+        "path": "app/services/s12_export/publication.py",
+        "sha256": "D9ACB72D6CB2F21799E5DB624B53EC15EA275E4992F2E6507015A2B108B6E94A",
+        "size": 23314
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 588,
+        "path": "app/services/s12_export/publication.py",
+        "sha256": "D9ACB72D6CB2F21799E5DB624B53EC15EA275E4992F2E6507015A2B108B6E94A",
+        "size": 23314,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-protected\\app\\services\\s12_export\\publication.py",
+        "snapshot_sha256": "D9ACB72D6CB2F21799E5DB624B53EC15EA275E4992F2E6507015A2B108B6E94A"
+      },
+      "changed": false,
+      "path": "app/services/s12_export/publication.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 833,
+        "path": "app/services/s12_export/runner.py",
+        "sha256": "8AFF0BCFCAEF8118FD345165717F8E4CCDC44DAB544F0FE94295DBD60537BD9B",
+        "size": 33725
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 833,
+        "path": "app/services/s12_export/runner.py",
+        "sha256": "8AFF0BCFCAEF8118FD345165717F8E4CCDC44DAB544F0FE94295DBD60537BD9B",
+        "size": 33725,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-protected\\app\\services\\s12_export\\runner.py",
+        "snapshot_sha256": "8AFF0BCFCAEF8118FD345165717F8E4CCDC44DAB544F0FE94295DBD60537BD9B"
+      },
+      "changed": false,
+      "path": "app/services/s12_export/runner.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 520,
+        "path": "app/services/s12_export/stitch.py",
+        "sha256": "5BF281733510938718AB4580386F762DA1300ECC917FA3178B562DFD9E122CD1",
+        "size": 17467
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 520,
+        "path": "app/services/s12_export/stitch.py",
+        "sha256": "5BF281733510938718AB4580386F762DA1300ECC917FA3178B562DFD9E122CD1",
+        "size": 17467,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-protected\\app\\services\\s12_export\\stitch.py",
+        "snapshot_sha256": "5BF281733510938718AB4580386F762DA1300ECC917FA3178B562DFD9E122CD1"
+      },
+      "changed": false,
+      "path": "app/services/s12_export/stitch.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 361,
+        "path": "app/workflow/s12_export_jobs.py",
+        "sha256": "89ED3C3E8784874E1C9D051AB5258B1DFC42502E50D05D9A351EA2E5F5816427",
+        "size": 14551
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 361,
+        "path": "app/workflow/s12_export_jobs.py",
+        "sha256": "89ED3C3E8784874E1C9D051AB5258B1DFC42502E50D05D9A351EA2E5F5816427",
+        "size": 14551,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-protected\\app\\workflow\\s12_export_jobs.py",
+        "snapshot_sha256": "89ED3C3E8784874E1C9D051AB5258B1DFC42502E50D05D9A351EA2E5F5816427"
+      },
+      "changed": false,
+      "path": "app/workflow/s12_export_jobs.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1066,
+        "path": "app/persistence/s12_export.py",
+        "sha256": "847B4FDA7311E04D482DDE0C3DD71AB853CB8B385AA10CCB6EB0A528CF3E4CFC",
+        "size": 42780
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1066,
+        "path": "app/persistence/s12_export.py",
+        "sha256": "847B4FDA7311E04D482DDE0C3DD71AB853CB8B385AA10CCB6EB0A528CF3E4CFC",
+        "size": 42780,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-protected\\app\\persistence\\s12_export.py",
+        "snapshot_sha256": "847B4FDA7311E04D482DDE0C3DD71AB853CB8B385AA10CCB6EB0A528CF3E4CFC"
+      },
+      "changed": false,
+      "path": "app/persistence/s12_export.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 745,
+        "path": "app/api/routes/s12_export.py",
+        "sha256": "EE63CB317369F14552ED19FBDE5DA37301CEE23551B1EB19BC01E1907B49BAB2",
+        "size": 31610
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 745,
+        "path": "app/api/routes/s12_export.py",
+        "sha256": "EE63CB317369F14552ED19FBDE5DA37301CEE23551B1EB19BC01E1907B49BAB2",
+        "size": 31610,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-protected\\app\\api\\routes\\s12_export.py",
+        "snapshot_sha256": "EE63CB317369F14552ED19FBDE5DA37301CEE23551B1EB19BC01E1907B49BAB2"
+      },
+      "changed": false,
+      "path": "app/api/routes/s12_export.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 331,
+        "path": "app/api/routes/s12_export_preflight.py",
+        "sha256": "8C29E8B1E7F5270B0B33740B1430AFAA903ED8C3FD0428A3D16E5B64BCF5AAA8",
+        "size": 12999
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 331,
+        "path": "app/api/routes/s12_export_preflight.py",
+        "sha256": "8C29E8B1E7F5270B0B33740B1430AFAA903ED8C3FD0428A3D16E5B64BCF5AAA8",
+        "size": 12999,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-protected\\app\\api\\routes\\s12_export_preflight.py",
+        "snapshot_sha256": "8C29E8B1E7F5270B0B33740B1430AFAA903ED8C3FD0428A3D16E5B64BCF5AAA8"
+      },
+      "changed": false,
+      "path": "app/api/routes/s12_export_preflight.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 276,
+        "path": "app/schemas/s12_export.py",
+        "sha256": "BCF4BCD081E185031CD9A00B85E596183860F21CC8EE0D5F39C5E1CEEFC59310",
+        "size": 9909
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 276,
+        "path": "app/schemas/s12_export.py",
+        "sha256": "BCF4BCD081E185031CD9A00B85E596183860F21CC8EE0D5F39C5E1CEEFC59310",
+        "size": 9909,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-protected\\app\\schemas\\s12_export.py",
+        "snapshot_sha256": "BCF4BCD081E185031CD9A00B85E596183860F21CC8EE0D5F39C5E1CEEFC59310"
+      },
+      "changed": false,
+      "path": "app/schemas/s12_export.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 610,
+        "path": "app/services/s12_export/authority.py",
+        "sha256": "266B6551D802981A808B472FE6AA36761D3FE41A94AF761DDD998BAD41AA1627",
+        "size": 25199
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 610,
+        "path": "app/services/s12_export/authority.py",
+        "sha256": "266B6551D802981A808B472FE6AA36761D3FE41A94AF761DDD998BAD41AA1627",
+        "size": 25199,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-protected\\app\\services\\s12_export\\authority.py",
+        "snapshot_sha256": "266B6551D802981A808B472FE6AA36761D3FE41A94AF761DDD998BAD41AA1627"
+      },
+      "changed": false,
+      "path": "app/services/s12_export/authority.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 857,
+        "path": "tests/s12/s12-t03c/test_publication.py",
+        "sha256": "1C884143697A4B920D42E9CE8C76D56D82B4E447941832A9018224C93E28EEA5",
+        "size": 34079
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 857,
+        "path": "tests/s12/s12-t03c/test_publication.py",
+        "sha256": "1C884143697A4B920D42E9CE8C76D56D82B4E447941832A9018224C93E28EEA5",
+        "size": 34079,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-protected\\tests\\s12\\s12-t03c\\test_publication.py",
+        "snapshot_sha256": "1C884143697A4B920D42E9CE8C76D56D82B4E447941832A9018224C93E28EEA5"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t03c/test_publication.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 996,
+        "path": "tests/s12/s12-t04a/test_c2_source_locked.py",
+        "sha256": "EBBAD80A73270D0CDAAC498AD8A9828EC1EF25B46F16C6733CE3E836BB5065B8",
+        "size": 38754
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 996,
+        "path": "tests/s12/s12-t04a/test_c2_source_locked.py",
+        "sha256": "EBBAD80A73270D0CDAAC498AD8A9828EC1EF25B46F16C6733CE3E836BB5065B8",
+        "size": 38754,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-protected\\tests\\s12\\s12-t04a\\test_c2_source_locked.py",
+        "snapshot_sha256": "EBBAD80A73270D0CDAAC498AD8A9828EC1EF25B46F16C6733CE3E836BB5065B8"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t04a/test_c2_source_locked.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 393,
+        "path": "frontend/src/components/export/ExportPanel.tsx",
+        "sha256": "D226E0257AA28F24D8A338BE64774C92E5B68ADC4399467C3D22A35B86C41EFD",
+        "size": 19200
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 393,
+        "path": "frontend/src/components/export/ExportPanel.tsx",
+        "sha256": "D226E0257AA28F24D8A338BE64774C92E5B68ADC4399467C3D22A35B86C41EFD",
+        "size": 19200,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-protected\\frontend\\src\\components\\export\\ExportPanel.tsx",
+        "snapshot_sha256": "D226E0257AA28F24D8A338BE64774C92E5B68ADC4399467C3D22A35B86C41EFD"
+      },
+      "changed": false,
+      "path": "frontend/src/components/export/ExportPanel.tsx"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 526,
+        "path": "frontend/src/lib/s12-export-api.ts",
+        "sha256": "85A39595F90D993962C688D2F35F51726E73B20A04AB9462E4581CF9874383DD",
+        "size": 16550
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 526,
+        "path": "frontend/src/lib/s12-export-api.ts",
+        "sha256": "85A39595F90D993962C688D2F35F51726E73B20A04AB9462E4581CF9874383DD",
+        "size": 16550,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-protected\\frontend\\src\\lib\\s12-export-api.ts",
+        "snapshot_sha256": "85A39595F90D993962C688D2F35F51726E73B20A04AB9462E4581CF9874383DD"
+      },
+      "changed": false,
+      "path": "frontend/src/lib/s12-export-api.ts"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 160,
+        "path": "docs/contracts/s12-export.md",
+        "sha256": "833F038BD917EB5E58D1A0685AC44CB292691D495FD1DCF4E3BA1C92412B6806",
+        "size": 8579
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 160,
+        "path": "docs/contracts/s12-export.md",
+        "sha256": "833F038BD917EB5E58D1A0685AC44CB292691D495FD1DCF4E3BA1C92412B6806",
+        "size": 8579,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r1\\20260910T100705Z\\snapshots\\qa-protected\\docs\\contracts\\s12-export.md",
+        "snapshot_sha256": "833F038BD917EB5E58D1A0685AC44CB292691D495FD1DCF4E3BA1C92412B6806"
+      },
+      "changed": false,
+      "path": "docs/contracts/s12-export.md"
+    }
+  ],
+  "root": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa",
+  "status": "VERIFIED"
+}

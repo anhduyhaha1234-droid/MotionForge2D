@@ -1,0 +1,1122 @@
+{
+  "failures": [],
+  "manifest": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\baseline-q1-guard.json",
+  "max_shrink_percent": 20.0,
+  "results": [
+    {
+      "after": {
+        "exists": true,
+        "lines": 109,
+        "path": "docs/pm/sessions/S12-LC3-QA/LOG.md",
+        "sha256": "888877B6AC09F538DBDEB2D01DC0245CCE980C682E06C661FF1CF90EB3915A48",
+        "size": 4490
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 109,
+        "path": "docs/pm/sessions/S12-LC3-QA/LOG.md",
+        "sha256": "888877B6AC09F538DBDEB2D01DC0245CCE980C682E06C661FF1CF90EB3915A48",
+        "size": 4490,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\docs\\pm\\sessions\\S12-LC3-QA\\LOG.md",
+        "snapshot_sha256": "888877B6AC09F538DBDEB2D01DC0245CCE980C682E06C661FF1CF90EB3915A48"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/LOG.md"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 58,
+        "path": "docs/pm/sessions/S12-LC3-QA/REPORT.md",
+        "sha256": "FE7F8B6CB6D8A077973D5FF3EAAAB0917C02092FC8ED73E8086D301AE5981238",
+        "size": 2534
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 58,
+        "path": "docs/pm/sessions/S12-LC3-QA/REPORT.md",
+        "sha256": "FE7F8B6CB6D8A077973D5FF3EAAAB0917C02092FC8ED73E8086D301AE5981238",
+        "size": 2534,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\docs\\pm\\sessions\\S12-LC3-QA\\REPORT.md",
+        "snapshot_sha256": "FE7F8B6CB6D8A077973D5FF3EAAAB0917C02092FC8ED73E8086D301AE5981238"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/REPORT.md"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 950,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/post-qa-q0-guard-report.json",
+        "sha256": "E301A2E3AF7CCEB99DEF3843D9D79087655C35C93084EE1EB6E591040F3B0849",
+        "size": 40985
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 950,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/post-qa-q0-guard-report.json",
+        "sha256": "E301A2E3AF7CCEB99DEF3843D9D79087655C35C93084EE1EB6E591040F3B0849",
+        "size": 40985,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\post-qa-q0-guard-report.json",
+        "snapshot_sha256": "E301A2E3AF7CCEB99DEF3843D9D79087655C35C93084EE1EB6E591040F3B0849"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/post-qa-q0-guard-report.json"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 408,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/post-qa-q0-guard.json",
+        "sha256": "6F92C540D4806A6ACCEEE5161A28AD32FA86273C97CCCE2F866D0AAB905A19D7",
+        "size": 22413
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 408,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/post-qa-q0-guard.json",
+        "sha256": "6F92C540D4806A6ACCEEE5161A28AD32FA86273C97CCCE2F866D0AAB905A19D7",
+        "size": 22413,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\post-qa-q0-guard.json",
+        "snapshot_sha256": "6F92C540D4806A6ACCEEE5161A28AD32FA86273C97CCCE2F866D0AAB905A19D7"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/post-qa-q0-guard.json"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 2,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q0-collect-green.stderr.txt",
+        "sha256": "75A11DA44C802486BC6F65640AA48A730F0F684C5C07A42BA3CD1735EB3FB070",
+        "size": 2
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 2,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q0-collect-green.stderr.txt",
+        "sha256": "75A11DA44C802486BC6F65640AA48A730F0F684C5C07A42BA3CD1735EB3FB070",
+        "size": 2,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q0-collect-green.stderr.txt",
+        "snapshot_sha256": "75A11DA44C802486BC6F65640AA48A730F0F684C5C07A42BA3CD1735EB3FB070"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q0-collect-green.stderr.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 334,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q0-collect-green.stdout.txt",
+        "sha256": "474DAC7C59389418789178B240DBD48296EEA9C56CF72408A1817577E564A15B",
+        "size": 28274
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 334,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q0-collect-green.stdout.txt",
+        "sha256": "474DAC7C59389418789178B240DBD48296EEA9C56CF72408A1817577E564A15B",
+        "size": 28274,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q0-collect-green.stdout.txt",
+        "snapshot_sha256": "474DAC7C59389418789178B240DBD48296EEA9C56CF72408A1817577E564A15B"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q0-collect-green.stdout.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 39,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q0-collection-audit.md",
+        "sha256": "067B9E5B2192C9C783E86E2B281544E4EC31550193DEB6FB6B4590B2C05D00A3",
+        "size": 1847
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 39,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q0-collection-audit.md",
+        "sha256": "067B9E5B2192C9C783E86E2B281544E4EC31550193DEB6FB6B4590B2C05D00A3",
+        "size": 1847,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q0-collection-audit.md",
+        "snapshot_sha256": "067B9E5B2192C9C783E86E2B281544E4EC31550193DEB6FB6B4590B2C05D00A3"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q0-collection-audit.md"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 326,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q0-node-id-manifest.txt",
+        "sha256": "CEADE9324C0258AE5BFEB5A039868436B970BEC00D7609B6FCF222BCA1893CF6",
+        "size": 27721
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 326,
+        "path": "docs/pm/sessions/S12-LC3-QA/evidence/q0-node-id-manifest.txt",
+        "sha256": "CEADE9324C0258AE5BFEB5A039868436B970BEC00D7609B6FCF222BCA1893CF6",
+        "size": 27721,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q0-node-id-manifest.txt",
+        "snapshot_sha256": "CEADE9324C0258AE5BFEB5A039868436B970BEC00D7609B6FCF222BCA1893CF6"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-QA/evidence/q0-node-id-manifest.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 195,
+        "path": "frontend/e2e/s12-export-boot.py",
+        "sha256": "4C208E45FBEFF0984D0E06872D32041D0146867DEA5525A98B1F662F6E4CA698",
+        "size": 7226
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 195,
+        "path": "frontend/e2e/s12-export-boot.py",
+        "sha256": "4C208E45FBEFF0984D0E06872D32041D0146867DEA5525A98B1F662F6E4CA698",
+        "size": 7226,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\frontend\\e2e\\s12-export-boot.py",
+        "snapshot_sha256": "4C208E45FBEFF0984D0E06872D32041D0146867DEA5525A98B1F662F6E4CA698"
+      },
+      "changed": false,
+      "path": "frontend/e2e/s12-export-boot.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 20,
+        "path": "frontend/e2e/s12-export-harness.py",
+        "sha256": "1AB687CB0B9BE67D86E3ED3E2F81ED5BBAA3D51DE51C5F4C12454484653CA603",
+        "size": 598
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 20,
+        "path": "frontend/e2e/s12-export-harness.py",
+        "sha256": "1AB687CB0B9BE67D86E3ED3E2F81ED5BBAA3D51DE51C5F4C12454484653CA603",
+        "size": 598,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\frontend\\e2e\\s12-export-harness.py",
+        "snapshot_sha256": "1AB687CB0B9BE67D86E3ED3E2F81ED5BBAA3D51DE51C5F4C12454484653CA603"
+      },
+      "changed": false,
+      "path": "frontend/e2e/s12-export-harness.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 691,
+        "path": "frontend/e2e/s12-export-seed.py",
+        "sha256": "29324683B02EF40975BDBAC14DD1D5474EC5F4445059F17CBD29445CA5CB0107",
+        "size": 27878
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 691,
+        "path": "frontend/e2e/s12-export-seed.py",
+        "sha256": "29324683B02EF40975BDBAC14DD1D5474EC5F4445059F17CBD29445CA5CB0107",
+        "size": 27878,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\frontend\\e2e\\s12-export-seed.py",
+        "snapshot_sha256": "29324683B02EF40975BDBAC14DD1D5474EC5F4445059F17CBD29445CA5CB0107"
+      },
+      "changed": false,
+      "path": "frontend/e2e/s12-export-seed.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 414,
+        "path": "frontend/e2e/s12-export.spec.ts",
+        "sha256": "756DEA72B75B71CABEC32C9818801E83A83A83E4C0590CA3B8815803CADCBFD0",
+        "size": 17735
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 414,
+        "path": "frontend/e2e/s12-export.spec.ts",
+        "sha256": "756DEA72B75B71CABEC32C9818801E83A83A83E4C0590CA3B8815803CADCBFD0",
+        "size": 17735,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\frontend\\e2e\\s12-export.spec.ts",
+        "snapshot_sha256": "756DEA72B75B71CABEC32C9818801E83A83A83E4C0590CA3B8815803CADCBFD0"
+      },
+      "changed": false,
+      "path": "frontend/e2e/s12-export.spec.ts"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 78,
+        "path": "frontend/playwright.s12-export.config.ts",
+        "sha256": "E8F74D0075CDCACC702A01007ED5819C87A7ABA7B5E1847593DFEF6266FABCFD",
+        "size": 2812
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 78,
+        "path": "frontend/playwright.s12-export.config.ts",
+        "sha256": "E8F74D0075CDCACC702A01007ED5819C87A7ABA7B5E1847593DFEF6266FABCFD",
+        "size": 2812,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\frontend\\playwright.s12-export.config.ts",
+        "snapshot_sha256": "E8F74D0075CDCACC702A01007ED5819C87A7ABA7B5E1847593DFEF6266FABCFD"
+      },
+      "changed": false,
+      "path": "frontend/playwright.s12-export.config.ts"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 57,
+        "path": "tests/s12/s12-lc3-ui/test_export_context_contract.py",
+        "sha256": "5DE429F770EF1D2FADC04A2A078AEC3FA803312A190B6E6160B6FFB6D4A713AF",
+        "size": 1920
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 57,
+        "path": "tests/s12/s12-lc3-ui/test_export_context_contract.py",
+        "sha256": "5DE429F770EF1D2FADC04A2A078AEC3FA803312A190B6E6160B6FFB6D4A713AF",
+        "size": 1920,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-lc3-ui\\test_export_context_contract.py",
+        "snapshot_sha256": "5DE429F770EF1D2FADC04A2A078AEC3FA803312A190B6E6160B6FFB6D4A713AF"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-lc3-ui/test_export_context_contract.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 282,
+        "path": "tests/s12/s12-lc3-val/test_r01_r03_r04_boundaries.py",
+        "sha256": "18F008A358445768CED6584B11985EA8E3D530132D9CEEEB5AC0F523A4B14401",
+        "size": 12529
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 282,
+        "path": "tests/s12/s12-lc3-val/test_r01_r03_r04_boundaries.py",
+        "sha256": "18F008A358445768CED6584B11985EA8E3D530132D9CEEEB5AC0F523A4B14401",
+        "size": 12529,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-lc3-val\\test_r01_r03_r04_boundaries.py",
+        "snapshot_sha256": "18F008A358445768CED6584B11985EA8E3D530132D9CEEEB5AC0F523A4B14401"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-lc3-val/test_r01_r03_r04_boundaries.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 712,
+        "path": "tests/s12/s12-t01/test_preflight_contract.py",
+        "sha256": "C82F7F98C3E506CC46220E9590D2E6BCEA37DE9D7666518B88A8FB58D6F3C36C",
+        "size": 27822
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 712,
+        "path": "tests/s12/s12-t01/test_preflight_contract.py",
+        "sha256": "C82F7F98C3E506CC46220E9590D2E6BCEA37DE9D7666518B88A8FB58D6F3C36C",
+        "size": 27822,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t01\\test_preflight_contract.py",
+        "snapshot_sha256": "C82F7F98C3E506CC46220E9590D2E6BCEA37DE9D7666518B88A8FB58D6F3C36C"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t01/test_preflight_contract.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 513,
+        "path": "tests/s12/s12-t01/test_s12_t01_c1_closure.py",
+        "sha256": "5AC17C5E22982992528CFB1363355FB4164B9E31CF1DD390CC3CE3772CCD07CC",
+        "size": 21298
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 513,
+        "path": "tests/s12/s12-t01/test_s12_t01_c1_closure.py",
+        "sha256": "5AC17C5E22982992528CFB1363355FB4164B9E31CF1DD390CC3CE3772CCD07CC",
+        "size": 21298,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t01\\test_s12_t01_c1_closure.py",
+        "snapshot_sha256": "5AC17C5E22982992528CFB1363355FB4164B9E31CF1DD390CC3CE3772CCD07CC"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t01/test_s12_t01_c1_closure.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 154,
+        "path": "tests/s12/s12-t02/test_capabilities.py",
+        "sha256": "BD4415401D8F3CF33909958E9EDE7B954DBF622A5E7707EA1B3B524D833F4A61",
+        "size": 5866
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 154,
+        "path": "tests/s12/s12-t02/test_capabilities.py",
+        "sha256": "BD4415401D8F3CF33909958E9EDE7B954DBF622A5E7707EA1B3B524D833F4A61",
+        "size": 5866,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t02\\test_capabilities.py",
+        "snapshot_sha256": "BD4415401D8F3CF33909958E9EDE7B954DBF622A5E7707EA1B3B524D833F4A61"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t02/test_capabilities.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 182,
+        "path": "tests/s12/s12-t02/test_profiles.py",
+        "sha256": "10652B79533CBA122D68EAB859507458AC2E39EE89F2A362680E93DA12ED4AA2",
+        "size": 7766
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 182,
+        "path": "tests/s12/s12-t02/test_profiles.py",
+        "sha256": "10652B79533CBA122D68EAB859507458AC2E39EE89F2A362680E93DA12ED4AA2",
+        "size": 7766,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t02\\test_profiles.py",
+        "snapshot_sha256": "10652B79533CBA122D68EAB859507458AC2E39EE89F2A362680E93DA12ED4AA2"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t02/test_profiles.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 141,
+        "path": "tests/s12/s12-t02/test_s12_t02_c1_closure.py",
+        "sha256": "6E7835629E38481F4ABA33274DAB3953CF5E381A4689A6AAF0BA16D475ECF110",
+        "size": 5582
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 141,
+        "path": "tests/s12/s12-t02/test_s12_t02_c1_closure.py",
+        "sha256": "6E7835629E38481F4ABA33274DAB3953CF5E381A4689A6AAF0BA16D475ECF110",
+        "size": 5582,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t02\\test_s12_t02_c1_closure.py",
+        "snapshot_sha256": "6E7835629E38481F4ABA33274DAB3953CF5E381A4689A6AAF0BA16D475ECF110"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t02/test_s12_t02_c1_closure.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 0,
+        "path": "tests/s12/s12-t03a/__init__.py",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 0,
+        "path": "tests/s12/s12-t03a/__init__.py",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03a\\__init__.py",
+        "snapshot_sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t03a/__init__.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 528,
+        "path": "tests/s12/s12-t03a/test_s12_export_c1_closure.py",
+        "sha256": "900D7B37167A8AD9EE29FDD480FD9BF85B845EF14ECD14C3311FDED5EC0E340E",
+        "size": 21047
+      },
+      "allowed_change": true,
+      "before": {
+        "exists": true,
+        "lines": 524,
+        "path": "tests/s12/s12-t03a/test_s12_export_c1_closure.py",
+        "sha256": "CE3F8F4ED7CF75690C3ED0D30A1B2580A0818D6D478561591564D81A9837192A",
+        "size": 20776,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03a\\test_s12_export_c1_closure.py",
+        "snapshot_sha256": "CE3F8F4ED7CF75690C3ED0D30A1B2580A0818D6D478561591564D81A9837192A"
+      },
+      "changed": true,
+      "path": "tests/s12/s12-t03a/test_s12_export_c1_closure.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 712,
+        "path": "tests/s12/s12-t03a/test_s12_export_c2_integrity.py",
+        "sha256": "E082C8BE51C71551B6AE7C26C3D2AB7D452B12D0649C4CAE086E92BA086B9D96",
+        "size": 28622
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 712,
+        "path": "tests/s12/s12-t03a/test_s12_export_c2_integrity.py",
+        "sha256": "E082C8BE51C71551B6AE7C26C3D2AB7D452B12D0649C4CAE086E92BA086B9D96",
+        "size": 28622,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03a\\test_s12_export_c2_integrity.py",
+        "snapshot_sha256": "E082C8BE51C71551B6AE7C26C3D2AB7D452B12D0649C4CAE086E92BA086B9D96"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t03a/test_s12_export_c2_integrity.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 631,
+        "path": "tests/s12/s12-t03a/test_s12_export_domain.py",
+        "sha256": "5BB2250CF7EA67F023722D6B4F350280D826C491843A01103155E0E7F2222405",
+        "size": 24254
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 631,
+        "path": "tests/s12/s12-t03a/test_s12_export_domain.py",
+        "sha256": "5BB2250CF7EA67F023722D6B4F350280D826C491843A01103155E0E7F2222405",
+        "size": 24254,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03a\\test_s12_export_domain.py",
+        "snapshot_sha256": "5BB2250CF7EA67F023722D6B4F350280D826C491843A01103155E0E7F2222405"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t03a/test_s12_export_domain.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 251,
+        "path": "tests/s12/s12-t03a/test_s12_export_migration.py",
+        "sha256": "0B13E58D3B4A06D443B4A381CB1E36D5AAF046819E9503DE1FA5C38633E1D0EF",
+        "size": 10812
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 251,
+        "path": "tests/s12/s12-t03a/test_s12_export_migration.py",
+        "sha256": "0B13E58D3B4A06D443B4A381CB1E36D5AAF046819E9503DE1FA5C38633E1D0EF",
+        "size": 10812,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03a\\test_s12_export_migration.py",
+        "snapshot_sha256": "0B13E58D3B4A06D443B4A381CB1E36D5AAF046819E9503DE1FA5C38633E1D0EF"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t03a/test_s12_export_migration.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 0,
+        "path": "tests/s12/s12-t03b/__init__.py",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 0,
+        "path": "tests/s12/s12-t03b/__init__.py",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03b\\__init__.py",
+        "snapshot_sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t03b/__init__.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 223,
+        "path": "tests/s12/s12-t03b/conftest.py",
+        "sha256": "1EF6E4A9BCF37D4BCA12F1FA93297F8BE8AC0FFD4EF4E0B01F1DF0185F0BD64F",
+        "size": 8079
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 223,
+        "path": "tests/s12/s12-t03b/conftest.py",
+        "sha256": "1EF6E4A9BCF37D4BCA12F1FA93297F8BE8AC0FFD4EF4E0B01F1DF0185F0BD64F",
+        "size": 8079,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03b\\conftest.py",
+        "snapshot_sha256": "1EF6E4A9BCF37D4BCA12F1FA93297F8BE8AC0FFD4EF4E0B01F1DF0185F0BD64F"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t03b/conftest.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 289,
+        "path": "tests/s12/s12-t03b/test_plan_stitch.py",
+        "sha256": "83B17E9B8D7D5B0473A31BFD43DA70158C5A1B49BE9418C12A8DC50DD0FA7DC7",
+        "size": 9250
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 289,
+        "path": "tests/s12/s12-t03b/test_plan_stitch.py",
+        "sha256": "83B17E9B8D7D5B0473A31BFD43DA70158C5A1B49BE9418C12A8DC50DD0FA7DC7",
+        "size": 9250,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03b\\test_plan_stitch.py",
+        "snapshot_sha256": "83B17E9B8D7D5B0473A31BFD43DA70158C5A1B49BE9418C12A8DC50DD0FA7DC7"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t03b/test_plan_stitch.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 306,
+        "path": "tests/s12/s12-t03b/test_runner_resume.py",
+        "sha256": "B88EFFCD7CD73A909FAC916E8718F0E73C928142DD76D04C02F57C63ECA954C5",
+        "size": 11929
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 306,
+        "path": "tests/s12/s12-t03b/test_runner_resume.py",
+        "sha256": "B88EFFCD7CD73A909FAC916E8718F0E73C928142DD76D04C02F57C63ECA954C5",
+        "size": 11929,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03b\\test_runner_resume.py",
+        "snapshot_sha256": "B88EFFCD7CD73A909FAC916E8718F0E73C928142DD76D04C02F57C63ECA954C5"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t03b/test_runner_resume.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 530,
+        "path": "tests/s12/s12-t03b/test_s12_t03b_c1_closure.py",
+        "sha256": "F7B50E1A5B3DAEFE53F9BFBCBE5A86D901C90BB699E01FDF3D910233CF6C367C",
+        "size": 21898
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 530,
+        "path": "tests/s12/s12-t03b/test_s12_t03b_c1_closure.py",
+        "sha256": "F7B50E1A5B3DAEFE53F9BFBCBE5A86D901C90BB699E01FDF3D910233CF6C367C",
+        "size": 21898,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03b\\test_s12_t03b_c1_closure.py",
+        "snapshot_sha256": "F7B50E1A5B3DAEFE53F9BFBCBE5A86D901C90BB699E01FDF3D910233CF6C367C"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t03b/test_s12_t03b_c1_closure.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 0,
+        "path": "tests/s12/s12-t03c/__init__.py",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 0,
+        "path": "tests/s12/s12-t03c/__init__.py",
+        "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "size": 0,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03c\\__init__.py",
+        "snapshot_sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t03c/__init__.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 306,
+        "path": "tests/s12/s12-t03c/test_c1_closure_c22.py",
+        "sha256": "192ED45B0BCD8B0833D91BFC0C87D7F1A53CCE8B78C41575410554931C0B3ACD",
+        "size": 12174
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 306,
+        "path": "tests/s12/s12-t03c/test_c1_closure_c22.py",
+        "sha256": "192ED45B0BCD8B0833D91BFC0C87D7F1A53CCE8B78C41575410554931C0B3ACD",
+        "size": 12174,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03c\\test_c1_closure_c22.py",
+        "snapshot_sha256": "192ED45B0BCD8B0833D91BFC0C87D7F1A53CCE8B78C41575410554931C0B3ACD"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t03c/test_c1_closure_c22.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 77,
+        "path": "tests/s12/s12-t03c/test_c1_repro_typeerrors.py",
+        "sha256": "BFD722FFCFD77A6EB4E2872D76CCFD8542DE365D01F331E4262025DE1E5E573B",
+        "size": 2954
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 77,
+        "path": "tests/s12/s12-t03c/test_c1_repro_typeerrors.py",
+        "sha256": "BFD722FFCFD77A6EB4E2872D76CCFD8542DE365D01F331E4262025DE1E5E573B",
+        "size": 2954,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03c\\test_c1_repro_typeerrors.py",
+        "snapshot_sha256": "BFD722FFCFD77A6EB4E2872D76CCFD8542DE365D01F331E4262025DE1E5E573B"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t03c/test_c1_repro_typeerrors.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 320,
+        "path": "tests/s12/s12-t03c/test_export_jobs_api.py",
+        "sha256": "754CBAEC2F83F7AA8DC73B4CE6CEE2C937285A5DCB1597BFD87E66F030C3C29E",
+        "size": 13351
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 320,
+        "path": "tests/s12/s12-t03c/test_export_jobs_api.py",
+        "sha256": "754CBAEC2F83F7AA8DC73B4CE6CEE2C937285A5DCB1597BFD87E66F030C3C29E",
+        "size": 13351,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03c\\test_export_jobs_api.py",
+        "snapshot_sha256": "754CBAEC2F83F7AA8DC73B4CE6CEE2C937285A5DCB1597BFD87E66F030C3C29E"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t03c/test_export_jobs_api.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 857,
+        "path": "tests/s12/s12-t03c/test_publication.py",
+        "sha256": "1C884143697A4B920D42E9CE8C76D56D82B4E447941832A9018224C93E28EEA5",
+        "size": 34079
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 857,
+        "path": "tests/s12/s12-t03c/test_publication.py",
+        "sha256": "1C884143697A4B920D42E9CE8C76D56D82B4E447941832A9018224C93E28EEA5",
+        "size": 34079,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03c\\test_publication.py",
+        "snapshot_sha256": "1C884143697A4B920D42E9CE8C76D56D82B4E447941832A9018224C93E28EEA5"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t03c/test_publication.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 580,
+        "path": "tests/s12/s12-t03c/test_s12_t03c_c1_closure.py",
+        "sha256": "571B21CED1EF79028A47368832D616BA857E3B6895A88AD9555C2C533D42F87C",
+        "size": 23858
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 580,
+        "path": "tests/s12/s12-t03c/test_s12_t03c_c1_closure.py",
+        "sha256": "571B21CED1EF79028A47368832D616BA857E3B6895A88AD9555C2C533D42F87C",
+        "size": 23858,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t03c\\test_s12_t03c_c1_closure.py",
+        "snapshot_sha256": "571B21CED1EF79028A47368832D616BA857E3B6895A88AD9555C2C533D42F87C"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t03c/test_s12_t03c_c1_closure.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 108,
+        "path": "tests/s12/s12-t04a/conftest.py",
+        "sha256": "6304A673EAE326C64DF4D3D591A3F7706913BDC047BF3DBED5DFE8E9A4EF6606",
+        "size": 3265
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 108,
+        "path": "tests/s12/s12-t04a/conftest.py",
+        "sha256": "6304A673EAE326C64DF4D3D591A3F7706913BDC047BF3DBED5DFE8E9A4EF6606",
+        "size": 3265,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t04a\\conftest.py",
+        "snapshot_sha256": "6304A673EAE326C64DF4D3D591A3F7706913BDC047BF3DBED5DFE8E9A4EF6606"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t04a/conftest.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 996,
+        "path": "tests/s12/s12-t04a/test_c2_source_locked.py",
+        "sha256": "EBBAD80A73270D0CDAAC498AD8A9828EC1EF25B46F16C6733CE3E836BB5065B8",
+        "size": 38754
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 996,
+        "path": "tests/s12/s12-t04a/test_c2_source_locked.py",
+        "sha256": "EBBAD80A73270D0CDAAC498AD8A9828EC1EF25B46F16C6733CE3E836BB5065B8",
+        "size": 38754,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t04a\\test_c2_source_locked.py",
+        "snapshot_sha256": "EBBAD80A73270D0CDAAC498AD8A9828EC1EF25B46F16C6733CE3E836BB5065B8"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t04a/test_c2_source_locked.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 372,
+        "path": "tests/s12/s12-t04a/test_s12_t04a_c1_closure.py",
+        "sha256": "E38A62537CC158B29B2999A74FF297098DC7D5B6DE13F3FE79AE3B64B836E5B4",
+        "size": 13664
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 372,
+        "path": "tests/s12/s12-t04a/test_s12_t04a_c1_closure.py",
+        "sha256": "E38A62537CC158B29B2999A74FF297098DC7D5B6DE13F3FE79AE3B64B836E5B4",
+        "size": 13664,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t04a\\test_s12_t04a_c1_closure.py",
+        "snapshot_sha256": "E38A62537CC158B29B2999A74FF297098DC7D5B6DE13F3FE79AE3B64B836E5B4"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t04a/test_s12_t04a_c1_closure.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 163,
+        "path": "tests/s12/s12-t04a/test_validation_negatives.py",
+        "sha256": "99CF75EAE521609D8BE1AAEA5F559725541708B2EFD8BADF9290EAEE9AB5C616",
+        "size": 5398
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 163,
+        "path": "tests/s12/s12-t04a/test_validation_negatives.py",
+        "sha256": "99CF75EAE521609D8BE1AAEA5F559725541708B2EFD8BADF9290EAEE9AB5C616",
+        "size": 5398,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t04a\\test_validation_negatives.py",
+        "snapshot_sha256": "99CF75EAE521609D8BE1AAEA5F559725541708B2EFD8BADF9290EAEE9AB5C616"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t04a/test_validation_negatives.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 98,
+        "path": "tests/s12/s12-t04a/test_validation_pass.py",
+        "sha256": "7E0B9CF8036A500C3A5DC5B9F0E0579FF878FB00DFDA00BAF91E53B390D81126",
+        "size": 3718
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 98,
+        "path": "tests/s12/s12-t04a/test_validation_pass.py",
+        "sha256": "7E0B9CF8036A500C3A5DC5B9F0E0579FF878FB00DFDA00BAF91E53B390D81126",
+        "size": 3718,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t04a\\test_validation_pass.py",
+        "snapshot_sha256": "7E0B9CF8036A500C3A5DC5B9F0E0579FF878FB00DFDA00BAF91E53B390D81126"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t04a/test_validation_pass.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 67,
+        "path": "tests/s12/s12-t04a/test_validation_units.py",
+        "sha256": "5225953495B7E862D7914169EC6AC425CD6B2F612B8F5D909CA97A32A50D5D6A",
+        "size": 2051
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 67,
+        "path": "tests/s12/s12-t04a/test_validation_units.py",
+        "sha256": "5225953495B7E862D7914169EC6AC425CD6B2F612B8F5D909CA97A32A50D5D6A",
+        "size": 2051,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t04a\\test_validation_units.py",
+        "snapshot_sha256": "5225953495B7E862D7914169EC6AC425CD6B2F612B8F5D909CA97A32A50D5D6A"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t04a/test_validation_units.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 82,
+        "path": "tests/s12/s12-t06a/test_manifest_integrity.py",
+        "sha256": "4B28EB795770702504E3819A2AA72B79B06A7F841616A44897F6B6330DF74A64",
+        "size": 3309
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 82,
+        "path": "tests/s12/s12-t06a/test_manifest_integrity.py",
+        "sha256": "4B28EB795770702504E3819A2AA72B79B06A7F841616A44897F6B6330DF74A64",
+        "size": 3309,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t06a\\test_manifest_integrity.py",
+        "snapshot_sha256": "4B28EB795770702504E3819A2AA72B79B06A7F841616A44897F6B6330DF74A64"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t06a/test_manifest_integrity.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 224,
+        "path": "tests/s12/s12-t06a/test_process_identity.py",
+        "sha256": "F865DA2FECDDC2015A390600B94115C455E2D86E61B2F3D6DFE72046BA1EE536",
+        "size": 9612
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 224,
+        "path": "tests/s12/s12-t06a/test_process_identity.py",
+        "sha256": "F865DA2FECDDC2015A390600B94115C455E2D86E61B2F3D6DFE72046BA1EE536",
+        "size": 9612,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t06a\\test_process_identity.py",
+        "snapshot_sha256": "F865DA2FECDDC2015A390600B94115C455E2D86E61B2F3D6DFE72046BA1EE536"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t06a/test_process_identity.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "tests/s12/s12-t06b/__init__.py",
+        "sha256": "00C8145B3734B3DA78069F3205E70372092F1D8617E2CCA5AA5EEB201675B305",
+        "size": 60
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "tests/s12/s12-t06b/__init__.py",
+        "sha256": "00C8145B3734B3DA78069F3205E70372092F1D8617E2CCA5AA5EEB201675B305",
+        "size": 60,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t06b\\__init__.py",
+        "snapshot_sha256": "00C8145B3734B3DA78069F3205E70372092F1D8617E2CCA5AA5EEB201675B305"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t06b/__init__.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 66,
+        "path": "tests/s12/s12-t06b/c27_stage1_worker.py",
+        "sha256": "5E186CA33769108B77C9BC62A7D301D7E9D21DD3EA5FFE87EF2A97AE557EC76F",
+        "size": 2428
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 66,
+        "path": "tests/s12/s12-t06b/c27_stage1_worker.py",
+        "sha256": "5E186CA33769108B77C9BC62A7D301D7E9D21DD3EA5FFE87EF2A97AE557EC76F",
+        "size": 2428,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t06b\\c27_stage1_worker.py",
+        "snapshot_sha256": "5E186CA33769108B77C9BC62A7D301D7E9D21DD3EA5FFE87EF2A97AE557EC76F"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t06b/c27_stage1_worker.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 516,
+        "path": "tests/s12/s12-t06b/conftest.py",
+        "sha256": "DD4C275217D7A4C04DA04B34DA8B62B804F60BE6F846EE91D1D5A149036C1CA1",
+        "size": 16843
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 516,
+        "path": "tests/s12/s12-t06b/conftest.py",
+        "sha256": "DD4C275217D7A4C04DA04B34DA8B62B804F60BE6F846EE91D1D5A149036C1CA1",
+        "size": 16843,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t06b\\conftest.py",
+        "snapshot_sha256": "DD4C275217D7A4C04DA04B34DA8B62B804F60BE6F846EE91D1D5A149036C1CA1"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t06b/conftest.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 338,
+        "path": "tests/s12/s12-t06b/test_c26_normal_product.py",
+        "sha256": "DD7AA9D77FB2A5D3ED25DD6CDAE7ED9D6D3F959EFD083602F41BA4E27D150194",
+        "size": 13547
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 338,
+        "path": "tests/s12/s12-t06b/test_c26_normal_product.py",
+        "sha256": "DD7AA9D77FB2A5D3ED25DD6CDAE7ED9D6D3F959EFD083602F41BA4E27D150194",
+        "size": 13547,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t06b\\test_c26_normal_product.py",
+        "snapshot_sha256": "DD7AA9D77FB2A5D3ED25DD6CDAE7ED9D6D3F959EFD083602F41BA4E27D150194"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t06b/test_c26_normal_product.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 240,
+        "path": "tests/s12/s12-t06b/test_c27_same_job_fresh_process.py",
+        "sha256": "063907E3EF456AD94ACAB36AF3EB311CC03B5F8EF75C210C7BDF003A13453E3D",
+        "size": 9083
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 240,
+        "path": "tests/s12/s12-t06b/test_c27_same_job_fresh_process.py",
+        "sha256": "063907E3EF456AD94ACAB36AF3EB311CC03B5F8EF75C210C7BDF003A13453E3D",
+        "size": 9083,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t06b\\test_c27_same_job_fresh_process.py",
+        "snapshot_sha256": "063907E3EF456AD94ACAB36AF3EB311CC03B5F8EF75C210C7BDF003A13453E3D"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t06b/test_c27_same_job_fresh_process.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 198,
+        "path": "tests/s12/s12-t06b/test_c28_audio_mapping.py",
+        "sha256": "EB9B42803E961A55335441DA52424E3344DA2BC14BA8C40BD5A67FCC08364DA8",
+        "size": 7415
+      },
+      "allowed_change": true,
+      "before": {
+        "exists": true,
+        "lines": 185,
+        "path": "tests/s12/s12-t06b/test_c28_audio_mapping.py",
+        "sha256": "9214850BBCAF77A283A5AFA86F03D0582C697E5E2328D53B9A7D5BD99EC9A933",
+        "size": 7121,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t06b\\test_c28_audio_mapping.py",
+        "snapshot_sha256": "9214850BBCAF77A283A5AFA86F03D0582C697E5E2328D53B9A7D5BD99EC9A933"
+      },
+      "changed": true,
+      "path": "tests/s12/s12-t06b/test_c28_audio_mapping.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 110,
+        "path": "tests/s12/s12-t06b/test_hardware_matrix.py",
+        "sha256": "FA8DBC024C5D8F1B4F522CD242137EDD8E5466B15E0A852883E7EDC765DC46C9",
+        "size": 3922
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 110,
+        "path": "tests/s12/s12-t06b/test_hardware_matrix.py",
+        "sha256": "FA8DBC024C5D8F1B4F522CD242137EDD8E5466B15E0A852883E7EDC765DC46C9",
+        "size": 3922,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t06b\\test_hardware_matrix.py",
+        "snapshot_sha256": "FA8DBC024C5D8F1B4F522CD242137EDD8E5466B15E0A852883E7EDC765DC46C9"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t06b/test_hardware_matrix.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 192,
+        "path": "tests/s12/s12-t06b/test_scenario_f_4k.py",
+        "sha256": "8A6FED3DCD9101FBDF32062EC35B214CE75C1C8298D0D784947B2A93A456099B",
+        "size": 7012
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 192,
+        "path": "tests/s12/s12-t06b/test_scenario_f_4k.py",
+        "sha256": "8A6FED3DCD9101FBDF32062EC35B214CE75C1C8298D0D784947B2A93A456099B",
+        "size": 7012,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t06b\\test_scenario_f_4k.py",
+        "snapshot_sha256": "8A6FED3DCD9101FBDF32062EC35B214CE75C1C8298D0D784947B2A93A456099B"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t06b/test_scenario_f_4k.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 320,
+        "path": "tests/s12/s12-t06b/test_scenario_g_resume.py",
+        "sha256": "439DCB708E028D05D74B361398E48A061B187458ECC22020CA68355994B6FA1A",
+        "size": 10501
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 320,
+        "path": "tests/s12/s12-t06b/test_scenario_g_resume.py",
+        "sha256": "439DCB708E028D05D74B361398E48A061B187458ECC22020CA68355994B6FA1A",
+        "size": 10501,
+        "snapshot": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa\\docs\\pm\\sessions\\S12-LC3-QA\\evidence\\q1-baseline-snapshots\\tests\\s12\\s12-t06b\\test_scenario_g_resume.py",
+        "snapshot_sha256": "439DCB708E028D05D74B361398E48A061B187458ECC22020CA68355994B6FA1A"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t06b/test_scenario_g_resume.py"
+    }
+  ],
+  "root": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-qa",
+  "status": "VERIFIED"
+}

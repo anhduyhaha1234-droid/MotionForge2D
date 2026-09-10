@@ -1,0 +1,14 @@
+..                                                                       [100%]
+============================== warnings summary ===============================
+tests/s12/s12-t03a/test_s12_export_c2_integrity.py::test_c08_transition_contention_one_winner
+tests/s12/s12-t03a/test_s12_export_c2_integrity.py::test_c08_resident_stale_orm_snapshot_loses
+  C:\Users\Admin\AppData\Local\Programs\Python\Python311\Lib\contextlib.py:144: SAWarning: Skipped unsupported reflection of expression-based index uq_character_active_workspace_code
+    next(self.gen)
+
+tests/s12/s12-t03a/test_s12_export_c2_integrity.py::test_c08_transition_contention_one_winner
+tests/s12/s12-t03a/test_s12_export_c2_integrity.py::test_c08_resident_stale_orm_snapshot_loses
+  C:\Users\Admin\AppData\Local\Programs\Python\Python311\Lib\contextlib.py:144: SAWarning: Skipped unsupported reflection of expression-based index uq_channel_active_workspace_role_name
+    next(self.gen)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+2 passed, 14 deselected, 4 warnings in 4.43s

@@ -1,0 +1,1 @@
+python -m ruff check --select F tests/s12; python -m ruff check --select F,E,I scripts/s12/s12_lc3_probe.py tests/s12/s12-t03a/test_s12_export_c1_closure.py tests/s12/s12-t06b/test_c28_audio_mapping.py; git diff --check

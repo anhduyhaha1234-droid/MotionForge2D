@@ -1,0 +1,1 @@
+python -m pytest tests/s12/s12-t03a/test_s12_export_c1_closure.py -k c08 tests/s12/s12-t03a/test_s12_export_c2_integrity.py -k c08 tests/s12/s12-t06b/test_c28_audio_mapping.py -q -p no:cacheprovider
