@@ -25,11 +25,18 @@ from app.api.deps import SessionDep, get_managed_root
 from app.persistence.models import Artifact, Project, VideoItem
 from app.persistence.readiness import compute_project_readiness
 from app.schemas.s12_export import (
+    ExportContextPlan,
+    ExportContextResponse,
+    ExportContextRun,
+    ExportProfile,
     ExportPreflightRequest,
     ExportPreflightResponse,
     PreflightCheck,
 )
-from app.services.s12_export.authority import resolve_export_authority
+from app.services.s12_export.authority import (
+    resolve_export_authority,
+    resolve_export_context,
+)
 from app.services.s12_export.preflight import (
     PreflightContext,
     evaluate_preflight,
@@ -37,6 +44,107 @@ from app.services.s12_export.preflight import (
 )
 
 router = APIRouter(prefix="/api/v2", tags=["s12-export-preflight"])
+
+
+@router.get(
+    "/projects/{project_id}/export/context",
+    response_model=ExportContextResponse,
+)
+def get_export_context(
+    project_id: str,
+    video_item_id: str,
+    session: SessionDep,
+) -> ExportContextResponse:
+    """Return the current scoped export context without mutating anything.
+
+    Pins and the render plan come from the latest completed Full Apply.  The
+    browser receives identities only; source/output paths and approval state
+    remain server-owned.
+    """
+    project = _resolve_project(session, project_id)
+    context = resolve_export_context(
+        session,
+        workspace_id=str(project.workspace_id),
+        project_id=project_id,
+        video_item_id=video_item_id,
+    )
+    if "S12_EXPORT_UNKNOWN_PROJECT" in context.reasons:
+        raise HTTPException(status_code=404, detail="project not found")
+    if "S12_EXPORT_UNKNOWN_VIDEO" in context.reasons:
+        raise HTTPException(status_code=404, detail="video not found in project")
+
+    profiles: list[ExportProfile] = []
+    for profile_id in ("master-4k-h264", "master-4k-hevc", "preview-1080p-h264"):
+        supported, basis = probe_encoder_support(profile_id)
+        spec = {
+            "master-4k-h264": (3840, 2160, "h264"),
+            "master-4k-hevc": (3840, 2160, "hevc"),
+            "preview-1080p-h264": (1920, 1080, "h264"),
+        }[profile_id]
+        profiles.append(
+            ExportProfile(
+                profile_id=profile_id,
+                width=spec[0],
+                height=spec[1],
+                codec=spec[2],
+                upscale_method=None,
+                supported=supported,
+                support_basis=basis,
+            )
+        )
+
+    checkpoint = None
+    if context.checkpoint_id and context.checkpoint_hash and context.checkpoint_revision:
+        checkpoint = {
+            "checkpoint_id": context.checkpoint_id,
+            "checkpoint_hash": context.checkpoint_hash,
+            "checkpoint_revision": context.checkpoint_revision,
+        }
+    lock = None
+    if context.manifest_id and context.manifest_hash and context.manifest_generation:
+        lock = {
+            "manifest_id": context.manifest_id,
+            "manifest_hash": context.manifest_hash,
+            "source_generation": context.manifest_generation,
+        }
+    plan = None
+    if context.plan_id and context.plan_hash and context.frame_count:
+        plan = ExportContextPlan(
+            plan_id=context.plan_id,
+            plan_hash=context.plan_hash,
+            frame_count=context.frame_count,
+            fps_num=context.fps_num,
+            fps_den=context.fps_den,
+            chunk_config=context.chunk_config,
+        )
+    current_run = None
+    if context.current_run_id and context.current_run_status and context.current_run_attempt:
+        current_run = ExportContextRun(
+            run_id=context.current_run_id,
+            status=context.current_run_status,
+            attempt=context.current_run_attempt,
+        )
+    return ExportContextResponse(
+        workspace_id=context.workspace_id,
+        project_id=context.project_id,
+        project_name=context.project_name,
+        video_item_id=context.video_item_id,
+        video_title=context.video_title,
+        video_status=context.video_status,
+        video_width=context.video_width,
+        video_height=context.video_height,
+        video_duration_ms=context.video_duration_ms,
+        video_fps_num=context.video_fps_num,
+        video_fps_den=context.video_fps_den,
+        checkpoint=checkpoint,
+        lock=lock,
+        plan=plan,
+        profiles=profiles,
+        current_run=current_run,
+        full_apply_run_id=context.full_apply_run_id,
+        context_revision=context.context_revision,
+        reasons=list(context.reasons),
+    )
 
 
 def _resolve_project(session: Session, project_id: str) -> Project:

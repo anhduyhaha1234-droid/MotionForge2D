@@ -30,6 +30,10 @@ export const S12_EXPORT_REASON_CODES = [
   "S12_EXPORT_DISK_INSUFFICIENT",
   "S12_EXPORT_UNKNOWN_PROJECT",
   "S12_EXPORT_UNKNOWN_VIDEO",
+  "S12_EXPORT_FULL_APPLY_MISSING",
+  "S12_EXPORT_SOURCE_STALE",
+  "S12_EXPORT_SOURCE_SPOOFED",
+  "S12_EXPORT_CONFIG_MISSING",
 ] as const;
 
 export type S12ExportReasonCode = (typeof S12_EXPORT_REASON_CODES)[number];
@@ -112,29 +116,69 @@ export interface S12ExportPreflightResponse {
   readiness_policy: string;
 }
 
-/** Immutable lineage and render pins accepted by POST /s12-exports/submit. */
-export interface S12ExportSubmitPins {
-  checkpoint_id: string;
-  checkpoint_hash: string;
-  checkpoint_revision: number;
-  manifest_id: string;
-  manifest_hash: string;
-  manifest_generation: string;
-  profile_id: string;
+export interface S12ExportContextPlan {
   plan_id: string;
   plan_hash: string;
   frame_count: number;
+  fps_num: number | null;
+  fps_den: number | null;
+  chunk_config: Record<string, unknown>;
+}
+
+export interface S12ExportContextRun {
+  run_id: string;
+  status: S12ExportRunStatus;
+  attempt: number;
+}
+
+export interface S12ExportContextResponse {
+  contract_version: string;
+  workspace_id: string;
+  project_id: string;
+  project_name: string | null;
+  video_item_id: string;
+  video_title: string | null;
+  video_status: string | null;
+  video_width: number | null;
+  video_height: number | null;
+  video_duration_ms: number | null;
+  video_fps_num: number | null;
+  video_fps_den: number | null;
+  checkpoint: S12ExportCheckpointPin | null;
+  lock: S12ExportLockPin | null;
+  plan: S12ExportContextPlan | null;
+  profiles: S12ExportProfile[];
+  current_run: S12ExportContextRun | null;
+  full_apply_run_id: string | null;
+  context_revision: string;
+  reasons: S12ExportReasonCode[];
+}
+
+/** Legacy lineage fields accepted by POST /s12-exports/submit when present. */
+export interface S12ExportSubmitPins {
+  checkpoint_id?: string;
+  checkpoint_hash?: string;
+  checkpoint_revision?: number;
+  manifest_id?: string;
+  manifest_hash?: string;
+  manifest_generation?: string;
+  profile_id: S12ExportProfileId;
+  plan_id?: string;
+  plan_hash?: string;
+  frame_count?: number;
 }
 
 export interface S12ExportSubmitBody extends S12ExportSubmitPins {
   project_id: string;
   video_item_id: string;
+  context_revision?: string;
   chunk_config?: Record<string, unknown>;
-  source_path: string;
-  fps: number;
-  chunk_dir: string;
-  scratch_dir: string;
-  output_path: string;
+  /** Legacy fields remain optional for old internal callers; normal UI never sends them. */
+  source_path?: string;
+  fps?: number;
+  chunk_dir?: string;
+  scratch_dir?: string;
+  output_path?: string;
   audio_source?: string | null;
   idempotency_key?: string | null;
 }
@@ -273,6 +317,22 @@ export const S12_EXPORT_REASON_COPY: Readonly<
     message: "Không tìm thấy video trong project.",
     action: "Kiểm tra video_item_id và chọn video thuộc đúng project.",
   },
+  S12_EXPORT_FULL_APPLY_MISSING: {
+    message: "Video chưa có Full Apply hoàn tất làm authority export.",
+    action: "Hoàn tất Full Apply hiện hành rồi tải lại context.",
+  },
+  S12_EXPORT_SOURCE_STALE: {
+    message: "Source authority không còn hợp lệ hoặc đã lỗi thời.",
+    action: "Tải lại context và chạy preflight lại.",
+  },
+  S12_EXPORT_SOURCE_SPOOFED: {
+    message: "Source media không khớp authority server.",
+    action: "Không dùng đường dẫn tự nhập; chọn lại video thuộc project.",
+  },
+  S12_EXPORT_CONFIG_MISSING: {
+    message: "Thiếu config/pack authority của Full Apply.",
+    action: "Hoàn tất cấu hình và Full Apply rồi thử lại.",
+  },
 };
 
 export const S12_EXPORT_GENERIC_ERROR_COPY: S12ExportErrorCopy = {
@@ -364,6 +424,15 @@ export function preflightExport(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     },
+  );
+}
+
+export function exportContext(
+  projectId: string,
+  videoItemId: string,
+): Promise<S12ExportContextResponse> {
+  return apiFetch<S12ExportContextResponse>(
+    `/api/v2/projects/${encodeURIComponent(projectId)}/export/context?video_item_id=${encodeURIComponent(videoItemId)}`,
   );
 }
 
