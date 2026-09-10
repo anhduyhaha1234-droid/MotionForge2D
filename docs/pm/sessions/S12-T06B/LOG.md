@@ -92,6 +92,25 @@ SHA-256 `c9b068b2195461b1f867a5ec95714cea3ab09881757f5607094574d15dda428f`,
   one candidate frame). Normal render pipeline only publishes when the
   candidate raster equals the source raster. Verifier does not fix.
 
+## REVERIFY-5 FINAL on base c9fdbf0 (T04A candidate-pipe fix)
+
+- Full T06B suite: **20 passed, 1 skipped in 90.37s**; ruff F clean.
+- Probe evidence: `probe_frame_psnr(candidate4k, ref1080p, 3840, 2160,
+  reference_width=1920, reference_height=1080)` NOW returns **30 frames
+  PSNR 65.0dB** — the temp-file decode fix works when reference dims are
+  supplied.
+- **F11-T06B-02 FINAL UPDATE (owner T04A/T03C) — still blocked at the
+  publication caller**: `_build_source_reference` sets `reference_path`
+  but NEVER sets `SourceReference.reference_width/height` (both default
+  None), so `probe_frame_psnr` keeps `ref_vf=None` -> the reference is
+  decoded UNSCALED through the pipe at its original raster and the
+  cross-raster job still FAILs frame_order (7/30).  Fix direction (one
+  line class): populate `reference_width/height` from the approved
+  artifact dims (helper `_probe_source_dims` already exists in
+  publication.py). Verifier does not fix; tests keep the fail-closed
+  assertions.
+- C26 FINAL status: native-4K positive; upscale/letterbox fail-closed.
+
 ## REVERIFY-4 FINAL on base 68f40b3 (T04A pipe-fix: ref -> temp raw file)
 
 - Full T06B suite: **20 passed, 1 skipped in 90.94s**; ruff F clean.
