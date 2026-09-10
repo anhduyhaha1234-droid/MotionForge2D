@@ -118,3 +118,11 @@ was preserved and is not committed.
 
 No unlisted production fix was required. The exact local commit is recorded
 after the guard and final status checks in the task response.
+
+## Correction follow-up
+
+QA Q1 found that the prior commit accidentally left `ExportRunner.code_for`
+under the top-level cleanup helper. The correction moved only that method back
+inside the class. The four reported T03B nodes passed, `hasattr(ExportRunner,
+"code_for")` passed, the VAL focused suite passed, and the correction evidence
+is [20260910T075450Z-code-for-correction.md](evidence/20260910T075450Z-code-for-correction.md).
