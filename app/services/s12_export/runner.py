@@ -42,6 +42,7 @@ import hashlib
 import os
 import shutil
 import subprocess
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -201,6 +202,27 @@ class DiskFullError(RunnerError):
     """Disk filled mid-render (ENOSPC) — chunk failed, resume later."""
 
 
+def _reap_render_process(process: subprocess.Popen[str]) -> bool:
+    """Bounded kill/wait used by the render process error paths."""
+    if process.poll() is None:
+        try:
+            process.kill()
+        except OSError:
+            pass
+    try:
+        process.wait(timeout=1.0)
+    except subprocess.TimeoutExpired:
+        try:
+            process.kill()
+        except OSError:
+            pass
+        try:
+            process.wait(timeout=1.0)
+        except subprocess.TimeoutExpired:
+            return False
+    return process.poll() is not None
+
+
 @dataclass
 class RunnerConfig:
     """All runner inputs (pure values; the caller owns sessions/commits)."""
@@ -240,6 +262,27 @@ class ExportRunner:
             )
         except OSError as err:
             raise RunnerError(f"ffmpeg spawn failed: {err}") from err
+        stderr_stop = threading.Event()
+        stderr_state = bytearray()
+        stderr_error: list[BaseException] = []
+        stderr_thread: threading.Thread | None = None
+        if process.stderr is not None:
+            def _drain_stderr() -> None:
+                try:
+                    while not stderr_stop.is_set():
+                        block = process.stderr.read(8192)
+                        if not block:
+                            break
+                        raw = block.encode("utf-8", "replace") if isinstance(block, str) else block
+                        if len(stderr_state) < 64 * 1024:
+                            stderr_state.extend(raw[: 64 * 1024 - len(stderr_state)])
+                except (OSError, ValueError) as err:
+                    stderr_error.append(err)
+
+            stderr_thread = threading.Thread(
+                target=_drain_stderr, name="s12-export-render-stderr", daemon=True
+            )
+            stderr_thread.start()
         deadline = time.monotonic() + 600.0
         peak_rss = 0
         try:
@@ -260,24 +303,29 @@ class ExportRunner:
                     except psutil.Error:  # type: ignore[name-defined]
                         pass
                 if self._cfg.cancel_flag is not None and Path(self._cfg.cancel_flag).exists():
-                    process.kill()
-                    process.wait()
                     raise CancelledError("cancel flag present during ffmpeg render")
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
-                    process.kill()
-                    process.wait()
                     raise RunnerError("ffmpeg render timed out after 600s")
                 try:
                     process.wait(timeout=min(0.2, remaining))
                 except subprocess.TimeoutExpired:
                     continue
-            stderr = process.stderr.read() if process.stderr is not None else ""
-            return subprocess.CompletedProcess(argv, process.returncode, "", stderr)
+            if stderr_thread is not None:
+                stderr_thread.join(timeout=1.0)
+            if stderr_error:
+                stderr_state.extend(str(stderr_error[0]).encode("utf-8", "replace"))
+            return subprocess.CompletedProcess(
+                argv,
+                process.returncode,
+                "",
+                bytes(stderr_state).decode("utf-8", "replace"),
+            )
         finally:
-            if process.poll() is None:
-                process.kill()
-                process.wait()
+            stderr_stop.set()
+            _reap_render_process(process)
+            if stderr_thread is not None:
+                stderr_thread.join(timeout=1.0)
             self.resource_metrics["peak_ffmpeg_rss_bytes"] = peak_rss
             if process.stderr is not None:
                 process.stderr.close()
@@ -405,7 +453,11 @@ class ExportRunner:
         # Scratch keeps a real .mp4 suffix (the muxer sniffs format from the
         # extension — ".partial" is not muxable); only the T03C-visible
         # candidate carries the frozen .partial name (see stitch.assemble_run).
-        scratch = dest_final.parent / f"{dest_final.stem}.tmp-render.mp4"
+        fence_suffix = str(self._cfg.extra.get("fence_token") or "")
+        scratch_name = f"{dest_final.stem}.tmp-render"
+        if fence_suffix:
+            scratch_name += f".{fence_suffix}"
+        scratch = dest_final.parent / f"{scratch_name}.mp4"
         try:
             completed = self._run_render_process(
                 [
@@ -484,7 +536,7 @@ class ExportRunner:
             raise
         # F06/M05 — persist byte identity beside the chunk: a resume may only
         # reuse a chunk whose ACTUAL file sha256 matches this recorded hash.
-        _write_chunk_sha(dest_final)
+        _write_chunk_sha(dest_final, fence_token=fence_suffix or None)
         return dest_final
 
     def _chunk_usable(self, spec: ChunkSpec) -> bool:
@@ -639,6 +691,10 @@ class ExportRunner:
             cleanup_owned_export_artifacts(
                 scratch_dir=self._cfg.scratch_dir,
                 chunk_dir=self._cfg.chunk_dir,
+                repository=self._repo,
+                owner_run_id=self._cfg.run_id,
+                owner_worker_id=self._cfg.worker_id,
+                owner_fence_token=self._cfg.fence_token,
             )
             raise
 
@@ -713,7 +769,14 @@ class ExportRunner:
 
 
 def cleanup_owned_export_artifacts(
-    *, scratch_dir: str | Path | None, chunk_dir: str | Path | None = None
+    *,
+    scratch_dir: str | Path | None,
+    chunk_dir: str | Path | None = None,
+    candidate_path: str | Path | None = None,
+    repository: S12ExportRepository | None = None,
+    owner_run_id: str | None = None,
+    owner_worker_id: str | None = None,
+    owner_fence_token: str | None = None,
 ) -> None:
     """Remove only known private/partial children from owned job roots.
 
@@ -721,7 +784,37 @@ def cleanup_owned_export_artifacts(
     untouched.  No recursive traversal or path-derived broad deletion is
     used; every removed child is a known temporary naming family.
     """
+    owner_scoped = all(
+        value is not None
+        for value in (
+            repository,
+            owner_run_id,
+            owner_worker_id,
+            owner_fence_token,
+        )
+    )
+    if owner_scoped and not _owner_is_live(
+        repository,  # type: ignore[arg-type]
+        owner_run_id,  # type: ignore[arg-type]
+        owner_worker_id,  # type: ignore[arg-type]
+        owner_fence_token,  # type: ignore[arg-type]
+    ):
+        return
     roots = [Path(value) for value in (scratch_dir, chunk_dir) if value]
+    scratch_root = Path(scratch_dir).resolve() if scratch_dir else None
+    candidate_name: str | None = None
+    if candidate_path and scratch_root is not None:
+        try:
+            candidate = Path(candidate_path)
+            if candidate.resolve().parent == scratch_root:
+                candidate_name = candidate.name.lower()
+        except OSError:
+            candidate_name = None
+    fence_fragment = (
+        f".tmp-render.{owner_fence_token}."
+        if owner_fence_token
+        else ""
+    )
     for root in roots:
         if not root.is_dir():
             continue
@@ -733,7 +826,7 @@ def cleanup_owned_export_artifacts(
             if child.is_symlink() or not child.is_file():
                 continue
             name = child.name.lower()
-            removable = (
+            known_private = (
                 name in {
                     "candidate_final.mp4",
                     "candidate.tmp-finalize.mp4",
@@ -741,7 +834,6 @@ def cleanup_owned_export_artifacts(
                     "_s12_t03b_concat.txt",
                 }
                 or name.startswith("core_") and name.endswith(".mp4")
-                or ".tmp-render." in name
                 or name.endswith(".partial")
                 or name.endswith(".raw")
                 or name.endswith(".raw.partial")
@@ -749,11 +841,46 @@ def cleanup_owned_export_artifacts(
                 or name.endswith(".sha256.tmp")
                 or name.startswith(".s12-psnr-")
             )
+            if owner_scoped:
+                try:
+                    is_scratch = root.resolve() == scratch_root
+                except OSError:
+                    is_scratch = False
+                removable = (
+                    is_scratch
+                    and (candidate_name is None or name == candidate_name or known_private)
+                ) or (
+                    not is_scratch
+                    and bool(fence_fragment)
+                    and fence_fragment in name
+                )
+            else:
+                removable = known_private or ".tmp-render." in name
             if removable:
                 try:
                     child.unlink()
                 except OSError:
                     pass
+
+
+def _owner_is_live(
+    repository: S12ExportRepository,
+    run_id: str,
+    worker_id: str,
+    fence_token: str,
+) -> bool:
+    """Check current DB ownership without trusting a resident ORM lease."""
+    from datetime import UTC, datetime
+
+    try:
+        return repository._lease_live_sql(  # noqa: SLF001
+            run_id,
+            worker_id,
+            fence_token,
+            now=datetime.now(UTC),
+        )
+    except Exception:
+        return False
 
 def _probe_dims(path: Path) -> tuple[int, int]:
     """Measured source dims (real ffprobe); fallback keeps disk gate safe."""
@@ -820,10 +947,14 @@ def _chunk_sha_sidecar(path: Path) -> Path:
     return path.parent / f"{path.name}.sha256"
 
 
-def _write_chunk_sha(path: Path) -> None:
+def _write_chunk_sha(path: Path, *, fence_token: str | None = None) -> None:
     """Record byte identity beside the chunk (atomic write + fsync)."""
     sidecar = _chunk_sha_sidecar(path)
-    tmp = sidecar.with_suffix(".sha256.tmp")
+    tmp = (
+        sidecar.with_name(f"{sidecar.name}.{fence_token}.tmp")
+        if fence_token
+        else sidecar.with_suffix(".sha256.tmp")
+    )
     tmp.write_text(_chunk_sha256(path) + "\n", encoding="ascii")
     os.replace(tmp, sidecar)
 

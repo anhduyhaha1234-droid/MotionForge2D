@@ -37,13 +37,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import queue
 import re
 import subprocess
+import threading
 import time
 from fractions import Fraction
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from app.services.ffmpeg_utils import find_ffmpeg, find_ffprobe
 
@@ -94,6 +96,10 @@ VERDICTS: tuple[str, ...] = ("PASS", "FAIL", "NOT_MEASURED")
 Verdict = Literal["PASS", "FAIL", "NOT_MEASURED"]
 
 _HASH_CHUNK = 1024 * 1024
+_PIPE_CHUNK_BYTES = 64 * 1024
+_MAX_STDERR_BYTES = 64 * 1024
+_MAX_PIPE_QUEUE_BLOCKS = 4
+_PROCESS_REAP_GRACE_SEC = 1.0
 
 
 @dataclass(frozen=True)
@@ -366,17 +372,81 @@ def _parse_rate(value: object) -> float | None:
     return rate
 
 
-def _read_exact(handle, size: int) -> bytes | None:
-    """Read exactly ``size`` bytes or return None on short read."""
-    chunks: list[bytes] = []
-    remaining = size
-    while remaining > 0:
-        chunk = handle.read(remaining)
-        if not chunk:
-            return None
-        chunks.append(chunk)
-        remaining -= len(chunk)
-    return b"".join(chunks)
+def _start_pipe_reader(
+    stream: Any,
+    stop: threading.Event,
+    *,
+    output: queue.Queue[bytes | None] | None = None,
+    retain_limit: int = 0,
+) -> tuple[threading.Thread, dict[str, Any]]:
+    """Drain one child pipe without making the validator wait on a pipe read.
+
+    ``output`` is a bounded queue for stdout.  A stderr reader retains only a
+    bounded prefix and continues draining after the cap, so a noisy decoder
+    cannot deadlock itself.  The caller owns process termination and joins.
+    """
+    state: dict[str, Any] = {"retained": bytearray(), "error": None}
+
+    def _read() -> None:
+        try:
+            while not stop.is_set():
+                block = stream.read(_PIPE_CHUNK_BYTES)
+                if not block:
+                    break
+                if output is not None:
+                    while not stop.is_set():
+                        try:
+                            output.put(block, timeout=0.05)
+                            break
+                        except queue.Full:
+                            continue
+                elif retain_limit > 0:
+                    raw = block.encode("utf-8", "replace") if isinstance(block, str) else block
+                    kept = state["retained"]
+                    if len(kept) < retain_limit:
+                        kept.extend(raw[: retain_limit - len(kept)])
+        except (OSError, ValueError) as err:
+            state["error"] = err
+        finally:
+            if output is not None:
+                while not stop.is_set():
+                    try:
+                        output.put(None, timeout=0.05)
+                        break
+                    except queue.Full:
+                        continue
+
+    thread = threading.Thread(target=_read, name="s12-export-pipe", daemon=True)
+    thread.start()
+    return thread, state
+
+
+def _reap_process(process: subprocess.Popen[Any]) -> bool:
+    """Kill, wait, and report whether a decoder child was reaped."""
+    if process.poll() is None:
+        try:
+            process.kill()
+        except OSError:
+            pass
+    try:
+        process.wait(timeout=_PROCESS_REAP_GRACE_SEC)
+    except subprocess.TimeoutExpired:
+        try:
+            process.kill()
+        except OSError:
+            pass
+        try:
+            process.wait(timeout=_PROCESS_REAP_GRACE_SEC)
+        except subprocess.TimeoutExpired:
+            return False
+    return process.poll() is not None
+
+
+def _close_pipe(stream: Any) -> None:
+    try:
+        stream.close()
+    except (OSError, ValueError):
+        pass
 
 
 def probe_frame_digests(
@@ -414,22 +484,42 @@ def probe_frame_digests(
     except OSError:
         return None
     assert proc.stdout is not None
+    stop = threading.Event()
+    blocks: queue.Queue[bytes | None] = queue.Queue(_MAX_PIPE_QUEUE_BLOCKS)
+    reader, state = _start_pipe_reader(proc.stdout, stop, output=blocks)
+    buffer = bytearray()
     digests: list[str] = []
+    deadline = time.monotonic() + 300.0
+    done = False
     try:
-        while True:
-            frame = _read_exact(proc.stdout, frame_size)
-            if frame is None:
-                break
-            digests.append(hashlib.sha256(frame).hexdigest())
-    finally:
-        try:
-            proc.stdout.close()
-        except OSError:
-            pass
-    rc = proc.wait(timeout=300)
-    if rc != 0:
+        while not done:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return None
+            try:
+                block = blocks.get(timeout=min(0.05, remaining))
+            except queue.Empty:
+                continue
+            if block is None:
+                done = True
+                continue
+            buffer.extend(block)
+            while len(buffer) >= frame_size:
+                frame = bytes(buffer[:frame_size])
+                del buffer[:frame_size]
+                digests.append(hashlib.sha256(frame).hexdigest())
+        if buffer or state["error"] is not None:
+            return None
+        if proc.wait(timeout=_PROCESS_REAP_GRACE_SEC) != 0:
+            return None
+        return tuple(digests) if digests else None
+    except (OSError, subprocess.SubprocessError):
         return None
-    return tuple(digests) if digests else None
+    finally:
+        stop.set()
+        _reap_process(proc)
+        reader.join(timeout=_PROCESS_REAP_GRACE_SEC)
+        _close_pipe(proc.stdout)
 
 
 def _fit_filter(width: int, height: int) -> str:
@@ -483,6 +573,9 @@ def probe_frame_psnr(
         f"[0:v][reference]psnr=stats_file={stats.name}:stats_version=2"
     )
     proc: subprocess.Popen[str] | None = None
+    stop = threading.Event()
+    stderr_reader: threading.Thread | None = None
+    stderr_state: dict[str, Any] = {"retained": bytearray(), "error": None}
     try:
         proc = subprocess.Popen(
             [
@@ -497,23 +590,31 @@ def probe_frame_psnr(
             stderr=subprocess.PIPE,
             text=True,
         )
+        if proc.stderr is not None:
+            stderr_reader, stderr_state = _start_pipe_reader(
+                proc.stderr, stop, retain_limit=_MAX_STDERR_BYTES
+            )
         deadline = time.monotonic() + timeout_sec
         while proc.poll() is None:
             if cancel_flag is not None and Path(cancel_flag).exists():
-                proc.kill()
-                proc.wait()
                 return None
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                proc.kill()
-                proc.wait()
                 return None
             try:
                 proc.wait(timeout=min(0.2, remaining))
             except subprocess.TimeoutExpired:
                 continue
-        stderr = proc.stderr.read() if proc.stderr is not None else ""
-        if proc.returncode != 0 or stderr:
+        if stderr_reader is not None:
+            stderr_reader.join(timeout=_PROCESS_REAP_GRACE_SEC)
+        stderr = bytes(stderr_state["retained"])
+        if (
+            proc.returncode != 0
+            or stderr
+            or stderr_reader is not None
+            and stderr_reader.is_alive()
+            or stderr_state["error"] is not None
+        ):
             return None
         values: list[float] = []
         expected_n = 1
@@ -533,13 +634,17 @@ def probe_frame_psnr(
             proc.wait()
         return None
     finally:
-        if proc is not None and proc.poll() is None:
-            proc.kill()
-            proc.wait()
+        stop.set()
+        if proc is not None:
+            _reap_process(proc)
+        if stderr_reader is not None:
+            stderr_reader.join(timeout=_PROCESS_REAP_GRACE_SEC)
         try:
             stats.unlink(missing_ok=True)
         except OSError:
             pass
+        if proc is not None and proc.stderr is not None:
+            _close_pipe(proc.stderr)
 
 
 def probe_audio_digest(
@@ -572,22 +677,35 @@ def probe_audio_digest(
     except OSError:
         return None
     assert proc.stdout is not None
+    stop = threading.Event()
+    blocks: queue.Queue[bytes | None] = queue.Queue(_MAX_PIPE_QUEUE_BLOCKS)
+    reader, state = _start_pipe_reader(proc.stdout, stop, output=blocks)
     digest = hashlib.sha256()
+    deadline = time.monotonic() + 300.0
+    done = False
     try:
-        while True:
-            chunk = proc.stdout.read(_HASH_CHUNK)
-            if not chunk:
-                break
-            digest.update(chunk)
-    finally:
-        try:
-            proc.stdout.close()
-        except OSError:
-            pass
-    rc = proc.wait(timeout=300)
-    if rc != 0:
+        while not done:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return None
+            try:
+                chunk = blocks.get(timeout=min(0.05, remaining))
+            except queue.Empty:
+                continue
+            if chunk is None:
+                done = True
+            else:
+                digest.update(chunk)
+        if state["error"] is not None or proc.wait(timeout=_PROCESS_REAP_GRACE_SEC) != 0:
+            return None
+        return digest.hexdigest()
+    except (OSError, subprocess.SubprocessError):
         return None
-    return digest.hexdigest()
+    finally:
+        stop.set()
+        _reap_process(proc)
+        reader.join(timeout=_PROCESS_REAP_GRACE_SEC)
+        _close_pipe(proc.stdout)
 
 
 def probe_audio_shape(path: str | Path, stream_index: int = 0) -> tuple[int, int] | None:
@@ -657,77 +775,156 @@ def probe_audio_content(
             ]
         )
     processes: list[subprocess.Popen[bytes]] = []
+    stop = threading.Event()
+    stdout_queues: list[queue.Queue[bytes | None]] = []
+    stdout_readers: list[threading.Thread] = []
+    stdout_states: list[dict[str, Any]] = []
+    stderr_readers: list[threading.Thread] = []
+    stderr_states: list[dict[str, Any]] = []
     try:
         for argv in commands:
-            processes.append(
-                subprocess.Popen(
-                    argv,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                )
+            process = subprocess.Popen(
+                argv,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
             )
+            processes.append(process)
+            assert process.stdout is not None
+            stdout_queue: queue.Queue[bytes | None] = queue.Queue(
+                _MAX_PIPE_QUEUE_BLOCKS
+            )
+            stdout_queues.append(stdout_queue)
+            stdout_reader, stdout_state = _start_pipe_reader(
+                process.stdout, stop, output=stdout_queue
+            )
+            stdout_readers.append(stdout_reader)
+            stdout_states.append(stdout_state)
+            if process.stderr is not None:
+                stderr_reader, stderr_state = _start_pipe_reader(
+                    process.stderr, stop, retain_limit=_MAX_STDERR_BYTES
+                )
+                stderr_readers.append(stderr_reader)
+                stderr_states.append(stderr_state)
+
         deadline = time.monotonic() + timeout_sec
+        frame_bytes = channels * 4
         counts = [0, 0]
+        buffers = [bytearray(), bytearray()]
+        done = [False, False]
         mins: list[float] = []
         spectral_mins: list[float] = []
         level_maxes: list[float] = []
-        active = [True, True]
-        while any(active):
-            if cancel_flag is not None and Path(cancel_flag).exists():
-                return None
-            if time.monotonic() >= deadline:
-                return None
-            blocks: list[bytes] = []
-            for index, process in enumerate(processes):
-                if not active[index]:
-                    blocks.append(b"")
-                    continue
-                assert process.stdout is not None
-                block = process.stdout.read(chunk_bytes)
-                blocks.append(block)
-                if not block:
-                    active[index] = False
-                if len(block) % (channels * 4):
-                    return None
-                counts[index] += len(block) // (channels * 4)
-            if not blocks[0] or not blocks[1]:
-                continue
-            left = np.frombuffer(blocks[0], dtype="<f4").reshape(-1, channels)
-            right = np.frombuffer(blocks[1], dtype="<f4").reshape(-1, channels)
-            size = min(len(left), len(right))
-            if size == 0:
-                continue
-            left = left[:size]
-            right = right[:size]
+
+        def _measure(left: bytes, right: bytes) -> bool:
+            left_values = np.frombuffer(left, dtype="<f4").reshape(-1, channels)
+            right_values = np.frombuffer(right, dtype="<f4").reshape(-1, channels)
             for channel in range(channels):
-                x = left[:, channel].astype(np.float64, copy=False)
-                y = right[:, channel].astype(np.float64, copy=False)
+                x = left_values[:, channel].astype(np.float64, copy=False)
+                y = right_values[:, channel].astype(np.float64, copy=False)
                 rms_x = float(np.sqrt(np.mean(x * x)))
                 rms_y = float(np.sqrt(np.mean(y * y)))
                 if rms_x <= 1e-5:
                     if rms_y > 1e-5:
-                        return None
+                        return False
                     mins.append(1.0)
                     spectral_mins.append(1.0)
                     level_maxes.append(0.0)
                     continue
                 if rms_y <= 1e-5:
-                    return None
+                    return False
                 centered_x = x - np.mean(x)
                 centered_y = y - np.mean(y)
-                denominator = float(np.linalg.norm(centered_x) * np.linalg.norm(centered_y))
-                correlation = float(np.dot(centered_x, centered_y) / denominator) if denominator else 0.0
+                denominator = float(
+                    np.linalg.norm(centered_x) * np.linalg.norm(centered_y)
+                )
+                correlation = (
+                    float(np.dot(centered_x, centered_y) / denominator)
+                    if denominator
+                    else 0.0
+                )
                 spectrum_x = np.abs(np.fft.rfft(centered_x)) ** 2
                 spectrum_y = np.abs(np.fft.rfft(centered_y)) ** 2
-                spectrum_den = float(np.linalg.norm(spectrum_x) * np.linalg.norm(spectrum_y))
-                spectral = float(np.dot(spectrum_x, spectrum_y) / spectrum_den) if spectrum_den else 0.0
+                spectrum_den = float(
+                    np.linalg.norm(spectrum_x) * np.linalg.norm(spectrum_y)
+                )
+                spectral = (
+                    float(np.dot(spectrum_x, spectrum_y) / spectrum_den)
+                    if spectrum_den
+                    else 0.0
+                )
                 mins.append(correlation)
                 spectral_mins.append(spectral)
                 level_maxes.append(abs(rms_y - rms_x) / max(rms_x, 1e-5))
+            return True
+
+        def _compare_ready() -> bool:
+            while True:
+                pair_samples = min(
+                    len(buffers[0]) // frame_bytes,
+                    len(buffers[1]) // frame_bytes,
+                )
+                if pair_samples <= 0:
+                    return True
+                samples = min(pair_samples, chunk_samples)
+                size = samples * frame_bytes
+                left = bytes(buffers[0][:size])
+                right = bytes(buffers[1][:size])
+                del buffers[0][:size]
+                del buffers[1][:size]
+                counts[0] += samples
+                counts[1] += samples
+                if not _measure(left, right):
+                    return False
+
+        while not all(done):
+            if cancel_flag is not None and Path(cancel_flag).exists():
+                return None
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return None
+            if not _compare_ready():
+                return None
+            progressed = False
+            for index, stdout_queue in enumerate(stdout_queues):
+                if done[index] or len(buffers[index]) >= chunk_bytes * 4:
+                    continue
+                try:
+                    block = stdout_queue.get_nowait()
+                except queue.Empty:
+                    continue
+                progressed = True
+                if block is None:
+                    done[index] = True
+                else:
+                    buffers[index].extend(block)
+            if not _compare_ready():
+                return None
+            for index in (0, 1):
+                other = 1 - index
+                if not done[other] or len(buffers[other]) >= frame_bytes:
+                    continue
+                extra = len(buffers[index]) - (len(buffers[index]) % frame_bytes)
+                if extra:
+                    del buffers[index][:extra]
+                    counts[index] += extra // frame_bytes
+            if not progressed:
+                time.sleep(min(0.01, remaining))
+
+        if not _compare_ready():
+            return None
+        if any(len(buffer) % frame_bytes for buffer in buffers):
+            return None
+        for index, buffer in enumerate(buffers):
+            counts[index] += len(buffer) // frame_bytes
+        for reader in stdout_readers + stderr_readers:
+            reader.join(timeout=_PROCESS_REAP_GRACE_SEC)
+            if reader.is_alive():
+                return None
+        for state in stdout_states + stderr_states:
+            if state["error"] is not None:
+                return None
         for process in processes:
-            if process.poll() is None:
-                process.wait(timeout=1)
-            if process.returncode != 0:
+            if process.wait(timeout=_PROCESS_REAP_GRACE_SEC) != 0:
                 return None
         if not mins:
             return None
@@ -745,18 +942,16 @@ def probe_audio_content(
     except (OSError, ValueError, subprocess.SubprocessError):
         return None
     finally:
+        stop.set()
         for process in processes:
-            if process.poll() is None:
-                process.kill()
-            try:
-                process.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait()
+            _reap_process(process)
+        for reader in stdout_readers + stderr_readers:
+            reader.join(timeout=_PROCESS_REAP_GRACE_SEC)
+        for process in processes:
             if process.stdout is not None:
-                process.stdout.close()
+                _close_pipe(process.stdout)
             if process.stderr is not None:
-                process.stderr.close()
+                _close_pipe(process.stderr)
 
 
 def _probe_av_bounds(

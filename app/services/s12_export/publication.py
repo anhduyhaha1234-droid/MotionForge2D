@@ -19,9 +19,11 @@ The run reaches ``completed`` ONLY through
 5. **Validation** — the candidate scores ``PASS`` against server-owned
    source-locked expectations (T04A C2 contract; ``FAIL`` /
    ``NOT_MEASURED`` fails closed and lands the run ``failed``).
-6. **Atomicity** — the run transitions ``running -> verifying ->
-   completed`` under fence + revision CAS in the same transaction as
-   the atomic rename (one crash-safe immutable publication).
+6. **Commit boundary** — the filesystem rename, sidecar, and publication
+   receipt are durable file operations; the run transitions
+   ``running -> verifying -> completed`` under fence + revision CAS in a
+   separate SQLite transaction.  The receipt makes that file/DB boundary
+   recoverable without unchecked overwrite.
 7. **Completed replay by bytes** — a replayed publication re-verifies
    the existing public artifact (sha256 vs the server-owned expected
    hash when asserted; never a bare status shortcut) before returning
@@ -31,6 +33,7 @@ The run reaches ``completed`` ONLY through
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 from pathlib import Path
 from typing import Any
@@ -43,7 +46,9 @@ __all__ = [
 _CHUNK_DIR = "chunk_dir"
 _SCRATCH_DIR = "scratch_dir"
 _OUTPUT_PATH = "output_path"
+_CANDIDATE_PATH = "candidate_path"
 _HASH_CHUNK = 1024 * 1024
+_RECEIPT_SUFFIX = ".publication.json"
 
 
 class PublicationError(ValueError):
@@ -66,12 +71,25 @@ def _sidecar_path(final: Path) -> Path:
     return final.with_name(f"{final.name}.sha256")
 
 
+def _publication_receipt_path(final: Path) -> Path:
+    """Receipt binding an output's bytes to one export attempt."""
+    return final.with_name(f"{final.name}{_RECEIPT_SUFFIX}")
+
+
 def _write_sidecar(final: Path, sha: str) -> None:
     """Write the byte-identity sidecar atomically next to the artifact."""
     sidecar = _sidecar_path(final)
     tmp = sidecar.with_name(f"{sidecar.name}.tmp")
     tmp.write_text(sha.strip().lower() + "\n", encoding="ascii")
     os.replace(tmp, sidecar)
+
+
+def _write_publication_receipt(final: Path, payload: dict[str, Any]) -> None:
+    """Persist ownership/content/validation identity before the DB commit."""
+    receipt = _publication_receipt_path(final)
+    tmp = receipt.with_name(f"{receipt.name}.{payload['fence_token']}.tmp")
+    tmp.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(tmp, receipt)
 
 
 def publish_export_run(
@@ -94,8 +112,10 @@ def publish_export_run(
     The candidate is the file the T03B runner assembled at
     ``<scratch>/candidate_final.mp4`` — always PRIVATE, never the
     public output path.  On every gate passing, the candidate becomes
-    the public output through one atomic rename and the run transitions
-    to ``completed`` inside the same transaction.
+    the public output through one atomic rename.  SQLite commit and
+    filesystem publication are separate operations; a receipt binds the
+    bytes and validation identity so a fresh owner can reconcile an
+    uncertain acknowledgement.
     """
     from app.persistence.s12_export import (  # noqa: PLC0415
         FencedWorkerError,
@@ -121,72 +141,191 @@ def publish_export_run(
             f"run {run_id} in status {run.status!r}; cannot publish"
         )
 
-    candidate = _candidate_path(manifest)
-    if candidate is None or not candidate.is_file():
-        _cleanup_publication_scratch(manifest)
-        raise PublicationError(
-            f"no private candidate for run {run_id}; cannot publish"
-        )
     final = Path(str(manifest[_OUTPUT_PATH]))
     if final.name.lower().endswith(".partial"):
-        _cleanup_publication_scratch(manifest)
+        _cleanup_publication_scratch(
+            manifest,
+            session=session,
+            run_id=run_id,
+            worker_id=worker_id,
+            fence_token=fence_token,
+        )
         raise PublicationError("public output must not carry the .partial suffix")
     if final.is_file():
-        _cleanup_publication_scratch(manifest)
+        recovered = _recover_pending_publication(
+            session,
+            repo,
+            run,
+            run_id=run_id,
+            workspace_id=workspace_id,
+            project_id=project_id,
+            worker_id=worker_id,
+            fence_token=fence_token,
+            manifest=manifest,
+            final=final,
+        )
+        if recovered is not None:
+            _cleanup_publication_scratch(
+                manifest,
+                session=session,
+                run_id=run_id,
+                worker_id=worker_id,
+                fence_token=fence_token,
+            )
+            return recovered
+        _cleanup_publication_scratch(
+            manifest,
+            session=session,
+            run_id=run_id,
+            worker_id=worker_id,
+            fence_token=fence_token,
+        )
         raise PublicationError(
             f"completed output exists — refusing overwrite: {final}"
         )
+    candidate = _candidate_path(manifest)
+    if candidate is None or not candidate.is_file():
+        _cleanup_publication_scratch(
+            manifest,
+            session=session,
+            run_id=run_id,
+            worker_id=worker_id,
+            fence_token=fence_token,
+        )
+        raise PublicationError(
+            f"no private candidate for run {run_id}; cannot publish"
+        )
     if candidate.resolve() == final.resolve():
-        _cleanup_publication_scratch(manifest)
+        _cleanup_publication_scratch(
+            manifest,
+            session=session,
+            run_id=run_id,
+            worker_id=worker_id,
+            fence_token=fence_token,
+        )
         raise PublicationError("candidate must be private, never the public output")
 
     try:
         _require_ready(session, workspace_id=workspace_id, project_id=project_id)
         _require_fence(repo, run_id, worker_id, fence_token)
     except BaseException:
-        _cleanup_publication_scratch(manifest)
+        _cleanup_publication_scratch(
+            manifest,
+            session=session,
+            run_id=run_id,
+            worker_id=worker_id,
+            fence_token=fence_token,
+        )
         raise
 
     try:
         expectation = _expectation_for(run, manifest, candidate_sha=_sha256_file(candidate))
         verdict = validate(candidate, expectation)
     except BaseException:
-        _cleanup_publication_scratch(manifest)
+        _cleanup_publication_scratch(
+            manifest,
+            session=session,
+            run_id=run_id,
+            worker_id=worker_id,
+            fence_token=fence_token,
+        )
         raise
     if verdict.verdict != "PASS":
         _fail_run(repo, run_id, worker_id, fence_token, run.revision)
         session.commit()
-        _cleanup_publication_scratch(manifest)
+        _cleanup_publication_scratch(
+            manifest,
+            session=session,
+            run_id=run_id,
+            worker_id=worker_id,
+            fence_token=fence_token,
+        )
         failing = [p.name for p in verdict.probes if p.verdict != "PASS"]
         raise PublicationError(
             f"export validation {verdict.verdict} on {failing}; run failed (retryable)"
         )
 
-    # ONE crash-safe immutable publication: atomic rename of the validated
-    # private candidate onto the public path, then the CAS transitions in
-    # the same transaction.
+    # ONE immutable publication: atomically rename the validated private
+    # candidate onto the public path, write its sidecar and receipt, then
+    # commit the fenced SQLite state.  Filesystem and SQLite are a recovery
+    # boundary, not one transaction; reconciliation never overwrites bytes.
     try:
         # Re-read authority immediately before the irreversible filesystem
         # mutation; a stale worker must not publish after validation.
         _require_fence(repo, run_id, worker_id, fence_token)
         os.replace(candidate, final)
     except OSError as err:
-        _cleanup_publication_scratch(manifest)
+        _cleanup_publication_scratch(
+            manifest,
+            session=session,
+            run_id=run_id,
+            worker_id=worker_id,
+            fence_token=fence_token,
+        )
         _fail_run(repo, run_id, worker_id, fence_token, run.revision)
         session.commit()
         raise PublicationError(f"publication rename failed: {err}") from err
     except FencedWorkerError as err:
-        _cleanup_publication_scratch(manifest)
+        _cleanup_publication_scratch(
+            manifest,
+            session=session,
+            run_id=run_id,
+            worker_id=worker_id,
+            fence_token=fence_token,
+        )
         raise PublicationError(f"publication fence lost before rename: {err}") from err
     actual_sha = _sha256_file(final)
     try:
         _write_sidecar(final, actual_sha)
     except OSError as err:
-        _remove_unpublished_output(final)
-        _cleanup_publication_scratch(manifest)
+        if _owner_is_live(repo, run_id, worker_id, fence_token):
+            _remove_unpublished_output(final)
+        _cleanup_publication_scratch(
+            manifest,
+            session=session,
+            run_id=run_id,
+            worker_id=worker_id,
+            fence_token=fence_token,
+        )
         _fail_run(repo, run_id, worker_id, fence_token, run.revision)
         session.commit()
         raise PublicationError(f"publication sidecar failed: {err}") from err
+    try:
+        _write_publication_receipt(
+            final,
+            {
+                "version": 1,
+                "run_id": run_id,
+                "workspace_id": workspace_id,
+                "project_id": project_id,
+                "video_item_id": run.video_item_id,
+                "attempt": int(run.attempt),
+                "fence_token": fence_token,
+                "checkpoint_hash": run.checkpoint_hash,
+                "manifest_hash": run.manifest_hash,
+                "plan_hash": run.plan_hash,
+                "profile_id": run.profile_id,
+                "artifact_sha256": actual_sha,
+                "candidate_sha256": actual_sha,
+                "validation_verdict": verdict.verdict,
+                "validation_probes": [
+                    p.name for p in verdict.probes if p.verdict == "PASS"
+                ],
+            },
+        )
+    except OSError as err:
+        if _owner_is_live(repo, run_id, worker_id, fence_token):
+            _remove_unpublished_output(final)
+        _cleanup_publication_scratch(
+            manifest,
+            session=session,
+            run_id=run_id,
+            worker_id=worker_id,
+            fence_token=fence_token,
+        )
+        _fail_run(repo, run_id, worker_id, fence_token, run.revision)
+        session.commit()
+        raise PublicationError(f"publication receipt failed: {err}") from err
     try:
         rec = repo.transition_run(
             run_id,
@@ -207,8 +346,15 @@ def publish_export_run(
         # report completed: the artifact stays, the run is failed/retryable
         # and a later winner converges by bytes.
         session.rollback()
-        _remove_unpublished_output(final)
-        _cleanup_publication_scratch(manifest)
+        if _owner_is_live(repo, run_id, worker_id, fence_token):
+            _remove_unpublished_output(final)
+        _cleanup_publication_scratch(
+            manifest,
+            session=session,
+            run_id=run_id,
+            worker_id=worker_id,
+            fence_token=fence_token,
+        )
         raise PublicationError(
             f"publication transition lost after rename: {err} (run {run_id})"
         ) from err
@@ -220,6 +366,107 @@ def publish_export_run(
         "output_path": str(final),
         "artifact_sha256": actual_sha,
         "verdict": verdict.verdict,
+        "probes": [
+            {"name": p.name, "verdict": p.verdict, "detail": p.detail}
+            for p in verdict.probes
+        ],
+    }
+
+
+def _recover_pending_publication(
+    session: Any,
+    repo: Any,
+    run: Any,
+    *,
+    run_id: str,
+    workspace_id: str,
+    project_id: str,
+    worker_id: str,
+    fence_token: str,
+    manifest: dict[str, Any],
+    final: Path,
+) -> dict[str, Any] | None:
+    """Reconcile a file/DB boundary after an uncertain publication commit.
+
+    The receipt is only a locator.  Adoption still requires the current live
+    fence, matching run lineage, matching sidecar/file bytes, current
+    readiness, and a fresh source-locked PASS.  A completed winner without
+    this proof is preserved and never overwritten or deleted.
+    """
+    receipt_path = _publication_receipt_path(final)
+    try:
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        if not isinstance(receipt, dict):
+            return None
+        actual_sha = _sha256_file(final)
+        stored_sha = _sidecar_path(final).read_text(encoding="ascii").strip().lower()
+    except (OSError, ValueError, UnicodeError, json.JSONDecodeError):
+        return None
+    if stored_sha != actual_sha:
+        return None
+    if any(
+        receipt.get(key) != expected
+        for key, expected in (
+            ("version", 1),
+            ("run_id", run_id),
+            ("workspace_id", workspace_id),
+            ("project_id", project_id),
+            ("video_item_id", run.video_item_id),
+            ("checkpoint_hash", run.checkpoint_hash),
+            ("manifest_hash", run.manifest_hash),
+            ("plan_hash", run.plan_hash),
+            ("profile_id", run.profile_id),
+            ("artifact_sha256", actual_sha),
+            ("candidate_sha256", actual_sha),
+            ("validation_verdict", "PASS"),
+        )
+    ):
+        return None
+    try:
+        if int(receipt.get("attempt")) != int(run.attempt):
+            return None
+    except (TypeError, ValueError):
+        return None
+    expected_sha = manifest.get("expected_sha256") or manifest.get("authority_sha256")
+    if expected_sha and str(expected_sha).lower() != actual_sha:
+        return None
+
+    _require_ready(session, workspace_id=workspace_id, project_id=project_id)
+    _require_fence(repo, run_id, worker_id, fence_token)
+    from app.services.s12_export.validation import validate  # noqa: PLC0415
+
+    expectation = _expectation_for(run, manifest, candidate_sha=actual_sha)
+    verdict = validate(final, expectation)
+    if verdict.verdict != "PASS":
+        return None
+    if run.status == "running":
+        verifying = repo.transition_run(
+            run_id,
+            "verifying",
+            actor=worker_id,
+            expected_revision=run.revision,
+            fence_token=fence_token,
+        )
+    elif run.status == "verifying":
+        verifying = run
+    else:
+        return None
+    completed = repo.transition_run(
+        run_id,
+        "completed",
+        actor=worker_id,
+        expected_revision=verifying.revision,
+        fence_token=fence_token,
+    )
+    session.commit()
+    return {
+        "run_id": run_id,
+        "status": completed.status,
+        "revision": completed.revision,
+        "output_path": str(final),
+        "artifact_sha256": actual_sha,
+        "verdict": verdict.verdict,
+        "recovered": True,
         "probes": [
             {"name": p.name, "verdict": p.verdict, "detail": p.detail}
             for p in verdict.probes
@@ -273,16 +520,40 @@ def _candidate_path(manifest: dict[str, Any]) -> Path | None:
     scratch = Path(str(manifest.get(_SCRATCH_DIR, "")))
     if not scratch.is_dir():
         return None
-    return scratch / "candidate_final.mp4"
+    explicit = manifest.get(_CANDIDATE_PATH)
+    candidate = Path(str(explicit)) if explicit else scratch / "candidate_final.mp4"
+    try:
+        if candidate.resolve().parent != scratch.resolve():
+            return None
+    except OSError:
+        return None
+    return candidate
 
 
-def _cleanup_publication_scratch(manifest: dict[str, Any]) -> None:
+def _cleanup_publication_scratch(
+    manifest: dict[str, Any],
+    *,
+    session: Any | None = None,
+    run_id: str | None = None,
+    worker_id: str | None = None,
+    fence_token: str | None = None,
+) -> None:
     """Clean private VAL scratch without touching an existing public file."""
+    from app.persistence.s12_export import S12ExportRepository  # noqa: PLC0415
     from app.services.s12_export.runner import cleanup_owned_export_artifacts
 
     cleanup_owned_export_artifacts(
         scratch_dir=manifest.get(_SCRATCH_DIR),
         chunk_dir=manifest.get(_CHUNK_DIR),
+        candidate_path=manifest.get(_CANDIDATE_PATH),
+        repository=(
+            S12ExportRepository(session)
+            if session is not None
+            else None
+        ),
+        owner_run_id=run_id,
+        owner_worker_id=worker_id,
+        owner_fence_token=fence_token,
     )
 
 
@@ -328,16 +599,37 @@ def _check_run_readiness(session: Any, **kwargs: Any) -> str:
     return str(check_run_readiness(session, **kwargs).status)  # type: ignore[arg-type]
 
 
-def _require_fence(repo: Any, run_id: str, worker_id: str, fence_token: str) -> None:
-    from app.persistence.s12_export import FencedWorkerError  # noqa: PLC0415
+def _owner_is_live(repo: Any, run_id: str, worker_id: str, fence_token: str) -> bool:
+    """Check DB ownership at cleanup time, bypassing stale ORM snapshots."""
+    from datetime import UTC, datetime
 
     try:
-        lease = repo.get_lease(run_id)
+        return bool(
+            repo._lease_live_sql(  # noqa: SLF001
+                run_id,
+                worker_id,
+                fence_token,
+                now=datetime.now(UTC),
+            )
+        )
+    except Exception:
+        return False
+
+
+def _require_fence(repo: Any, run_id: str, worker_id: str, fence_token: str) -> None:
+    from app.persistence.s12_export import FencedWorkerError  # noqa: PLC0415
+    from datetime import UTC, datetime
+
+    try:
+        live = repo._lease_live_sql(  # noqa: SLF001
+            run_id,
+            worker_id,
+            fence_token,
+            now=datetime.now(UTC),
+        )
     except Exception as err:
         raise PublicationError(f"no live lease for run {run_id}: {err}") from err
-    if lease is None:
-        raise PublicationError(f"no live lease for run {run_id}")
-    if lease.worker_id != worker_id or lease.fence_token != fence_token:
+    if not live:
         raise FencedWorkerError(
             f"fence mismatch for run {run_id}", run_id=run_id
         )
@@ -580,6 +872,7 @@ def _remove_unpublished_output(final: Path) -> None:
     for path in (
         final,
         sidecar,
+        _publication_receipt_path(final),
         sidecar.with_name(f"{sidecar.name}.tmp"),
     ):
         try:
