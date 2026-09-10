@@ -43,6 +43,35 @@ def _response_record(response: Any) -> dict[str, Any]:
     return {"status_code": response.status_code, "body": body}
 
 
+def _operation_shape(paths: dict[str, Any], path: str, method: str) -> dict[str, Any] | None:
+    """Keep a concise, exact OpenAPI route envelope in the evidence."""
+    operation = (paths.get(path) or {}).get(method.lower())
+    if not isinstance(operation, dict):
+        return None
+    return {
+        "method": method.upper(),
+        "path": path,
+        "operation_id": operation.get("operationId"),
+        "summary": operation.get("summary"),
+        "parameters": [
+            {
+                "in": item.get("in"),
+                "name": item.get("name"),
+                "required": item.get("required", False),
+            }
+            for item in operation.get("parameters", [])
+            if isinstance(item, dict)
+        ],
+        "request_body_schema": (
+            (operation.get("requestBody") or {})
+            .get("content", {})
+            .get("application/json", {})
+            .get("schema")
+        ),
+        "response_statuses": sorted((operation.get("responses") or {}).keys()),
+    }
+
+
 def run_probe(work_root: Path | None = None) -> dict[str, Any]:
     """Run the isolated public API probe and return raw structured results."""
     temp_context: Any
@@ -160,6 +189,33 @@ def run_probe(work_root: Path | None = None) -> dict[str, Any]:
                         )
                     )
                 },
+            }
+            graph_targets = [
+                ("POST", "/api/v2/projects/"),
+                ("POST", "/api/v2/projects/{project_id}/videos"),
+                ("GET", "/api/v2/projects/{project_id}/export/context"),
+                ("GET", "/api/v2/reskin-configs"),
+                ("POST", "/api/v2/reskin-configs"),
+                ("GET", "/api/v2/object-intelligence/roles"),
+                ("POST", "/api/v2/object-intelligence/roles"),
+                ("GET", "/api/v2/project-cast"),
+                ("GET", "/api/v2/s09-approvals"),
+                ("POST", "/api/v2/s09-approvals/reapprove"),
+                ("GET", "/api/v2/s09-approvals/{checkpoint_id}/full-apply-authority"),
+                ("POST", "/api/v2/projects/{project_id}/full-apply"),
+                ("POST", "/s12-exports/submit"),
+                ("POST", "/api/projects"),
+                ("POST", "/api/projects/{project_id}/video"),
+                ("POST", "/api/projects/{project_id}/analyze"),
+                ("GET", "/api/projects/{project_id}/analyze"),
+            ]
+            evidence["steps"]["public_chain_openapi"] = {
+                "response": _response_record(openapi),
+                "operations": [
+                    shape
+                    for method, path in graph_targets
+                    if (shape := _operation_shape(paths, path, method)) is not None
+                ],
             }
 
             config_attempt = client.post(
@@ -305,6 +361,46 @@ def run_probe(work_root: Path | None = None) -> dict[str, Any]:
                             evidence["steps"]["legacy_id_v2_export_context"] = _response_record(
                                 legacy_v2_context
                             )
+                            legacy_video_id = final_state["video_item_id"]
+                            scoped_reads: dict[str, Any] = {}
+                            scoped_reads["reskin_configs"] = _response_record(
+                                client.get(
+                                    "/api/v2/reskin-configs",
+                                    params={"project_id": legacy_project_id},
+                                )
+                            )
+                            scoped_reads["object_roles"] = _response_record(
+                                client.get(
+                                    "/api/v2/object-intelligence/roles",
+                                    params={
+                                        "workspace_id": "default",
+                                        "video_item_id": legacy_video_id,
+                                    },
+                                )
+                            )
+                            scoped_reads["project_cast"] = _response_record(
+                                client.get(
+                                    "/api/v2/project-cast",
+                                    params={"project_id": legacy_project_id},
+                                )
+                            )
+                            scoped_reads["s09_approvals"] = _response_record(
+                                client.get(
+                                    "/api/v2/s09-approvals",
+                                    params={
+                                        "workspace_id": "default",
+                                        "project_id": legacy_project_id,
+                                    },
+                                )
+                            )
+                            scoped_reads["project_readiness"] = _response_record(
+                                client.get(f"/api/v2/projects/{legacy_project_id}/readiness")
+                            )
+                            evidence["steps"]["legacy_current_authority_reads"] = {
+                                "project_id": legacy_project_id,
+                                "video_item_id": legacy_video_id,
+                                "requests": scoped_reads,
+                            }
                         evidence["steps"]["legacy_analyze_chain_read_mutation_counts"] = counts()
 
             # These are the next supported public authority steps. They are

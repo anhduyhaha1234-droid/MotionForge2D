@@ -2,12 +2,15 @@
 
 Runs against real migrated temp DBs (never MAIN, never production).
 Covers contract §6 lifecycle: enqueue (no render in request), status
-shape, atomic cancel, retry convergence (no duplicate successor),
-reconciler expiry release vs live-lease skip, stale-identity fail-closed.
+shape, atomic cancel, retry convergence (one usable successor), reconciler
+expiry release vs live-lease skip, stale-identity fail-closed.  Retry setup
+is explicitly FIXTURE_ONLY mechanism coverage over an isolated migrated DB;
+it is not normal-product export evidence.
 """
 
 from __future__ import annotations
 
+import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -21,16 +24,19 @@ from app.api.routes import s12_export as route
 from app.persistence import create_engine_for_path, create_session_factory
 from app.persistence.jobs import JobRepository
 from app.persistence.s12_export import S12ExportRepository
-from app.workflow.s12_export_jobs import S12ExportSubmitError
 from app.persistence.structural_lock import StructuralLockRepository
 from app.workflow.job_service import JobService
 from app.workflow.s12_export_jobs import (
     S12_EXPORT_JOB_TYPE,
+    S12ExportSubmitError,
     reconcile_export_jobs,
     submit_export_job,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT / "tests" / "s12" / "s12-t01"))
+from test_preflight_contract import _seed_s10_authority  # noqa: E402
+
 WS = "ws-s12t03c"
 OTHER_WS = "ws-s12t03c-other"
 
@@ -115,7 +121,35 @@ def env(tmp_path: Path):  # type: ignore[no-untyped-def]
             m1, _ = lock.create_manifest(WS, f"p-{WS}", f"v-{WS}", "gen1", _manifest_doc())
             s2.commit()
             seed_manifest = m1.id
-    svc = JobService(factory, managed_root=tmp_path / "artifacts")
+    # FIXTURE_ONLY: use the current T01 authority factory so retry exercises
+    # server-current pins; this isolated mechanism fixture is not product
+    # readiness or normal-export evidence.
+    managed = tmp_path / "artifacts"
+    with factory() as authority_session:
+        auth = _seed_s10_authority(
+            authority_session,
+            ws=WS,
+            pid=f"p-{WS}",
+            vid=f"v-{WS}",
+            ckpt={
+                "checkpoint_id": "ac-a",
+                "checkpoint_hash": CHK_HASH,
+                "checkpoint_revision": 1,
+            },
+            frame_count=100,
+            fps_num=30,
+            fps_den=1,
+        )
+    source = managed / "apply" / f"{auth['artifact_id']}.mp4"
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_bytes(b"FIXTURE_ONLY_SOURCE_MEDIA")
+    with factory() as authority_session:
+        authority_session.execute(
+            text("UPDATE artifact SET relative_path=:rel WHERE id=:aid"),
+            {"rel": str(source.relative_to(managed)).replace("\\", "/"), "aid": auth["artifact_id"]},
+        )
+        authority_session.commit()
+    svc = JobService(factory, managed_root=managed)
     dirs = {
         "chunk": str(tmp_path / "chunks"),
         "scratch": str(tmp_path / "scratch"),
@@ -159,6 +193,26 @@ def _submit_kwargs(factory: Any, manifest_id: str, dirs: dict[str, str], **over:
     }
     kw.update(over)
     return kw
+
+
+def _current_s10_pins(factory: Any) -> dict[str, Any]:
+    """Read the server-current Full Apply pins seeded by the fixture factory."""
+    from app.persistence.models import S10FullApplyRun
+
+    with factory() as s:
+        row = (
+            s.query(S10FullApplyRun)
+            .filter_by(workspace_id=WS, project_id=f"p-{WS}", video_item_id=f"v-{WS}")
+            .filter_by(status="completed")
+            .order_by(S10FullApplyRun.created_at.desc(), S10FullApplyRun.id.desc())
+            .first()
+        )
+        assert row is not None
+        return {
+            "plan_id": str(row.plan_id),
+            "plan_hash": str(row.plan_hash),
+            "frame_count": int(row.frame_count),
+        }
 
 
 def test_submit_pins_run_and_enqueues_job(env) -> None:  # type: ignore[no-untyped-def]
@@ -230,7 +284,21 @@ def test_cancel_transitions_run_and_job(env, monkeypatch: pytest.MonkeyPatch) ->
 
 def test_retry_after_cancel_converges(env, monkeypatch: pytest.MonkeyPatch) -> None:  # type: ignore[no-untyped-def]
     factory, svc, manifest_id, dirs = env
-    run, _job, _ = submit_export_job(svc, **_submit_kwargs(factory, manifest_id, dirs))
+    managed = Path(dirs["output"]).parent / "artifacts"
+    monkeypatch.setattr(route, "get_managed_root", lambda: managed)
+    # FIXTURE_ONLY: a predecessor is given a fixture-scoped natural key so the
+    # real retry route must create a usable successor; repeat retry converges
+    # on that successor by the supported retry idempotency key.
+    run, _job, _ = submit_export_job(
+        svc,
+        **_submit_kwargs(
+            factory,
+            manifest_id,
+            dirs,
+            **_current_s10_pins(factory),
+            natural_key=f"FIXTURE_ONLY:cancelled-predecessor:{manifest_id}",
+        ),
+    )
     monkeypatch.setattr(route, "get_job_service", lambda: svc)
     with factory() as s:
         route.cancel_export(run.id, s, workspace_id=WS, project_id=None)
@@ -238,24 +306,32 @@ def test_retry_after_cancel_converges(env, monkeypatch: pytest.MonkeyPatch) -> N
     with factory() as s:
         first = route.retry_export(run.id, s, workspace_id=WS, project_id=None)
         s.commit()
-    # Same lineage pins hit the frozen T03A identity unique backstop and
-    # converge onto the cancelled run (created=False) — never a duplicate
-    # successor.  A genuine new attempt requires new pins (new plan).
-    assert first["run_id"] == run.id
-    assert first["status"] == "cancelled"
-    assert first["created"] is False
+    assert first["run_id"] != run.id
+    assert first["predecessor_run_id"] == run.id
+    assert first["status"] == "pending"
+    assert first["created"] is True
+    assert first["job_id"]
     with factory() as s:
         second = route.retry_export(run.id, s, workspace_id=WS, project_id=None)
         s.rollback()
-    assert second["run_id"] == run.id
+    assert second["run_id"] == first["run_id"]
+    assert second["predecessor_run_id"] == run.id
+    assert second["created"] is False
     with factory() as s:
+        from app.persistence.models import S12ExportRun
+
         runs = [
             r
-            for r in s.query(__import__("app.persistence.models", fromlist=["S12ExportRun"]).S12ExportRun)
+            for r in s.query(S12ExportRun)
             .filter_by(workspace_id=WS)
             .all()
         ]
-    assert len(runs) == 1
+        jobs = [j for j in JobRepository(s).list_jobs(WS, limit=1000) if j.job_type == S12_EXPORT_JOB_TYPE]
+    assert len(runs) == 2
+    assert {r.id for r in runs} == {run.id, first["run_id"]}
+    assert sum(r.status == "cancelled" for r in runs) == 1
+    assert sum(r.status == "pending" for r in runs) == 1
+    assert len(jobs) == 2
 
 
 def test_retry_active_predecessor_fails_closed(env, monkeypatch: pytest.MonkeyPatch) -> None:  # type: ignore[no-untyped-def]
