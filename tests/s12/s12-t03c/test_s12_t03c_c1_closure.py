@@ -15,7 +15,9 @@ from __future__ import annotations
 
 import json
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Barrier
 from types import SimpleNamespace
 from typing import Any
 
@@ -27,7 +29,7 @@ from sqlalchemy import text
 from app.api import routes  # noqa: F401  # mounted-route sanity
 from app.api.deps import SessionDep  # noqa: F401  # signature sanity
 from app.api.routes import s12_export as route
-from app.persistence import create_engine_for_path, create_session_factory
+from app.persistence import DEFAULT_WORKSPACE_ID, create_engine_for_path, create_session_factory
 from app.persistence.jobs import JobRepository
 from app.persistence.s12_export import S12ExportRepository
 from app.persistence.structural_lock import StructuralLockRepository
@@ -42,8 +44,6 @@ from app.workflow.s12_export_jobs import (
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "tests" / "s12" / "s12-t01"))
 from test_preflight_contract import _seed_s10_authority  # noqa: E402
-
-from app.persistence import DEFAULT_WORKSPACE_ID
 
 WS = DEFAULT_WORKSPACE_ID
 FPS = 10
@@ -130,7 +130,9 @@ def env(tmp_path: Path):  # type: ignore[no-untyped-def]
             s2.commit()
             manifest_id = m1.id
     svc = JobService(factory, managed_root=managed)
-    # S10 Full Apply authority + a REAL source artifact file under the root.
+    # FIXTURE_ONLY: current S10 Full Apply authority factory + a source
+    # artifact under the isolated managed root. This is mechanism coverage,
+    # not normal-product readiness or export evidence.
     with factory() as s:
         auth = _seed_s10_authority(
             s,
@@ -186,6 +188,22 @@ def _real_manifest_hash(factory: Any, manifest_id: str) -> str:
         return str(row.manifest_hash)
 
 
+def _current_s10_pins(factory: Any, auth: dict[str, str]) -> dict[str, Any]:
+    """Read the exact pins returned by the current fixture authority row."""
+    from app.persistence.models import S10FullApplyRun
+
+    with factory() as s:
+        row = s.get(S10FullApplyRun, auth["run_id"])
+        assert row is not None
+        return {
+            "plan_id": str(row.plan_id),
+            "plan_hash": str(row.plan_hash),
+            "frame_count": int(row.frame_count),
+            "fps_num": int(row.fps_num or FPS),
+            "fps_den": int(row.fps_den or 1),
+        }
+
+
 def _ready(monkeypatch: pytest.MonkeyPatch) -> None:
     """Boundary: frozen QC readiness aggregate (Decision F, T03G lane).
 
@@ -210,6 +228,7 @@ def _authority_body(factory: Any, auth: dict[str, str], manifest_id: str, **over
     with factory() as s:
         row = s.get(StructuralLockManifest, manifest_id)
         real_hash = str(row.manifest_hash)
+    current = _current_s10_pins(factory, auth)
     body: dict[str, Any] = {
         "project_id": f"p-{WS}",
         "video_item_id": f"v-{WS}",
@@ -220,8 +239,9 @@ def _authority_body(factory: Any, auth: dict[str, str], manifest_id: str, **over
         "manifest_hash": real_hash,
         "manifest_generation": "gen1",
         "profile_id": "master-4k-h264",
-        "plan_id": PLAN_ID,
-        "plan_hash": PLAN_HASH,
+        "plan_id": current["plan_id"],
+        "plan_hash": current["plan_hash"],
+        "frame_count": current["frame_count"],
         "chunk_config": {"overlap": 1, "max_frames": 4},
     }
     body.update(over)
@@ -450,8 +470,9 @@ def test_c14_part_crash_then_restart_reports_resumable(env) -> None:  # type: ig
 
 
 def test_c15_retry_converges_no_duplicate_successor(env) -> None:  # type: ignore[no-untyped-def]
-    """Cancel → retry converges on the lineage; ≤1 successor, states agree."""
+    """FIXTURE_ONLY: cancel → two live retries yield one usable successor."""
     factory, svc, manifest_id, auth, dirs, managed = env
+    current = _current_s10_pins(factory, auth)
     kw = {
         "workspace_id": WS,
         "project_id": f"p-{WS}",
@@ -463,9 +484,9 @@ def test_c15_retry_converges_no_duplicate_successor(env) -> None:  # type: ignor
         "manifest_hash": _real_manifest_hash(factory, manifest_id),
         "manifest_generation": "gen1",
         "profile_id": "master-4k-h264",
-        "plan_id": PLAN_ID,
-        "plan_hash": PLAN_HASH,
-        "frame_count": FRAMES,
+        "plan_id": current["plan_id"],
+        "plan_hash": current["plan_hash"],
+        "frame_count": current["frame_count"],
         "chunk_config": {"overlap": 1, "max_frames": 4},
         "source_path": str(managed / "apply" / "x.mp4"),
         "fps": float(FPS),
@@ -475,6 +496,9 @@ def test_c15_retry_converges_no_duplicate_successor(env) -> None:  # type: ignor
         "scratch_dir": dirs["scratch"],
         "output_path": dirs["output"],
         "expected_sha256": "a" * 64,
+        # FIXTURE_ONLY predecessor identity: the public retry route computes
+        # the canonical successor identity, so it cannot replay cancellation.
+        "natural_key": f"FIXTURE_ONLY:cancelled-predecessor:{manifest_id}",
     }
     run, job, _ = submit_export_job(svc, **kw)
     with factory() as s:
@@ -487,6 +511,7 @@ def test_c15_retry_converges_no_duplicate_successor(env) -> None:  # type: ignor
     # Two callers cancel concurrently-shaped path: first wins, second 409.
     monkeypatch = pytest.MonkeyPatch()
     monkeypatch.setattr(route, "get_job_service", lambda: svc)
+    monkeypatch.setattr(route, "get_managed_root", lambda: managed)
     with factory() as s:
         out = route.cancel_export(run.id, s, workspace_id=WS, project_id=None)
         s.commit()
@@ -498,13 +523,35 @@ def test_c15_retry_converges_no_duplicate_successor(env) -> None:  # type: ignor
             route.cancel_export(run.id, s, workspace_id=WS, project_id=None)
         s.rollback()
     assert exc.value.status_code == 409
-    # Retry: converges (created False, same run) — no successor rows.
+    # Two live request sessions contend on the same retry idempotency key.
+    barrier = Barrier(2)
+
+    def _retry_from_live_caller() -> dict[str, Any]:
+        with factory() as s:
+            barrier.wait(timeout=5)
+            result = route.retry_export(run.id, s, workspace_id=WS, project_id=None)
+            s.commit()
+            return result
+
+    with ThreadPoolExecutor(max_workers=2, thread_name_prefix="s12-retry") as pool:
+        results = list(pool.map(lambda _n: _retry_from_live_caller(), (1, 2)))
+    assert sorted(bool(result["created"]) for result in results) == [False, True]
+    successor_ids = {result["run_id"] for result in results}
+    assert len(successor_ids) == 1
+    successor_id = next(iter(successor_ids))
+    assert successor_id != run.id
+    assert all(result["predecessor_run_id"] == run.id for result in results)
+    assert all(result["job_id"] for result in results)
     with factory() as s:
-        r = route.retry_export(run.id, s, workspace_id=WS, project_id=None)
-        s.commit()
-    assert r["created"] is False
-    assert r["run_id"] == run.id
-    assert _counts(factory)["runs"] == 1
+        from app.persistence.models import S12ExportRun
+
+        runs = s.query(S12ExportRun).filter_by(workspace_id=WS).all()
+        jobs = [j for j in JobRepository(s).list_jobs(WS, limit=1000) if j.job_type == S12_EXPORT_JOB_TYPE]
+    assert len(runs) == 2
+    assert {r.id for r in runs} == {run.id, successor_id}
+    assert sum(r.status == "cancelled" for r in runs) == 1
+    assert sum(r.status == "pending" for r in runs) == 1
+    assert len(jobs) == 2
     monkeypatch.undo()
 
 

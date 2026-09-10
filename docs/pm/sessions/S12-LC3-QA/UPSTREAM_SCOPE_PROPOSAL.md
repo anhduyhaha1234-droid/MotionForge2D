@@ -1,8 +1,9 @@
-# S12-LC3-QA R1 — upstream scope proposal
+# S12-LC3-QA R2 — upstream scope proposal
 
 Status: `PROPOSAL_ONLY`; no upstream production file was edited by QA.
-This is the minimal contract work needed before Q1 normal-product export
-acceptance can be replayed without fabricated authority.
+The R1 proposal above remains historical. The R2 addendum below is the
+minimal exact correction scope identified by the fresh retry and public-chain
+evidence. It is not an approval or closure decision.
 
 ## Exact shared changes required
 
@@ -73,3 +74,91 @@ then transport the resulting shared contract/tests to QA. Until those are
 available, Q1 remains externally blocked and no acceptance job, completed
 Full Apply row, or media result may be fabricated by this QA worker.
 
+## R2 exact correction addendum
+
+### Q1 retry identity defect
+
+The isolated `FIXTURE_ONLY` mechanism fixtures now use current server-owned
+Full Apply pins, a real managed root, and actual `retry_export` calls. Both
+required nodes still fail because the frozen implementation tries to create a
+successor with the same natural identity as the cancelled predecessor:
+
+- `app/api/routes/s12_export.py::retry_export` validates current context and
+  resubmits the predecessor pins with `idempotency_key=s12_retry:{run_id}`;
+- `app/persistence/s12_export.py::S12ExportRepository.create_run` computes
+  the canonical natural key and inserts;
+- `app/persistence/s12_export.py::_replay_after_conflict` searches by
+  idempotency/natural key and then raises `export run creation conflict
+  resolved to no row`;
+- `migrations/versions/c3d4e5f6a7b8_s12_export_domain.py` enforces unique
+  `uq_s12_run_identity` over workspace/project/video/profile/plan/checkpoint.
+
+The first valid retry request reaches current authority and then returns HTTP
+500 on the unique natural-key conflict; a concurrent second request cannot
+observe a successor. The smallest upstream change is an explicit immutable
+retry-attempt/successor identity or equivalent retry discriminator, while
+retaining the existing lineage uniqueness guard. Repeat retry and two live
+callers must resolve to exactly one usable successor; the cancelled
+predecessor must never be replayed and 409/500 must not be accepted as
+success.
+
+Upstream owner: S12 export backend/persistence owner. Required tests before
+QA rerun: cancelled predecessor → one new run/job; repeat retry → same
+successor with `created=False`; two live callers → one winner plus typed
+loser/replay; complete workspace/project/video/checkpoint/manifest/plan pins
+and managed paths on all rows; active/stale/missing/cross-project/
+tampered/partial denial with zero mutation; idempotency/transaction retry,
+worker restart, and retained-data compatibility. Keep
+`uq_s12_run_identity` rather than removing it.
+
+### Q2 exact public graph gap
+
+The public source graph was traced to these current owners:
+
+- `app/api/routes/projects.py` and `ProjectWorkflowService.create_project`:
+  legacy 12-hex project and upload;
+- `app/api/routes/projects.py` analyze and
+  `AnalyzeOrchestrator._ensure_durable_shell`: UUID durable shell plus import,
+  proxy, and scene jobs;
+- `app/api/routes/durable_videos.py::create_video`: v2 UUID metadata only,
+  with no public source import operation;
+- `app/api/routes/reskin_config.py::create_reskin_config`:
+  role/config ownership boundary;
+- `app/api/routes/s09_approval.py::reapprove_checkpoint` and
+  `app/services/s09_approval.py::S09ApprovalRepository.submit_checkpoint_v2`:
+  consume a ReskinConfig and do not create a StructuralLock;
+- `app/api/routes/s10_full_apply.py::submit_full_apply`: current checkpoint
+  to durable Full Apply;
+- `app/persistence/structural_lock.py::StructuralLockRepository.create_manifest`:
+  persistence capability with no public manifest create/activate route in the
+  captured OpenAPI path set.
+
+The smallest shared API delta is: (1) a v2 source-ingest bridge,
+preferably `POST /api/v2/projects/{project_id:uuid}/videos/{video_id:uuid}/import`
+multipart, that publishes a managed artifact, verifies ffprobe/SHA256,
+enforces ownership, returns actual durable IDs, and replays idempotently; (2)
+an S09-owned create/activate operation for a current
+`StructuralLockManifest` keyed by workspace/project/video/source generation,
+with server canonical hash, route/segment evidence, ownership, and
+idempotency; and (3) the smallest supported published pack/asset and owned
+role/project-cast path needed by `create_reskin_config` (or an explicit
+catalog-seeding API contract). Existing legacy 12-hex create/upload/analyze
+compatibility must remain explicit; a v2 UUID must not cross namespaces by
+guessing.
+
+The first valid missing request in R2 is not a guessed-ID 404: actual public
+IDs produced empty `reskin_configs`, `object_roles`, `project_cast`, and
+`s09_approvals`, while readiness was `not_run`. Thus no valid current
+StructuralLock/ReskinConfig/ApplyCheckpoint body exists for reapprove or
+Full Apply. Clean S12 context returned
+`S12_EXPORT_FULL_APPLY_MISSING` and `S12_EXPORT_LOCK_MISSING`; submit returned
+409 with zero S12 run mutation. Dependency order is:
+
+`v2 source identity/import bridge` → `current lock + evidence` →
+`owned pack/role/cast/config` → `S09 reapprove` → `S10 Full Apply worker`
+→ `S12 normal-product acceptance`.
+
+Proposed shared tests must assert returned IDs, ownership scope, idempotency,
+retained source/proxy media, exact hashes, zero mutation on missing/stale/
+tampered/partial/cross-project inputs, and the S09→S10 ordering. QA does not
+implement this proposal upstream.

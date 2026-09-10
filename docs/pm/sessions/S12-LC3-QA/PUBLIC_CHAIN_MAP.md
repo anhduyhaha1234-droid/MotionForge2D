@@ -88,3 +88,75 @@ owned role/config graph, as shown by the empty picker and the config-create
 - The UI seed that directly inserts completed Full Apply rows is explicitly
   excluded from this map and from normal-product evidence.
 
+## R2 fresh public evidence
+
+Candidate: `codex/s12-lc3-luna-qa` at
+`7dfbca84456501c3a995490e98741604d149aabf`. Route: `gpt-5.6-luna`, high,
+fallback OFF. This section is a new isolated probe; the R1 record above is
+preserved as historical evidence.
+
+Raw evidence and exact command envelope:
+
+- `C:\Users\Admin\Documents\Codex\2026-09-05\files-pasted-by-the-user-codex\outputs\s12-luna-c3-r2\20260910T124058Z\q2\public-chain-v2-20260910T125705Z.json`
+  (SHA256 `AE477C28459D9BBD3A904949CC0918F52DD84EC22386849DAAF01BB5A8C36F39`)
+- `C:\Users\Admin\Documents\Codex\2026-09-05\files-pasted-by-the-user-codex\outputs\s12-luna-c3-r2\20260910T124058Z\q2\public-chain-v2-command-20260910T125705Z.json`
+  (SHA256 `CBFD4271BCF5CE73346DA8B4DC899D0C3AB024238C5DFD48864CC793BD6DF708`)
+- Probe argv: `python scripts/s12/s12_lc3_probe.py --work-root C:\Users\Admin\mfqa\s12-lc3-r2\20260910T124058Z\QA\Q2-public-chain-v2 --evidence <raw evidence path>`; cwd is the QA worktree; duration `10.7718887329102s`; exit `0`. The probe envelope did not include epoch start/end fields.
+
+Runtime and database were contained under
+`C:\Users\Admin\mfqa\s12-lc3-r2\20260910T124058Z\QA\Q2-public-chain-v2\`;
+database was `data\probe.db`, managed root was `artifacts`, and
+`manual_sql_used=false`. The durable worker was started and stopped by the
+probe. No demo or live-main path was used.
+
+The fresh public IDs were:
+
+| Boundary | Returned identity | Observed result |
+|---|---|---|
+| v2 project create | `927abd13-58ad-466e-a420-b344870f84df` | `POST /api/v2/projects/` → `201` |
+| v2 video create | `ff6bba00-062c-480b-8408-538a532588cd` | `POST /api/v2/projects/{project_id}/videos` → `201`, `status=imported`, no source artifact |
+| legacy project create | `3902d80b8bf1` | `POST /api/projects` → `201`; 12-hex `ProjectWorkflowService` identity |
+| legacy durable video | `18585f88-6590-40d2-9acf-7594a7eb7877` | returned by public legacy analyze; UUID durable shell |
+| source artifact | `0b36ae99-96da-508d-af59-10bb439d047f` | published by the durable worker |
+| proxy artifact | `2af7f681-55b8-53f0-ae59-9d84a0aadb81` | published by the durable worker |
+
+The legacy chain reached `completed` with `scenes_count=1`, three completed
+jobs (`59f91218-5a29-4cfd-8910-4a580057683d`,
+`29cd7de2-27d6-45cd-a589-b6d80341168f`,
+`2053b3f0-504a-4c5b-8019-cdc2befa608d`), two artifacts, and source SHA256
+`bce0018453ff8594a4c1f4bd8287fc5cf84b980b1a713a795fabec5a77096977`.
+That is source-ingest/analyze evidence only; it is not Full Apply or S12
+export evidence.
+
+The v2 context for the actual v2 project/video returned `200` with
+`full_apply_run_id=null`, `checkpoint=null`, `lock=null`, `plan=null`, and
+reasons `S12_EXPORT_FULL_APPLY_MISSING` and `S12_EXPORT_LOCK_MISSING`.
+`POST /s12-exports/submit` returned `409` with
+`export context not current: ['S12_EXPORT_FULL_APPLY_MISSING', 'S12_EXPORT_LOCK_MISSING']`.
+Before submit, counts were `projects=2, video_items=2, artifacts=2, jobs=3,
+s12_export_runs=0`; after the rejected submit, `jobs=3,
+s12_export_runs=0`.
+
+The actual-ID scoped reads against the legacy 12-hex project and returned
+UUID video all returned `200`, but were empty/not-ready: reskin configs `0`,
+object roles `0`, project-cast mappings `0`, S09 approvals `0`, and project
+readiness `status=not_run`, `video run_state=never_run`. Thus this run did not
+reach a valid current StructuralLock or Full Apply prerequisite. The clean
+v2 identity is separate from the completed legacy chain; a legacy upload
+against the v2 UUID returned `404 Project not found`, which is secondary
+identity-boundary evidence, not the first blocker.
+
+The OpenAPI snapshot recorded the real create/upload/analyze, v2 context,
+ReskinConfig, role/cast, S09 approval/reapprove, full-apply, and S12 routes.
+There is no v2 durable video import path and no StructuralLock manifest
+creation path in the OpenAPI path set. The first valid missing prerequisite
+is a supported server-owned path that can produce and pin a current
+StructuralLockManifest plus the required owned role/pack/config graph for
+the returned source generation; without it, no valid S09 reapprove request or
+S10 Full Apply request can be constructed. The guessed missing-ID calls and
+their 404s are retained only as secondary raw evidence.
+
+Status remains `BLOCKED_EXTERNAL_AUTHORITY_FIXTURE`; normal-product S12
+submit → worker → publisher → result/media and real UI interaction were not
+demonstrated. No assertion, completed authority, run, job, or media row was
+fabricated.
