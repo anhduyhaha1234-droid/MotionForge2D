@@ -199,3 +199,57 @@ The complete command envelopes and raw repro summaries are in
 [20260910T1052Z-r1.md](evidence/20260910T1052Z-r1.md) and the mirrored
 external evidence set. The post-write-set guard is [20260910T1057Z-post-guard-r1.json](evidence/20260910T1057Z-post-guard-r1.json).
 This is a transport checkpoint only, not an approval or closure claim.
+
+## C3 R2 exact-owner continuation
+
+This R2 continuation used route `gpt-5.6-luna`, high reasoning, fallback OFF,
+in the frozen VAL worktree at `7dfbca84456501c3a995490e98741604d149aabf`.
+The route was not changed or substituted. Existing R1 work and the pre-existing
+58-file, 1,073,079-byte `work/` tree were preserved.
+
+The first R2 micro reproduced both defects against the real publication path:
+the stale participant overwrote the winner and a foreign sidecar was replaced
+(`1 failed` overall, exit `1`). The repair uses exclusive hard-link creation
+for the final, sidecar, and receipt files. A pre-publication rendezvous lets A
+pause after its fence check; B expires/reclaims the same run with a real
+repository claim and completes; A then receives typed `PublicationRaceLost`.
+The winner's final/sidecar/receipt bytes, SHA-256 values, sizes, mtimes, run
+row, and job row remain unchanged; A's private candidate remains untouched.
+There is no overwrite-capable final rename in this race boundary.
+
+The owned R2 probes passed:
+
+- `test_r2_f01_real_handoff_cannot_overwrite_winner`: two live threads and
+  separate sessions, expiry/reclaim, exclusive primitive, immutable winner,
+  typed loser, durable row/file identity.
+- `test_r2_f02_foreign_companion_is_not_overwritten`: foreign sidecar is
+  preserved and candidate cleanup is owner-scoped.
+- `test_r2_f02_child_kill_fresh_process_reclaims_same_db_job`: an actual owned
+  child process was terminated, a fresh Python process reopened the same
+  isolated SQLite DB/job, reclaimed the expired lease, and retained chunk bytes.
+
+The full allowed gate passed `73` nodes with `54` warnings, exit `0`, in
+`58.516s` wall time (`57.30s` pytest):
+
+```text
+python -m pytest tests/s12/s12-lc3-val tests/s12/s12-t03c/test_publication.py tests/s12/s12-t04a/test_c2_source_locked.py -q --tb=short
+cwd C:\Users\Admin\MotionForge2D-worktrees\s12-lc3-luna-val
+start 2026-09-10T13:02:23.7355887Z
+end   2026-09-10T13:03:22.2514259Z
+exit  0
+```
+
+Compileall, Ruff F, and `git diff --check` all passed after one test-only
+F811 correction. The bounded native resource sample covered 4/8/16 frames,
+reported peak ffmpeg RSS `19,988,480` bytes, zero post-run scratch bytes, and
+actual free disk readings. It is a small bounded scaling measurement only;
+there is no whole-tree or 30-minute capacity claim, and any longer arithmetic
+would be extrapolation.
+
+The R2 raw envelopes, process/reaping result, resource sample, preserved red
+micro, and cleanup boundary are in
+[20260910T1305Z-r2.md](evidence/20260910T1305Z-r2.md). The pre-commit
+baseline guard is [20260910T1305Z-post-guard-r2.json](evidence/20260910T1305Z-post-guard-r2.json)
+and passed with all baseline entries present, no destructive shrink, and only
+the allowlisted existing files changed. The exact-owner R2 result is a local
+transport checkpoint only; it is not an approval or closure claim.

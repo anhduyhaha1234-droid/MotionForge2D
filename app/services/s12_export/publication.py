@@ -11,11 +11,11 @@ The run reaches ``completed`` ONLY through
 3. **Ownership** — run workspace/project match the request scope.
 4. **Candidate boundary (C2 F07)** — the runner assembled a PRIVATE
    candidate under scratch; this module NEVER assembles.  The final
-   public output is created by ONE atomic ``os.replace`` from the
+   public output is created by ONE exclusive ``os.link`` from the
    validated candidate, only after the source-locked validator scores
-   ``PASS``.  An existing completed output is never overwritten;
-   a crash leaves only ``.partial``/candidate scratch, never a public
-   result.
+   ``PASS``.  Exclusive creation lets a stale participant lose without
+   an overwrite-capable rename touching a winner.  The private candidate
+   remains until the fenced DB commit and is then cleaned by its owner.
 5. **Validation** — the candidate scores ``PASS`` against server-owned
    source-locked expectations (T04A C2 contract; ``FAIL`` /
    ``NOT_MEASURED`` fails closed and lands the run ``failed``).
@@ -35,11 +35,13 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import uuid
 from pathlib import Path
 from typing import Any
 
 __all__ = [
     "PublicationError",
+    "PublicationRaceLost",
     "publish_export_run",
 ]
 
@@ -53,6 +55,12 @@ _RECEIPT_SUFFIX = ".publication.json"
 
 class PublicationError(ValueError):
     """Fail-closed publication gate error."""
+
+
+class PublicationRaceLost(PublicationError):
+    """Another fenced participant exclusively published the final bytes."""
+
+    code = "S12_T03C_PUBLICATION_RACE_LOST"
 
 
 def _sha256_file(path: Path) -> str:
@@ -76,20 +84,66 @@ def _publication_receipt_path(final: Path) -> Path:
     return final.with_name(f"{final.name}{_RECEIPT_SUFFIX}")
 
 
+def _write_exclusive_file(path: Path, payload: bytes, *, owner_token: str) -> None:
+    """Create *path* once, using an owner-unique temp and exclusive link."""
+    safe_token = "".join(ch for ch in owner_token if ch.isalnum()) or "owner"
+    tmp = path.with_name(f"{path.name}.{safe_token}.{uuid.uuid4().hex}.tmp")
+    fd: int | None = None
+    try:
+        fd = os.open(
+            str(tmp),
+            os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+            0o600,
+        )
+        with os.fdopen(fd, "wb") as handle:
+            fd = None
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        # Hard-link creation is the exclusive visibility primitive: it fails
+        # when a participant already created the destination and never
+        # replaces an existing sidecar or receipt.
+        os.link(tmp, path)
+    finally:
+        if fd is not None:
+            os.close(fd)
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
 def _write_sidecar(final: Path, sha: str) -> None:
-    """Write the byte-identity sidecar atomically next to the artifact."""
-    sidecar = _sidecar_path(final)
-    tmp = sidecar.with_name(f"{sidecar.name}.tmp")
-    tmp.write_text(sha.strip().lower() + "\n", encoding="ascii")
-    os.replace(tmp, sidecar)
+    """Create the byte-identity sidecar without replacing foreign bytes."""
+    _write_exclusive_file(
+        _sidecar_path(final),
+        (sha.strip().lower() + "\n").encode("ascii"),
+        owner_token=sha,
+    )
 
 
 def _write_publication_receipt(final: Path, payload: dict[str, Any]) -> None:
     """Persist ownership/content/validation identity before the DB commit."""
-    receipt = _publication_receipt_path(final)
-    tmp = receipt.with_name(f"{receipt.name}.{payload['fence_token']}.tmp")
-    tmp.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
-    os.replace(tmp, receipt)
+    _write_exclusive_file(
+        _publication_receipt_path(final),
+        (json.dumps(payload, sort_keys=True) + "\n").encode("utf-8"),
+        owner_token=str(payload["fence_token"]),
+    )
+
+
+def _before_publication_primitive(candidate: Path, final: Path) -> None:
+    """Rendezvous seam immediately before exclusive final creation."""
+    _ = candidate, final
+
+
+def _publish_candidate_exclusive(candidate: Path, final: Path) -> None:
+    """Expose a candidate exactly once without an overwrite-capable rename."""
+    try:
+        os.link(candidate, final)
+    except FileExistsError as err:
+        raise PublicationRaceLost(
+            f"publication race lost: final already exists and is immutable: {final}"
+        ) from err
 
 
 def publish_export_run(
@@ -112,7 +166,7 @@ def publish_export_run(
     The candidate is the file the T03B runner assembled at
     ``<scratch>/candidate_final.mp4`` — always PRIVATE, never the
     public output path.  On every gate passing, the candidate becomes
-    the public output through one atomic rename.  SQLite commit and
+    the public output through one exclusive hard-link creation.  SQLite commit and
     filesystem publication are separate operations; a receipt binds the
     bytes and validation identity so a fresh owner can reconcile an
     uncertain acknowledgement.
@@ -151,7 +205,7 @@ def publish_export_run(
             fence_token=fence_token,
         )
         raise PublicationError("public output must not carry the .partial suffix")
-    if final.is_file():
+    if final.exists() or final.is_symlink():
         recovered = _recover_pending_publication(
             session,
             repo,
@@ -182,6 +236,19 @@ def publish_export_run(
         )
         raise PublicationError(
             f"completed output exists — refusing overwrite: {final}"
+        )
+    sidecar = _sidecar_path(final)
+    receipt = _publication_receipt_path(final)
+    if sidecar.exists() or sidecar.is_symlink() or receipt.exists() or receipt.is_symlink():
+        _cleanup_publication_scratch(
+            manifest,
+            session=session,
+            run_id=run_id,
+            worker_id=worker_id,
+            fence_token=fence_token,
+        )
+        raise PublicationError(
+            f"publication companions exist without a final artifact; refusing overwrite: {final}"
         )
     candidate = _candidate_path(manifest)
     if candidate is None or not candidate.is_file():
@@ -245,15 +312,20 @@ def publish_export_run(
             f"export validation {verdict.verdict} on {failing}; run failed (retryable)"
         )
 
-    # ONE immutable publication: atomically rename the validated private
-    # candidate onto the public path, write its sidecar and receipt, then
+    # ONE immutable publication: exclusively create the public path from the
+    # validated private candidate, write its sidecar and receipt, then
     # commit the fenced SQLite state.  Filesystem and SQLite are a recovery
     # boundary, not one transaction; reconciliation never overwrites bytes.
     try:
         # Re-read authority immediately before the irreversible filesystem
         # mutation; a stale worker must not publish after validation.
         _require_fence(repo, run_id, worker_id, fence_token)
-        os.replace(candidate, final)
+        _before_publication_primitive(candidate, final)
+        _publish_candidate_exclusive(candidate, final)
+    except PublicationRaceLost:
+        # The losing worker must not clean or mutate a winner's final,
+        # sidecar, receipt, or a candidate belonging to a different fence.
+        raise
     except OSError as err:
         _cleanup_publication_scratch(
             manifest,
@@ -275,11 +347,14 @@ def publish_export_run(
         )
         raise PublicationError(f"publication fence lost before rename: {err}") from err
     actual_sha = _sha256_file(final)
+    sidecar_owned = False
+    receipt_owned = False
     try:
         _write_sidecar(final, actual_sha)
+        sidecar_owned = True
     except OSError as err:
         if _owner_is_live(repo, run_id, worker_id, fence_token):
-            _remove_unpublished_output(final)
+            _remove_unpublished_output(final, expected_sha=actual_sha)
         _cleanup_publication_scratch(
             manifest,
             session=session,
@@ -313,9 +388,14 @@ def publish_export_run(
                 ],
             },
         )
+        receipt_owned = True
     except OSError as err:
         if _owner_is_live(repo, run_id, worker_id, fence_token):
-            _remove_unpublished_output(final)
+            _remove_unpublished_output(
+                final,
+                expected_sha=actual_sha,
+                remove_sidecar=sidecar_owned,
+            )
         _cleanup_publication_scratch(
             manifest,
             session=session,
@@ -342,12 +422,17 @@ def publish_export_run(
             fence_token=fence_token,
         )
     except (FencedWorkerError, ValueError) as err:
-        # The rename happened but the transition lost the race — never
+        # The exclusive final creation happened but the transition lost the race — never
         # report completed: the artifact stays, the run is failed/retryable
         # and a later winner converges by bytes.
         session.rollback()
         if _owner_is_live(repo, run_id, worker_id, fence_token):
-            _remove_unpublished_output(final)
+            _remove_unpublished_output(
+                final,
+                expected_sha=actual_sha,
+                remove_sidecar=sidecar_owned,
+                remove_receipt=receipt_owned,
+            )
         _cleanup_publication_scratch(
             manifest,
             session=session,
@@ -356,9 +441,16 @@ def publish_export_run(
             fence_token=fence_token,
         )
         raise PublicationError(
-            f"publication transition lost after rename: {err} (run {run_id})"
+            f"publication transition lost after final creation: {err} (run {run_id})"
         ) from err
     session.commit()
+    _cleanup_publication_scratch(
+        manifest,
+        session=session,
+        run_id=run_id,
+        worker_id=worker_id,
+        fence_token=fence_token,
+    )
     return {
         "run_id": run_id,
         "status": final_rec.status,
@@ -483,16 +575,31 @@ def _replay_completed(repo: Any, run_id: str, manifest: dict[str, Any]) -> dict[
     is never a bare status shortcut.
     """
     final = Path(str(manifest[_OUTPUT_PATH]))
-    if not final.is_file():
+    if final.is_symlink() or not final.is_file():
         raise PublicationError(
             f"completed run {run_id} has no public artifact; cannot replay"
         )
     if final.name.lower().endswith(".partial"):
         raise PublicationError(f"public artifact is partial for run {run_id}")
     sidecar = _sidecar_path(final)
-    if not sidecar.is_file():
+    if sidecar.is_symlink() or not sidecar.is_file():
         raise PublicationError(
             f"completed run {run_id} has no byte-identity sidecar; cannot replay"
+        )
+    receipt = _publication_receipt_path(final)
+    if receipt.is_symlink() or not receipt.is_file():
+        raise PublicationError(
+            f"completed run {run_id} has no trustworthy publication receipt; cannot replay"
+        )
+    try:
+        receipt_payload = json.loads(receipt.read_text(encoding="utf-8"))
+    except (OSError, ValueError, UnicodeError, json.JSONDecodeError) as err:
+        raise PublicationError(
+            f"completed run {run_id} has an unreadable publication receipt"
+        ) from err
+    if not isinstance(receipt_payload, dict) or receipt_payload.get("run_id") != run_id:
+        raise PublicationError(
+            f"completed run {run_id} has a mismatched publication receipt"
         )
     stored = sidecar.read_text(encoding="ascii").strip().lower()
     actual = _sha256_file(final)
@@ -523,6 +630,8 @@ def _candidate_path(manifest: dict[str, Any]) -> Path | None:
     explicit = manifest.get(_CANDIDATE_PATH)
     candidate = Path(str(explicit)) if explicit else scratch / "candidate_final.mp4"
     try:
+        if candidate.is_symlink():
+            return None
         if candidate.resolve().parent != scratch.resolve():
             return None
     except OSError:
@@ -866,15 +975,26 @@ def _fail_run(repo: Any, run_id: str, worker_id: str, fence_token: str, revision
         pass
 
 
-def _remove_unpublished_output(final: Path) -> None:
-    """Remove an output that never reached a durable completed state."""
-    sidecar = _sidecar_path(final)
-    for path in (
-        final,
-        sidecar,
-        _publication_receipt_path(final),
-        sidecar.with_name(f"{sidecar.name}.tmp"),
-    ):
+def _remove_unpublished_output(
+    final: Path,
+    *,
+    expected_sha: str | None = None,
+    remove_sidecar: bool = False,
+    remove_receipt: bool = False,
+) -> None:
+    """Remove only this attempt's identity-matched unpublished files."""
+    if expected_sha is not None:
+        try:
+            if _sha256_file(final) != expected_sha:
+                return
+        except OSError:
+            return
+    paths = [final]
+    if remove_sidecar:
+        paths.append(_sidecar_path(final))
+    if remove_receipt:
+        paths.append(_publication_receipt_path(final))
+    for path in paths:
         try:
             path.unlink(missing_ok=True)
         except OSError:

@@ -233,12 +233,16 @@ def test_publish_fence_lost_before_rename_cleans_candidate(
 def test_publish_rename_fault_cleans_private_candidate(
     env, monkeypatch: pytest.MonkeyPatch
 ) -> None:  # type: ignore[no-untyped-def]
-    """C18: atomic rename failure leaves no candidate or public artifact."""
+    """C18: exclusive final-create failure leaves no candidate or public artifact."""
     import app.services.s12_export.publication as pubmod
 
     _patch(monkeypatch, "PASS")
     factory, kw = _submit(env, monkeypatch)
-    monkeypatch.setattr(pubmod.os, "replace", lambda *args: (_ for _ in ()).throw(OSError("rename fault")))
+    monkeypatch.setattr(
+        pubmod,
+        "_publish_candidate_exclusive",
+        lambda *args: (_ for _ in ()).throw(OSError("rename fault")),
+    )
     with factory() as s:
         with pytest.raises(pub.PublicationError, match="rename failed"):
             pub.publish_export_run(s, **kw)

@@ -1,0 +1,24 @@
+{
+  "guard": "baseline-val-r2.json",
+  "root": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-val",
+  "captured_at_utc": "2026-09-10T13:05:17.0831962Z",
+  "head": "7dfbca84456501c3a995490e98741604d149aabf",
+  "status": [
+    " M app/services/s12_export/publication.py",
+    " M tests/s12/s12-t03c/test_publication.py",
+    "?? tests/s12/s12-lc3-val/test_r2_ownership_recovery.py",
+    "?? work/"
+  ],
+  "entries": [
+    {"path":"app/services/s12_export/publication.py","exists":true,"sha256":"75EA117B739E8770A71674BC07E5EC7EA66BBD0338296238BFA51E3C5E9B8B5A","size":36919,"lines":1001,"baseline_sha256":"6F27B6D9F4A9339133C87AC593BC4C8CA33C636AE2AB3971CD8D3C29FB30F6A6","baseline_size":32628,"baseline_lines":881,"protected":false},
+    {"path":"app/services/s12_export/validation.py","exists":true,"sha256":"999B0C500F706A81AE0479691FE72A291B5C93BA1A9A2D691A012AE5B71B17F7","size":76395,"lines":2081,"baseline_sha256":"999B0C500F706A81AE0479691FE72A291B5C93BA1A9A2D691A012AE5B71B17F7","baseline_size":76395,"baseline_lines":2081,"protected":true},
+    {"path":"app/services/s12_export/runner.py","exists":true,"sha256":"ADBF98D7E6BC24E8B09D940FC6A14C69AD659DF12FB2E3B6F3AE6E838B1FD000","size":37998,"lines":964,"baseline_sha256":"ADBF98D7E6BC24E8B09D940FC6A14C69AD659DF12FB2E3B6F3AE6E838B1FD000","baseline_size":37998,"baseline_lines":964,"protected":true},
+    {"path":"app/services/s12_export/stitch.py","exists":true,"sha256":"FDEDED5652F89FC231D488569C7014E4BB3F781F2202D6C30980CF1D95F40D1D","size":17407,"lines":520,"baseline_sha256":"FDEDED5652F89FC231D488569C7014E4BB3F781F2202D6C30980CF1D95F40D1D","baseline_size":17407,"baseline_lines":520,"protected":true},
+    {"path":"app/workflow/s12_export_jobs.py","exists":true,"sha256":"34F7A8672E0CED50ABBBF75EFA22D85579399C91FD98D12C3D0DAFFAD4B0F276","size":16313,"lines":395,"baseline_sha256":"34F7A8672E0CED50ABBBF75EFA22D85579399C91FD98D12C3D0DAFFAD4B0F276","baseline_size":16313,"baseline_lines":395,"protected":true},
+    {"path":"app/persistence/s12_export.py","exists":true,"sha256":"847B4FDA7311E04D482DDE0C3DD71AB853CB8B385AA10CCB6EB0A528CF3E4CFC","size":42780,"lines":1066,"baseline_sha256":"847B4FDA7311E04D482DDE0C3DD71AB853CB8B385AA10CCB6EB0A528CF3E4CFC","baseline_size":42780,"baseline_lines":1066,"protected":true},
+    {"path":"tests/s12/s12-t03c/test_publication.py","exists":true,"sha256":"7F6F73C3B994D159F5EDA8F181DE3DFDBF11C5E41E448AC650C74129C3E0FF87","size":33963,"lines":861,"baseline_sha256":"A53889AF0944F45F1F67CCD0660A1750B8D27DAC34F5267434E8323043081087","baseline_size":33905,"baseline_lines":857,"protected":false},
+    {"path":"tests/s12/s12-t04a/test_c2_source_locked.py","exists":true,"sha256":"F0452D62FB4C49D9EC3703BF902DB13382B0B7B41E22C0C9B159B95EA8AA2C96","size":38741,"lines":996,"baseline_sha256":"F0452D62FB4C49D9EC3703BF902DB13382B0B7B41E22C0C9B159B95EA8AA2C96","baseline_size":38741,"baseline_lines":996,"protected":true}
+  ],
+  "failures": [],
+  "result": "PASS"
+}
