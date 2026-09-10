@@ -209,6 +209,7 @@ def _s12_export_handler(ctx: Any) -> dict[str, Any]:
     from app.services.s12_export.runner import (  # noqa: PLC0415
         ExportRunner,
         RunnerConfig,
+        cleanup_owned_export_artifacts,
     )
 
     manifest = ctx.input_manifest
@@ -271,6 +272,10 @@ def _s12_export_handler(ctx: Any) -> dict[str, Any]:
                 # Lost the fence mid-failure (fresh owner reclaimed): the
                 # run is owned elsewhere; nothing more to mutate.
                 session.rollback()
+            cleanup_owned_export_artifacts(
+                scratch_dir=manifest.get("scratch_dir"),
+                chunk_dir=manifest.get("chunk_dir"),
+            )
             raise
     return {
         "run_id": run_id,

@@ -430,36 +430,66 @@ def assemble_run(
     # os.replace.  Crash-safe: only scratch remains on failure.
     candidate = scratch / "candidate.tmp-finalize.mp4"
 
-    cores: list[Path] = []
-    for item in ordered:
-        cores.append(
-            trim_core(
-                item.path,
-                item.spec,
-                frame_count=frame_count,
-                fps=fps,
-                dest=scratch / f"core_{item.spec.order_index:04d}.mp4",
-                encoder=encoder,
+    try:
+        cores: list[Path] = []
+        for item in ordered:
+            cores.append(
+                trim_core(
+                    item.path,
+                    item.spec,
+                    frame_count=frame_count,
+                    fps=fps,
+                    dest=scratch / f"core_{item.spec.order_index:04d}.mp4",
+                    encoder=encoder,
+                )
             )
+        stitched = scratch / "stitched_video.mp4"
+        concat_cores(cores, dest=stitched, fps=fps)
+        got_video = count_video_frames(stitched)
+        if got_video != frame_count:
+            raise StitchError(
+                f"stitched video has {got_video} frames, expected {frame_count}"
+            )
+        mux_audio_once(
+            stitched, audio_source, dest=candidate, total_frames=frame_count, fps=fps
         )
-    stitched = scratch / "stitched_video.mp4"
-    concat_cores(cores, dest=stitched, fps=fps)
-    got_video = count_video_frames(stitched)
-    if got_video != frame_count:
-        raise StitchError(
-            f"stitched video has {got_video} frames, expected {frame_count}"
-        )
-    mux_audio_once(
-        stitched, audio_source, dest=candidate, total_frames=frame_count, fps=fps
-    )
-    got_final = count_video_frames(candidate)
-    if got_final != frame_count:
-        raise StitchError(
-            f"final candidate has {got_final} frames, expected {frame_count}"
-        )
-    _verify_codec(candidate, encoder, "final candidate")
-    os.replace(candidate, output)
-    return output
+        got_final = count_video_frames(candidate)
+        if got_final != frame_count:
+            raise StitchError(
+                f"final candidate has {got_final} frames, expected {frame_count}"
+            )
+        _verify_codec(candidate, encoder, "final candidate")
+        os.replace(candidate, output)
+        return output
+    except BaseException:
+        _cleanup_assembly_scratch(scratch)
+        raise
+
+
+def _cleanup_assembly_scratch(scratch: Path) -> None:
+    """Remove only assembly-private files after a failed stitch."""
+    names = {
+        "candidate.tmp-finalize.mp4",
+        "stitched_video.mp4",
+        "_s12_t03b_concat.txt",
+    }
+    try:
+        children = list(scratch.iterdir())
+    except OSError:
+        return
+    for child in children:
+        if child.is_symlink() or not child.is_file():
+            continue
+        name = child.name.lower()
+        if (
+            name in names
+            or (name.startswith("core_") and name.endswith(".mp4"))
+            or name.endswith(".partial")
+        ):
+            try:
+                child.unlink()
+            except OSError:
+                pass
 
 
 def _verify_codec(path: str | Path, encoder: str, label: str) -> None:

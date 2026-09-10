@@ -1,0 +1,120 @@
+# S12-LC3-VAL completion evidence
+
+This report records the bounded VAL implementation and verification on branch
+`codex/s12-lc3-luna-val`. It is not an approval or a closure decision.
+
+## Scope
+
+Only the VAL allowlist was changed: the five permitted production files, the
+permitted T04A/T03C tests, the new `tests/s12/s12-lc3-val/` regressions, and
+this session evidence. No API, schema, frontend, persistence, packaging,
+migration, global configuration, or other worktree files were changed.
+
+## R01 audio and publication
+
+Transcode audio now uses two independent ffmpeg decoders and bounded 8192
+sample windows. Numpy vectorized measurements cover channel-preserving
+waveform correlation, broadband spectral cosine similarity, relative RMS
+error, all windows, sample counts, and one-source-frame timing drift. The
+documented AAC acceptance bounds are correlation >= 0.80, spectral cosine >=
+0.85, and relative RMS error <= 0.40 for every content-bearing window.
+Remux/copy remains decoded-content digest checked. Missing audio, wrong tone,
+silence, stereo channel swap, and swapped track mapping fail. A valid AAC
+re-encode passes.
+
+The real publication-path wrong-audio test used these raw paths:
+
+```text
+root:    C:\Users\Admin\AppData\Local\Temp\pytest-of-Admin\pytest-988\test_publish_real_wrong_audio_0
+source:  C:\Users\Admin\AppData\Local\Temp\pytest-of-Admin\pytest-988\test_publish_real_wrong_audio_0\src_audio.mp4
+wrong:   C:\Users\Admin\AppData\Local\Temp\pytest-of-Admin\pytest-988\test_publish_real_wrong_audio_0\wrong_audio.mp4
+scratch: C:\Users\Admin\AppData\Local\Temp\pytest-of-Admin\pytest-988\test_publish_real_wrong_audio_0\scratch
+public:  C:\Users\Admin\AppData\Local\Temp\pytest-of-Admin\pytest-988\test_publish_real_wrong_audio_0\out.mp4
+```
+
+It exited `0`, passed `1` node in `4.18s`, left the run failed, left no
+public output, and left no private scratch candidate.
+
+## R03 bounded validation and resources
+
+Cross-raster PSNR uses native ffmpeg `psnr` statistics with `-reinit_filter
+0`, fit+pad alignment, strict ordered frame numbers, and one bounded stats
+file. It no longer materializes a full-clip raw file or uses a Python
+per-byte hot loop. Decoder nonzero exit, malformed/truncated input, short
+read, timeout, cancellation, and stats cleanup fail closed. Runner ffmpeg
+children are polled, killed on cancellation/deadline, waited, and reaped.
+
+The fresh scaling node used this owned raw root:
+
+```text
+C:\Users\Admin\AppData\Local\Temp\pytest-of-Admin\pytest-987\test_r03_resource_scaling_is_b0
+```
+
+The exact scaling output was:
+
+```json
+{"measurements": [{"duration_sec": 0.038642, "frames": 4, "free_disk_after": 537298477056, "free_disk_before": 537298477056, "scratch_bytes": 0}, {"duration_sec": 0.038014, "frames": 8, "free_disk_after": 537298460672, "free_disk_before": 537298460672, "scratch_bytes": 0}, {"duration_sec": 0.040601, "frames": 16, "free_disk_after": 537298440192, "free_disk_before": 537298440192, "scratch_bytes": 0}], "peak_ffmpeg_rss_bytes": 20000768}
+```
+
+Resource node argv was:
+
+```text
+python -m pytest tests/s12/s12-lc3-val/test_r01_r03_r04_boundaries.py::test_r03_resource_scaling_is_bounded_and_recorded -q -s
+```
+
+cwd was `C:\Users\Admin\MotionForge2D-worktrees\s12-lc3-luna-val`, start
+UTC `2026-09-10T07:11:56.6961691Z`, end UTC
+`2026-09-10T07:12:03.7568779Z`, exit `0`. The timing series is a bounded
+4/8/16-frame measurement, not a 30-minute run; any 30-minute arithmetic would
+be extrapolation only. It observed zero post-run scratch bytes, actual free
+disk on the owned temp volume, and 20,000,768 bytes peak ffmpeg RSS. No TB
+allocation or full-clip raw buffer was used.
+
+## R04 cleanup and C17/C18
+
+Stitch, runner, workflow, and publication failure paths remove only known
+private/partial children under the owned scratch/chunk roots. Completed
+consumer chunks and successful public output are preserved. Publication
+rechecks the fence immediately before rename; rename, sidecar, and CAS
+transition faults do not strand an unpublished artifact. The five fault
+boundary nodes for fence loss, rename, sidecar, transition, and real wrong
+audio all passed.
+
+C09 was exercised only through the mechanisms present in this VAL scope:
+legitimate exact-reference/remux behavior, documented PSNR profile tolerance,
+cross-raster fit+pad, explicit VFR rejection, reorder negatives, and missing
+threshold/reference fail-closed controls. No separate C09 mechanism required
+an out-of-allowlist change.
+
+## Verification commands
+
+Full affected test command, exact cwd:
+
+```text
+python -m pytest tests/s12/s12-t04a tests/s12/s12-t03c tests/s12/s12-lc3-val -q
+```
+
+HEAD before the final command was
+`577e9a3eab0ff7b9efd95bf2cecdf2d79e759a59`. Start UTC
+`2026-09-10T07:15:53.1124466Z`; end UTC
+`2026-09-10T07:17:14.0242800Z`; wall duration `80.9118334s` (pytest reported
+`79.51s`); exit `0`; `134 passed, 87 warnings`.
+
+Static checks:
+
+```text
+python -m compileall -q [all affected VAL production/test paths]  -> 0
+python -m ruff check --select F [all affected VAL production/test paths] -> 0
+git diff --check -> 0
+```
+
+The supplied baseline guard was run against the current worktree. Its full
+post-state is [20260910T071125Z-post-guard.json](evidence/20260910T071125Z-post-guard.json).
+All changed entries are within the allowlist; baseline authority files not
+owned for modification are unchanged. The unrelated untracked `work/` cache
+was preserved and is not committed.
+
+## Final state
+
+No unlisted production fix was required. The exact local commit is recorded
+after the guard and final status checks in the task response.
