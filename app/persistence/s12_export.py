@@ -512,6 +512,7 @@ class S12ExportRepository:
             raise RunNotFoundError(f"export run {predecessor_run_id!r} not found")
         if predecessor.workspace_id != workspace_id or predecessor.project_id != project_id:
             raise StaleIdentityError("retry predecessor is outside the requested scope")
+        self._validate_claim_lineage(predecessor)
         if predecessor.status not in S12_EXPORT_TERMINAL_STATUSES[1:]:
             raise S12ExportError(
                 f"run {predecessor.id} in status {predecessor.status!r}; "
@@ -519,7 +520,7 @@ class S12ExportRepository:
             )
         if predecessor.attempt < 1:
             raise S12ExportError("retry predecessor has corrupt attempt identity")
-        lineage_id = predecessor.lineage_id or predecessor.natural_key or predecessor.id
+        lineage_id = predecessor.lineage_id
         if not lineage_id or len(lineage_id) > 255:
             raise S12ExportError("retry predecessor has corrupt lineage identity")
         if predecessor.predecessor_run_id == predecessor.id:
@@ -653,6 +654,7 @@ class S12ExportRepository:
             or job.owner_type != "project"
             or job.owner_id != run.project_id
             or job.idempotency_key != expected_key
+            or job.input_generation != run.plan_hash
             or str(manifest.get("run_id")) != run.id
             or str(manifest.get("workspace_id")) != run.workspace_id
             or str(manifest.get("project_id")) != run.project_id
@@ -663,6 +665,23 @@ class S12ExportRepository:
             raise S12ExportError(
                 f"durable Job {job_id!r} is not correctly bound to export run {run.id!r}"
             )
+        # New retry manifests carry the remaining immutable lineage identity.
+        # Keep the checks additive so an already-upgraded initial Job with the
+        # legacy flattened manifest remains replayable, while any present
+        # lineage field is authoritative and cannot be silently changed.
+        optional_identity = {
+            "manifest_id": run.manifest_id,
+            "manifest_generation": run.manifest_generation,
+            "lineage_id": run.lineage_id,
+            "predecessor_run_id": run.predecessor_run_id,
+            "attempt": run.attempt,
+            "chunk_config": json.loads(run.chunk_config_json),
+        }
+        for key, expected in optional_identity.items():
+            if key in manifest and manifest[key] != expected:
+                raise S12ExportError(
+                    f"durable Job {job_id!r} has corrupt {key} for export run {run.id!r}"
+                )
         if run.job_id not in (None, job.id):
             raise S12ExportError(
                 f"export run {run.id!r} already points to a different durable Job"
@@ -704,8 +723,74 @@ class S12ExportRepository:
 
     # ── Atomic claim / fence ─────────────────────────────────────────────
 
+    def _validate_claim_lineage(self, run: S12ExportRun) -> None:
+        """Validate the complete immutable chain before any lease write."""
+        if run.attempt < 1 or not run.lineage_id:
+            raise S12ExportError(f"invalid S12 export lineage for run {run.id!r}")
+        if run.attempt == 1:
+            if run.predecessor_run_id is not None:
+                raise S12ExportError(
+                    f"invalid S12 export lineage: attempt 1 run {run.id!r} has a predecessor"
+                )
+            return
+        if run.predecessor_run_id is None or run.predecessor_run_id == run.id:
+            raise S12ExportError(f"invalid S12 export lineage for run {run.id!r}")
+
+        current = run
+        seen = {run.id}
+        frozen_fields = (
+            "workspace_id",
+            "project_id",
+            "video_item_id",
+            "checkpoint_id",
+            "checkpoint_hash",
+            "checkpoint_revision",
+            "manifest_id",
+            "manifest_hash",
+            "manifest_generation",
+            "profile_id",
+            "profile_dims",
+            "profile_codec",
+            "plan_id",
+            "plan_hash",
+            "frame_count",
+            "chunk_config_json",
+            "lineage_id",
+        )
+        while current.attempt > 1:
+            predecessor_id = current.predecessor_run_id
+            predecessor = self._session.get(S12ExportRun, predecessor_id)
+            if predecessor is None or predecessor.id in seen:
+                raise S12ExportError(
+                    f"invalid or cyclic S12 export lineage for run {run.id!r}"
+                )
+            seen.add(predecessor.id)
+            if predecessor.attempt != current.attempt - 1:
+                raise S12ExportError(
+                    f"invalid S12 export lineage attempt for run {run.id!r}"
+                )
+            if predecessor.status not in S12_EXPORT_TERMINAL_STATUSES[1:]:
+                raise S12ExportError(
+                    f"retry predecessor {predecessor.id!r} is not terminal"
+                )
+            if any(
+                getattr(predecessor, field) != getattr(run, field)
+                for field in frozen_fields
+            ):
+                raise S12ExportError(
+                    f"inconsistent frozen identity in S12 export lineage for run {run.id!r}"
+                )
+            current = predecessor
+        if current.attempt != 1 or current.predecessor_run_id is not None:
+            raise S12ExportError(f"invalid S12 export lineage root for run {run.id!r}")
+
     def claim_run(
-        self, run_id: str, worker_id: str, *, ttl_seconds: int = 300
+        self,
+        run_id: str,
+        worker_id: str,
+        *,
+        ttl_seconds: int = 300,
+        job_id: str | None = None,
     ) -> LeaseRecord:
         """Atomically claim the run for *worker_id* (exactly one winner).
 
@@ -723,8 +808,13 @@ class S12ExportRepository:
             raise RunNotFoundError(f"export run {run_id!r} not found")
         if ttl_seconds < 1:
             raise S12ExportError("ttl_seconds must be >= 1")
-        if run.status == "pending" and run.attempt != 1:
-            raise S12ExportError("pending run with attempt != 1 is ambiguous")
+        self._validate_claim_lineage(run)
+        if job_id is not None:
+            if run.job_id != job_id:
+                raise S12ExportError(
+                    f"worker Job {job_id!r} is not the durable Job bound to run {run_id!r}"
+                )
+            self.bind_job(run.id, job_id)
         if run.status not in ("pending", "running"):
             raise S12ExportError(
                 f"run {run_id} in status {run.status!r} cannot be claimed"

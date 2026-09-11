@@ -503,7 +503,17 @@ def retry_export(
             status_code=500,
             detail="S12 durable Job pointer is missing; retry rejected",
         )
-    _, seen = _job_state_in(session, _job_key(run_id), workspace_id, rec.job_id)
+    try:
+        _, seen = _job_state_in(session, _job_key(run_id), workspace_id, rec.job_id)
+    except HTTPException:
+        session.rollback()
+        raise
+    except Exception as err:
+        session.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"S12 durable Job lookup failed closed: {err}",
+        ) from err
     # A cancelled run's own job lingering in ``cancelling`` is NOT competing
     # work — the run is terminal and the retry creates a NEW run + NEW job.
     # Only a genuinely active (queued/running) job blocks the retry.
