@@ -64,3 +64,26 @@ Guard and evidence root: `C:\Users\Admin\mfqa\s12-lc3-r3\20260911T034253Z\RETRY`
 
 These exact preimages are transferred exclusively to
 `tests/s12/s12-lc3-retry/`; their contents are not edited in transit.
+
+## R4 correction design and proof plan
+
+R4 preserves the landed additive schema and migration byte-for-byte. Claim
+admission now validates the whole immutable chain before inserting a lease:
+attempt 1 is the sole root, each later attempt points to the terminal prior
+attempt with identical workspace/project/video and frozen checkpoint,
+manifest, profile, plan, frame and chunk configuration, and cycles or wrong
+attempts are rejected. The durable worker supplies its actual Job ID to that
+claim. Retry creation uses one session transaction for successor row, exact
+Job row and pointer binding; commit uncertainty is reconciled only by exact
+successor plus unfiltered workspace Job lookup. No predecessor, plan,
+checkpoint, migration or unrelated table is reset or rewritten.
+
+R4 proof nodes are `test_r4_retry_execution.py`: failed and cancelled chains
+exercise actual registered DurableWorker attempts; malformed lineage has no
+lease; two live sessions rendezvous at `create_successor_run` and assert one
+winner/one successor/one Job; generation, manifest and query faults assert
+zero Run/Job delta; a pre-existing zero-Job successor is repaired exactly
+once; and a lost commit acknowledgement replays the exact pair. Existing
+sequential replay controls remain separate. Fresh raw evidence belongs under
+`C:\Users\Admin\Documents\Codex\2026-09-11\tr-x20\outputs\s12-r4-owner-submission\20260911T195310Z\RETRY`;
+runtime belongs under the matching `C:\Users\Admin\Documents\Codex\work\s12-r4\20260911T195310Z\RETRY`.

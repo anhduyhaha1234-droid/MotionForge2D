@@ -177,3 +177,23 @@ uniqueness rule. Job binding is durable and one-to-one. A missing, ambiguous,
 cross-workspace, stale, materially different, corrupt or query-failed run/Job
 identity fails closed with rollback and no unintended mutation. Plan and
 checkpoint pins are never randomized, reset, deleted or rewritten.
+
+## S12-LC3-R4 retry execution and uncertainty addendum
+
+The durable worker admits a retry attempt only after validating the complete
+chain: a non-null lineage has a root attempt 1, every predecessor is the
+immediate prior attempt in the same workspace/project/video and frozen pin
+set, every predecessor is terminal, and no pointer is missing, self-referential
+or cyclic. The worker claim may additionally carry the durable Job ID; a
+different or corrupt pointer is rejected before lease mutation. Therefore
+attempts 2 and 3 use the same claim/fence operation as attempt 1 without
+resetting their attempt number or changing their plan/checkpoint.
+
+Retry successor creation, exact Job creation, and run-to-Job binding are one
+transaction. A committed retry has one immediate successor and one Job; a
+missing Job may be repaired only by an exact-key, exact-manifest bind, and a
+lost commit acknowledgement is reconciled by rereading the unique successor
+and its unfiltered workspace-scoped Job rows. Ambiguous, wrong-scope, tampered,
+query-failed, enqueue-failed or bind-failed identities roll back with zero new
+Run/Job rows. The initial-submit idempotency key remains unchanged and no
+global JobService or unrelated domain table is modified.

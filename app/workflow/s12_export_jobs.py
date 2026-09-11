@@ -182,13 +182,112 @@ def submit_retry_export_job(
     fps_den: int = 0,
     priority: int = 50,
 ) -> tuple[Any, Any, bool]:
-    """Append one S12 successor and bind exactly one durable Job to it."""
+    """Append one successor and its Job in one durable transaction."""
+    from app.persistence import StepInput  # noqa: PLC0415
+    from app.persistence.jobs import JobRepository  # noqa: PLC0415
+    from app.persistence.models import Job, S12ExportRun  # noqa: PLC0415
     from app.persistence.s12_export import S12ExportRepository  # noqa: PLC0415
 
     factory = getattr(job_service, "session_factory", None)
     if factory is None:
         raise S12ExportSubmitError("job service has no session factory")
     key = f"s12_retry:{predecessor_run_id}"
+
+    def make_manifest(run: Any) -> dict[str, Any]:
+        try:
+            chunk_config = json.loads(run_chunk_config(run))
+        except (TypeError, ValueError) as err:
+            raise S12ExportSubmitError(
+                "retry predecessor has corrupt chunk configuration"
+            ) from err
+        if not isinstance(chunk_config, dict):
+            raise S12ExportSubmitError("retry predecessor has invalid chunk configuration")
+        return {
+            "schema_version": 1,
+            "managed_root": str(getattr(job_service, "managed_root", "")),
+            "run_id": run.id,
+            "workspace_id": workspace_id,
+            "project_id": project_id,
+            "video_item_id": run.video_item_id,
+            "profile_id": run.profile_id,
+            "plan_hash": run.plan_hash,
+            "checkpoint_hash": run.checkpoint_hash,
+            "frame_count": run.frame_count,
+            "source_path": source_path,
+            "fps": float(fps),
+            "chunk_dir": chunk_dir,
+            "scratch_dir": scratch_dir,
+            "output_path": output_path,
+            "audio_source": audio_source,
+            "max_frames_per_chunk": int(chunk_config.get("max_frames", 120)),
+            "overlap_frames": int(chunk_config.get("overlap", 4)),
+            "expected_sha256": expected_sha256,
+            "fps_num": int(fps_num),
+            "fps_den": int(fps_den),
+            "manifest_id": run.manifest_id,
+            "manifest_generation": run.manifest_generation,
+            "lineage_id": run.lineage_id,
+            "predecessor_run_id": run.predecessor_run_id,
+            "attempt": run.attempt,
+            "chunk_config": chunk_config,
+        }
+
+    def ensure_pair(session: Any, run: Any, manifest: dict[str, Any]) -> Any:
+        jobs = JobRepository(session)
+        repo = S12ExportRepository(session)
+        rows = list(
+            session.scalars(
+                select(Job).where(
+                    Job.workspace_id == workspace_id,
+                    Job.idempotency_key == f"s12_export_job:{run.id}",
+                )
+            )
+        )
+        if len(rows) > 1:
+            raise S12ExportSubmitError(
+                f"retry Job identity is ambiguous for run {run.id!r}"
+            )
+        if run.job_id is not None:
+            if len(rows) != 1 or str(rows[0].id) != str(run.job_id):
+                raise S12ExportSubmitError(
+                    f"retry run {run.id!r} has a corrupt durable Job pointer"
+                )
+            job_record = jobs.get_job(str(run.job_id))
+        elif rows:
+            job_record = jobs.get_job(str(rows[0].id))
+        else:
+            job_record = jobs.create_job(
+                workspace_id=workspace_id,
+                job_type=S12_EXPORT_JOB_TYPE,
+                owner_type="project",
+                owner_id=project_id,
+                input_manifest=manifest,
+                idempotency_key=f"s12_export_job:{run.id}",
+                input_generation=run.plan_hash,
+                priority=int(priority),
+                steps=[StepInput(step_code="run", position=0, step_type="sync")],
+                actor="api",
+            )
+        repo.bind_job(run.id, job_record.id)
+        return job_record
+
+    def reconcile_pair() -> tuple[Any, Any, bool]:
+        with factory() as session:
+            repo = S12ExportRepository(session)
+            successor = session.scalar(
+                select(S12ExportRun).where(
+                    S12ExportRun.predecessor_run_id == predecessor_run_id
+                )
+            )
+            if successor is None:
+                raise S12ExportSubmitError(
+                    "retry transaction uncertainty resolved to no successor"
+                )
+            run = repo.get_run(successor.id)
+            job_record = ensure_pair(session, run, make_manifest(run))
+            session.commit()
+            return repo.get_run(run.id), job_service._job_info(job_record), False
+
     with factory() as session:
         repo = S12ExportRepository(session)
         try:
@@ -198,49 +297,21 @@ def submit_retry_export_job(
                 project_id=project_id,
                 idempotency_key=key,
             )
+            job_record = ensure_pair(session, run, make_manifest(run))
+            bound_run = repo.get_run(run.id)
             session.commit()
+            return bound_run, job_service._job_info(job_record), created
         except Exception as err:
             session.rollback()
-            raise S12ExportSubmitError(f"retry successor creation failed: {err}") from err
-
-    try:
-        chunk_config = json.loads(run_chunk_config(run))
-    except (TypeError, ValueError) as err:
-        raise S12ExportSubmitError("retry predecessor has corrupt chunk configuration") from err
-    manifest = {
-        "schema_version": 1,
-        "run_id": run.id,
-        "workspace_id": workspace_id,
-        "project_id": project_id,
-        "video_item_id": run.video_item_id,
-        "profile_id": run.profile_id,
-        "plan_hash": run.plan_hash,
-        "checkpoint_hash": run.checkpoint_hash,
-        "frame_count": run.frame_count,
-        "source_path": source_path,
-        "fps": float(fps),
-        "chunk_dir": chunk_dir,
-        "scratch_dir": scratch_dir,
-        "output_path": output_path,
-        "audio_source": audio_source,
-        "max_frames_per_chunk": int(chunk_config.get("max_frames", 120)),
-        "overlap_frames": int(chunk_config.get("overlap", 4)),
-        "expected_sha256": expected_sha256,
-        "fps_num": int(fps_num),
-        "fps_den": int(fps_den),
-    }
-    job, bound_run = _enqueue_and_bind_job(
-        job_service,
-        factory=factory,
-        run=run,
-        manifest=manifest,
-        workspace_id=workspace_id,
-        project_id=project_id,
-        job_key=f"s12_export_job:{run.id}",
-        input_generation=run.plan_hash,
-        priority=int(priority),
-    )
-    return bound_run, job, created
+            try:
+                return reconcile_pair()
+            except S12ExportSubmitError:
+                raise
+            except Exception as reconcile_err:
+                raise S12ExportSubmitError(
+                    f"retry transaction failed closed: {err}; "
+                    f"reconciliation failed: {reconcile_err}"
+                ) from reconcile_err
 
 
 def run_chunk_config(run: Any) -> str:
@@ -353,7 +424,11 @@ def _s12_export_handler(ctx: Any) -> dict[str, Any]:
 
     with factory() as session:
         repo = S12ExportRepository(session)
-        lease = repo.claim_run(run_id, ctx.worker_id)
+        lease = repo.claim_run(
+            run_id,
+            ctx.worker_id,
+            job_id=getattr(ctx, "job_id", None),
+        )
         session.commit()
         claimed_run = repo.get_run(run_id)
         owner_scratch = (
