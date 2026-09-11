@@ -16,6 +16,9 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from conftest import _DURATION as DURATION
+from conftest import _FPS as FPS
+from conftest import build_media
 
 from app.services.s12_export.validation import (
     AudioReference,
@@ -27,10 +30,6 @@ from app.services.s12_export.validation import (
     sha256_file,
     validate,
 )
-
-from conftest import _DURATION as DURATION
-from conftest import _FPS as FPS
-from conftest import build_media
 
 FRAMES = int(FPS * DURATION)
 W, H = 320, 180

@@ -30,3 +30,19 @@ The complete R2 envelopes and raw summaries are in `evidence/20260910T1305Z-r2.m
 | 2026-09-10T13:38:34Z–13:38:35Z | Exact four-file compileall, Ruff F/I, diff-check | all exit 0 |
 
 The correction evidence is `evidence/20260910T1339Z-static-correction.md`.
+
+## C3 R3 exact-owner continuation
+
+| 2026-09-11T03:55:14Z–03:56:00Z | R3 S01/S02/S04 micro, including one preserved test-harness red | corrected micro 4 passed, exit 0 |
+| 2026-09-11T04:00:52Z–04:01:20Z | R3 S05 actual-worker micro harness corrections | import/lease-expiry harness reds preserved; no production red |
+| 2026-09-11T04:09:28.7280619Z–04:10:34.9141286Z | R3 full allowed VAL/T03C publication/T04A gate | 78 passed, 64 warnings, exit 0 |
+| 2026-09-11T04:10:44.7661323Z–04:10:44.9159277Z | R3 exact-path compileall, Ruff F/I, diff check | all exit 0 |
+| 2026-09-11T04:11:50.2818279Z–04:11:57.7844019Z | R3 bounded native 4/8/16-frame resource sample | 2 passed, exit 0; peak scratch/RSS recorded |
+| 2026-09-11T04:14:02.9049017Z–04:14:02.9802085Z | R3 baseline-val-r3 post-write-set guard | VERIFIED; 75 entries, 0 failures, exit 0 |
+
+The complete R3 command envelopes, raw markers, process reaping, resource
+limits, and preserved work snapshot result are in
+`evidence/20260911T041253Z-r3.md`. The final supplied `baseline-val-r3.json`
+post-write-set guard is recorded as
+`evidence/20260911T041253Z-post-guard-r3.json`. This remains a local
+transport checkpoint, not an approval or closure claim.

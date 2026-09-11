@@ -41,6 +41,7 @@ from typing import Any
 
 __all__ = [
     "PublicationError",
+    "PublicationPathError",
     "PublicationRaceLost",
     "publish_export_run",
 ]
@@ -55,6 +56,12 @@ _RECEIPT_SUFFIX = ".publication.json"
 
 class PublicationError(ValueError):
     """Fail-closed publication gate error."""
+
+
+class PublicationPathError(PublicationError):
+    """The public artifact or its immutable companions cannot be addressed."""
+
+    code = "S12_T03C_PUBLICATION_PATH_INVALID"
 
 
 class PublicationRaceLost(PublicationError):
@@ -131,19 +138,107 @@ def _write_publication_receipt(final: Path, payload: dict[str, Any]) -> None:
     )
 
 
+def _receipt_payload(
+    run: Any,
+    *,
+    run_id: str,
+    workspace_id: str,
+    project_id: str,
+    fence_token: str,
+    artifact_sha: str,
+    verdict: Any,
+) -> dict[str, Any]:
+    """Build the durable identity record shared by fresh and recovered writes."""
+    return {
+        "version": 1,
+        "run_id": run_id,
+        "workspace_id": workspace_id,
+        "project_id": project_id,
+        "video_item_id": run.video_item_id,
+        "attempt": int(run.attempt),
+        "fence_token": fence_token,
+        "checkpoint_hash": run.checkpoint_hash,
+        "manifest_hash": run.manifest_hash,
+        "plan_hash": run.plan_hash,
+        "profile_id": run.profile_id,
+        "artifact_sha256": artifact_sha,
+        "candidate_sha256": artifact_sha,
+        "validation_verdict": verdict.verdict,
+        "validation_probes": [
+            p.name for p in verdict.probes if p.verdict == "PASS"
+        ],
+    }
+
+
 def _before_publication_primitive(candidate: Path, final: Path) -> None:
     """Rendezvous seam immediately before exclusive final creation."""
     _ = candidate, final
 
 
 def _publish_candidate_exclusive(candidate: Path, final: Path) -> None:
-    """Expose a candidate exactly once without an overwrite-capable rename."""
+    """Expose a distinct candidate inode exactly once without overwrite."""
+    temporary = candidate.with_name(f"{candidate.name}.{uuid.uuid4().hex}.tmp")
+    fd: int | None = None
     try:
-        os.link(candidate, final)
+        fd = os.open(
+            str(temporary),
+            os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+            0o600,
+        )
+        with candidate.open("rb") as source, os.fdopen(fd, "wb") as target:
+            fd = None
+            while True:
+                block = source.read(_HASH_CHUNK)
+                if not block:
+                    break
+                target.write(block)
+            target.flush()
+            os.fsync(target.fileno())
+        # The temporary is in the owner scratch root, while the final link is
+        # exclusive.  Thus the candidate and final are never the same inode,
+        # and a winner cannot be replaced by a stale participant.
+        os.link(temporary, final)
     except FileExistsError as err:
         raise PublicationRaceLost(
             f"publication race lost: final already exists and is immutable: {final}"
         ) from err
+    finally:
+        if fd is not None:
+            os.close(fd)
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+_MAX_PUBLICATION_COMPONENT_BYTES = 240
+_MAX_PUBLICATION_PATH_CHARS = 32767
+
+
+def _preflight_publication_paths(final: Path) -> None:
+    """Validate final/sidecar/receipt names before any public mutation."""
+    if not final.is_absolute():
+        raise PublicationPathError("public output path must be absolute")
+    paths = (final, _sidecar_path(final), _publication_receipt_path(final))
+    if not final.parent.is_dir() or final.parent.is_symlink():
+        raise PublicationPathError(
+            f"public output parent is not an owned directory: {final.parent}"
+        )
+    for path in paths:
+        try:
+            component_bytes = len(path.name.encode("utf-8"))
+        except UnicodeError as err:
+            raise PublicationPathError(
+                f"public output name is not encodable: {path.name!r}"
+            ) from err
+        if component_bytes > _MAX_PUBLICATION_COMPONENT_BYTES:
+            raise PublicationPathError(
+                f"public output companion name is too long: {path.name!r}"
+            )
+        if len(str(path)) > _MAX_PUBLICATION_PATH_CHARS:
+            raise PublicationPathError(
+                f"public output companion path is too long: {path}"
+            )
 
 
 def publish_export_run(
@@ -205,6 +300,17 @@ def publish_export_run(
             fence_token=fence_token,
         )
         raise PublicationError("public output must not carry the .partial suffix")
+    try:
+        _preflight_publication_paths(final)
+    except PublicationPathError:
+        _cleanup_publication_scratch(
+            manifest,
+            session=session,
+            run_id=run_id,
+            worker_id=worker_id,
+            fence_token=fence_token,
+        )
+        raise
     if final.exists() or final.is_symlink():
         recovered = _recover_pending_publication(
             session,
@@ -368,25 +474,15 @@ def publish_export_run(
     try:
         _write_publication_receipt(
             final,
-            {
-                "version": 1,
-                "run_id": run_id,
-                "workspace_id": workspace_id,
-                "project_id": project_id,
-                "video_item_id": run.video_item_id,
-                "attempt": int(run.attempt),
-                "fence_token": fence_token,
-                "checkpoint_hash": run.checkpoint_hash,
-                "manifest_hash": run.manifest_hash,
-                "plan_hash": run.plan_hash,
-                "profile_id": run.profile_id,
-                "artifact_sha256": actual_sha,
-                "candidate_sha256": actual_sha,
-                "validation_verdict": verdict.verdict,
-                "validation_probes": [
-                    p.name for p in verdict.probes if p.verdict == "PASS"
-                ],
-            },
+            _receipt_payload(
+                run,
+                run_id=run_id,
+                workspace_id=workspace_id,
+                project_id=project_id,
+                fence_token=fence_token,
+                artifact_sha=actual_sha,
+                verdict=verdict,
+            ),
         )
         receipt_owned = True
     except OSError as err:
@@ -485,7 +581,25 @@ def _recover_pending_publication(
     readiness, and a fresh source-locked PASS.  A completed winner without
     this proof is preserved and never overwritten or deleted.
     """
+    if final.is_symlink() or not final.is_file():
+        return None
     receipt_path = _publication_receipt_path(final)
+    if receipt_path.is_symlink():
+        return None
+    if not receipt_path.exists():
+        if not _recover_pre_receipt_publication(
+            session,
+            repo,
+            run,
+            run_id=run_id,
+            workspace_id=workspace_id,
+            project_id=project_id,
+            worker_id=worker_id,
+            fence_token=fence_token,
+            manifest=manifest,
+            final=final,
+        ):
+            return None
     try:
         receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
         if not isinstance(receipt, dict):
@@ -564,6 +678,69 @@ def _recover_pending_publication(
             for p in verdict.probes
         ],
     }
+
+
+def _recover_pre_receipt_publication(
+    session: Any,
+    repo: Any,
+    run: Any,
+    *,
+    run_id: str,
+    workspace_id: str,
+    project_id: str,
+    worker_id: str,
+    fence_token: str,
+    manifest: dict[str, Any],
+    final: Path,
+) -> bool:
+    """Rebuild a missing receipt only from a live, matching private attempt."""
+    if run.status not in ("running", "verifying"):
+        return False
+    sidecar = _sidecar_path(final)
+    candidate = _candidate_path(manifest)
+    if (
+        sidecar.is_symlink()
+        or not sidecar.is_file()
+        or candidate is None
+        or not candidate.is_file()
+    ):
+        return False
+    try:
+        actual_sha = _sha256_file(final)
+        candidate_sha = _sha256_file(candidate)
+        stored_sha = sidecar.read_text(encoding="ascii").strip().lower()
+        same_inode = os.path.samefile(candidate, final)
+    except (OSError, UnicodeError):
+        return False
+    if same_inode or candidate_sha != actual_sha or stored_sha != actual_sha:
+        return False
+    expected_sha = manifest.get("expected_sha256") or manifest.get("authority_sha256")
+    if expected_sha and str(expected_sha).lower() != actual_sha:
+        return False
+    _require_ready(session, workspace_id=workspace_id, project_id=project_id)
+    _require_fence(repo, run_id, worker_id, fence_token)
+    from app.services.s12_export.validation import validate  # noqa: PLC0415
+
+    expectation = _expectation_for(run, manifest, candidate_sha=actual_sha)
+    verdict = validate(final, expectation)
+    if verdict.verdict != "PASS":
+        return False
+    try:
+        _write_publication_receipt(
+            final,
+            _receipt_payload(
+                run,
+                run_id=run_id,
+                workspace_id=workspace_id,
+                project_id=project_id,
+                fence_token=fence_token,
+                artifact_sha=actual_sha,
+                verdict=verdict,
+            ),
+        )
+    except OSError:
+        return False
+    return True
 
 
 def _replay_completed(repo: Any, run_id: str, manifest: dict[str, Any]) -> dict[str, Any]:

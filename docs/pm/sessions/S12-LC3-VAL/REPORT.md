@@ -253,3 +253,31 @@ baseline guard is [20260910T1305Z-post-guard-r2.json](evidence/20260910T1305Z-po
 and passed with all baseline entries present, no destructive shrink, and only
 the allowlisted existing files changed. The exact-owner R2 result is a local
 transport checkpoint only; it is not an approval or closure claim.
+
+## C3 R3 exact-owner continuation
+
+R3 continued in the reviewed VAL worktree at
+`a9d350d7ac686af118ff4de35c41023cec70406f` with the requested
+`gpt-5.6-luna/high/fallback-OFF` route unchanged. The pre-existing untracked
+`work/` tree remained byte-for-byte unchanged at 58 files and 1,073,079 bytes.
+The required design note and finite anti-omission matrix are
+[20260911T-r3-design-matrix.md](evidence/20260911T-r3-design-matrix.md).
+
+The bounded R3 publication changes are in `publication.py`: distinct private
+candidate/public-final inodes through owner-scratch copy plus exclusive link,
+typed companion-path preflight before public mutation, and fail-closed
+pre-receipt recovery requiring matching candidate/sidecar hashes, distinct
+inode identity, current readiness/fence, and fresh source-locked validation.
+The actual worker E2E test reached the real publication boundary, killed and
+reaped the owned child, then recovered the same SQLite job/run in a fresh
+process while retaining chunks. Existing owned R1/R2 controls remain in the
+finite gate; no persistence, workflow, API, UI, schema, or other owner files
+were changed.
+
+The final allowed gate was 78 passed with 64 warnings and exit 0. Exact
+commands, UTC envelopes, raw markers, resource measurements, and preserved
+red harness attempts are in
+[20260911T041253Z-r3.md](evidence/20260911T041253Z-r3.md). Static checks were
+compileall 0, Ruff F/I 0, and diff-check 0. The final supplied baseline guard
+is [20260911T041253Z-post-guard-r3.json](evidence/20260911T041253Z-post-guard-r3.json).
+This is a local transport checkpoint only, not an approval or closure claim.
