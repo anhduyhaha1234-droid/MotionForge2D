@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import json
 import hashlib
+import json
 import os
 import shutil
 import subprocess
@@ -31,7 +31,6 @@ from app.services.s12_export.validation import (  # noqa: E402
     sha256_file,
     validate,
 )
-
 
 env = publication_base.env
 

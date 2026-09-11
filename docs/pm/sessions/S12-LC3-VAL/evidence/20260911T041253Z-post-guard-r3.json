@@ -1,0 +1,1584 @@
+{
+  "failures": [],
+  "manifest": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\baseline-val-r3.json",
+  "max_shrink_percent": 20.0,
+  "results": [
+    {
+      "after": {
+        "exists": true,
+        "lines": 1179,
+        "path": "app/services/s12_export/publication.py",
+        "sha256": "4FCDBA104B7F2CA5426FAD1A3D64A7E2E5AAEE511FBE5593414A3483226F688E",
+        "size": 42544
+      },
+      "allowed_change": true,
+      "before": {
+        "exists": true,
+        "lines": 1002,
+        "path": "app/services/s12_export/publication.py",
+        "sha256": "E72AF560648378C4A6DB6AD2C91A15A67E7FC092DBA0869147B801448B6FE98D",
+        "size": 36920,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\app\\services\\s12_export\\publication.py",
+        "snapshot_sha256": "E72AF560648378C4A6DB6AD2C91A15A67E7FC092DBA0869147B801448B6FE98D"
+      },
+      "changed": true,
+      "path": "app/services/s12_export/publication.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 964,
+        "path": "app/services/s12_export/runner.py",
+        "sha256": "ADBF98D7E6BC24E8B09D940FC6A14C69AD659DF12FB2E3B6F3AE6E838B1FD000",
+        "size": 37998
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 964,
+        "path": "app/services/s12_export/runner.py",
+        "sha256": "ADBF98D7E6BC24E8B09D940FC6A14C69AD659DF12FB2E3B6F3AE6E838B1FD000",
+        "size": 37998,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\app\\services\\s12_export\\runner.py",
+        "snapshot_sha256": "ADBF98D7E6BC24E8B09D940FC6A14C69AD659DF12FB2E3B6F3AE6E838B1FD000"
+      },
+      "changed": false,
+      "path": "app/services/s12_export/runner.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 520,
+        "path": "app/services/s12_export/stitch.py",
+        "sha256": "FDEDED5652F89FC231D488569C7014E4BB3F781F2202D6C30980CF1D95F40D1D",
+        "size": 17407
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 520,
+        "path": "app/services/s12_export/stitch.py",
+        "sha256": "FDEDED5652F89FC231D488569C7014E4BB3F781F2202D6C30980CF1D95F40D1D",
+        "size": 17407,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\app\\services\\s12_export\\stitch.py",
+        "snapshot_sha256": "FDEDED5652F89FC231D488569C7014E4BB3F781F2202D6C30980CF1D95F40D1D"
+      },
+      "changed": false,
+      "path": "app/services/s12_export/stitch.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 2081,
+        "path": "app/services/s12_export/validation.py",
+        "sha256": "66FB87169CE8141ACBAA2AB0D68591D49ED90BC6DED0C94F724664FF54F6507F",
+        "size": 76392
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 2081,
+        "path": "app/services/s12_export/validation.py",
+        "sha256": "66FB87169CE8141ACBAA2AB0D68591D49ED90BC6DED0C94F724664FF54F6507F",
+        "size": 76392,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\app\\services\\s12_export\\validation.py",
+        "snapshot_sha256": "66FB87169CE8141ACBAA2AB0D68591D49ED90BC6DED0C94F724664FF54F6507F"
+      },
+      "changed": false,
+      "path": "app/services/s12_export/validation.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 40,
+        "path": "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T051228Z-r01-r03-r04-micro.md",
+        "sha256": "C0C197284584221EE941EBA9CAD9FB355BD497742169C001BBE4B826CA493764",
+        "size": 3321
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 40,
+        "path": "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T051228Z-r01-r03-r04-micro.md",
+        "sha256": "C0C197284584221EE941EBA9CAD9FB355BD497742169C001BBE4B826CA493764",
+        "size": 3321,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\docs\\pm\\sessions\\S12-LC3-VAL\\evidence\\20260910T051228Z-r01-r03-r04-micro.md",
+        "snapshot_sha256": "C0C197284584221EE941EBA9CAD9FB355BD497742169C001BBE4B826CA493764"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T051228Z-r01-r03-r04-micro.md"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 28,
+        "path": "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T071125Z-post-guard.json",
+        "sha256": "605806D25D9D9A460ACEECC59077F187F4D0AFE57527A43E984D48C8E5B911A3",
+        "size": 5005
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 28,
+        "path": "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T071125Z-post-guard.json",
+        "sha256": "605806D25D9D9A460ACEECC59077F187F4D0AFE57527A43E984D48C8E5B911A3",
+        "size": 5005,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\docs\\pm\\sessions\\S12-LC3-VAL\\evidence\\20260910T071125Z-post-guard.json",
+        "snapshot_sha256": "605806D25D9D9A460ACEECC59077F187F4D0AFE57527A43E984D48C8E5B911A3"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T071125Z-post-guard.json"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 53,
+        "path": "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T075450Z-code-for-correction.md",
+        "sha256": "65A128DC9EDD4FE3ECF9C653B75F85504F1AB0E3CC43294C609FD1A695994A21",
+        "size": 2199
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 53,
+        "path": "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T075450Z-code-for-correction.md",
+        "sha256": "65A128DC9EDD4FE3ECF9C653B75F85504F1AB0E3CC43294C609FD1A695994A21",
+        "size": 2199,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\docs\\pm\\sessions\\S12-LC3-VAL\\evidence\\20260910T075450Z-code-for-correction.md",
+        "snapshot_sha256": "65A128DC9EDD4FE3ECF9C653B75F85504F1AB0E3CC43294C609FD1A695994A21"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T075450Z-code-for-correction.md"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 74,
+        "path": "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T1052Z-r1.md",
+        "sha256": "D525128B64D24FF67742C986F47D0D76C019FDC66E0A7E3B04CCA59692203011",
+        "size": 3935
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 74,
+        "path": "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T1052Z-r1.md",
+        "sha256": "D525128B64D24FF67742C986F47D0D76C019FDC66E0A7E3B04CCA59692203011",
+        "size": 3935,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\docs\\pm\\sessions\\S12-LC3-VAL\\evidence\\20260910T1052Z-r1.md",
+        "snapshot_sha256": "D525128B64D24FF67742C986F47D0D76C019FDC66E0A7E3B04CCA59692203011"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T1052Z-r1.md"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 56,
+        "path": "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T1057Z-post-guard-r1.json",
+        "sha256": "13BFD7DD1DA8954E46B4938E4F75491CEB6EE0056E1C449DBB51D1F42B39F8D1",
+        "size": 4546
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 56,
+        "path": "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T1057Z-post-guard-r1.json",
+        "sha256": "13BFD7DD1DA8954E46B4938E4F75491CEB6EE0056E1C449DBB51D1F42B39F8D1",
+        "size": 4546,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\docs\\pm\\sessions\\S12-LC3-VAL\\evidence\\20260910T1057Z-post-guard-r1.json",
+        "snapshot_sha256": "13BFD7DD1DA8954E46B4938E4F75491CEB6EE0056E1C449DBB51D1F42B39F8D1"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T1057Z-post-guard-r1.json"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 24,
+        "path": "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T1305Z-post-guard-r2.json",
+        "sha256": "4966E611E16079EFA69F2BBBA4A4ECB395E21B7CCD34346DEB2F4765BBF967AF",
+        "size": 2974
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 24,
+        "path": "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T1305Z-post-guard-r2.json",
+        "sha256": "4966E611E16079EFA69F2BBBA4A4ECB395E21B7CCD34346DEB2F4765BBF967AF",
+        "size": 2974,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\docs\\pm\\sessions\\S12-LC3-VAL\\evidence\\20260910T1305Z-post-guard-r2.json",
+        "snapshot_sha256": "4966E611E16079EFA69F2BBBA4A4ECB395E21B7CCD34346DEB2F4765BBF967AF"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T1305Z-post-guard-r2.json"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 158,
+        "path": "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T1305Z-r2.md",
+        "sha256": "EEB7CC9DE8DC1290694DD22E9D0E379AF9677BBD9B6D4D014C0493C989211800",
+        "size": 6712
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 158,
+        "path": "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T1305Z-r2.md",
+        "sha256": "EEB7CC9DE8DC1290694DD22E9D0E379AF9677BBD9B6D4D014C0493C989211800",
+        "size": 6712,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\docs\\pm\\sessions\\S12-LC3-VAL\\evidence\\20260910T1305Z-r2.md",
+        "snapshot_sha256": "EEB7CC9DE8DC1290694DD22E9D0E379AF9677BBD9B6D4D014C0493C989211800"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T1305Z-r2.md"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 79,
+        "path": "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T1339Z-static-correction.md",
+        "sha256": "3B2BC8AF35297286CF977715BA478096E33953D7EE4C49995A30EA45EB96F1A5",
+        "size": 4093
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 79,
+        "path": "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T1339Z-static-correction.md",
+        "sha256": "3B2BC8AF35297286CF977715BA478096E33953D7EE4C49995A30EA45EB96F1A5",
+        "size": 4093,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\docs\\pm\\sessions\\S12-LC3-VAL\\evidence\\20260910T1339Z-static-correction.md",
+        "snapshot_sha256": "3B2BC8AF35297286CF977715BA478096E33953D7EE4C49995A30EA45EB96F1A5"
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-VAL/evidence/20260910T1339Z-static-correction.md"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 48,
+        "path": "docs/pm/sessions/S12-LC3-VAL/LOG.md",
+        "sha256": "1503DC042C38B2CC6C72C7CCF7D8E5B016E5F94D2B45A6C03D07C80C9F23CF10",
+        "size": 3331
+      },
+      "allowed_change": true,
+      "before": {
+        "exists": true,
+        "lines": 32,
+        "path": "docs/pm/sessions/S12-LC3-VAL/LOG.md",
+        "sha256": "A74AB14334BA92D3A95C9A0FBE0CDA9A43D2F3855BDB9567A19AF3B26CF8F141",
+        "size": 2109,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\docs\\pm\\sessions\\S12-LC3-VAL\\LOG.md",
+        "snapshot_sha256": "A74AB14334BA92D3A95C9A0FBE0CDA9A43D2F3855BDB9567A19AF3B26CF8F141"
+      },
+      "changed": true,
+      "path": "docs/pm/sessions/S12-LC3-VAL/LOG.md"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 283,
+        "path": "docs/pm/sessions/S12-LC3-VAL/REPORT.md",
+        "sha256": "7C80CC3AD940AA1CB69ADB0F3D7D97CE3DACDE9870C438BD94D44AC2CDE2E94D",
+        "size": 14408
+      },
+      "allowed_change": true,
+      "before": {
+        "exists": true,
+        "lines": 255,
+        "path": "docs/pm/sessions/S12-LC3-VAL/REPORT.md",
+        "sha256": "4A992125E93E6A5278CF910BABA982836DA8F26D2A34A89CD25EEEE425069511",
+        "size": 12781,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\docs\\pm\\sessions\\S12-LC3-VAL\\REPORT.md",
+        "snapshot_sha256": "4A992125E93E6A5278CF910BABA982836DA8F26D2A34A89CD25EEEE425069511"
+      },
+      "changed": true,
+      "path": "docs/pm/sessions/S12-LC3-VAL/REPORT.md"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 292,
+        "path": "tests/s12/s12-lc3-val/test_r2_ownership_recovery.py",
+        "sha256": "FCAEEC8B6B4944FBC06F6DFBB465BBE8E95A8B525A1209B0296354DF040DE7A9",
+        "size": 11720
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 292,
+        "path": "tests/s12/s12-lc3-val/test_r2_ownership_recovery.py",
+        "sha256": "FCAEEC8B6B4944FBC06F6DFBB465BBE8E95A8B525A1209B0296354DF040DE7A9",
+        "size": 11720,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\tests\\s12\\s12-lc3-val\\test_r2_ownership_recovery.py",
+        "snapshot_sha256": "FCAEEC8B6B4944FBC06F6DFBB465BBE8E95A8B525A1209B0296354DF040DE7A9"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-lc3-val/test_r2_ownership_recovery.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 864,
+        "path": "tests/s12/s12-t03c/test_publication.py",
+        "sha256": "0416C07ADCC0978D541976BB736949EE5263F158B283FCD509A60562ABDA9AA3",
+        "size": 33948
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 864,
+        "path": "tests/s12/s12-t03c/test_publication.py",
+        "sha256": "0416C07ADCC0978D541976BB736949EE5263F158B283FCD509A60562ABDA9AA3",
+        "size": 33948,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\tests\\s12\\s12-t03c\\test_publication.py",
+        "snapshot_sha256": "0416C07ADCC0978D541976BB736949EE5263F158B283FCD509A60562ABDA9AA3"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t03c/test_publication.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 995,
+        "path": "tests/s12/s12-t04a/test_c2_source_locked.py",
+        "sha256": "516F15763F8124D67424CC134D6BE1A0B745648F3773987C90325410A4218096",
+        "size": 37757
+      },
+      "allowed_change": true,
+      "before": {
+        "exists": true,
+        "lines": 996,
+        "path": "tests/s12/s12-t04a/test_c2_source_locked.py",
+        "sha256": "3EE1673CDE3D82324DBACF65638EC8F97012126BFEF687CAB0F63E6A03A87434",
+        "size": 37758,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\tests\\s12\\s12-t04a\\test_c2_source_locked.py",
+        "snapshot_sha256": "3EE1673CDE3D82324DBACF65638EC8F97012126BFEF687CAB0F63E6A03A87434"
+      },
+      "changed": true,
+      "path": "tests/s12/s12-t04a/test_c2_source_locked.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/s12t04a_c20/approved_ab.lst.txt",
+        "sha256": "E6A2127C5F7837514F4D2B3EF50E0EFE5ED726B3D7EA68F8A452B7EEFAB71152",
+        "size": 202
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/s12t04a_c20/approved_ab.lst.txt",
+        "sha256": "E6A2127C5F7837514F4D2B3EF50E0EFE5ED726B3D7EA68F8A452B7EEFAB71152",
+        "size": 202,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\s12t04a_c20\\approved_ab.lst.txt",
+        "snapshot_sha256": "E6A2127C5F7837514F4D2B3EF50E0EFE5ED726B3D7EA68F8A452B7EEFAB71152"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/s12t04a_c20/approved_ab.lst.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 90,
+        "path": "work/tmp/micro/s12t04a_c20/approved_ab.mp4",
+        "sha256": "6BC3D3A87168FB80B3AD9702674A428E6A0F89008474890F718D5038CA999166",
+        "size": 18472
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 90,
+        "path": "work/tmp/micro/s12t04a_c20/approved_ab.mp4",
+        "sha256": "6BC3D3A87168FB80B3AD9702674A428E6A0F89008474890F718D5038CA999166",
+        "size": 18472,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\s12t04a_c20\\approved_ab.mp4",
+        "snapshot_sha256": "6BC3D3A87168FB80B3AD9702674A428E6A0F89008474890F718D5038CA999166"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/s12t04a_c20/approved_ab.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/s12t04a_c20/approved_audio_ab.lst.txt",
+        "sha256": "EFEE8EC2C7A2AF6FFADDF65E2960057DB80AD02B96752711A2DFADC18C919045",
+        "size": 210
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/s12t04a_c20/approved_audio_ab.lst.txt",
+        "sha256": "EFEE8EC2C7A2AF6FFADDF65E2960057DB80AD02B96752711A2DFADC18C919045",
+        "size": 210,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\s12t04a_c20\\approved_audio_ab.lst.txt",
+        "snapshot_sha256": "EFEE8EC2C7A2AF6FFADDF65E2960057DB80AD02B96752711A2DFADC18C919045"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/s12t04a_c20/approved_audio_ab.lst.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 246,
+        "path": "work/tmp/micro/s12t04a_c20/approved_audio_ab.mp4",
+        "sha256": "2B282F6BE076D5D2F0D52CCFC5EA221FDA6D15F07C1961E81E1937C0A4A75202",
+        "size": 50186
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 246,
+        "path": "work/tmp/micro/s12t04a_c20/approved_audio_ab.mp4",
+        "sha256": "2B282F6BE076D5D2F0D52CCFC5EA221FDA6D15F07C1961E81E1937C0A4A75202",
+        "size": 50186,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\s12t04a_c20\\approved_audio_ab.mp4",
+        "snapshot_sha256": "2B282F6BE076D5D2F0D52CCFC5EA221FDA6D15F07C1961E81E1937C0A4A75202"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/s12t04a_c20/approved_audio_ab.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 81,
+        "path": "work/tmp/micro/s12t04a_c20/seg_880_2s.mp4",
+        "sha256": "D94D35F33D5E6ECC1E5E8925780F463ECF995A70E331A4A4192C12777B46ED8E",
+        "size": 22208
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 81,
+        "path": "work/tmp/micro/s12t04a_c20/seg_880_2s.mp4",
+        "sha256": "D94D35F33D5E6ECC1E5E8925780F463ECF995A70E331A4A4192C12777B46ED8E",
+        "size": 22208,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\s12t04a_c20\\seg_880_2s.mp4",
+        "snapshot_sha256": "D94D35F33D5E6ECC1E5E8925780F463ECF995A70E331A4A4192C12777B46ED8E"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/s12t04a_c20/seg_880_2s.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 126,
+        "path": "work/tmp/micro/s12t04a_c20/seg_a_440.mp4",
+        "sha256": "C8E9645CB350D119C86EB7BD2F542D8FBCABBF3DC747F9844EBBE391F6073849",
+        "size": 25758
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 126,
+        "path": "work/tmp/micro/s12t04a_c20/seg_a_440.mp4",
+        "sha256": "C8E9645CB350D119C86EB7BD2F542D8FBCABBF3DC747F9844EBBE391F6073849",
+        "size": 25758,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\s12t04a_c20\\seg_a_440.mp4",
+        "snapshot_sha256": "C8E9645CB350D119C86EB7BD2F542D8FBCABBF3DC747F9844EBBE391F6073849"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/s12t04a_c20/seg_a_440.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 81,
+        "path": "work/tmp/micro/s12t04a_c20/seg_a.mp4",
+        "sha256": "D16FCD95C4B93C1B8E5FDEDFEBF37CA117F084AFEB8E6C1BAE00E4833DDC55CC",
+        "size": 15858
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 81,
+        "path": "work/tmp/micro/s12t04a_c20/seg_a.mp4",
+        "sha256": "D16FCD95C4B93C1B8E5FDEDFEBF37CA117F084AFEB8E6C1BAE00E4833DDC55CC",
+        "size": 15858,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\s12t04a_c20\\seg_a.mp4",
+        "snapshot_sha256": "D16FCD95C4B93C1B8E5FDEDFEBF37CA117F084AFEB8E6C1BAE00E4833DDC55CC"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/s12t04a_c20/seg_a.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 56,
+        "path": "work/tmp/micro/s12t04a_c20/seg_b_880.mp4",
+        "sha256": "904E0CF929B52BD522FB01F47A81B2A1372F1B51C3572BF184CABEE81E8F585B",
+        "size": 12989
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 56,
+        "path": "work/tmp/micro/s12t04a_c20/seg_b_880.mp4",
+        "sha256": "904E0CF929B52BD522FB01F47A81B2A1372F1B51C3572BF184CABEE81E8F585B",
+        "size": 12989,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\s12t04a_c20\\seg_b_880.mp4",
+        "snapshot_sha256": "904E0CF929B52BD522FB01F47A81B2A1372F1B51C3572BF184CABEE81E8F585B"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/s12t04a_c20/seg_b_880.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 15,
+        "path": "work/tmp/micro/s12t04a_c20/seg_b.mp4",
+        "sha256": "A7EB5D874FD71D1EE823F2038CFE189F37C495B33CEB180FE42DE8E46F2E3904",
+        "size": 3391
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 15,
+        "path": "work/tmp/micro/s12t04a_c20/seg_b.mp4",
+        "sha256": "A7EB5D874FD71D1EE823F2038CFE189F37C495B33CEB180FE42DE8E46F2E3904",
+        "size": 3391,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\s12t04a_c20\\seg_b.mp4",
+        "snapshot_sha256": "A7EB5D874FD71D1EE823F2038CFE189F37C495B33CEB180FE42DE8E46F2E3904"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/s12t04a_c20/seg_b.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 111,
+        "path": "work/tmp/micro/s12t04a_c20/seg_c.mp4",
+        "sha256": "8BE129B3F76D0A56232A54D81397171C1B3A47FA61D0862B0E2B48CCE95A9464",
+        "size": 22720
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 111,
+        "path": "work/tmp/micro/s12t04a_c20/seg_c.mp4",
+        "sha256": "8BE129B3F76D0A56232A54D81397171C1B3A47FA61D0862B0E2B48CCE95A9464",
+        "size": 22720,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\s12t04a_c20\\seg_c.mp4",
+        "snapshot_sha256": "8BE129B3F76D0A56232A54D81397171C1B3A47FA61D0862B0E2B48CCE95A9464"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/s12t04a_c20/seg_c.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 210,
+        "path": "work/tmp/micro/s12t04a_pf0/pf_a.mp4",
+        "sha256": "3035314BFEC8A7BB726BD6D8E9514E8DB79D1BED613AE8DB3DF5BA032AA59CD5",
+        "size": 35417
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 210,
+        "path": "work/tmp/micro/s12t04a_pf0/pf_a.mp4",
+        "sha256": "3035314BFEC8A7BB726BD6D8E9514E8DB79D1BED613AE8DB3DF5BA032AA59CD5",
+        "size": 35417,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\s12t04a_pf0\\pf_a.mp4",
+        "snapshot_sha256": "3035314BFEC8A7BB726BD6D8E9514E8DB79D1BED613AE8DB3DF5BA032AA59CD5"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/s12t04a_pf0/pf_a.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 10,
+        "path": "work/tmp/micro/s12t04a_pf0/pf_b.mp4",
+        "sha256": "B752CB5191FC2096E7F780B9DCCFFEC90FE4C40972DF59455A6F29C14F1E636B",
+        "size": 4025
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 10,
+        "path": "work/tmp/micro/s12t04a_pf0/pf_b.mp4",
+        "sha256": "B752CB5191FC2096E7F780B9DCCFFEC90FE4C40972DF59455A6F29C14F1E636B",
+        "size": 4025,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\s12t04a_pf0\\pf_b.mp4",
+        "snapshot_sha256": "B752CB5191FC2096E7F780B9DCCFFEC90FE4C40972DF59455A6F29C14F1E636B"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/s12t04a_pf0/pf_b.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 76,
+        "path": "work/tmp/micro/s12t04a_xr0/lb_a.mp4",
+        "sha256": "CBD9399D2EFDB74CB6DBF46612A65360826F6E1156B461F7B425F43A169D1AC9",
+        "size": 16212
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 76,
+        "path": "work/tmp/micro/s12t04a_xr0/lb_a.mp4",
+        "sha256": "CBD9399D2EFDB74CB6DBF46612A65360826F6E1156B461F7B425F43A169D1AC9",
+        "size": 16212,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\s12t04a_xr0\\lb_a.mp4",
+        "snapshot_sha256": "CBD9399D2EFDB74CB6DBF46612A65360826F6E1156B461F7B425F43A169D1AC9"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/s12t04a_xr0/lb_a.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 13,
+        "path": "work/tmp/micro/s12t04a_xr0/lb_b.mp4",
+        "sha256": "345121A5D8818E639B39B2F559DA2F8708E86467A842E6C2A6ADCDBED582480F",
+        "size": 3725
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 13,
+        "path": "work/tmp/micro/s12t04a_xr0/lb_b.mp4",
+        "sha256": "345121A5D8818E639B39B2F559DA2F8708E86467A842E6C2A6ADCDBED582480F",
+        "size": 3725,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\s12t04a_xr0\\lb_b.mp4",
+        "snapshot_sha256": "345121A5D8818E639B39B2F559DA2F8708E86467A842E6C2A6ADCDBED582480F"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/s12t04a_xr0/lb_b.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 244,
+        "path": "work/tmp/micro/s12t04a_xr0/lb_b2.mp4",
+        "sha256": "04E2FC46AE779F802805090477A0AF7C901BD05F60074DD4A3CA7B43D1F745CC",
+        "size": 50662
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 244,
+        "path": "work/tmp/micro/s12t04a_xr0/lb_b2.mp4",
+        "sha256": "04E2FC46AE779F802805090477A0AF7C901BD05F60074DD4A3CA7B43D1F745CC",
+        "size": 50662,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\s12t04a_xr0\\lb_b2.mp4",
+        "snapshot_sha256": "04E2FC46AE779F802805090477A0AF7C901BD05F60074DD4A3CA7B43D1F745CC"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/s12t04a_xr0/lb_b2.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 210,
+        "path": "work/tmp/micro/test_c19_changed_audio_fails0/changed_audio.mp4",
+        "sha256": "8295CBBB86DCB1657BE3DCE710F854B4CA3F4476424DA3CE0FA53ADE2F0A0EF2",
+        "size": 49035
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 210,
+        "path": "work/tmp/micro/test_c19_changed_audio_fails0/changed_audio.mp4",
+        "sha256": "8295CBBB86DCB1657BE3DCE710F854B4CA3F4476424DA3CE0FA53ADE2F0A0EF2",
+        "size": 49035,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_c19_changed_audio_fails0\\changed_audio.mp4",
+        "snapshot_sha256": "8295CBBB86DCB1657BE3DCE710F854B4CA3F4476424DA3CE0FA53ADE2F0A0EF2"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_c19_changed_audio_fails0/changed_audio.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/test_c19_combined_reorder_and_0/approved.lst.txt",
+        "sha256": "EFEE8EC2C7A2AF6FFADDF65E2960057DB80AD02B96752711A2DFADC18C919045",
+        "size": 210
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/test_c19_combined_reorder_and_0/approved.lst.txt",
+        "sha256": "EFEE8EC2C7A2AF6FFADDF65E2960057DB80AD02B96752711A2DFADC18C919045",
+        "size": 210,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_c19_combined_reorder_and_0\\approved.lst.txt",
+        "snapshot_sha256": "EFEE8EC2C7A2AF6FFADDF65E2960057DB80AD02B96752711A2DFADC18C919045"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_c19_combined_reorder_and_0/approved.lst.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 246,
+        "path": "work/tmp/micro/test_c19_combined_reorder_and_0/approved.mp4",
+        "sha256": "2B282F6BE076D5D2F0D52CCFC5EA221FDA6D15F07C1961E81E1937C0A4A75202",
+        "size": 50186
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 246,
+        "path": "work/tmp/micro/test_c19_combined_reorder_and_0/approved.mp4",
+        "sha256": "2B282F6BE076D5D2F0D52CCFC5EA221FDA6D15F07C1961E81E1937C0A4A75202",
+        "size": 50186,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_c19_combined_reorder_and_0\\approved.mp4",
+        "snapshot_sha256": "2B282F6BE076D5D2F0D52CCFC5EA221FDA6D15F07C1961E81E1937C0A4A75202"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_c19_combined_reorder_and_0/approved.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/test_c19_combined_reorder_and_0/combined.lst.txt",
+        "sha256": "FB3996EF6EE472AA3A9A7FD9252731E504B7047E532BFC6D10B8777EB10A766B",
+        "size": 210
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/test_c19_combined_reorder_and_0/combined.lst.txt",
+        "sha256": "FB3996EF6EE472AA3A9A7FD9252731E504B7047E532BFC6D10B8777EB10A766B",
+        "size": 210,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_c19_combined_reorder_and_0\\combined.lst.txt",
+        "snapshot_sha256": "FB3996EF6EE472AA3A9A7FD9252731E504B7047E532BFC6D10B8777EB10A766B"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_c19_combined_reorder_and_0/combined.lst.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 176,
+        "path": "work/tmp/micro/test_c19_combined_reorder_and_0/combined.mp4",
+        "sha256": "2793A9DF3897A236F8AAA81DD2A2335EAFAECEC9197BFF473025BD6C3E5F283A",
+        "size": 37422
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 176,
+        "path": "work/tmp/micro/test_c19_combined_reorder_and_0/combined.mp4",
+        "sha256": "2793A9DF3897A236F8AAA81DD2A2335EAFAECEC9197BFF473025BD6C3E5F283A",
+        "size": 37422,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_c19_combined_reorder_and_0\\combined.mp4",
+        "snapshot_sha256": "2793A9DF3897A236F8AAA81DD2A2335EAFAECEC9197BFF473025BD6C3E5F283A"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_c19_combined_reorder_and_0/combined.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/test_c19_equal_length_reordere0/approved.lst.txt",
+        "sha256": "E6A2127C5F7837514F4D2B3EF50E0EFE5ED726B3D7EA68F8A452B7EEFAB71152",
+        "size": 202
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/test_c19_equal_length_reordere0/approved.lst.txt",
+        "sha256": "E6A2127C5F7837514F4D2B3EF50E0EFE5ED726B3D7EA68F8A452B7EEFAB71152",
+        "size": 202,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_c19_equal_length_reordere0\\approved.lst.txt",
+        "snapshot_sha256": "E6A2127C5F7837514F4D2B3EF50E0EFE5ED726B3D7EA68F8A452B7EEFAB71152"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_c19_equal_length_reordere0/approved.lst.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 90,
+        "path": "work/tmp/micro/test_c19_equal_length_reordere0/approved.mp4",
+        "sha256": "6BC3D3A87168FB80B3AD9702674A428E6A0F89008474890F718D5038CA999166",
+        "size": 18472
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 90,
+        "path": "work/tmp/micro/test_c19_equal_length_reordere0/approved.mp4",
+        "sha256": "6BC3D3A87168FB80B3AD9702674A428E6A0F89008474890F718D5038CA999166",
+        "size": 18472,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_c19_equal_length_reordere0\\approved.mp4",
+        "snapshot_sha256": "6BC3D3A87168FB80B3AD9702674A428E6A0F89008474890F718D5038CA999166"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_c19_equal_length_reordere0/approved.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/test_c19_equal_length_reordere0/reordered.lst.txt",
+        "sha256": "A62D0764CF7AA0D22842D1071F9F8D3792DBA609BFC6A1CD1CCCAF5220022275",
+        "size": 202
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/test_c19_equal_length_reordere0/reordered.lst.txt",
+        "sha256": "A62D0764CF7AA0D22842D1071F9F8D3792DBA609BFC6A1CD1CCCAF5220022275",
+        "size": 202,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_c19_equal_length_reordere0\\reordered.lst.txt",
+        "snapshot_sha256": "A62D0764CF7AA0D22842D1071F9F8D3792DBA609BFC6A1CD1CCCAF5220022275"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_c19_equal_length_reordere0/reordered.lst.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 89,
+        "path": "work/tmp/micro/test_c19_equal_length_reordere0/reordered.mp4",
+        "sha256": "BFA0E11ADD7140AAEFDEE0F269A56A826361013923AD82573EA08C6936C17BA6",
+        "size": 18477
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 89,
+        "path": "work/tmp/micro/test_c19_equal_length_reordere0/reordered.mp4",
+        "sha256": "BFA0E11ADD7140AAEFDEE0F269A56A826361013923AD82573EA08C6936C17BA6",
+        "size": 18477,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_c19_equal_length_reordere0\\reordered.mp4",
+        "snapshot_sha256": "BFA0E11ADD7140AAEFDEE0F269A56A826361013923AD82573EA08C6936C17BA6"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_c19_equal_length_reordere0/reordered.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/test_c19_timing_drift_fails0/drifted.lst.txt",
+        "sha256": "8CEBCD7704E4388C1EA8A5A0DED0CE93E486C231FFBF71DC05D2DB4C45D258DB",
+        "size": 208
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/test_c19_timing_drift_fails0/drifted.lst.txt",
+        "sha256": "8CEBCD7704E4388C1EA8A5A0DED0CE93E486C231FFBF71DC05D2DB4C45D258DB",
+        "size": 208,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_c19_timing_drift_fails0\\drifted.lst.txt",
+        "snapshot_sha256": "8CEBCD7704E4388C1EA8A5A0DED0CE93E486C231FFBF71DC05D2DB4C45D258DB"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_c19_timing_drift_fails0/drifted.lst.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 200,
+        "path": "work/tmp/micro/test_c19_timing_drift_fails0/drifted.mp4",
+        "sha256": "3285D239815210DC0569C62A7CB78B0260239825E879C3F020B6E7587D09AC32",
+        "size": 40380
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 200,
+        "path": "work/tmp/micro/test_c19_timing_drift_fails0/drifted.mp4",
+        "sha256": "3285D239815210DC0569C62A7CB78B0260239825E879C3F020B6E7587D09AC32",
+        "size": 40380,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_c19_timing_drift_fails0\\drifted.mp4",
+        "snapshot_sha256": "3285D239815210DC0569C62A7CB78B0260239825E879C3F020B6E7587D09AC32"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_c19_timing_drift_fails0/drifted.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 198,
+        "path": "work/tmp/micro/test_c28_audio_start_drift_fai0/audio_440_2s.mp4",
+        "sha256": "1DCBFE76DFB0AC970EDC8527D49E89596E35D71FD3C3FAF205CAF1E1D97838B8",
+        "size": 44105
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 198,
+        "path": "work/tmp/micro/test_c28_audio_start_drift_fai0/audio_440_2s.mp4",
+        "sha256": "1DCBFE76DFB0AC970EDC8527D49E89596E35D71FD3C3FAF205CAF1E1D97838B8",
+        "size": 44105,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_c28_audio_start_drift_fai0\\audio_440_2s.mp4",
+        "snapshot_sha256": "1DCBFE76DFB0AC970EDC8527D49E89596E35D71FD3C3FAF205CAF1E1D97838B8"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_c28_audio_start_drift_fai0/audio_440_2s.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 225,
+        "path": "work/tmp/micro/test_c28_audio_start_drift_fai0/delayed_audio.mp4",
+        "sha256": "3F4517F705C06CA04F99A39FBA932B9A3A400F77BA70A381C5F766693548562D",
+        "size": 45471
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 225,
+        "path": "work/tmp/micro/test_c28_audio_start_drift_fai0/delayed_audio.mp4",
+        "sha256": "3F4517F705C06CA04F99A39FBA932B9A3A400F77BA70A381C5F766693548562D",
+        "size": 45471,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_c28_audio_start_drift_fai0\\delayed_audio.mp4",
+        "snapshot_sha256": "3F4517F705C06CA04F99A39FBA932B9A3A400F77BA70A381C5F766693548562D"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_c28_audio_start_drift_fai0/delayed_audio.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/test_delta_psnr_changed_audio_0/approved_av.lst.txt",
+        "sha256": "EFEE8EC2C7A2AF6FFADDF65E2960057DB80AD02B96752711A2DFADC18C919045",
+        "size": 210
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/test_delta_psnr_changed_audio_0/approved_av.lst.txt",
+        "sha256": "EFEE8EC2C7A2AF6FFADDF65E2960057DB80AD02B96752711A2DFADC18C919045",
+        "size": 210,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_delta_psnr_changed_audio_0\\approved_av.lst.txt",
+        "snapshot_sha256": "EFEE8EC2C7A2AF6FFADDF65E2960057DB80AD02B96752711A2DFADC18C919045"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_delta_psnr_changed_audio_0/approved_av.lst.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 246,
+        "path": "work/tmp/micro/test_delta_psnr_changed_audio_0/approved_av.mp4",
+        "sha256": "2B282F6BE076D5D2F0D52CCFC5EA221FDA6D15F07C1961E81E1937C0A4A75202",
+        "size": 50186
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 246,
+        "path": "work/tmp/micro/test_delta_psnr_changed_audio_0/approved_av.mp4",
+        "sha256": "2B282F6BE076D5D2F0D52CCFC5EA221FDA6D15F07C1961E81E1937C0A4A75202",
+        "size": 50186,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_delta_psnr_changed_audio_0\\approved_av.mp4",
+        "snapshot_sha256": "2B282F6BE076D5D2F0D52CCFC5EA221FDA6D15F07C1961E81E1937C0A4A75202"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_delta_psnr_changed_audio_0/approved_av.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 218,
+        "path": "work/tmp/micro/test_delta_psnr_changed_audio_0/changed_audio.mp4",
+        "sha256": "8FE1685000888A9FA2DA2D935AD1C1AB2A64C81E4324196B73E7D76D04840695",
+        "size": 50007
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 218,
+        "path": "work/tmp/micro/test_delta_psnr_changed_audio_0/changed_audio.mp4",
+        "sha256": "8FE1685000888A9FA2DA2D935AD1C1AB2A64C81E4324196B73E7D76D04840695",
+        "size": 50007,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_delta_psnr_changed_audio_0\\changed_audio.mp4",
+        "snapshot_sha256": "8FE1685000888A9FA2DA2D935AD1C1AB2A64C81E4324196B73E7D76D04840695"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_delta_psnr_changed_audio_0/changed_audio.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/test_delta_psnr_combined_still0/approved_av.lst.txt",
+        "sha256": "EFEE8EC2C7A2AF6FFADDF65E2960057DB80AD02B96752711A2DFADC18C919045",
+        "size": 210
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/test_delta_psnr_combined_still0/approved_av.lst.txt",
+        "sha256": "EFEE8EC2C7A2AF6FFADDF65E2960057DB80AD02B96752711A2DFADC18C919045",
+        "size": 210,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_delta_psnr_combined_still0\\approved_av.lst.txt",
+        "snapshot_sha256": "EFEE8EC2C7A2AF6FFADDF65E2960057DB80AD02B96752711A2DFADC18C919045"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_delta_psnr_combined_still0/approved_av.lst.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 246,
+        "path": "work/tmp/micro/test_delta_psnr_combined_still0/approved_av.mp4",
+        "sha256": "2B282F6BE076D5D2F0D52CCFC5EA221FDA6D15F07C1961E81E1937C0A4A75202",
+        "size": 50186
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 246,
+        "path": "work/tmp/micro/test_delta_psnr_combined_still0/approved_av.mp4",
+        "sha256": "2B282F6BE076D5D2F0D52CCFC5EA221FDA6D15F07C1961E81E1937C0A4A75202",
+        "size": 50186,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_delta_psnr_combined_still0\\approved_av.mp4",
+        "snapshot_sha256": "2B282F6BE076D5D2F0D52CCFC5EA221FDA6D15F07C1961E81E1937C0A4A75202"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_delta_psnr_combined_still0/approved_av.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/test_delta_psnr_combined_still0/combined.lst.txt",
+        "sha256": "FB3996EF6EE472AA3A9A7FD9252731E504B7047E532BFC6D10B8777EB10A766B",
+        "size": 210
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/test_delta_psnr_combined_still0/combined.lst.txt",
+        "sha256": "FB3996EF6EE472AA3A9A7FD9252731E504B7047E532BFC6D10B8777EB10A766B",
+        "size": 210,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_delta_psnr_combined_still0\\combined.lst.txt",
+        "snapshot_sha256": "FB3996EF6EE472AA3A9A7FD9252731E504B7047E532BFC6D10B8777EB10A766B"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_delta_psnr_combined_still0/combined.lst.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 176,
+        "path": "work/tmp/micro/test_delta_psnr_combined_still0/combined.mp4",
+        "sha256": "2793A9DF3897A236F8AAA81DD2A2335EAFAECEC9197BFF473025BD6C3E5F283A",
+        "size": 37422
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 176,
+        "path": "work/tmp/micro/test_delta_psnr_combined_still0/combined.mp4",
+        "sha256": "2793A9DF3897A236F8AAA81DD2A2335EAFAECEC9197BFF473025BD6C3E5F283A",
+        "size": 37422,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_delta_psnr_combined_still0\\combined.mp4",
+        "snapshot_sha256": "2793A9DF3897A236F8AAA81DD2A2335EAFAECEC9197BFF473025BD6C3E5F283A"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_delta_psnr_combined_still0/combined.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 28,
+        "path": "work/tmp/micro/test_delta_psnr_legit_reencode0/reencode.mp4",
+        "sha256": "89CDAE16CC80850CC148BE299E2B19C83E2BB1365836D069F701E62F4DB52FFC",
+        "size": 7566
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 28,
+        "path": "work/tmp/micro/test_delta_psnr_legit_reencode0/reencode.mp4",
+        "sha256": "89CDAE16CC80850CC148BE299E2B19C83E2BB1365836D069F701E62F4DB52FFC",
+        "size": 7566,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_delta_psnr_legit_reencode0\\reencode.mp4",
+        "snapshot_sha256": "89CDAE16CC80850CC148BE299E2B19C83E2BB1365836D069F701E62F4DB52FFC"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_delta_psnr_legit_reencode0/reencode.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 90,
+        "path": "work/tmp/micro/test_delta_psnr_missing_refere0/candidate.mp4",
+        "sha256": "6BC3D3A87168FB80B3AD9702674A428E6A0F89008474890F718D5038CA999166",
+        "size": 18472
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 90,
+        "path": "work/tmp/micro/test_delta_psnr_missing_refere0/candidate.mp4",
+        "sha256": "6BC3D3A87168FB80B3AD9702674A428E6A0F89008474890F718D5038CA999166",
+        "size": 18472,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_delta_psnr_missing_refere0\\candidate.mp4",
+        "snapshot_sha256": "6BC3D3A87168FB80B3AD9702674A428E6A0F89008474890F718D5038CA999166"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_delta_psnr_missing_refere0/candidate.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 90,
+        "path": "work/tmp/micro/test_delta_psnr_missing_thresh0/candidate.mp4",
+        "sha256": "6BC3D3A87168FB80B3AD9702674A428E6A0F89008474890F718D5038CA999166",
+        "size": 18472
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 90,
+        "path": "work/tmp/micro/test_delta_psnr_missing_thresh0/candidate.mp4",
+        "sha256": "6BC3D3A87168FB80B3AD9702674A428E6A0F89008474890F718D5038CA999166",
+        "size": 18472,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_delta_psnr_missing_thresh0\\candidate.mp4",
+        "snapshot_sha256": "6BC3D3A87168FB80B3AD9702674A428E6A0F89008474890F718D5038CA999166"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_delta_psnr_missing_thresh0/candidate.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/test_delta_psnr_reorder_still_0/approved.lst.txt",
+        "sha256": "E6A2127C5F7837514F4D2B3EF50E0EFE5ED726B3D7EA68F8A452B7EEFAB71152",
+        "size": 202
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/test_delta_psnr_reorder_still_0/approved.lst.txt",
+        "sha256": "E6A2127C5F7837514F4D2B3EF50E0EFE5ED726B3D7EA68F8A452B7EEFAB71152",
+        "size": 202,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_delta_psnr_reorder_still_0\\approved.lst.txt",
+        "snapshot_sha256": "E6A2127C5F7837514F4D2B3EF50E0EFE5ED726B3D7EA68F8A452B7EEFAB71152"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_delta_psnr_reorder_still_0/approved.lst.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 90,
+        "path": "work/tmp/micro/test_delta_psnr_reorder_still_0/approved.mp4",
+        "sha256": "6BC3D3A87168FB80B3AD9702674A428E6A0F89008474890F718D5038CA999166",
+        "size": 18472
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 90,
+        "path": "work/tmp/micro/test_delta_psnr_reorder_still_0/approved.mp4",
+        "sha256": "6BC3D3A87168FB80B3AD9702674A428E6A0F89008474890F718D5038CA999166",
+        "size": 18472,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_delta_psnr_reorder_still_0\\approved.mp4",
+        "snapshot_sha256": "6BC3D3A87168FB80B3AD9702674A428E6A0F89008474890F718D5038CA999166"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_delta_psnr_reorder_still_0/approved.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/test_delta_psnr_reorder_still_0/reordered.lst.txt",
+        "sha256": "A62D0764CF7AA0D22842D1071F9F8D3792DBA609BFC6A1CD1CCCAF5220022275",
+        "size": 202
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/test_delta_psnr_reorder_still_0/reordered.lst.txt",
+        "sha256": "A62D0764CF7AA0D22842D1071F9F8D3792DBA609BFC6A1CD1CCCAF5220022275",
+        "size": 202,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_delta_psnr_reorder_still_0\\reordered.lst.txt",
+        "snapshot_sha256": "A62D0764CF7AA0D22842D1071F9F8D3792DBA609BFC6A1CD1CCCAF5220022275"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_delta_psnr_reorder_still_0/reordered.lst.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 89,
+        "path": "work/tmp/micro/test_delta_psnr_reorder_still_0/reordered.mp4",
+        "sha256": "BFA0E11ADD7140AAEFDEE0F269A56A826361013923AD82573EA08C6936C17BA6",
+        "size": 18477
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 89,
+        "path": "work/tmp/micro/test_delta_psnr_reorder_still_0/reordered.mp4",
+        "sha256": "BFA0E11ADD7140AAEFDEE0F269A56A826361013923AD82573EA08C6936C17BA6",
+        "size": 18477,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_delta_psnr_reorder_still_0\\reordered.mp4",
+        "snapshot_sha256": "BFA0E11ADD7140AAEFDEE0F269A56A826361013923AD82573EA08C6936C17BA6"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_delta_psnr_reorder_still_0/reordered.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/test_delta_psnr_timing_drift_s0/approved.lst.txt",
+        "sha256": "E6A2127C5F7837514F4D2B3EF50E0EFE5ED726B3D7EA68F8A452B7EEFAB71152",
+        "size": 202
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/test_delta_psnr_timing_drift_s0/approved.lst.txt",
+        "sha256": "E6A2127C5F7837514F4D2B3EF50E0EFE5ED726B3D7EA68F8A452B7EEFAB71152",
+        "size": 202,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_delta_psnr_timing_drift_s0\\approved.lst.txt",
+        "snapshot_sha256": "E6A2127C5F7837514F4D2B3EF50E0EFE5ED726B3D7EA68F8A452B7EEFAB71152"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_delta_psnr_timing_drift_s0/approved.lst.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 90,
+        "path": "work/tmp/micro/test_delta_psnr_timing_drift_s0/approved.mp4",
+        "sha256": "6BC3D3A87168FB80B3AD9702674A428E6A0F89008474890F718D5038CA999166",
+        "size": 18472
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 90,
+        "path": "work/tmp/micro/test_delta_psnr_timing_drift_s0/approved.mp4",
+        "sha256": "6BC3D3A87168FB80B3AD9702674A428E6A0F89008474890F718D5038CA999166",
+        "size": 18472,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_delta_psnr_timing_drift_s0\\approved.mp4",
+        "snapshot_sha256": "6BC3D3A87168FB80B3AD9702674A428E6A0F89008474890F718D5038CA999166"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_delta_psnr_timing_drift_s0/approved.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/test_delta_psnr_timing_drift_s0/drifted.lst.txt",
+        "sha256": "A9B1A589F6E7B6878221C2E028AC6528D445B04D4A7E41B9F433FE3DD810835D",
+        "size": 225
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/test_delta_psnr_timing_drift_s0/drifted.lst.txt",
+        "sha256": "A9B1A589F6E7B6878221C2E028AC6528D445B04D4A7E41B9F433FE3DD810835D",
+        "size": 225,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_delta_psnr_timing_drift_s0\\drifted.lst.txt",
+        "snapshot_sha256": "A9B1A589F6E7B6878221C2E028AC6528D445B04D4A7E41B9F433FE3DD810835D"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_delta_psnr_timing_drift_s0/drifted.lst.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 200,
+        "path": "work/tmp/micro/test_delta_psnr_timing_drift_s0/drifted.mp4",
+        "sha256": "3285D239815210DC0569C62A7CB78B0260239825E879C3F020B6E7587D09AC32",
+        "size": 40380
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 200,
+        "path": "work/tmp/micro/test_delta_psnr_timing_drift_s0/drifted.mp4",
+        "sha256": "3285D239815210DC0569C62A7CB78B0260239825E879C3F020B6E7587D09AC32",
+        "size": 40380,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_delta_psnr_timing_drift_s0\\drifted.mp4",
+        "snapshot_sha256": "3285D239815210DC0569C62A7CB78B0260239825E879C3F020B6E7587D09AC32"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_delta_psnr_timing_drift_s0/drifted.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 90,
+        "path": "work/tmp/micro/test_delta_psnr_wrong_referenc0/candidate.mp4",
+        "sha256": "6BC3D3A87168FB80B3AD9702674A428E6A0F89008474890F718D5038CA999166",
+        "size": 18472
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 90,
+        "path": "work/tmp/micro/test_delta_psnr_wrong_referenc0/candidate.mp4",
+        "sha256": "6BC3D3A87168FB80B3AD9702674A428E6A0F89008474890F718D5038CA999166",
+        "size": 18472,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_delta_psnr_wrong_referenc0\\candidate.mp4",
+        "snapshot_sha256": "6BC3D3A87168FB80B3AD9702674A428E6A0F89008474890F718D5038CA999166"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_delta_psnr_wrong_referenc0/candidate.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 113,
+        "path": "work/tmp/micro/test_delta_psnr_wrong_referenc0/wrong_ref.mp4",
+        "sha256": "CB3E22103585933E3820695133F5F7A9284BFB7DE6D68E6DD8B1CDA4723217AC",
+        "size": 25245
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 113,
+        "path": "work/tmp/micro/test_delta_psnr_wrong_referenc0/wrong_ref.mp4",
+        "sha256": "CB3E22103585933E3820695133F5F7A9284BFB7DE6D68E6DD8B1CDA4723217AC",
+        "size": 25245,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_delta_psnr_wrong_referenc0\\wrong_ref.mp4",
+        "snapshot_sha256": "CB3E22103585933E3820695133F5F7A9284BFB7DE6D68E6DD8B1CDA4723217AC"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_delta_psnr_wrong_referenc0/wrong_ref.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "work/tmp/micro/test_pf_letterbox_30_reorder_f0/approved_a.lst.txt",
+        "sha256": "E2877590DB138A69C8A93B1AE85D430E08E0D15C4F174B625147D9F588FACAD5",
+        "size": 100
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "work/tmp/micro/test_pf_letterbox_30_reorder_f0/approved_a.lst.txt",
+        "sha256": "E2877590DB138A69C8A93B1AE85D430E08E0D15C4F174B625147D9F588FACAD5",
+        "size": 100,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_pf_letterbox_30_reorder_f0\\approved_a.lst.txt",
+        "snapshot_sha256": "E2877590DB138A69C8A93B1AE85D430E08E0D15C4F174B625147D9F588FACAD5"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_pf_letterbox_30_reorder_f0/approved_a.lst.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 211,
+        "path": "work/tmp/micro/test_pf_letterbox_30_reorder_f0/approved_a.mp4",
+        "sha256": "138E65CDEBDFF1A77AE71D2E0E1EB60EDDAEB223DA0270B25E5A694B8E1187C4",
+        "size": 35451
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 211,
+        "path": "work/tmp/micro/test_pf_letterbox_30_reorder_f0/approved_a.mp4",
+        "sha256": "138E65CDEBDFF1A77AE71D2E0E1EB60EDDAEB223DA0270B25E5A694B8E1187C4",
+        "size": 35451,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_pf_letterbox_30_reorder_f0\\approved_a.mp4",
+        "snapshot_sha256": "138E65CDEBDFF1A77AE71D2E0E1EB60EDDAEB223DA0270B25E5A694B8E1187C4"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_pf_letterbox_30_reorder_f0/approved_a.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "work/tmp/micro/test_pf_letterbox_30_reorder_f0/approved_b.lst.txt",
+        "sha256": "793BCD8E386D49398E37640FB6F7583F48EF4386652CE38A0BF7A25B01FA7EC0",
+        "size": 100
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "work/tmp/micro/test_pf_letterbox_30_reorder_f0/approved_b.lst.txt",
+        "sha256": "793BCD8E386D49398E37640FB6F7583F48EF4386652CE38A0BF7A25B01FA7EC0",
+        "size": 100,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_pf_letterbox_30_reorder_f0\\approved_b.lst.txt",
+        "snapshot_sha256": "793BCD8E386D49398E37640FB6F7583F48EF4386652CE38A0BF7A25B01FA7EC0"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_pf_letterbox_30_reorder_f0/approved_b.lst.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 10,
+        "path": "work/tmp/micro/test_pf_letterbox_30_reorder_f0/approved_b.mp4",
+        "sha256": "D1131469F034653F9931690EC5CF1490E3A2D2F72F635E25D032EE91495866AC",
+        "size": 4064
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 10,
+        "path": "work/tmp/micro/test_pf_letterbox_30_reorder_f0/approved_b.mp4",
+        "sha256": "D1131469F034653F9931690EC5CF1490E3A2D2F72F635E25D032EE91495866AC",
+        "size": 4064,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_pf_letterbox_30_reorder_f0\\approved_b.mp4",
+        "snapshot_sha256": "D1131469F034653F9931690EC5CF1490E3A2D2F72F635E25D032EE91495866AC"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_pf_letterbox_30_reorder_f0/approved_b.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 1,
+        "path": "work/tmp/micro/test_pf_letterbox_30_reorder_f0/candidate_mismatch.lst.txt",
+        "sha256": "793BCD8E386D49398E37640FB6F7583F48EF4386652CE38A0BF7A25B01FA7EC0",
+        "size": 100
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 1,
+        "path": "work/tmp/micro/test_pf_letterbox_30_reorder_f0/candidate_mismatch.lst.txt",
+        "sha256": "793BCD8E386D49398E37640FB6F7583F48EF4386652CE38A0BF7A25B01FA7EC0",
+        "size": 100,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_pf_letterbox_30_reorder_f0\\candidate_mismatch.lst.txt",
+        "snapshot_sha256": "793BCD8E386D49398E37640FB6F7583F48EF4386652CE38A0BF7A25B01FA7EC0"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_pf_letterbox_30_reorder_f0/candidate_mismatch.lst.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 19,
+        "path": "work/tmp/micro/test_pf_letterbox_30_reorder_f0/candidate_mismatch.mp4",
+        "sha256": "1B0F8516EB6F1F295CF6B484F1362CE2D20F9AF2B8D7CCBE1EE61C0E339152FF",
+        "size": 9158
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 19,
+        "path": "work/tmp/micro/test_pf_letterbox_30_reorder_f0/candidate_mismatch.mp4",
+        "sha256": "1B0F8516EB6F1F295CF6B484F1362CE2D20F9AF2B8D7CCBE1EE61C0E339152FF",
+        "size": 9158,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_pf_letterbox_30_reorder_f0\\candidate_mismatch.mp4",
+        "snapshot_sha256": "1B0F8516EB6F1F295CF6B484F1362CE2D20F9AF2B8D7CCBE1EE61C0E339152FF"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_pf_letterbox_30_reorder_f0/candidate_mismatch.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/test_xr_reorder_still_fails0/approved_lb.lst.txt",
+        "sha256": "B68867FCD017388938B50864E33E0EA0AB914EA37A1560204523541312882778",
+        "size": 200
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/test_xr_reorder_still_fails0/approved_lb.lst.txt",
+        "sha256": "B68867FCD017388938B50864E33E0EA0AB914EA37A1560204523541312882778",
+        "size": 200,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_xr_reorder_still_fails0\\approved_lb.lst.txt",
+        "snapshot_sha256": "B68867FCD017388938B50864E33E0EA0AB914EA37A1560204523541312882778"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_xr_reorder_still_fails0/approved_lb.lst.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 83,
+        "path": "work/tmp/micro/test_xr_reorder_still_fails0/approved_lb.mp4",
+        "sha256": "5DD2CDFBA31AFCF087021525821D085F45C424C7428F3F7BDB260BAA37591522",
+        "size": 19159
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 83,
+        "path": "work/tmp/micro/test_xr_reorder_still_fails0/approved_lb.mp4",
+        "sha256": "5DD2CDFBA31AFCF087021525821D085F45C424C7428F3F7BDB260BAA37591522",
+        "size": 19159,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_xr_reorder_still_fails0\\approved_lb.mp4",
+        "snapshot_sha256": "5DD2CDFBA31AFCF087021525821D085F45C424C7428F3F7BDB260BAA37591522"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_xr_reorder_still_fails0/approved_lb.mp4"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/test_xr_reorder_still_fails0/reordered_lb.lst.txt",
+        "sha256": "2C16CF8C8F267BD31E38F5D41B8E53FA8E27D46B49F7DA003F3E27E517D7A37A",
+        "size": 200
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 2,
+        "path": "work/tmp/micro/test_xr_reorder_still_fails0/reordered_lb.lst.txt",
+        "sha256": "2C16CF8C8F267BD31E38F5D41B8E53FA8E27D46B49F7DA003F3E27E517D7A37A",
+        "size": 200,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_xr_reorder_still_fails0\\reordered_lb.lst.txt",
+        "snapshot_sha256": "2C16CF8C8F267BD31E38F5D41B8E53FA8E27D46B49F7DA003F3E27E517D7A37A"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_xr_reorder_still_fails0/reordered_lb.lst.txt"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 179,
+        "path": "work/tmp/micro/test_xr_reorder_still_fails0/reordered_lb.mp4",
+        "sha256": "1694B1A900DF5916F602C0E360EB9DB71A07923B95EDA2B4113701D21BF24057",
+        "size": 44642
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 179,
+        "path": "work/tmp/micro/test_xr_reorder_still_fails0/reordered_lb.mp4",
+        "sha256": "1694B1A900DF5916F602C0E360EB9DB71A07923B95EDA2B4113701D21BF24057",
+        "size": 44642,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-05\\files-pasted-by-the-user-codex\\outputs\\s12-luna-c3-r3\\20260911T034253Z\\snapshots\\val\\work\\tmp\\micro\\test_xr_reorder_still_fails0\\reordered_lb.mp4",
+        "snapshot_sha256": "1694B1A900DF5916F602C0E360EB9DB71A07923B95EDA2B4113701D21BF24057"
+      },
+      "changed": false,
+      "path": "work/tmp/micro/test_xr_reorder_still_fails0/reordered_lb.mp4"
+    }
+  ],
+  "root": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-val",
+  "status": "VERIFIED"
+}

@@ -18,6 +18,7 @@ from app.services.s12_export.runner import (
     RunnerConfig,
     cleanup_owned_export_artifacts,
 )
+from app.services.s12_export.stitch import ChunkMedia, StitchError, assemble_run
 from app.services.s12_export.validation import (
     AudioReference,
     SourceReference,
@@ -27,8 +28,6 @@ from app.services.s12_export.validation import (
     sha256_file,
     validate,
 )
-from app.services.s12_export.stitch import ChunkMedia, StitchError, assemble_run
-
 
 W, H, FPS, DURATION = 64, 36, 4, 1.0
 
