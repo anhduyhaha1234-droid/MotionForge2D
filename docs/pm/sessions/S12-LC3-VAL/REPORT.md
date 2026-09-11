@@ -281,3 +281,25 @@ red harness attempts are in
 compileall 0, Ruff F/I 0, and diff-check 0. The final supplied baseline guard
 is [20260911T041253Z-post-guard-r3.json](evidence/20260911T041253Z-post-guard-r3.json).
 This is a local transport checkpoint only, not an approval or closure claim.
+
+## Post-integration import compatibility correction
+
+The independent integrated candidate at
+`17fa931c76bcffb6be5148531d786d2f6e745c41` exposed collection failure because
+the RETRY transfer removed `tests/s12/s12-t03c/test_export_jobs_api.py` while
+T03C publication still imported that module as `base`. The live VAL branch
+remained at the authorized parent `ad0bf034fc218cc3d95cbf6b2e80c84eff89979f`
+and therefore could not reproduce that red locally; its pre-fix finite command
+was green with the old helper present.
+
+The bounded fix changes only
+`tests/s12/s12-t03c/test_publication.py`: when present, the explicit sibling
+`tests/s12/s12-lc3-retry` path is prepended before the unchanged helper import.
+No RETRY file, test body, assertion, production path, or unlisted owner path
+was changed. The R3 boundary micro passed 5 nodes; the exact full allowed
+matrix passed 78 nodes with 64 warnings; compileall, Ruff F/I, and diff-check
+passed. Full command envelopes and the honest pre-fix distinction are in
+[20260911T1342Z-import-compat-correction.md](evidence/20260911T1342Z-import-compat-correction.md).
+The final baseline post-guard is
+[20260911T1342Z-post-guard.json](evidence/20260911T1342Z-post-guard.json).
+This is a local transport correction only, not an approval or closure claim.
