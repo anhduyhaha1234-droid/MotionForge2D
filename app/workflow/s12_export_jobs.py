@@ -21,14 +21,19 @@ scratch only — resume re-renders them, never accepts them as completed.
 
 from __future__ import annotations
 
+import json
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
+
+from sqlalchemy import select
 
 __all__ = [
     "S12_EXPORT_JOB_TYPE",
     "S12ExportSubmitError",
     "submit_export_job",
+    "submit_retry_export_job",
     "register_s12_export_handler",
     "reconcile_export_jobs",
 ]
@@ -146,6 +151,118 @@ def submit_export_job(
         "fps_den": int(fps_den),
     }
     job_key = f"s12_export_job:{run.id}"
+    job, run = _enqueue_and_bind_job(
+        job_service,
+        factory=factory,
+        run=run,
+        manifest=manifest,
+        workspace_id=workspace_id,
+        project_id=project_id,
+        job_key=job_key,
+        input_generation=plan_hash,
+        priority=int(priority),
+    )
+    return run, job, created
+
+
+def submit_retry_export_job(
+    job_service: Any,
+    *,
+    predecessor_run_id: str,
+    workspace_id: str,
+    project_id: str,
+    source_path: str,
+    fps: float,
+    chunk_dir: str,
+    scratch_dir: str,
+    output_path: str,
+    expected_sha256: str | None = None,
+    audio_source: str | None = None,
+    fps_num: int = 0,
+    fps_den: int = 0,
+    priority: int = 50,
+) -> tuple[Any, Any, bool]:
+    """Append one S12 successor and bind exactly one durable Job to it."""
+    from app.persistence.s12_export import S12ExportRepository  # noqa: PLC0415
+
+    factory = getattr(job_service, "session_factory", None)
+    if factory is None:
+        raise S12ExportSubmitError("job service has no session factory")
+    key = f"s12_retry:{predecessor_run_id}"
+    with factory() as session:
+        repo = S12ExportRepository(session)
+        try:
+            run, created = repo.create_successor_run(
+                predecessor_run_id,
+                workspace_id=workspace_id,
+                project_id=project_id,
+                idempotency_key=key,
+            )
+            session.commit()
+        except Exception as err:
+            session.rollback()
+            raise S12ExportSubmitError(f"retry successor creation failed: {err}") from err
+
+    try:
+        chunk_config = json.loads(run_chunk_config(run))
+    except (TypeError, ValueError) as err:
+        raise S12ExportSubmitError("retry predecessor has corrupt chunk configuration") from err
+    manifest = {
+        "schema_version": 1,
+        "run_id": run.id,
+        "workspace_id": workspace_id,
+        "project_id": project_id,
+        "video_item_id": run.video_item_id,
+        "profile_id": run.profile_id,
+        "plan_hash": run.plan_hash,
+        "checkpoint_hash": run.checkpoint_hash,
+        "frame_count": run.frame_count,
+        "source_path": source_path,
+        "fps": float(fps),
+        "chunk_dir": chunk_dir,
+        "scratch_dir": scratch_dir,
+        "output_path": output_path,
+        "audio_source": audio_source,
+        "max_frames_per_chunk": int(chunk_config.get("max_frames", 120)),
+        "overlap_frames": int(chunk_config.get("overlap", 4)),
+        "expected_sha256": expected_sha256,
+        "fps_num": int(fps_num),
+        "fps_den": int(fps_den),
+    }
+    job, bound_run = _enqueue_and_bind_job(
+        job_service,
+        factory=factory,
+        run=run,
+        manifest=manifest,
+        workspace_id=workspace_id,
+        project_id=project_id,
+        job_key=f"s12_export_job:{run.id}",
+        input_generation=run.plan_hash,
+        priority=int(priority),
+    )
+    return bound_run, job, created
+
+
+def run_chunk_config(run: Any) -> str:
+    """Keep retry config access narrow while accepting immutable RunRecord snapshots."""
+    value = getattr(run, "chunk_config_json", None)
+    if value is not None:
+        return str(value)
+    raise S12ExportSubmitError("retry run snapshot omitted chunk configuration")
+
+
+def _enqueue_and_bind_job(
+    job_service: Any,
+    *,
+    factory: Callable[[], Any],
+    run: Any,
+    manifest: dict[str, Any],
+    workspace_id: str,
+    project_id: str,
+    job_key: str,
+    input_generation: str,
+    priority: int,
+) -> tuple[Any, Any]:
     try:
         job = job_service.create_job(
             S12_EXPORT_JOB_TYPE,
@@ -154,37 +271,50 @@ def submit_export_job(
             owner_type="project",
             owner_id=project_id,
             idempotency_key=job_key,
-            # Deterministic non-NULL generation from the run lineage so the
-            # unique backstop serializes a concurrent identical submit.
-            input_generation=plan_hash,
-            priority=int(priority),
+            input_generation=input_generation,
+            priority=priority,
         )
     except Exception as err:
-        name = type(err).__name__
-        if name in ("IdempotencyKeyInUse", "IntegrityError"):
-            # Replay submit: the run was deduped and its job already exists
-            # — converge on the winner instead of a duplicate.  The winner
-            # is returned as the same JobInfo shape as the fresh path.
+        if type(err).__name__ not in ("IdempotencyKeyInUse", "IntegrityError"):
+            raise S12ExportSubmitError(f"export job enqueue failed: {err}") from err
+        try:
             existing = _find_job_by_key(factory, workspace_id, job_key)
-            if existing is not None:
-                info = job_service._job_info(existing)
-                return run, info, False
-        raise S12ExportSubmitError(f"export job enqueue failed: {err}") from err
-    return run, job, created
-
-
-def _find_job_by_key(factory: Callable[[], Any], workspace_id: str, key: str) -> Any | None:
-    """Return the durable job holding *key*, or None (replay convergence)."""
-    from app.persistence.jobs import JobRepository  # noqa: PLC0415
-
+            job = job_service._job_info(existing)
+        except Exception as lookup_err:
+            raise S12ExportSubmitError(
+                f"export Job replay lookup failed closed: {lookup_err}"
+            ) from lookup_err
+    job_id = getattr(job, "job_id", None) or getattr(job, "id", None)
+    if not job_id:
+        raise S12ExportSubmitError("durable Job response omitted its actual job_id")
     try:
         with factory() as session:
-            for job in JobRepository(session).list_jobs(workspace_id, limit=1000):
-                if job.idempotency_key == key:
-                    return job
-    except Exception:
-        return None
-    return None
+            from app.persistence.s12_export import S12ExportRepository  # noqa: PLC0415
+
+            bound_run = S12ExportRepository(session).bind_job(run.id, str(job_id))
+            session.commit()
+    except Exception as err:
+        raise S12ExportSubmitError(f"export Job binding failed closed: {err}") from err
+    return job, bound_run
+
+
+def _find_job_by_key(factory: Callable[[], Any], workspace_id: str, key: str) -> Any:
+    """Return the exact durable Job, propagating query failures."""
+    from app.persistence.jobs import JobRepository  # noqa: PLC0415
+    from app.persistence.models import Job  # noqa: PLC0415
+
+    with factory() as session:
+        job = session.scalar(
+            select(Job).where(
+                Job.workspace_id == workspace_id,
+                Job.idempotency_key == key,
+            )
+        )
+        if job is None:
+            raise S12ExportSubmitError(
+                f"durable Job replay lookup found no Job for key {key!r}"
+            )
+        return JobRepository(session).get_job(job.id)
 
 
 def _s12_export_handler(ctx: Any) -> dict[str, Any]:
