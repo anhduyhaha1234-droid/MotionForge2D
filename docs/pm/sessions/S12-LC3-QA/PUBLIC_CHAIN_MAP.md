@@ -150,13 +150,110 @@ The OpenAPI snapshot recorded the real create/upload/analyze, v2 context,
 ReskinConfig, role/cast, S09 approval/reapprove, full-apply, and S12 routes.
 There is no v2 durable video import path and no StructuralLock manifest
 creation path in the OpenAPI path set. The first valid missing prerequisite
-is a supported server-owned path that can produce and pin a current
-StructuralLockManifest plus the required owned role/pack/config graph for
-the returned source generation; without it, no valid S09 reapprove request or
-S10 Full Apply request can be constructed. The guessed missing-ID calls and
-their 404s are retained only as secondary raw evidence.
+after the returned source/evidence, role/pack/cast, and config producers is a
+supported server-owned path that can produce and pin a current
+StructuralLockManifest for the returned source generation; without it, S09 can
+only return a verified but non-executable snapshot and S10 cannot construct an
+executable authority. The guessed missing-ID calls and their 404s are retained
+only as secondary raw evidence.
 
 Status remains `BLOCKED_EXTERNAL_AUTHORITY_FIXTURE`; normal-product S12
 submit → worker → publisher → result/media and real UI interaction were not
 demonstrated. No assertion, completed authority, run, job, or media row was
 fabricated.
+
+## R3 fresh producer-chain evidence
+
+R3 was run from QA HEAD `e17f772cf85d388a3c53cd70c11a3b7f60868992` using
+`gpt-5.6-luna`, reasoning `high`, fallback `OFF`. The harness is a new
+QA-owned executable at
+`tests/s12/s12-lc3-qa-r3/r3_public_producer_chain_harness.py`; it uses an
+isolated migrated SQLite database and managed root and never inserts authority,
+readiness, completion, or export rows. The deterministic extractor is marked
+`FIXTURE_ONLY_ENGINEERING_MECHANISM`, not normal-product evidence.
+
+Raw command envelope, stdout/result, and stderr are retained at the R3
+evidence root:
+
+- `public-producer-chain-20260911T035817Z.command.json` — SHA-256
+  `9C38ECC5392E3BC8539B3FE6B719CEC5404CF5F2AE998743CDD563377B056AE9`
+- `public-producer-chain-20260911T035817Z.stdout.txt` — SHA-256
+  `C97FA33215908D4352BEDB547E1B8E8B3A68141696AEA10FA75E8683497612EA`
+- `public-producer-chain-20260911T035817Z.stderr.txt` — SHA-256
+  `124F2F3866280D26F6F7521251EBD7BE954CA24C07F3C1082D964EACCD181F54`
+- `public-producer-chain-20260911T035817Z.json` — SHA-256
+  `C97FA33215908D4352BEDB547E1B8E8B3A68141696AEA10FA75E8683497612EA`
+
+Exact command envelope: cwd
+`C:\Users\Admin\MotionForge2D-worktrees\s12-lc3-luna-qa`, start
+`2026-09-11T03:58:17.6701313Z`, end `2026-09-11T03:58:30.2858493Z`,
+duration `12.615718s`, exit `0`; argv was
+`python tests/s12/s12-lc3-qa-r3/r3_public_producer_chain_harness.py --work-root C:\Users\Admin\mfqa\s12-lc3-r3\20260911T034253Z\QA\public-producer-r3-capture-20260911T035817Z --evidence C:\Users\Admin\Documents\Codex\2026-09-05\files-pasted-by-the-user-codex\outputs\s12-luna-c3-r3\20260911T034253Z\public-producer-chain-20260911T035817Z.json`.
+
+The runtime and database were contained under
+`C:\Users\Admin\mfqa\s12-lc3-r3\20260911T034253Z\QA\public-producer-r3-capture-20260911T035817Z\`;
+the worker and analyze orchestrator were stopped and the engine disposed.
+Fresh returned identities were:
+
+| Boundary | Returned identity | Result |
+|---|---|---|
+| Legacy project create | `27ff27234a0b` | `POST /api/projects` → `201`; server-created 12-hex project |
+| Legacy analyze video | `7513a010-767c-4309-aa87-9d47a0ecf860` | `POST /api/projects/27ff27234a0b/analyze` → `200`; UUID durable shell |
+| Legacy source/proxy | `c3a42ae2-7260-5107-8da8-2b795075db31` / `a5bd78a7-f3e1-5de7-8ecf-a4c2e0f3ca17` | import, proxy, scene jobs all completed; one scene; source SHA from uploaded 256x256 MP4 |
+| DISCOVER_OBJECTS job | `802bf597-31d6-4331-9e88-e3b160d99a33` | `POST /api/v2/object-intelligence/extraction` → `201`; durable worker completed and published 5 outputs |
+| Current roles/occurrences | `role_id=8511d899-f27f-5cc3-8151-678e4a0a6bca` plus one other returned role | `GET /api/v2/object-intelligence/roles?video_item_id=...` → `200`; two current roles and two occurrences; role confirmation used returned revision |
+| Character/version/asset | `character_id=09e90320-efb4-4a62-9cc2-257b39dbfd83`, `pack_version_id=890e2e5c-8574-4d67-8654-3e13deadd92a`, image artifact `9a451a01-fed8-589b-b11c-977615fdd59c` | public character create/version, six public attaches, validation `complete=true/errors=[]`, publish `200` |
+| Project cast | `f1e89003-2df8-4fda-a976-9592ea189558` | `POST /api/v2/project-cast` → `201`, actual role/character/version IDs |
+| ReskinConfig | `d78a4a7e-eda5-4028-b0fe-d33b69f39c1e` | `POST /api/v2/reskin-configs` → `201`, actual cast/config pins |
+
+The exact producer/consumer route graph and source call-sites were:
+
+| Stage | Public route/method and request shape | Owner/source call-site | Observed state |
+|---|---|---|---|
+| Legacy identity/upload | `POST /api/projects` JSON `{name}`; `POST /api/projects/{project_id}/video` multipart `file` | `app/api/routes/projects.py:228-230`, `:329-331`; `ProjectWorkflowService.create_project` at `app/workflow/project_workflow.py:61` | 12-hex project and server-owned uploaded filename; no ID fabrication |
+| Legacy durable chain | `POST /api/projects/{project_id}/analyze` JSON `{generation,title}`; bounded `GET .../analyze?generation=1` | `app/api/routes/projects.py:2399-2401`, `:2446-2447`; `AnalyzeOrchestrator._ensure_durable_shell` at `app/workflow/analyze_orchestrator.py:702` | import/proxy/scene jobs completed; source/proxy artifacts and returned UUID video |
+| Extraction producer | `POST /api/v2/object-intelligence/extraction` JSON `{project_id,video_item_id,generation}`; `GET /{job_id}`, `/outputs`, `/graph` | `app/api/routes/object_extraction.py:92-94`, `:511`, `:558`, `:619`; `submit_discover_objects` at `app/services/object_extraction.py:2793` | QA-only deterministic server policy completed; ready managed image masks, roles, occurrences, structural segments |
+| Role/occurrence consumer | `GET /api/v2/object-intelligence/roles`; `PATCH /roles/{role_id}` with returned revision; occurrence evidence read from returned role | `app/api/routes/object_intelligence.py:95-98`, `:230-232`, `:263-280` | current scope `generation=1`; no standalone occurrence row was fabricated |
+| Character producer | `POST /api/v2/characters`; `POST /api/v2/characters/{id}/versions`; `POST /api/v2/characters/versions/{id}/assets` `{pose_slot,artifact_id}`; `GET .../validation`; `POST .../publish` `{revision}` | `app/api/routes/durable_characters.py:49-51`, `:200-202`, `:229-231`, `:342-344`, `:266-268` | six required slots attached to returned ready extraction artifact; validation passed and version published |
+| Cast consumer | `POST /api/v2/project-cast` `{project_id,object_role_id,character_id,pack_version_id,idempotency_key}` | `app/api/routes/project_cast.py:59-61` | mapping `201`; server checked current generation, published complete pack, ownership, and kind |
+| Reskin consumer | `POST /api/v2/reskin-configs` with actual role/character/version/cast IDs and typed params | `app/api/routes/reskin_config.py:48-50` | config `201`; `structural_lock_manifest_id=null`, `lock_policy_version=null` |
+| Structural evidence consumer | `GET /api/v2/structural-evidence/segments?video_item_id=...` | `app/api/routes/structural_evidence.py:409-411` | two current extraction-produced segments returned; no StructuralLockManifest row |
+| S09 v1/v2 consumers | `POST /api/v2/s09-approvals`; `POST /api/v2/s09-approvals/reapprove`; `GET /api/v2/s09-approvals/{checkpoint_id}/full-apply-authority` | `app/api/routes/s09_approval.py:100-105`, `:166-171`, `:229-233`; `S09ApprovalRepository.submit_checkpoint_v2` at `app/services/s09_approval.py:648` | v1 and v2 requests both returned `201`; v2 authority `verified=true` but `full_apply_executable=false`, no lock/source/role mappings |
+| S10 consumer | `POST /api/v2/projects/{project_id}/full-apply` with returned v2 checkpoint ID/hash and `expected_checkpoint_revision=1` | `app/api/routes/s10_full_apply.py:952-953` | `422 {"detail":"v2 authority has no frozen source artifact (incomplete authority)"}`; counts unchanged |
+| S12 consumer | `GET /api/v2/projects/{project_id}/export/context?video_item_id=...`; `POST /s12-exports/submit` `{project_id,video_item_id,profile_id}` | `app/api/routes/s12_export_preflight.py:49-53`; `app/api/routes/s12_export.py:194-195` | context `200` with `full_apply_run_id=null`, `checkpoint=null`, `lock=null`, `plan=null`; submit `409` with exact missing reasons |
+
+The authoritative mutation-count snapshot after the failed S10 and failed S12
+consumer was: `projects=1`, `video_items=1`, `jobs=4`, `artifacts=7`,
+`characters=1`, `pack_versions=1`, `character_assets=6`, `roles=2`,
+`occurrences=2`, `project_cast_mappings=1`, `reskin_configs=1`,
+`structural_lock_manifests=0`, `s09_approvals=2`, `s12_export_runs=0`.
+The before/after S12 counts were identical.
+
+### First genuine missing producer
+
+The raw OpenAPI path set contains structural-evidence segment/motion/contact
+routes and S09 correction route surfaces, but no `StructuralLockManifest`
+creation/activation route. The persistence capability exists at
+`app/persistence/structural_lock.py:495` (`StructuralLockRepository.create_manifest`)
+and route decisions can be persisted by
+`app/persistence/structural_lock.py:743` (`record_render_route`), but the
+captured public graph has no route that produces and activates a current
+manifest. The public v1 approval can therefore create a non-executable
+checkpoint, and reapproval can create a verified v2 snapshot whose exact
+eligibility is:
+
+`no structural lock manifest pinned; full apply requires manifest authority (reapproval after pinning)`
+
+The subsequent public S10 response is:
+
+`422 {"detail":"v2 authority has no frozen source artifact (incomplete authority)"}`
+
+The subsequent public S12 response is:
+
+`409 {"detail":"export context not current: ['S12_EXPORT_FULL_APPLY_MISSING', 'S12_EXPORT_LOCK_MISSING']"}`
+
+This is not an empty-picker or invented-UUID conclusion: the valid legacy
+public chain, current extraction roles/occurrences/segments, published pack,
+cast mapping, and ReskinConfig all succeeded first. The exact upstream scope
+is recorded once in `UPSTREAM_SCOPE_PROPOSAL_R3.md`. Normal-product S12
+worker/publisher/result/media and UI playback remain not demonstrated.
