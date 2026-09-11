@@ -46,3 +46,19 @@ limits, and preserved work snapshot result are in
 post-write-set guard is recorded as
 `evidence/20260911T041253Z-post-guard-r3.json`. This remains a local
 transport checkpoint, not an approval or closure claim.
+
+## Post-integration import compatibility correction
+
+| 2026-09-11T13:38:01.7356854Z–13:39:07.6827296Z | Candidate-red command on live pre-transfer VAL checkout | 78 passed; integrated candidate collection red is preserved as external evidence |
+| 2026-09-11T13:39:21.1680125Z–13:39:35.4314691Z | R3 boundary micro after sibling-path correction | 5 passed, 10 warnings, exit 0 |
+| 2026-09-11T13:39:49.4743338Z–13:40:55.6460469Z | Exact full allowed VAL/T03C/T04A correction gate | 78 passed, 64 warnings, exit 0 |
+| 2026-09-11T13:41:06.9903764Z–13:41:07.1489255Z | Compileall, Ruff F/I, diff check | all exit 0 |
+| 2026-09-11T13:43:52.5950695Z–13:43:53.0252946Z | Initial R3 post-guard with incomplete allowance set | 2 previously landed VAL deltas reported; preserved red guard evidence |
+| 2026-09-11T13:44:14.6288807Z–13:44:14.7066513Z | Corrected R3 post-guard with prior and current VAL allowances | VERIFIED; 75 entries, 0 failures, exit 0 |
+
+The exact candidate collection red, bounded change, and post-fix envelopes
+are in `evidence/20260911T1342Z-import-compat-correction.md`. The RETRY
+transferred file was preserved. The first incomplete-allowance guard result
+and final verified guard result are recorded in the correction evidence and
+`evidence/20260911T1342Z-post-guard.json`. This remains a local transport
+correction, not an approval or closure claim.

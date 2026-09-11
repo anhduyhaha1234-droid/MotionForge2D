@@ -11,10 +11,16 @@ fails replay, partials never become public.
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Any
 
 import pytest
+
+_RETRY_TEST_ROOT = Path(__file__).resolve().parents[1] / "s12-lc3-retry"
+if _RETRY_TEST_ROOT.is_dir():
+    sys.path.insert(0, str(_RETRY_TEST_ROOT))
+
 import test_export_jobs_api as base
 from alembic import command
 from sqlalchemy import text
