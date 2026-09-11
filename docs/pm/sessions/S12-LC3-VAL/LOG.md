@@ -62,3 +62,17 @@ transferred file was preserved. The first incomplete-allowance guard result
 and final verified guard result are recorded in the correction evidence and
 `evidence/20260911T1342Z-post-guard.json`. This remains a local transport
 correction, not an approval or closure claim.
+
+## C3 R4 exact-owner continuation
+
+| 2026-09-12 | R4 design note and finite anti-omission matrix | recorded before source edit; existing owner/session and work/ preserved |
+| 2026-09-12 | R4 pre-fix publication/path micro | 2 intended reds preserved: no post-final recovery seam; temp companion not preflighted |
+| 2026-09-12 | R4 post-fix micro and retained R2/R3 boundary controls | green; foreign/tampered intent preserves marker and cleans only owner candidate |
+| 2026-09-12 | R4 actual worker kill after final/pre-sidecar | 1 passed; child killed/reaped, fresh same-DB worker completed job/run, chunks unchanged |
+| 2026-09-12 | R4 full contained-runtime VAL/T03C/T04A gate | 83 passed, 74 warnings, exit 0, 81.57s |
+| 2026-09-12 | R4 compileall, Ruff F/I, diff-check | all exit 0 |
+| 2026-09-12 | R4 baseline guard | initial no-allow rejection retained; final `VERIFIED`, 9 entries, 0 failures with publication.py only |
+
+Exact commands, raw runtime paths, process markers, hashes, and guard files
+are in `evidence/20260912T-r4.md`. This remains a local transport checkpoint,
+not an approval or closure claim.
