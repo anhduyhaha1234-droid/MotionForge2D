@@ -30,7 +30,11 @@ from app.persistence.s12_export import (
     RunNotFoundError,
     S12ExportRepository,
 )
-from app.workflow.s12_export_jobs import S12ExportSubmitError, submit_export_job
+from app.workflow.s12_export_jobs import (
+    S12ExportSubmitError,
+    submit_export_job,
+    submit_retry_export_job,
+)
 
 WORKSPACE_ID = DEFAULT_WORKSPACE_ID
 
@@ -147,11 +151,28 @@ def _server_paths(root: Any, project_id: str, video_item_id: str) -> dict[str, s
     }
 
 
-def _job_state_in(session: Session, key: str) -> tuple[str | None, str | None]:
+def _job_state_in(
+    session: Session,
+    key: str,
+    workspace_id: str,
+    expected_job_id: str | None = None,
+) -> tuple[str | None, str | None]:
     """Live (job_id, state) for the durable job holding *key* (same session)."""
-    row = session.scalar(select(JobRow).where(JobRow.idempotency_key == key))
+    rows = list(
+        session.scalars(
+            select(JobRow).where(
+                JobRow.workspace_id == workspace_id,
+                JobRow.idempotency_key == key,
+            )
+        )
+    )
+    if len(rows) > 1:
+        raise HTTPException(status_code=500, detail="S12 durable Job identity is ambiguous")
+    row = rows[0] if rows else None
     if row is None:
         return None, None
+    if expected_job_id is not None and str(row.id) != expected_job_id:
+        raise HTTPException(status_code=500, detail="S12 durable Job pointer is corrupt")
     return str(row.id), str(row.state)
 
 
@@ -172,7 +193,9 @@ def _run_payload(session: Session, run_id: str, workspace_id: str) -> dict[str, 
         }
         for c in repo.list_chunks(run_id)
     ]
-    job_id, job_state = _job_state_in(session, _job_key(run_id))
+    job_id, job_state = _job_state_in(
+        session, _job_key(run_id), workspace_id, rec.job_id
+    )
     return {
         "run_id": rec.id,
         "workspace_id": rec.workspace_id,
@@ -406,7 +429,9 @@ def cancel_export(
 
     job_state: str | None = None
     try:
-        job_id, seen = _job_state_in(session, _job_key(run_id))
+        job_id, seen = _job_state_in(
+            session, _job_key(run_id), workspace_id, rec.job_id
+        )
         job_state = seen
         if job_id is not None and seen in ("queued", "running"):
             current = JobRepository(session).get_job(job_id)
@@ -446,6 +471,7 @@ def retry_export(
     session: SessionDep,
     workspace_id: str = Query(default=WORKSPACE_ID, min_length=1),
     project_id: str | None = Query(default=None),
+    client_id: str | None = Query(default=None, min_length=1),
 ) -> dict[str, Any]:
     """Retry a failed/cancelled run: re-submit the same lineage pins.
 
@@ -453,6 +479,9 @@ def retry_export(
     (``created=False``) — never a duplicate successor.  An active
     predecessor job fails closed with 409 (no competing work).
     """
+    # Client identity is observability metadata only; it is deliberately not
+    # part of the durable retry key, so same/different clients converge.
+    _ = client_id
     repo = S12ExportRepository(session)
     try:
         rec = repo.get_run(run_id)
@@ -468,7 +497,13 @@ def retry_export(
             status_code=409,
             detail=f"run {run_id} in status {rec.status!r}; only failed/cancelled runs can be retried",
         )
-    _, seen = _job_state_in(session, _job_key(run_id))
+    if rec.job_id is None:
+        session.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="S12 durable Job pointer is missing; retry rejected",
+        )
+    _, seen = _job_state_in(session, _job_key(run_id), workspace_id, rec.job_id)
     # A cancelled run's own job lingering in ``cancelling`` is NOT competing
     # work — the run is terminal and the retry creates a NEW run + NEW job.
     # Only a genuinely active (queued/running) job blocks the retry.
@@ -531,18 +566,6 @@ def retry_export(
     if paths is None:
         session.rollback()
         raise HTTPException(status_code=409, detail="export identity invalid; retry rejected")
-    pins = {
-        "checkpoint_id": rec.checkpoint_id,
-        "checkpoint_hash": rec.checkpoint_hash,
-        "checkpoint_revision": rec.checkpoint_revision,
-        "manifest_id": rec.manifest_id,
-        "manifest_hash": rec.manifest_hash,
-        "manifest_generation": rec.manifest_generation,
-        "profile_id": rec.profile_id,
-        "plan_id": rec.plan_id,
-        "plan_hash": rec.plan_hash,
-        "frame_count": rec.frame_count,
-    }
     manifest = {
         "chunk_config": context.chunk_config,
         "source_path": source_path,
@@ -555,13 +578,11 @@ def retry_export(
         "expected_sha256": authority.source_sha256,
     }
     try:
-        new_run, job, created = submit_export_job(
+        new_run, job, created = submit_retry_export_job(
             get_job_service(),
+            predecessor_run_id=run_id,
             workspace_id=workspace_id,
             project_id=rec.project_id,
-            video_item_id=rec.video_item_id,
-            idempotency_key=f"s12_retry:{run_id}",
-            chunk_config=dict(manifest.get("chunk_config") or {}),
             source_path=str(manifest["source_path"]),
             fps=float(manifest.get("fps") or 0) or 30.0,
             chunk_dir=str(manifest.get("chunk_dir") or ""),
@@ -571,7 +592,6 @@ def retry_export(
             expected_sha256=manifest.get("expected_sha256"),
             fps_num=int(manifest.get("fps_num") or 0),
             fps_den=int(manifest.get("fps_den") or 0),
-            **pins,  # type: ignore[arg-type]
         )
     except S12ExportSubmitError as err:
         session.rollback()
@@ -608,7 +628,7 @@ def _owned_completed_artifact(
     path.  A missing file, a ``.partial`` name, a missing byte-identity
     sidecar, or a sidecar mismatch (tampered artifact) all fail closed.
     """
-    from app.services.s12_export.publication import _sidecar_path, _sha256_file  # noqa: PLC0415
+    from app.services.s12_export.publication import _sha256_file, _sidecar_path  # noqa: PLC0415
 
     repo = S12ExportRepository(session)
     try:
@@ -702,14 +722,21 @@ def _retry_manifest(
     authority stays missing; the worker fails closed instead of fabricating.
     """
     out: dict[str, Any] = {}
-    _, job_state = _job_state_in(session, _job_key(rec.id))
+    _, job_state = _job_state_in(
+        session, _job_key(rec.id), rec.workspace_id, rec.job_id
+    )
     try:
         js = get_job_service()
         factory = getattr(js, "session_factory", None)
         if factory is None:
             return out, job_state
         with factory() as jsess:
-            row = jsess.scalar(select(JobRow).where(JobRow.idempotency_key == _job_key(rec.id)))
+            row = jsess.scalar(
+                select(JobRow).where(
+                    JobRow.workspace_id == rec.workspace_id,
+                    JobRow.idempotency_key == _job_key(rec.id),
+                )
+            )
             raw = getattr(row, "input_manifest_json", None) if row is not None else None
         if not isinstance(raw, str) or not raw:
             return out, job_state

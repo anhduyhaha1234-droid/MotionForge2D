@@ -44,6 +44,7 @@ from app.persistence.models import (
     S12_EXPORT_CHUNK_STATES,
     S12_EXPORT_RUN_STATUSES,
     ApplyCheckpoint,
+    Job,
     S12ExportChunk,
     S12ExportLease,
     S12ExportRun,
@@ -138,9 +139,13 @@ class RunRecord:
     plan_hash: str
     status: str
     frame_count: int
+    chunk_config_json: str
     attempt: int
     natural_key: str | None
     idempotency_key: str | None
+    lineage_id: str | None
+    predecessor_run_id: str | None
+    job_id: str | None
     revision: int
 
 
@@ -197,9 +202,13 @@ def _map_run(row: S12ExportRun) -> RunRecord:
         plan_hash=row.plan_hash,
         status=row.status,
         frame_count=row.frame_count,
+        chunk_config_json=row.chunk_config_json,
         attempt=row.attempt,
         natural_key=row.natural_key,
         idempotency_key=row.idempotency_key,
+        lineage_id=row.lineage_id,
+        predecessor_run_id=row.predecessor_run_id,
+        job_id=row.job_id,
         revision=row.revision,
     )
 
@@ -370,6 +379,8 @@ class S12ExportRepository:
             attempt=1,
             natural_key=derived_natural,
             idempotency_key=idempotency_key,
+            lineage_id=derived_natural,
+            predecessor_run_id=None,
         )
         try:
             with self._session.no_autoflush:
@@ -479,6 +490,217 @@ class S12ExportRepository:
         if row is None:
             raise RunNotFoundError(f"export run {run_id!r} not found")
         return _map_run(row)
+
+    def create_successor_run(
+        self,
+        predecessor_run_id: str,
+        *,
+        workspace_id: str,
+        project_id: str,
+        idempotency_key: str,
+    ) -> tuple[RunRecord, bool]:
+        """Append exactly one immutable successor to a terminal predecessor.
+
+        The predecessor is read and never modified.  The unique
+        ``predecessor_run_id`` index is the concurrency arbiter; a collision
+        is resolved only by re-reading and comparing the complete frozen
+        identity.  This method owns no commit so callers can prove the run
+        insert before enqueueing the Job.
+        """
+        predecessor = self._session.get(S12ExportRun, predecessor_run_id)
+        if predecessor is None:
+            raise RunNotFoundError(f"export run {predecessor_run_id!r} not found")
+        if predecessor.workspace_id != workspace_id or predecessor.project_id != project_id:
+            raise StaleIdentityError("retry predecessor is outside the requested scope")
+        if predecessor.status not in S12_EXPORT_TERMINAL_STATUSES[1:]:
+            raise S12ExportError(
+                f"run {predecessor.id} in status {predecessor.status!r}; "
+                "only failed/cancelled runs can be retried"
+            )
+        if predecessor.attempt < 1:
+            raise S12ExportError("retry predecessor has corrupt attempt identity")
+        lineage_id = predecessor.lineage_id or predecessor.natural_key or predecessor.id
+        if not lineage_id or len(lineage_id) > 255:
+            raise S12ExportError("retry predecessor has corrupt lineage identity")
+        if predecessor.predecessor_run_id == predecessor.id:
+            raise S12ExportError("retry predecessor has a self-referential lineage")
+        if predecessor.job_id is None:
+            raise S12ExportError("retry predecessor has no durable Job binding")
+        # Validate the pointer and the Job manifest before the successor race;
+        # a corrupt predecessor cannot be used as a retry source.
+        self.bind_job(predecessor.id, predecessor.job_id)
+
+        existing = self._session.scalar(
+            select(S12ExportRun).where(
+                S12ExportRun.predecessor_run_id == predecessor.id
+            )
+        )
+        if existing is not None:
+            self._verify_successor_identity(
+                existing,
+                predecessor=predecessor,
+                workspace_id=workspace_id,
+                project_id=project_id,
+                idempotency_key=idempotency_key,
+                lineage_id=lineage_id,
+            )
+            return _map_run(existing), False
+
+        successor = S12ExportRun(
+            workspace_id=predecessor.workspace_id,
+            project_id=predecessor.project_id,
+            video_item_id=predecessor.video_item_id,
+            checkpoint_id=predecessor.checkpoint_id,
+            checkpoint_hash=predecessor.checkpoint_hash,
+            checkpoint_revision=predecessor.checkpoint_revision,
+            manifest_id=predecessor.manifest_id,
+            manifest_hash=predecessor.manifest_hash,
+            manifest_generation=predecessor.manifest_generation,
+            profile_id=predecessor.profile_id,
+            profile_dims=predecessor.profile_dims,
+            profile_codec=predecessor.profile_codec,
+            plan_id=predecessor.plan_id,
+            plan_hash=predecessor.plan_hash,
+            status="pending",
+            frame_count=predecessor.frame_count,
+            chunk_config_json=predecessor.chunk_config_json,
+            attempt=predecessor.attempt + 1,
+            natural_key=None,
+            idempotency_key=idempotency_key,
+            lineage_id=lineage_id,
+            predecessor_run_id=predecessor.id,
+        )
+        try:
+            self._session.add(successor)
+            self._session.flush()
+        except IntegrityError as err:
+            self._session.rollback()
+            winner = self._session.scalar(
+                select(S12ExportRun).where(
+                    S12ExportRun.predecessor_run_id == predecessor.id
+                )
+            )
+            if winner is None:
+                raise S12ExportError(
+                    f"retry successor collision resolved to no row: {err.orig}"
+                ) from err
+            self._verify_successor_identity(
+                winner,
+                predecessor=predecessor,
+                workspace_id=workspace_id,
+                project_id=project_id,
+                idempotency_key=idempotency_key,
+                lineage_id=lineage_id,
+            )
+            return _map_run(winner), False
+        return _map_run(successor), True
+
+    @staticmethod
+    def _verify_successor_identity(
+        existing: S12ExportRun,
+        *,
+        predecessor: S12ExportRun,
+        workspace_id: str,
+        project_id: str,
+        idempotency_key: str,
+        lineage_id: str,
+    ) -> None:
+        expected = {
+            "workspace_id": workspace_id,
+            "project_id": project_id,
+            "video_item_id": predecessor.video_item_id,
+            "checkpoint_id": predecessor.checkpoint_id,
+            "checkpoint_hash": predecessor.checkpoint_hash,
+            "checkpoint_revision": predecessor.checkpoint_revision,
+            "manifest_id": predecessor.manifest_id,
+            "manifest_hash": predecessor.manifest_hash,
+            "manifest_generation": predecessor.manifest_generation,
+            "profile_id": predecessor.profile_id,
+            "profile_dims": predecessor.profile_dims,
+            "profile_codec": predecessor.profile_codec,
+            "plan_id": predecessor.plan_id,
+            "plan_hash": predecessor.plan_hash,
+            "frame_count": predecessor.frame_count,
+            "chunk_config_json": predecessor.chunk_config_json,
+            "attempt": predecessor.attempt + 1,
+            "natural_key": None,
+            "idempotency_key": idempotency_key,
+            "lineage_id": lineage_id,
+            "predecessor_run_id": predecessor.id,
+        }
+        if any(getattr(existing, key) != value for key, value in expected.items()):
+            raise IdempotencyConflictError(
+                f"retry predecessor {predecessor.id!r} resolves to a materially "
+                f"different successor {existing.id!r}; refusing replay"
+            )
+
+    def bind_job(self, run_id: str, job_id: str) -> RunRecord:
+        """Bind and verify the one actual durable S12 Job for a run."""
+        run = self._session.get(S12ExportRun, run_id)
+        if run is None:
+            raise RunNotFoundError(f"export run {run_id!r} not found")
+        job = self._session.get(Job, job_id)
+        if job is None:
+            raise S12ExportError(f"durable Job {job_id!r} not found")
+        expected_key = f"s12_export_job:{run.id}"
+        try:
+            manifest = json.loads(job.input_manifest_json)
+        except (TypeError, ValueError) as err:
+            raise S12ExportError(f"Job {job_id!r} has corrupt input manifest") from err
+        if (
+            job.workspace_id != run.workspace_id
+            or job.job_type != "s12_export"
+            or job.owner_type != "project"
+            or job.owner_id != run.project_id
+            or job.idempotency_key != expected_key
+            or str(manifest.get("run_id")) != run.id
+            or str(manifest.get("workspace_id")) != run.workspace_id
+            or str(manifest.get("project_id")) != run.project_id
+            or str(manifest.get("video_item_id")) != run.video_item_id
+            or str(manifest.get("plan_hash")) != run.plan_hash
+            or str(manifest.get("checkpoint_hash")) != run.checkpoint_hash
+        ):
+            raise S12ExportError(
+                f"durable Job {job_id!r} is not correctly bound to export run {run.id!r}"
+            )
+        if run.job_id not in (None, job.id):
+            raise S12ExportError(
+                f"export run {run.id!r} already points to a different durable Job"
+            )
+        if run.job_id is None:
+            result = self._session.execute(
+                update(S12ExportRun)
+                .where(
+                    S12ExportRun.id == run.id,
+                    S12ExportRun.job_id.is_(None),
+                )
+                .values(job_id=job.id, revision=S12ExportRun.revision + 1)
+            )
+            if result.rowcount != 1:
+                self._session.rollback()
+                fresh = self._session.get(S12ExportRun, run.id)
+                if fresh is None or fresh.job_id != job.id:
+                    raise S12ExportError(
+                        f"concurrent export Job binding lost for run {run.id!r}"
+                    )
+                return _map_run(fresh)
+            self._session.flush()
+            self._session.expire(run)
+            run = self._session.get(S12ExportRun, run.id)
+            if run is None:  # pragma: no cover - defensive
+                raise RunNotFoundError(f"export run {run_id!r} not found")
+        return _map_run(run)
+
+    def get_bound_job(self, run_id: str) -> Job:
+        """Return the exact Job pointer, rejecting missing/corrupt bindings."""
+        run = self._session.get(S12ExportRun, run_id)
+        if run is None:
+            raise RunNotFoundError(f"export run {run_id!r} not found")
+        job = self._session.get(Job, run.job_id) if run.job_id else None
+        if job is None:
+            raise S12ExportError(f"export run {run.id!r} has no durable Job binding")
+        self.bind_job(run.id, job.id)
+        return job
 
     # ── Atomic claim / fence ─────────────────────────────────────────────
 

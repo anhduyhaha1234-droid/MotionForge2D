@@ -3292,9 +3292,13 @@ class S12ExportRun(TimestampMixin, Base):
     - Idempotency: UNIQUE(workspace_id, idempotency_key) WHERE NOT NULL —
       equivalent replay returns the existing row, materially different
       payload → conflict.
-    - Natural key UNIQUE(workspace_id, natural_key) WHERE NOT NULL binds the
-      content-derived lineage identity (project/video/profile/plan/checkpoint
-      pins) so duplicate lineage can never create a second run.
+    - Initial submit retains UNIQUE(workspace_id, natural_key) WHERE
+      ``attempt = 1`` and ``UNIQUE(workspace_id, idempotency_key)``.  Retry
+      attempts share ``lineage_id`` but have a new ``attempt`` and are linked
+      by one unique ``predecessor_run_id``; the predecessor is immutable.
+    - ``job_id`` is a durable one-to-one pointer to the actual S12 Job.  It is
+      bound by a guarded replay after Job creation and is never replaced by a
+      different Job.
     - All FKs ondelete RESTRICT fail closed; revision CAS > 0.
     """
 
@@ -3331,21 +3335,45 @@ class S12ExportRun(TimestampMixin, Base):
         CheckConstraint(
             "length(idempotency_key) <= 255", name="ck_s12_run_idem_key_len"
         ),
-        UniqueConstraint(
-            "workspace_id",
-            "project_id",
-            "video_item_id",
-            "profile_id",
-            "plan_hash",
-            "checkpoint_hash",
-            name="uq_s12_run_identity",
+        CheckConstraint(
+            "length(lineage_id) BETWEEN 1 AND 255 OR lineage_id IS NULL",
+            name="ck_s12_run_lineage_id_len",
+        ),
+        CheckConstraint(
+            "(attempt = 1 AND predecessor_run_id IS NULL) OR "
+            "(attempt > 1 AND predecessor_run_id IS NOT NULL)",
+            name="ck_s12_run_attempt_predecessor",
         ),
         Index(
             "uq_s12_run_natural",
             "workspace_id",
             "natural_key",
             unique=True,
-            sqlite_where=sa_text("natural_key IS NOT NULL"),
+            sqlite_where=sa_text("natural_key IS NOT NULL AND attempt = 1"),
+            postgresql_where=sa_text("natural_key IS NOT NULL AND attempt = 1"),
+        ),
+        Index(
+            "uq_s12_run_lineage_attempt",
+            "workspace_id",
+            "lineage_id",
+            "attempt",
+            unique=True,
+            sqlite_where=sa_text("lineage_id IS NOT NULL"),
+            postgresql_where=sa_text("lineage_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_s12_run_predecessor",
+            "predecessor_run_id",
+            unique=True,
+            sqlite_where=sa_text("predecessor_run_id IS NOT NULL"),
+            postgresql_where=sa_text("predecessor_run_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_s12_run_job",
+            "job_id",
+            unique=True,
+            sqlite_where=sa_text("job_id IS NOT NULL"),
+            postgresql_where=sa_text("job_id IS NOT NULL"),
         ),
         Index(
             "uq_s12_run_workspace_idempotency",
@@ -3360,6 +3388,9 @@ class S12ExportRun(TimestampMixin, Base):
         Index("ix_s12_run_checkpoint", "checkpoint_id"),
         Index("ix_s12_run_manifest", "manifest_id"),
         Index("ix_s12_run_status", "status"),
+        Index("ix_s12_run_lineage", "lineage_id"),
+        Index("ix_s12_run_predecessor", "predecessor_run_id"),
+        Index("ix_s12_run_job", "job_id"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
@@ -3396,6 +3427,13 @@ class S12ExportRun(TimestampMixin, Base):
     attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     natural_key: Mapped[str | None] = mapped_column(String(255))
     idempotency_key: Mapped[str | None] = mapped_column(String(255))
+    lineage_id: Mapped[str | None] = mapped_column(String(255))
+    predecessor_run_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("s12_export_run.id", ondelete="RESTRICT")
+    )
+    job_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("job.id", ondelete="RESTRICT")
+    )
     revision: Mapped[int] = mapped_column(
         Integer, default=1, server_default=sa_text("1"), nullable=False
     )

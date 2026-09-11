@@ -158,3 +158,22 @@ Submit and retry re-resolve the current authority and reject a stale
 actual durable run pointer. The UI stores only that pointer under the scoped
 workspace/project/video key and refetches server truth after navigation,
 refresh, retry, or recovery.
+
+## S12-LC3-RETRY immutable retry lineage
+
+Retries are append-only attempt rows. A failed or cancelled predecessor is
+immutable; its frozen checkpoint, manifest, profile, plan, frame count and
+canonical chunk configuration are copied byte-for-byte to the immediate
+successor. The successor increments `attempt`, retains `lineage_id`, sets
+`predecessor_run_id`, and receives a fresh durable Job. The unique predecessor
+pointer is the database race arbiter: concurrent or repeated retries return
+the same successor and its actual Job pointer. Retrying that successor creates
+only its next successor.
+
+Initial-submit deduplication remains workspace-scoped by the supplied
+`idempotency_key` and initial natural key; retry attempts use their own
+predecessor/attempt identity and do not reuse the initial six-field
+uniqueness rule. Job binding is durable and one-to-one. A missing, ambiguous,
+cross-workspace, stale, materially different, corrupt or query-failed run/Job
+identity fails closed with rollback and no unintended mutation. Plan and
+checkpoint pins are never randomized, reset, deleted or rewritten.
