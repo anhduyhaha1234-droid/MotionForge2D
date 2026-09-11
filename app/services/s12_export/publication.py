@@ -91,10 +91,25 @@ def _publication_receipt_path(final: Path) -> Path:
     return final.with_name(f"{final.name}{_RECEIPT_SUFFIX}")
 
 
+_INTENT_SUFFIX = ".publication.intent"
+
+
+def _publication_intent_path(final: Path) -> Path:
+    """Intent proving which private attempt may complete a public write."""
+    return final.with_name(f"{final.name}{_INTENT_SUFFIX}")
+
+
+def _exclusive_temp_path(
+    path: Path, owner_token: str, *, nonce: str | None = None
+) -> Path:
+    safe_token = "".join(ch for ch in owner_token if ch.isalnum()) or "owner"
+    suffix = nonce or uuid.uuid4().hex
+    return path.with_name(f"{path.name}.{safe_token}.{suffix}.tmp")
+
+
 def _write_exclusive_file(path: Path, payload: bytes, *, owner_token: str) -> None:
     """Create *path* once, using an owner-unique temp and exclusive link."""
-    safe_token = "".join(ch for ch in owner_token if ch.isalnum()) or "owner"
-    tmp = path.with_name(f"{path.name}.{safe_token}.{uuid.uuid4().hex}.tmp")
+    tmp = _exclusive_temp_path(path, owner_token)
     fd: int | None = None
     try:
         fd = os.open(
@@ -138,6 +153,19 @@ def _write_publication_receipt(final: Path, payload: dict[str, Any]) -> None:
     )
 
 
+def _intent_bytes(payload: dict[str, Any]) -> bytes:
+    return (json.dumps(payload, sort_keys=True) + "\n").encode("utf-8")
+
+
+def _write_publication_intent(final: Path, payload: dict[str, Any]) -> None:
+    """Durably bind the public path to one private attempt before linking."""
+    _write_exclusive_file(
+        _publication_intent_path(final),
+        _intent_bytes(payload),
+        owner_token=str(payload["fence_token"]),
+    )
+
+
 def _receipt_payload(
     run: Any,
     *,
@@ -170,9 +198,216 @@ def _receipt_payload(
     }
 
 
+def _intent_payload(
+    run: Any,
+    *,
+    run_id: str,
+    workspace_id: str,
+    project_id: str,
+    worker_id: str,
+    fence_token: str,
+    final: Path,
+    candidate: Path,
+    artifact_sha: str,
+    expected_sha: str,
+) -> dict[str, Any]:
+    """Build the durable pre-publication identity used after a crash."""
+    return {
+        "version": 1,
+        "kind": "s12-publication-intent",
+        "run_id": run_id,
+        "workspace_id": workspace_id,
+        "project_id": project_id,
+        "video_item_id": run.video_item_id,
+        "attempt": int(run.attempt),
+        "worker_id": worker_id,
+        "fence_token": fence_token,
+        "checkpoint_hash": run.checkpoint_hash,
+        "manifest_hash": run.manifest_hash,
+        "plan_hash": run.plan_hash,
+        "profile_id": run.profile_id,
+        "output_path": str(final),
+        "candidate_path": str(candidate),
+        "candidate_sha256": artifact_sha,
+        "expected_sha256": str(expected_sha or ""),
+    }
+
+
 def _before_publication_primitive(candidate: Path, final: Path) -> None:
     """Rendezvous seam immediately before exclusive final creation."""
     _ = candidate, final
+
+
+def _after_publication_final(final: Path) -> None:
+    """Fault seam immediately after final creation and before its sidecar."""
+    _ = final
+
+
+def _read_publication_intent(final: Path) -> dict[str, Any] | None:
+    """Read an intent strictly; malformed or aliased proof fails closed."""
+    path = _publication_intent_path(final)
+    if not path.exists():
+        return None
+    if path.is_symlink() or not path.is_file():
+        raise PublicationError(f"publication intent is not a regular file: {path}")
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, UnicodeError, json.JSONDecodeError) as err:
+        raise PublicationError(f"publication intent is unreadable: {path}") from err
+    if not isinstance(payload, dict):
+        raise PublicationError(f"publication intent is not an object: {path}")
+    return payload
+
+
+def _intent_candidate_path(
+    payload: dict[str, Any], manifest: dict[str, Any], run: Any
+) -> Path | None:
+    """Resolve only an attempt-owned candidate named by a valid intent."""
+    try:
+        candidate = Path(str(payload["candidate_path"]))
+        attempt = int(payload["attempt"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if candidate.name != "candidate_final.mp4" or candidate.is_symlink():
+        return None
+    scratch = Path(str(manifest.get(_SCRATCH_DIR, "")))
+    try:
+        scratch_root = scratch.resolve().parent
+        resolved_parent = candidate.resolve().parent
+        if candidate.parent.is_symlink() or scratch_root.is_symlink():
+            return None
+        same_current = resolved_parent == scratch.resolve()
+        same_attempt_root = (
+            resolved_parent.parent == scratch_root
+            and resolved_parent != scratch_root
+        )
+    except OSError:
+        return None
+    if not (same_current or same_attempt_root):
+        return None
+    if attempt != int(getattr(run, "attempt", -1)):
+        return None
+    return candidate
+
+
+def _intent_matches_run(
+    payload: dict[str, Any],
+    run: Any,
+    *,
+    run_id: str,
+    workspace_id: str,
+    project_id: str,
+    final: Path,
+    expected_sha: str,
+    candidate_sha: str | None = None,
+) -> bool:
+    expected = {
+        "version": 1,
+        "kind": "s12-publication-intent",
+        "run_id": run_id,
+        "workspace_id": workspace_id,
+        "project_id": project_id,
+        "video_item_id": run.video_item_id,
+        "attempt": int(run.attempt),
+        "checkpoint_hash": run.checkpoint_hash,
+        "manifest_hash": run.manifest_hash,
+        "plan_hash": run.plan_hash,
+        "profile_id": run.profile_id,
+        "output_path": str(final),
+        "expected_sha256": str(expected_sha or ""),
+    }
+    if any(payload.get(key) != value for key, value in expected.items()):
+        return False
+    if not isinstance(payload.get("worker_id"), str):
+        return False
+    if not isinstance(payload.get("fence_token"), str) or not payload["fence_token"]:
+        return False
+    if not isinstance(payload.get("candidate_path"), str):
+        return False
+    if candidate_sha is not None and payload.get("candidate_sha256") != candidate_sha:
+        return False
+    return True
+
+
+def _ensure_publication_intent(
+    final: Path,
+    payload: dict[str, Any],
+    *,
+    repo: Any,
+    run: Any,
+    manifest: dict[str, Any],
+) -> None:
+    """Create one intent, or replace only a proven dead same-run intent."""
+    path = _publication_intent_path(final)
+    if not path.exists():
+        _write_publication_intent(final, payload)
+        return
+    existing = _read_publication_intent(final)
+    if existing is None:
+        _write_publication_intent(final, payload)
+        return
+    if not _intent_matches_run(
+        existing,
+        run,
+        run_id=str(payload["run_id"]),
+        workspace_id=str(payload["workspace_id"]),
+        project_id=str(payload["project_id"]),
+        final=final,
+        expected_sha=str(payload["expected_sha256"]),
+    ):
+        raise PublicationError(f"publication intent identity mismatch: {path}")
+    try:
+        if path.read_bytes() != _intent_bytes(existing):
+            raise PublicationError(f"publication intent bytes were tampered: {path}")
+    except OSError as err:
+        raise PublicationError(f"publication intent is unreadable: {path}") from err
+    old_candidate = _intent_candidate_path(existing, manifest, run)
+    if old_candidate is None or not old_candidate.is_file():
+        raise PublicationError(f"publication intent candidate is unavailable: {path}")
+    try:
+        if _sha256_file(old_candidate) != existing["candidate_sha256"]:
+            raise PublicationError(f"publication intent candidate was tampered: {path}")
+    except OSError as err:
+        raise PublicationError(f"publication intent candidate is unreadable: {path}") from err
+    same_owner = (
+        existing.get("worker_id") == payload["worker_id"]
+        and existing.get("fence_token") == payload["fence_token"]
+        and existing.get("candidate_path") == payload["candidate_path"]
+    )
+    if same_owner:
+        if existing.get("candidate_sha256") != payload["candidate_sha256"]:
+            raise PublicationError(f"publication intent candidate changed: {path}")
+        return
+    if _owner_is_live(
+        repo,
+        str(payload["run_id"]),
+        str(existing["worker_id"]),
+        str(existing["fence_token"]),
+    ):
+        # A second live participant may proceed to the same exclusive final
+        # primitive.  It must not replace the first intent or any winner file.
+        return
+    try:
+        path.unlink()
+    except OSError as err:
+        raise PublicationError(f"publication intent cleanup failed: {path}") from err
+    _write_publication_intent(final, payload)
+
+
+def _remove_owned_publication_intent(
+    final: Path, payload: dict[str, Any] | None
+) -> None:
+    """Remove only the exact intent bytes this owner wrote."""
+    if payload is None:
+        return
+    path = _publication_intent_path(final)
+    try:
+        if path.is_symlink() or not path.is_file():
+            return
+        if path.read_bytes() == _intent_bytes(payload):
+            path.unlink()
+    except OSError:
+        pass
 
 
 def _publish_candidate_exclusive(candidate: Path, final: Path) -> None:
@@ -215,11 +450,16 @@ _MAX_PUBLICATION_COMPONENT_BYTES = 240
 _MAX_PUBLICATION_PATH_CHARS = 32767
 
 
-def _preflight_publication_paths(final: Path) -> None:
-    """Validate final/sidecar/receipt names before any public mutation."""
+def _preflight_publication_paths(final: Path, *, owner_token: str = "") -> None:
+    """Validate every public name and the actual exclusive temp companions."""
     if not final.is_absolute():
         raise PublicationPathError("public output path must be absolute")
-    paths = (final, _sidecar_path(final), _publication_receipt_path(final))
+    paths = (
+        final,
+        _sidecar_path(final),
+        _publication_receipt_path(final),
+        _publication_intent_path(final),
+    )
     if not final.parent.is_dir() or final.parent.is_symlink():
         raise PublicationPathError(
             f"public output parent is not an owned directory: {final.parent}"
@@ -239,6 +479,27 @@ def _preflight_publication_paths(final: Path) -> None:
             raise PublicationPathError(
                 f"public output companion path is too long: {path}"
             )
+        # The sidecar, receipt, and intent use the same helper as the write
+        # path.  A digest is 64 characters; the lease token may be shorter or
+        # longer, so validate both the actual token and the conservative
+        # digest-shaped upper bound before any public mutation.
+        owner_tokens = (owner_token, "f" * 64)
+        for token in owner_tokens:
+            temporary = _exclusive_temp_path(path, token, nonce="0" * 32)
+            try:
+                temporary_bytes = len(temporary.name.encode("utf-8"))
+            except UnicodeError as err:
+                raise PublicationPathError(
+                    f"public output temporary name is not encodable: {temporary.name!r}"
+                ) from err
+            if temporary_bytes > _MAX_PUBLICATION_COMPONENT_BYTES:
+                raise PublicationPathError(
+                    f"public output temporary companion name is too long: {temporary.name!r}"
+                )
+            if len(str(temporary)) > _MAX_PUBLICATION_PATH_CHARS:
+                raise PublicationPathError(
+                    f"public output temporary companion path is too long: {temporary}"
+                )
 
 
 def publish_export_run(
@@ -301,7 +562,7 @@ def publish_export_run(
         )
         raise PublicationError("public output must not carry the .partial suffix")
     try:
-        _preflight_publication_paths(final)
+        _preflight_publication_paths(final, owner_token=fence_token)
     except PublicationPathError:
         _cleanup_publication_scratch(
             manifest,
@@ -392,7 +653,8 @@ def publish_export_run(
         raise
 
     try:
-        expectation = _expectation_for(run, manifest, candidate_sha=_sha256_file(candidate))
+        candidate_sha = _sha256_file(candidate)
+        expectation = _expectation_for(run, manifest, candidate_sha=candidate_sha)
         verdict = validate(candidate, expectation)
     except BaseException:
         _cleanup_publication_scratch(
@@ -422,10 +684,33 @@ def publish_export_run(
     # validated private candidate, write its sidecar and receipt, then
     # commit the fenced SQLite state.  Filesystem and SQLite are a recovery
     # boundary, not one transaction; reconciliation never overwrites bytes.
+    intent_payload = _intent_payload(
+        run,
+        run_id=run_id,
+        workspace_id=workspace_id,
+        project_id=project_id,
+        worker_id=worker_id,
+        fence_token=fence_token,
+        final=final,
+        candidate=candidate,
+        artifact_sha=candidate_sha,
+        expected_sha=str(
+            manifest.get("expected_sha256")
+            or manifest.get("authority_sha256")
+            or ""
+        ),
+    )
     try:
         # Re-read authority immediately before the irreversible filesystem
         # mutation; a stale worker must not publish after validation.
         _require_fence(repo, run_id, worker_id, fence_token)
+        _ensure_publication_intent(
+            final,
+            intent_payload,
+            repo=repo,
+            run=run,
+            manifest=manifest,
+        )
         _before_publication_primitive(candidate, final)
         _publish_candidate_exclusive(candidate, final)
     except PublicationRaceLost:
@@ -433,6 +718,7 @@ def publish_export_run(
         # sidecar, receipt, or a candidate belonging to a different fence.
         raise
     except OSError as err:
+        _remove_owned_publication_intent(final, intent_payload)
         _cleanup_publication_scratch(
             manifest,
             session=session,
@@ -444,6 +730,7 @@ def publish_export_run(
         session.commit()
         raise PublicationError(f"publication rename failed: {err}") from err
     except FencedWorkerError as err:
+        _remove_owned_publication_intent(final, intent_payload)
         _cleanup_publication_scratch(
             manifest,
             session=session,
@@ -452,6 +739,18 @@ def publish_export_run(
             fence_token=fence_token,
         )
         raise PublicationError(f"publication fence lost before rename: {err}") from err
+    except PublicationError:
+        # Identity or hook failures before final creation preserve the
+        # foreign proof bytes but release only this owner's private candidate.
+        _cleanup_publication_scratch(
+            manifest,
+            session=session,
+            run_id=run_id,
+            worker_id=worker_id,
+            fence_token=fence_token,
+        )
+        raise
+    _after_publication_final(final)
     actual_sha = _sha256_file(final)
     sidecar_owned = False
     receipt_owned = False
@@ -461,6 +760,7 @@ def publish_export_run(
     except OSError as err:
         if _owner_is_live(repo, run_id, worker_id, fence_token):
             _remove_unpublished_output(final, expected_sha=actual_sha)
+            _remove_owned_publication_intent(final, intent_payload)
         _cleanup_publication_scratch(
             manifest,
             session=session,
@@ -492,6 +792,7 @@ def publish_export_run(
                 expected_sha=actual_sha,
                 remove_sidecar=sidecar_owned,
             )
+            _remove_owned_publication_intent(final, intent_payload)
         _cleanup_publication_scratch(
             manifest,
             session=session,
@@ -529,6 +830,7 @@ def publish_export_run(
                 remove_sidecar=sidecar_owned,
                 remove_receipt=receipt_owned,
             )
+            _remove_owned_publication_intent(final, intent_payload)
         _cleanup_publication_scratch(
             manifest,
             session=session,
@@ -540,6 +842,7 @@ def publish_export_run(
             f"publication transition lost after final creation: {err} (run {run_id})"
         ) from err
     session.commit()
+    _remove_owned_publication_intent(final, intent_payload)
     _cleanup_publication_scratch(
         manifest,
         session=session,
@@ -586,6 +889,11 @@ def _recover_pending_publication(
     receipt_path = _publication_receipt_path(final)
     if receipt_path.is_symlink():
         return None
+    expected_sha = manifest.get("expected_sha256") or manifest.get("authority_sha256")
+    try:
+        intent = _read_publication_intent(final)
+    except PublicationError:
+        return None
     if not receipt_path.exists():
         if not _recover_pre_receipt_publication(
             session,
@@ -610,6 +918,17 @@ def _recover_pending_publication(
         return None
     if stored_sha != actual_sha:
         return None
+    if intent is not None and not _intent_matches_run(
+        intent,
+        run,
+        run_id=run_id,
+        workspace_id=workspace_id,
+        project_id=project_id,
+        final=final,
+        expected_sha=str(expected_sha or ""),
+        candidate_sha=actual_sha,
+    ):
+        return None
     if any(
         receipt.get(key) != expected
         for key, expected in (
@@ -633,7 +952,6 @@ def _recover_pending_publication(
             return None
     except (TypeError, ValueError):
         return None
-    expected_sha = manifest.get("expected_sha256") or manifest.get("authority_sha256")
     if expected_sha and str(expected_sha).lower() != actual_sha:
         return None
 
@@ -665,6 +983,7 @@ def _recover_pending_publication(
         fence_token=fence_token,
     )
     session.commit()
+    _remove_owned_publication_intent(final, intent)
     return {
         "run_id": run_id,
         "status": completed.status,
@@ -693,28 +1012,51 @@ def _recover_pre_receipt_publication(
     manifest: dict[str, Any],
     final: Path,
 ) -> bool:
-    """Rebuild a missing receipt only from a live, matching private attempt."""
+    """Rebuild missing companions only from a durable matching intent."""
     if run.status not in ("running", "verifying"):
         return False
     sidecar = _sidecar_path(final)
+    try:
+        intent = _read_publication_intent(final)
+    except PublicationError:
+        return False
+    expected_sha = manifest.get("expected_sha256") or manifest.get("authority_sha256")
     candidate = _candidate_path(manifest)
-    if (
-        sidecar.is_symlink()
-        or not sidecar.is_file()
-        or candidate is None
-        or not candidate.is_file()
-    ):
+    if intent is not None:
+        if not _intent_matches_run(
+            intent,
+            run,
+            run_id=run_id,
+            workspace_id=workspace_id,
+            project_id=project_id,
+            final=final,
+            expected_sha=str(expected_sha or ""),
+        ):
+            return False
+        candidate = _intent_candidate_path(intent, manifest, run)
+    if sidecar.is_symlink() or candidate is None or not candidate.is_file():
         return False
     try:
         actual_sha = _sha256_file(final)
         candidate_sha = _sha256_file(candidate)
-        stored_sha = sidecar.read_text(encoding="ascii").strip().lower()
         same_inode = os.path.samefile(candidate, final)
     except (OSError, UnicodeError):
         return False
-    if same_inode or candidate_sha != actual_sha or stored_sha != actual_sha:
+    if same_inode or candidate_sha != actual_sha:
         return False
-    expected_sha = manifest.get("expected_sha256") or manifest.get("authority_sha256")
+    if intent is not None and intent.get("candidate_sha256") != candidate_sha:
+        return False
+    if sidecar.exists():
+        if not sidecar.is_file():
+            return False
+        try:
+            stored_sha = sidecar.read_text(encoding="ascii").strip().lower()
+        except (OSError, UnicodeError):
+            return False
+        if stored_sha != actual_sha:
+            return False
+    elif intent is None:
+        return False
     if expected_sha and str(expected_sha).lower() != actual_sha:
         return False
     _require_ready(session, workspace_id=workspace_id, project_id=project_id)
@@ -726,6 +1068,8 @@ def _recover_pre_receipt_publication(
     if verdict.verdict != "PASS":
         return False
     try:
+        if not sidecar.exists():
+            _write_sidecar(final, actual_sha)
         _write_publication_receipt(
             final,
             _receipt_payload(

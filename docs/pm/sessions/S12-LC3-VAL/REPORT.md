@@ -303,3 +303,35 @@ passed. Full command envelopes and the honest pre-fix distinction are in
 The final baseline post-guard is
 [20260911T1342Z-post-guard.json](evidence/20260911T1342Z-post-guard.json).
 This is a local transport correction only, not an approval or closure claim.
+
+## C3 R4 exact-owner continuation
+
+This R4 correction resumed the existing VAL owner/session from
+`acd2fd69c3bf48e4f4bf503cbb15d9bb1430c275` and preserved the pre-existing
+untracked `work/` tree. The finite design and anti-omission matrix were locked
+before editing in [20260912T-r4-design-matrix.md](evidence/20260912T-r4-design-matrix.md).
+
+The bounded production correction is only in `app/services/s12_export/publication.py`.
+It adds a durable identity-bound publication intent before the exclusive final
+link, validates final/sidecar/receipt/intent temporary companion paths before
+public mutation, exposes the real post-final/pre-sidecar fault seam, and
+recovers a missing sidecar/receipt only from intact same-run private candidate
+proof plus current readiness/fence and fresh source-locked PASS. Foreign,
+malformed, tampered, missing, and aliased intent/candidate proof fails closed.
+
+The new owned test is
+`tests/s12/s12-lc3-val/test_r4_correction_boundaries.py`. Its real worker test
+killed an owned publisher child after final creation and before sidecar, then a
+fresh process reclaimed the same SQLite job/run. The final SHA-256 was
+`fd19749bb00a68052a27cf521380943c293dc80cec95401fc23bd00aabfad1c7`; two
+chunks retained their bytes and mtimes; sidecar/receipt were rebuilt and the
+intent was removed after convergence. Raw paths and markers are in
+[20260912T-r4.md](evidence/20260912T-r4.md) under the mandated contained
+runtime lane.
+
+The final contained-runtime gate passed `83` nodes, `74` warnings, exit `0`,
+in `81.57s`. Compileall, Ruff F/I, and diff-check exited `0`. The supplied
+R4 baseline guard first rejected the changed protected production file without
+an allowance, then passed with only
+`app/services/s12_export/publication.py` allowed: `9` entries, `0` failures.
+This is a local transport checkpoint only, not an approval or closure claim.
