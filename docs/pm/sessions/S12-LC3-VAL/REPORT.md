@@ -306,6 +306,22 @@ This is a local transport correction only, not an approval or closure claim.
 
 ## C3 R4 exact-owner continuation
 
+### F03 deep space/Unicode companion correction
+
+The independent finite candidate reproduced a real `FileNotFoundError` when
+the sidecar temp companion was created below a deep path containing spaces and
+Unicode. The bounded correction changes only
+`app/services/s12_export/publication.py`: Windows native filesystem calls now
+use the extended path form when needed. Actual companion-temp preflight,
+component fencing, R4 recovery, and inode isolation remain intact.
+
+The post-fix R4 plus Unicode/deep-path micro passed `6` nodes; VAL-only passed
+`30`; and the full allowed VAL/T03C/T04A gate passed `83` with `74` warnings,
+exit `0`, in `75.00s`. Compileall, Ruff F/I, and diff-check passed. Exact raw
+commands, paths, markers, and guard output are recorded in
+[20260912T1502Z-r4-f03-correction.md](evidence/20260912T1502Z-r4-f03-correction.md).
+This is a local transport correction only, not an approval or closure claim.
+
 This R4 correction resumed the existing VAL owner/session from
 `acd2fd69c3bf48e4f4bf503cbb15d9bb1430c275` and preserved the pre-existing
 untracked `work/` tree. The finite design and anti-omission matrix were locked

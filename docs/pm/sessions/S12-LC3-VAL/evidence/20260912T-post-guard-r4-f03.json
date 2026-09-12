@@ -1,0 +1,192 @@
+{
+  "failures": [],
+  "manifest": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\s12-r4-owner-submission\\20260911T195310Z\\val-baseline-r4.json",
+  "max_shrink_percent": 20.0,
+  "results": [
+    {
+      "after": {
+        "exists": true,
+        "lines": 1537,
+        "path": "app/services/s12_export/publication.py",
+        "sha256": "24F874FB45DC8D80E8BA727B222AFF7F60ABA89C85AB052EB96198DC9F928C55",
+        "size": 55287
+      },
+      "allowed_change": true,
+      "before": {
+        "exists": true,
+        "lines": 1179,
+        "path": "app/services/s12_export/publication.py",
+        "sha256": "4FCDBA104B7F2CA5426FAD1A3D64A7E2E5AAEE511FBE5593414A3483226F688E",
+        "size": 42544,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\s12-r4-owner-submission\\20260911T195310Z\\val-snapshots\\app\\services\\s12_export\\publication.py",
+        "snapshot_sha256": "4FCDBA104B7F2CA5426FAD1A3D64A7E2E5AAEE511FBE5593414A3483226F688E"
+      },
+      "changed": true,
+      "path": "app/services/s12_export/publication.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 2081,
+        "path": "app/services/s12_export/validation.py",
+        "sha256": "66FB87169CE8141ACBAA2AB0D68591D49ED90BC6DED0C94F724664FF54F6507F",
+        "size": 76392
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 2081,
+        "path": "app/services/s12_export/validation.py",
+        "sha256": "66FB87169CE8141ACBAA2AB0D68591D49ED90BC6DED0C94F724664FF54F6507F",
+        "size": 76392,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\s12-r4-owner-submission\\20260911T195310Z\\val-snapshots\\app\\services\\s12_export\\validation.py",
+        "snapshot_sha256": "66FB87169CE8141ACBAA2AB0D68591D49ED90BC6DED0C94F724664FF54F6507F"
+      },
+      "changed": false,
+      "path": "app/services/s12_export/validation.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 964,
+        "path": "app/services/s12_export/runner.py",
+        "sha256": "ADBF98D7E6BC24E8B09D940FC6A14C69AD659DF12FB2E3B6F3AE6E838B1FD000",
+        "size": 37998
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 964,
+        "path": "app/services/s12_export/runner.py",
+        "sha256": "ADBF98D7E6BC24E8B09D940FC6A14C69AD659DF12FB2E3B6F3AE6E838B1FD000",
+        "size": 37998,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\s12-r4-owner-submission\\20260911T195310Z\\val-snapshots\\app\\services\\s12_export\\runner.py",
+        "snapshot_sha256": "ADBF98D7E6BC24E8B09D940FC6A14C69AD659DF12FB2E3B6F3AE6E838B1FD000"
+      },
+      "changed": false,
+      "path": "app/services/s12_export/runner.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 520,
+        "path": "app/services/s12_export/stitch.py",
+        "sha256": "FDEDED5652F89FC231D488569C7014E4BB3F781F2202D6C30980CF1D95F40D1D",
+        "size": 17407
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 520,
+        "path": "app/services/s12_export/stitch.py",
+        "sha256": "FDEDED5652F89FC231D488569C7014E4BB3F781F2202D6C30980CF1D95F40D1D",
+        "size": 17407,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\s12-r4-owner-submission\\20260911T195310Z\\val-snapshots\\app\\services\\s12_export\\stitch.py",
+        "snapshot_sha256": "FDEDED5652F89FC231D488569C7014E4BB3F781F2202D6C30980CF1D95F40D1D"
+      },
+      "changed": false,
+      "path": "app/services/s12_export/stitch.py"
+    },
+    {
+      "after": {
+        "exists": false,
+        "lines": null,
+        "path": "tests/s12/s12-lc3-val",
+        "sha256": null,
+        "size": null
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": false,
+        "lines": null,
+        "path": "tests/s12/s12-lc3-val",
+        "sha256": null,
+        "size": null
+      },
+      "changed": false,
+      "path": "tests/s12/s12-lc3-val"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 870,
+        "path": "tests/s12/s12-t03c/test_publication.py",
+        "sha256": "50B139BCBB161A8147EE7F6FC8A9B911F3063521B2FE15ABE8BC2D9A89B5D58F",
+        "size": 34105
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 870,
+        "path": "tests/s12/s12-t03c/test_publication.py",
+        "sha256": "50B139BCBB161A8147EE7F6FC8A9B911F3063521B2FE15ABE8BC2D9A89B5D58F",
+        "size": 34105,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\s12-r4-owner-submission\\20260911T195310Z\\val-snapshots\\tests\\s12\\s12-t03c\\test_publication.py",
+        "snapshot_sha256": "50B139BCBB161A8147EE7F6FC8A9B911F3063521B2FE15ABE8BC2D9A89B5D58F"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t03c/test_publication.py"
+    },
+    {
+      "after": {
+        "exists": true,
+        "lines": 995,
+        "path": "tests/s12/s12-t04a/test_c2_source_locked.py",
+        "sha256": "516F15763F8124D67424CC134D6BE1A0B745648F3773987C90325410A4218096",
+        "size": 37757
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": true,
+        "lines": 995,
+        "path": "tests/s12/s12-t04a/test_c2_source_locked.py",
+        "sha256": "516F15763F8124D67424CC134D6BE1A0B745648F3773987C90325410A4218096",
+        "size": 37757,
+        "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\s12-r4-owner-submission\\20260911T195310Z\\val-snapshots\\tests\\s12\\s12-t04a\\test_c2_source_locked.py",
+        "snapshot_sha256": "516F15763F8124D67424CC134D6BE1A0B745648F3773987C90325410A4218096"
+      },
+      "changed": false,
+      "path": "tests/s12/s12-t04a/test_c2_source_locked.py"
+    },
+    {
+      "after": {
+        "exists": false,
+        "lines": null,
+        "path": "docs/pm/sessions/S12-LC3-VAL",
+        "sha256": null,
+        "size": null
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": false,
+        "lines": null,
+        "path": "docs/pm/sessions/S12-LC3-VAL",
+        "sha256": null,
+        "size": null
+      },
+      "changed": false,
+      "path": "docs/pm/sessions/S12-LC3-VAL"
+    },
+    {
+      "after": {
+        "exists": false,
+        "lines": null,
+        "path": "work",
+        "sha256": null,
+        "size": null
+      },
+      "allowed_change": false,
+      "before": {
+        "exists": false,
+        "lines": null,
+        "path": "work",
+        "sha256": null,
+        "size": null
+      },
+      "changed": false,
+      "path": "work"
+    }
+  ],
+  "root": "C:\\Users\\Admin\\MotionForge2D-worktrees\\s12-lc3-luna-val",
+  "status": "VERIFIED"
+}

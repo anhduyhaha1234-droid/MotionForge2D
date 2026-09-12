@@ -65,6 +65,21 @@ correction, not an approval or closure claim.
 
 ## C3 R4 exact-owner continuation
 
+### F03 deep space/Unicode companion correction
+
+| UTC | Event | Result |
+|---|---|---|
+| 2026-09-12 | Independent R3 deep space/Unicode companion repro | 1 failed, exit 1; actual sidecar temp open raised `FileNotFoundError` |
+| 2026-09-12 | R4 boundary + Unicode/deep-path micro after `_native_fs_path` | 6 passed, 12 warnings, exit 0, 15.25s |
+| 2026-09-12 | VAL-only finite gate | 30 passed, 36 warnings, exit 0, 40.75s |
+| 2026-09-12 | Full allowed VAL/T03C/T04A finite gate | 83 passed, 74 warnings, exit 0, 75.00s |
+| 2026-09-12 | Exact affected compileall, Ruff F/I, diff-check | all exit 0 |
+| 2026-09-12 | R4 baseline post-write-set guard | `VERIFIED`, 9 entries, 0 failures; publication.py only |
+
+Raw correction commands, paths, hashes, and process markers are in
+`evidence/20260912T1502Z-r4-f03-correction.md`. This remains a local
+transport correction only, not an approval or closure claim.
+
 | 2026-09-12 | R4 design note and finite anti-omission matrix | recorded before source edit; existing owner/session and work/ preserved |
 | 2026-09-12 | R4 pre-fix publication/path micro | 2 intended reds preserved: no post-final recovery seam; temp companion not preflighted |
 | 2026-09-12 | R4 post-fix micro and retained R2/R3 boundary controls | green; foreign/tampered intent preserves marker and cleans only owner candidate |

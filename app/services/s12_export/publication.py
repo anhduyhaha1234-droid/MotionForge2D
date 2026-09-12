@@ -107,13 +107,21 @@ def _exclusive_temp_path(
     return path.with_name(f"{path.name}.{safe_token}.{suffix}.tmp")
 
 
+def _native_fs_path(path: Path) -> str:
+    """Use the Windows extended path form for long, valid Unicode paths."""
+    value = os.fspath(path)
+    if os.name != "nt" or value.startswith("\\\\?\\") or len(value) < 248:
+        return value
+    return "\\\\?\\" + os.path.abspath(value)
+
+
 def _write_exclusive_file(path: Path, payload: bytes, *, owner_token: str) -> None:
     """Create *path* once, using an owner-unique temp and exclusive link."""
     tmp = _exclusive_temp_path(path, owner_token)
     fd: int | None = None
     try:
         fd = os.open(
-            str(tmp),
+            _native_fs_path(tmp),
             os.O_CREAT | os.O_EXCL | os.O_WRONLY,
             0o600,
         )
@@ -125,12 +133,14 @@ def _write_exclusive_file(path: Path, payload: bytes, *, owner_token: str) -> No
         # Hard-link creation is the exclusive visibility primitive: it fails
         # when a participant already created the destination and never
         # replaces an existing sidecar or receipt.
-        os.link(tmp, path)
+        os.link(_native_fs_path(tmp), _native_fs_path(path))
     finally:
         if fd is not None:
             os.close(fd)
         try:
-            tmp.unlink(missing_ok=True)
+            os.unlink(_native_fs_path(tmp))
+        except FileNotFoundError:
+            pass
         except OSError:
             pass
 
@@ -499,6 +509,10 @@ def _preflight_publication_paths(final: Path, *, owner_token: str = "") -> None:
             if len(str(temporary)) > _MAX_PUBLICATION_PATH_CHARS:
                 raise PublicationPathError(
                     f"public output temporary companion path is too long: {temporary}"
+                )
+            if len(_native_fs_path(temporary)) > _MAX_PUBLICATION_PATH_CHARS:
+                raise PublicationPathError(
+                    f"public output native temporary path is too long: {temporary}"
                 )
 
 
