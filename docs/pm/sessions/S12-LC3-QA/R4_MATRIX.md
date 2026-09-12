@@ -1,10 +1,32 @@
 # S12 LC3-R4 QA evidence matrix
 
 Owner/session: QA Goodall / `01a08991-c909-7d03-86ed-ac236d50c87b`.
-Candidate baseline: integration `17b33f53b27da58e3330dd4a8270706ac853d37a`;
+Candidate baseline for the original packet: integration `17b33f53b27da58e3330dd4a8270706ac853d37a`;
 QA checkpoint before R4 evidence: `ac49c9d4e40e6c3d3a5b3cad49f67d6f12a80cdd`.
 Route: `gpt-5.6-luna`, reasoning high, fallback OFF. This is a 62-row evidence
 map, not a pass count and not a closure decision.
+
+## Final candidate transport audit
+
+Audited candidate: integration `b6d71873dd1597f191b3ead95cb15e5aff73a722`
+(clean). Ancestor checks are green for VAL merge
+`86630450213f5ed399aa7cbcace0c671999d8b89`, RETRY merge
+`0df6cf370d655445953480b56d4797bfddec560f`, and QA merge
+`617f7e809f7feb8fda0b69a49c469cc751a2e749`. The four relevant merged-scope
+checks were micro-first and green in a short isolated runtime: VAL `2/2`
+micro and `3/3` finite; RETRY `4/4` micro and `9/9` finite. Deselected counts,
+warnings, exits, and raw hashes are in `R4_COMMAND_LEDGER.md` and
+`R4_RAW_EVIDENCE_INDEX.md`. These are finite owner-scope checks only and do
+not close the 62 rows.
+
+Collection found 18 node IDs with exit `0`, no collection errors, and is marked
+collection-only rather than pass. Compileall and diff-check are green. Ruff
+has six pre-existing landed VAL production findings and is not green for the
+merged candidate; QA made no production edit. Corrected duplicate-definition
+and unresolved-import checks are green. Candidate guard is green (26 entries,
+zero failures), and the final QA-owned process audit is clean. B01 remains the
+external public StructuralLock/Full Apply blocker; no normal-product S12/video/
+UI evidence is promoted.
 
 ## C01-C32 retained acceptance rows
 

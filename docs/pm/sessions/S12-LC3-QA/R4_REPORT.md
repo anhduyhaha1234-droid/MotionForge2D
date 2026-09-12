@@ -7,7 +7,7 @@ Model route: `gpt-5.6-luna`, reasoning high, fallback OFF. QA branch/worktree:
 `codex/s12-lc3-luna-qa` /
 `C:\Users\Admin\MotionForge2D-worktrees\s12-lc3-luna-qa`.
 QA checkpoint at start: `ac49c9d4e40e6c3d3a5b3cad49f67d6f12a80cdd`.
-Frozen integration candidate: `17b33f53b27da58e3330dd4a8270706ac853d37a`.
+Frozen integration candidate at the prior QA packet: `17b33f53b27da58e3330dd4a8270706ac853d37a`.
 
 ## Scope
 
@@ -112,3 +112,54 @@ See [R4_MATRIX.md](R4_MATRIX.md), [R4_COMMAND_LEDGER.md](R4_COMMAND_LEDGER.md),
 
 Final packet paths are QA-only. No RETRY/VAL/UI test was rerun from this lane,
 and no normal-product S12/video/UI claim was promoted.
+
+## Final candidate transport audit — b6d7187
+
+The exact frozen candidate independently audited after R4 INT transport is
+`b6d71873dd1597f191b3ead95cb15e5aff73a722`, clean in
+`C:\Users\Admin\MotionForge2D-worktrees\s12-lc3-luna-integration` on
+`codex/s12-lc3-luna-integration`. The captured graph verification proves
+ancestors `86630450213f5ed399aa7cbcace0c671999d8b89` (VAL merge),
+`0df6cf370d655445953480b56d4797bfddec560f` (RETRY merge), and
+`617f7e809f7feb8fda0b69a49c469cc751a2e749` (QA merge); graph envelope
+`candidate-merge-graph-verify-20260912T150700Z.command.json` exited `0`.
+
+Read-only candidate gates were run in micro-first order against the merged
+VAL/RETRY scopes. In the short contained runtime lane, VAL micro was `2
+passed, 3 deselected`, RETRY micro `4 passed, 9 deselected`, VAL finite `3
+passed, 2 deselected`, and RETRY finite `9 passed, 4 deselected`; each exited
+`0`, with no skips or xfails. Exact envelopes and stdout hashes are indexed in
+the fresh candidate lane. Two earlier retained controls failed only from
+fixture/temp-path residue (`PublicationError` on an existing output and a
+long-path `FileNotFoundError`); they were not promoted to product failures.
+
+Candidate compileall exited `0`; merged-scope `git diff --check` exited `0`.
+Changed-scope Ruff exited `1` only on six already-landed VAL findings in
+`app/services/s12_export/publication.py` (N818/SIM105/SIM103/SIM102); QA did
+not edit production. Corrected duplicate-definition and public-import scans
+exited `0` with respectively `[]` over 10 files and five imported modules
+with no import errors. The candidate write-set verification exited `0` with
+26 entries and zero failures; the final candidate process audit exited `0`
+with zero QA-owned matches.
+
+Collection-only verification exited `0` and found 18 VAL/RETRY node IDs with
+no collection errors. It remains collection-only and is not a pass or
+execution count. The actual VAL worker-kill evidence and RETRY actual-worker/
+contested-identity evidence remain owner-submitted artifacts, not normal
+public S12 evidence. The read-only b6 audit still reports no public
+StructuralLock producer/caller, `structural_lock_manifests=0`, S10 `422`, and
+S12 `409` missing Full Apply/lock; B01 remains `PROPOSED_ONLY`,
+`BLOCKED_EXTERNAL_STRUCTURAL_LOCK_AUTHORITY`, `NOT_CLOSED`, and
+`NOT_APPROVED`. Normal public S12/video/publisher/media/UI/playback remains
+`NOT_DEMONSTRATED`/`NOT_RUN`.
+
+Fresh evidence lane:
+`C:\Users\Admin\Documents\Codex\2026-09-11\tr-x20\outputs\s12-r4-owner-submission\20260911T195310Z\qa-candidate-b6d7187-20260912T145123Z`.
+The candidate and QA trees were left without QA-owned processes; no external
+process was terminated. This transport audit changes no production, VAL, RETRY,
+frontend, or candidate bytes.
+
+The QA packet micro was rerun after this addendum: envelope
+`qa-packet-micro-candidate-b6-20260912T152700Z.command.json`, exit `0`, `3
+passed`, stdout SHA
+`CB9CCAE7A25731B47BF196002B487FAD709F7ACC25B8ED060BE59B74A388EE4C`.
