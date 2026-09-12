@@ -426,11 +426,13 @@ def _publish_candidate_exclusive(candidate: Path, final: Path) -> None:
     fd: int | None = None
     try:
         fd = os.open(
-            str(temporary),
+            _native_fs_path(temporary),
             os.O_CREAT | os.O_EXCL | os.O_WRONLY,
             0o600,
         )
-        with candidate.open("rb") as source, os.fdopen(fd, "wb") as target:
+        with open(_native_fs_path(candidate), "rb") as source, os.fdopen(
+            fd, "wb"
+        ) as target:
             fd = None
             while True:
                 block = source.read(_HASH_CHUNK)
@@ -442,7 +444,7 @@ def _publish_candidate_exclusive(candidate: Path, final: Path) -> None:
         # The temporary is in the owner scratch root, while the final link is
         # exclusive.  Thus the candidate and final are never the same inode,
         # and a winner cannot be replaced by a stale participant.
-        os.link(temporary, final)
+        os.link(_native_fs_path(temporary), _native_fs_path(final))
     except FileExistsError as err:
         raise PublicationRaceLost(
             f"publication race lost: final already exists and is immutable: {final}"
@@ -451,7 +453,9 @@ def _publish_candidate_exclusive(candidate: Path, final: Path) -> None:
         if fd is not None:
             os.close(fd)
         try:
-            temporary.unlink(missing_ok=True)
+            os.unlink(_native_fs_path(temporary))
+        except FileNotFoundError:
+            pass
         except OSError:
             pass
 

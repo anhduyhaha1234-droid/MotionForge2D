@@ -322,6 +322,16 @@ commands, paths, markers, and guard output are recorded in
 [20260912T1502Z-r4-f03-correction.md](evidence/20260912T1502Z-r4-f03-correction.md).
 This is a local transport correction only, not an approval or closure claim.
 
+The candidate then exposed a second F03 gap in the full publisher path:
+`_publish_candidate_exclusive` still passed raw long paths to `os.open`,
+candidate reads, `os.link`, and temp cleanup. The bounded follow-up changes
+only that function to use the existing `_native_fs_path` helper at all four
+filesystem boundaries. The R4/R3 worker-boundary micro passed `7` nodes and
+the full allowed finite gate passed `83` nodes with `74` warnings, exit `0`,
+in `76.19s`. Evidence is
+[20260912T-r4-f03-publish-correction.md](evidence/20260912T-r4-f03-publish-correction.md).
+This is a local transport correction only, not an approval or closure claim.
+
 This R4 correction resumed the existing VAL owner/session from
 `acd2fd69c3bf48e4f4bf503cbb15d9bb1430c275` and preserved the pre-existing
 untracked `work/` tree. The finite design and anti-omission matrix were locked
