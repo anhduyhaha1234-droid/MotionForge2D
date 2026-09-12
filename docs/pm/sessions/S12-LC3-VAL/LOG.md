@@ -75,6 +75,11 @@ correction, not an approval or closure claim.
 | 2026-09-12 | Full allowed VAL/T03C/T04A finite gate | 83 passed, 74 warnings, exit 0, 75.00s |
 | 2026-09-12 | Exact affected compileall, Ruff F/I, diff-check | all exit 0 |
 | 2026-09-12 | R4 baseline post-write-set guard | `VERIFIED`, 9 entries, 0 failures; publication.py only |
+| 2026-09-12 | Candidate second F03 full-publisher path gap | 81 passed, 2 failed, exit 1; preserved candidate red |
+| 2026-09-12 | R3/R4 worker-boundary micro after full-publisher path fix | 7 passed, 14 warnings, exit 0, 20.50s |
+| 2026-09-12 | Full allowed VAL/T03C/T04A finite gate after full-publisher path fix | 83 passed, 74 warnings, exit 0, 76.19s |
+| 2026-09-12 | Exact affected compileall, Ruff F/I, diff-check | all exit 0 |
+| 2026-09-12 | R4 F03 post-write-set guard | `VERIFIED`, 9 entries, 0 failures; publication.py only |
 
 Raw correction commands, paths, hashes, and process markers are in
 `evidence/20260912T1502Z-r4-f03-correction.md`. This remains a local
