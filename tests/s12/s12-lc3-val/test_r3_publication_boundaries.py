@@ -25,34 +25,148 @@ env = publication_base.env
 def test_r3_s01_pre_receipt_recovery_requires_matching_private_attempt(
     env, monkeypatch: pytest.MonkeyPatch
 ) -> None:  # type: ignore[no-untyped-def]
-    """A final/sidecar pair without a receipt is recoverable only with its candidate."""
+    """A real interrupted publisher recovers from its durable attempt intent."""
     publication_base._patch(monkeypatch, "PASS")
     factory, kw = publication_base._submit(env, monkeypatch)
     final = Path(kw["manifest"]["output_path"])
     candidate = Path(kw["manifest"]["scratch_dir"]) / "candidate_final.mp4"
-    payload = b"r3 pre-receipt recovery bytes"
-    candidate.write_bytes(payload)
-    shutil.copyfile(candidate, final)
-    pub._sidecar_path(final).write_text(
-        f"{pub._sha256_file(final)}\n", encoding="ascii"
-    )
+    db = Path(kw["manifest"]["scratch_dir"]).parent / "t03c-pub.db"
     monkeypatch.setattr(pub, "_cleanup_publication_scratch", lambda *a, **k: None)
+    child_script = r"""
+import json
+import sys
+from types import SimpleNamespace
 
-    with factory() as session:
-        result = pub.publish_export_run(session, **kw)
-        session.commit()
+from app.persistence import create_engine_for_path, create_session_factory
+from app.services.s12_export import publication as pub
+from app.services.s12_export import validation
 
+payload = json.loads(sys.argv[1])
+factory = create_session_factory(create_engine_for_path(payload["db"]))
+pub._require_ready = lambda session, **kwargs: None
+pub._cleanup_publication_scratch = lambda *args, **kwargs: None
+validation.validate = lambda path, expectation: SimpleNamespace(
+    verdict="PASS",
+    probes=tuple(
+        SimpleNamespace(name=name, verdict="PASS", detail="test pass")
+        for name in ("frame_count", "frame_order", "av_policy", "provenance")
+    ),
+)
+if payload["phase"] == "interrupt":
+    def interrupt_after_final(final):
+        intent_path = pub._publication_intent_path(final)
+        intent = pub._read_publication_intent(final)
+        assert intent_path.is_file() and intent is not None
+        assert intent["run_id"] == payload["kwargs"]["run_id"]
+        assert intent["fence_token"] == payload["kwargs"]["fence_token"]
+        print("DURABLE_ATTEMPT_PROOF", intent["attempt"], intent["candidate_sha256"], flush=True)
+        raise SystemExit(86)
+    pub._after_publication_final = interrupt_after_final
+with factory() as session:
+    result = pub.publish_export_run(session, **payload["kwargs"])
+    session.commit()
+    print("RECOVERY_RESULT=" + json.dumps(result, sort_keys=True), flush=True)
+"""
+    payload = {"db": str(db), "kwargs": kw, "phase": "interrupt"}
+    interrupted = subprocess.run(
+        [sys.executable, "-c", child_script, json.dumps(payload)],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    print(
+        "R3_S01_INTERRUPTED_PUBLISHER "
+        f"exit={interrupted.returncode} stdout={interrupted.stdout.strip()} "
+        f"stderr={interrupted.stderr[-500:].strip()}"
+    )
+    assert interrupted.returncode == 86, interrupted.stderr
+    assert "DURABLE_ATTEMPT_PROOF" in interrupted.stdout
+    intent_path = pub._publication_intent_path(final)
+    receipt = pub._publication_receipt_path(final)
+    assert intent_path.is_file()
+    assert not pub._sidecar_path(final).exists()
+    assert not receipt.exists()
+    final_sha = pub._sha256_file(final)
+    assert final_sha == pub._sha256_file(candidate)
+    assert not os.path.samefile(candidate, final)
+
+    payload["phase"] = "recover"
+    recovered = subprocess.run(
+        [sys.executable, "-c", child_script, json.dumps(payload)],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    print(
+        "R3_S01_FRESH_PROCESS_RECOVERY "
+        f"exit={recovered.returncode} stdout={recovered.stdout.strip()} "
+        f"stderr={recovered.stderr[-500:].strip()}"
+    )
+    assert recovered.returncode == 0, recovered.stderr
+    result_line = next(
+        line for line in recovered.stdout.splitlines() if line.startswith("RECOVERY_RESULT=")
+    )
+    result = json.loads(result_line.partition("=")[2])
     receipt = pub._publication_receipt_path(final)
     print(
         "R3_S01_PRE_RECEIPT "
-        f"status={result['status']} final_sha256={pub._sha256_file(final)} "
-        f"receipt={receipt.is_file()} candidate={candidate.is_file()}"
+        f"status={result['status']} recovered={result.get('recovered')} "
+        f"final_sha256={pub._sha256_file(final)} receipt={receipt.is_file()} "
+        f"candidate={candidate.is_file()} samefile={os.path.samefile(candidate, final)}"
     )
     assert result["status"] == "completed"
+    assert result["recovered"] is True
     assert receipt.is_file()
-    assert final.read_bytes() == payload
+    assert pub._sha256_file(final) == final_sha
     assert candidate.is_file()
     assert not os.path.samefile(candidate, final)
+    assert not intent_path.exists()
+    with factory() as session:
+        assert publication_base.S12ExportRepository(session).get_run(kw["run_id"]).status == "completed"
+
+
+def test_r3_s01_unowned_same_byte_pair_is_not_recovered_or_mutated(
+    env, monkeypatch: pytest.MonkeyPatch
+) -> None:  # type: ignore[no-untyped-def]
+    """Equal final/candidate/sidecar bytes without intent or receipt prove no ownership."""
+    publication_base._patch(monkeypatch, "PASS")
+    factory, kw = publication_base._submit(env, monkeypatch)
+    final = Path(kw["manifest"]["output_path"])
+    candidate = Path(kw["manifest"]["scratch_dir"]) / "candidate_final.mp4"
+    payload = b"synthetic unowned same-byte final"
+    candidate.write_bytes(payload)
+    shutil.copyfile(candidate, final)
+    sidecar = pub._sidecar_path(final)
+    sidecar.write_text(f"{pub._sha256_file(final)}\n", encoding="ascii")
+    receipt = pub._publication_receipt_path(final)
+    intent = pub._publication_intent_path(final)
+    monkeypatch.setattr(pub, "_cleanup_publication_scratch", lambda *a, **k: None)
+    final_identity = (final.stat().st_dev, final.stat().st_ino)
+    sidecar_identity = (sidecar.stat().st_dev, sidecar.stat().st_ino)
+    final_bytes = final.read_bytes()
+    sidecar_bytes = sidecar.read_bytes()
+
+    with factory() as session:
+        before = publication_base.S12ExportRepository(session).get_run(kw["run_id"])
+        assert before.status == "running"
+        with pytest.raises(pub.PublicationError):
+            pub.publish_export_run(session, **kw)
+        session.rollback()
+    with factory() as session:
+        after = publication_base.S12ExportRepository(session).get_run(kw["run_id"])
+        assert after.status == before.status
+    print(
+        "R3_S01_UNOWNED_PAIR "
+        f"status={after.status} final_sha256={pub._sha256_file(final)} "
+        f"sidecar_sha256={sidecar_bytes.decode('ascii').strip()} "
+        f"receipt={receipt.exists()} intent={intent.exists()}"
+    )
+    assert final.read_bytes() == final_bytes
+    assert sidecar.read_bytes() == sidecar_bytes
+    assert (final.stat().st_dev, final.stat().st_ino) == final_identity
+    assert (sidecar.stat().st_dev, sidecar.stat().st_ino) == sidecar_identity
+    assert not receipt.exists()
+    assert not intent.exists()
 
 
 def test_r3_s02_private_candidate_and_public_final_are_distinct_inodes(

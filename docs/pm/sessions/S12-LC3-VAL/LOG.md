@@ -81,6 +81,23 @@ correction, not an approval or closure claim.
 | 2026-09-12 | Exact affected compileall, Ruff F/I, diff-check | all exit 0 |
 | 2026-09-12 | R4 F03 post-write-set guard | `VERIFIED`, 9 entries, 0 failures; publication.py only |
 
+## C3 R5 F02 exact-owner continuation
+
+| UTC | Event | Result |
+|---|---|---|
+| 2026-09-12T17:02:33Z | Fresh before-red: real publisher interruption/recovery plus unowned-pair control | `1 passed, 1 failed, 4 warnings`, exit 1; `DID NOT RAISE PublicationError` on unowned pair |
+| 2026-09-12T17:04:18Z | Corrected actual-interruption/unowned-pair micro | `2 passed, 4 warnings`, exit 0, 6.25s |
+| 2026-09-12T17:05:28Z | Full allowed VAL/T03C publication/T04A source-lock gate | `84 passed, 76 warnings`, exit 0, 81.08s pytest |
+| 2026-09-12T17:17:44.299090Z–17:19:03.025595Z | Timestamped repeat finite gate | `84 passed, 76 warnings`, exit 0; 78.726475s process wall |
+| 2026-09-12T17:19:35Z | Timestamped compileall, Ruff F/I, diff-check | all exit 0 |
+| 2026-09-12 | Compileall, Ruff F/I, diff-check | all exit 0 |
+| 2026-09-12 | Manager VAL baseline post-write-set guard | `VERIFIED`, 103 entries, 0 failures; includes protected files and `work/` |
+
+Exact argv, cwd, raw proof/recovery markers, source hashes, and fresh external
+before-red/finite evidence are in
+`evidence/20260912T1708Z-r5-f02-publication-recovery.md`. This is a local
+transport checkpoint only, not integration, approval, or closure.
+
 Raw correction commands, paths, hashes, and process markers are in
 `evidence/20260912T1502Z-r4-f03-correction.md`. This remains a local
 transport correction only, not an approval or closure claim.
