@@ -57,6 +57,7 @@ __all__ = [
     "LEASE_CONFLICT_CODE",
     "S12_EXPORT_TERMINAL_STATUSES",
     "S12ExportError",
+    "InvalidLineageError",
     "FencedWorkerError",
     "IdempotencyConflictError",
     "LeaseConflictError",
@@ -92,6 +93,10 @@ class RunNotFoundError(S12ExportError):
 
 class StaleIdentityError(S12ExportError):
     """The caller's frozen identity pins do not match the pinned run."""
+
+
+class InvalidLineageError(S12ExportError):
+    """A stored S12 attempt/predecessor chain is malformed or inconsistent."""
 
 
 class LeaseConflictError(S12ExportError):
@@ -382,6 +387,27 @@ class S12ExportRepository:
             lineage_id=derived_natural,
             predecessor_run_id=None,
         )
+        replay = self._replay_after_conflict(
+            workspace_id=workspace_id,
+            project_id=project_id,
+            video_item_id=video_item_id,
+            checkpoint_id=checkpoint_id,
+            checkpoint_hash=checkpoint_hash,
+            checkpoint_revision=checkpoint_revision,
+            manifest_id=manifest_id,
+            manifest_hash=manifest_hash,
+            manifest_generation=manifest_generation,
+            profile_id=profile_id,
+            plan_id=plan_id,
+            plan_hash=plan_hash,
+            frame_count=frame_count,
+            chunk_config_json=_canonical_json(chunk_config),
+            idempotency_key=idempotency_key,
+            natural_key=derived_natural,
+            cause=None,
+        )
+        if replay is not None:
+            return replay
         try:
             with self._session.no_autoflush:
                 self._session.add(row)
@@ -392,7 +418,10 @@ class S12ExportRepository:
                 workspace_id=workspace_id,
                 project_id=project_id,
                 video_item_id=video_item_id,
+                checkpoint_id=checkpoint_id,
                 checkpoint_hash=checkpoint_hash,
+                checkpoint_revision=checkpoint_revision,
+                manifest_id=manifest_id,
                 manifest_hash=manifest_hash,
                 manifest_generation=manifest_generation,
                 profile_id=profile_id,
@@ -412,7 +441,10 @@ class S12ExportRepository:
         workspace_id: str,
         project_id: str,
         video_item_id: str,
+        checkpoint_id: str,
         checkpoint_hash: str,
+        checkpoint_revision: int,
+        manifest_id: str,
         manifest_hash: str,
         manifest_generation: str,
         profile_id: str,
@@ -422,9 +454,9 @@ class S12ExportRepository:
         chunk_config_json: str,
         idempotency_key: str | None,
         natural_key: str,
-        cause: IntegrityError,
-    ) -> tuple[RunRecord, bool]:
-        """Resolve a create_run uniqueness conflict: replay or fail-closed.
+        cause: IntegrityError | None,
+    ) -> tuple[RunRecord, bool] | None:
+        """Resolve an existing identity before insertion, or a race after it.
 
         Resolves the UNION of durable identities (workspace idempotency key
         AND lineage natural key).  Every candidate that is found is compared
@@ -455,6 +487,8 @@ class S12ExportRepository:
             candidates.append(by_natural)
             seen.add(by_natural.id)
         if not candidates:
+            if cause is None:
+                return None
             raise S12ExportError(
                 f"export run creation conflict resolved to no row: {cause.orig}"
             ) from cause
@@ -468,7 +502,10 @@ class S12ExportRepository:
         same_identity = (
             existing.project_id == project_id
             and existing.video_item_id == video_item_id
+            and existing.checkpoint_id == checkpoint_id
             and existing.checkpoint_hash == checkpoint_hash
+            and existing.checkpoint_revision == checkpoint_revision
+            and existing.manifest_id == manifest_id
             and existing.manifest_hash == manifest_hash
             and existing.manifest_generation == manifest_generation
             and existing.profile_id == profile_id
@@ -476,6 +513,10 @@ class S12ExportRepository:
             and existing.plan_hash == plan_hash
             and existing.frame_count == frame_count
             and existing.chunk_config_json == chunk_config_json
+            and existing.natural_key == natural_key
+            and existing.lineage_id == natural_key
+            and existing.predecessor_run_id is None
+            and existing.attempt == 1
         )
         if not same_identity:
             raise IdempotencyConflictError(
@@ -726,15 +767,19 @@ class S12ExportRepository:
     def _validate_claim_lineage(self, run: S12ExportRun) -> None:
         """Validate the complete immutable chain before any lease write."""
         if run.attempt < 1 or not run.lineage_id:
-            raise S12ExportError(f"invalid S12 export lineage for run {run.id!r}")
+            raise InvalidLineageError(
+                f"invalid S12 export lineage for run {run.id!r}"
+            )
         if run.attempt == 1:
             if run.predecessor_run_id is not None:
-                raise S12ExportError(
+                raise InvalidLineageError(
                     f"invalid S12 export lineage: attempt 1 run {run.id!r} has a predecessor"
                 )
             return
         if run.predecessor_run_id is None or run.predecessor_run_id == run.id:
-            raise S12ExportError(f"invalid S12 export lineage for run {run.id!r}")
+            raise InvalidLineageError(
+                f"invalid S12 export lineage for run {run.id!r}"
+            )
 
         current = run
         seen = {run.id}
@@ -761,12 +806,12 @@ class S12ExportRepository:
             predecessor_id = current.predecessor_run_id
             predecessor = self._session.get(S12ExportRun, predecessor_id)
             if predecessor is None or predecessor.id in seen:
-                raise S12ExportError(
+                raise InvalidLineageError(
                     f"invalid or cyclic S12 export lineage for run {run.id!r}"
                 )
             seen.add(predecessor.id)
             if predecessor.attempt != current.attempt - 1:
-                raise S12ExportError(
+                raise InvalidLineageError(
                     f"invalid S12 export lineage attempt for run {run.id!r}"
                 )
             if predecessor.status not in S12_EXPORT_TERMINAL_STATUSES[1:]:
@@ -777,12 +822,14 @@ class S12ExportRepository:
                 getattr(predecessor, field) != getattr(run, field)
                 for field in frozen_fields
             ):
-                raise S12ExportError(
+                raise InvalidLineageError(
                     f"inconsistent frozen identity in S12 export lineage for run {run.id!r}"
                 )
             current = predecessor
         if current.attempt != 1 or current.predecessor_run_id is not None:
-            raise S12ExportError(f"invalid S12 export lineage root for run {run.id!r}")
+            raise InvalidLineageError(
+                f"invalid S12 export lineage root for run {run.id!r}"
+            )
 
     def claim_run(
         self,

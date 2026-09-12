@@ -32,6 +32,7 @@ from sqlalchemy import select
 __all__ = [
     "S12_EXPORT_JOB_TYPE",
     "S12ExportSubmitError",
+    "S12ExportLineageError",
     "submit_export_job",
     "submit_retry_export_job",
     "register_s12_export_handler",
@@ -44,6 +45,15 @@ S12_EXPORT_JOB_TYPE = "s12_export"
 
 class S12ExportSubmitError(ValueError):
     """Fail-closed submission error (stale pins, missing authority)."""
+
+
+class S12ExportLineageError(S12ExportSubmitError):
+    """Typed denial for malformed durable retry lineage."""
+
+    code = "S12_EXPORT_INVALID_LINEAGE"
+
+    def __init__(self, message: str) -> None:
+        super().__init__(f"{self.code}: {message}")
 
 
 def submit_export_job(
@@ -83,6 +93,8 @@ def submit_export_job(
     never a duplicate successor).  The HTTP request never renders: it
     only commits the ``pending`` run row and the ``queued`` job row.
     """
+    from app.persistence.jobs import JobRepository  # noqa: PLC0415
+    from app.persistence.models import Job  # noqa: PLC0415
     from app.persistence.s12_export import (  # noqa: PLC0415
         S12ExportRepository,
         StaleIdentityError,
@@ -120,6 +132,42 @@ def submit_export_job(
         except StaleIdentityError as err:
             session.rollback()
             raise S12ExportSubmitError(str(err)) from err
+        if not created:
+            try:
+                if run.job_id is None:
+                    raise S12ExportSubmitError(
+                        f"existing export run {run.id!r} has no durable Job pointer"
+                    )
+                matching_jobs = list(
+                    session.scalars(
+                        select(Job).where(
+                            Job.workspace_id == workspace_id,
+                            Job.idempotency_key == f"s12_export_job:{run.id}",
+                        )
+                    )
+                )
+                if (
+                    len(matching_jobs) != 1
+                    or str(matching_jobs[0].id) != str(run.job_id)
+                ):
+                    raise S12ExportSubmitError(
+                        f"existing export run {run.id!r} does not resolve to exactly "
+                        "its actual durable Job"
+                    )
+                job_record = JobRepository(session).get_job(str(run.job_id))
+                repo.bind_job(run.id, str(run.job_id))
+                replay_job = job_service._job_info(job_record)
+            except S12ExportSubmitError:
+                session.rollback()
+                raise
+            except Exception as err:
+                session.rollback()
+                raise S12ExportSubmitError(
+                    f"existing export Run/Job replay failed closed: {err}"
+                ) from err
+            # Replay is read-only: do not enqueue, repair, or commit anything.
+            session.rollback()
+            return run, replay_job, False
         # Commit the run BEFORE opening the second writer for the job —
         # one SQLite writer at a time (S10-C10 precedent).
         try:
@@ -186,7 +234,12 @@ def submit_retry_export_job(
     from app.persistence import StepInput  # noqa: PLC0415
     from app.persistence.jobs import JobRepository  # noqa: PLC0415
     from app.persistence.models import Job, S12ExportRun  # noqa: PLC0415
-    from app.persistence.s12_export import S12ExportRepository  # noqa: PLC0415
+    from app.persistence.s12_export import (  # noqa: PLC0415
+        IdempotencyConflictError,
+        InvalidLineageError,
+        S12ExportError,
+        S12ExportRepository,
+    )
 
     factory = getattr(job_service, "session_factory", None)
     if factory is None:
@@ -299,9 +352,28 @@ def submit_retry_export_job(
             )
             job_record = ensure_pair(session, run, make_manifest(run))
             bound_run = repo.get_run(run.id)
-            session.commit()
-            return bound_run, job_service._job_info(job_record), created
+        except InvalidLineageError as err:
+            session.rollback()
+            raise S12ExportLineageError(str(err)) from err
+        except S12ExportSubmitError:
+            session.rollback()
+            raise
+        except (IdempotencyConflictError, S12ExportError) as err:
+            session.rollback()
+            raise S12ExportSubmitError(str(err)) from err
         except Exception as err:
+            # Preparation/query failures did not attempt COMMIT.  They are
+            # fail-closed and must never be interpreted as commit uncertainty.
+            session.rollback()
+            raise S12ExportSubmitError(
+                f"retry preparation failed closed: {err}"
+            ) from err
+
+        try:
+            session.commit()
+        except Exception as err:
+            # Reconciliation is limited to the one operation whose outcome
+            # may be unknown: COMMIT itself.
             session.rollback()
             try:
                 return reconcile_pair()
@@ -309,9 +381,10 @@ def submit_retry_export_job(
                 raise
             except Exception as reconcile_err:
                 raise S12ExportSubmitError(
-                    f"retry transaction failed closed: {err}; "
+                    f"retry commit outcome uncertain: {err}; "
                     f"reconciliation failed: {reconcile_err}"
                 ) from reconcile_err
+        return bound_run, job_service._job_info(job_record), created
 
 
 def run_chunk_config(run: Any) -> str:
