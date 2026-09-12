@@ -361,3 +361,38 @@ R4 baseline guard first rejected the changed protected production file without
 an allowance, then passed with only
 `app/services/s12_export/publication.py` allowed: `9` entries, `0` failures.
 This is a local transport checkpoint only, not an approval or closure claim.
+
+## C3 R5 F02 exact-owner continuation
+
+The same VAL owner resumed on `codex/s12-lc3-luna-val` at
+`e9a1686df7c740934c6fa8e12e23e1597f04856f`, with the accepted route
+`gpt-5.6-luna / high / fallback OFF`. No other production path changed.
+
+The fresh before-red used an actual publisher subprocess: it established an
+attempt-bound durable intent, created the final, and exited at the
+post-final/pre-sidecar seam. A second process recovered the same run. The
+separate synthetic unowned same-byte final+candidate+sidecar negative exposed
+the defect (`DID NOT RAISE PublicationError`): current code inferred ownership
+without an intent or receipt. The production fix now requires a present
+intent matching run/project/attempt/output/content and its candidate digest
+before pre-receipt recovery. Readiness and current-fence checks remain before
+writing the sidecar/receipt or completing the run.
+
+After repair, both F02 micro nodes passed. The real positive retained
+completion, final hash, and distinct candidate/final inode assertions and
+recovered in a second process; the unowned negative preserved DB status,
+final/sidecar bytes and inodes, and absent intent/receipt. The full allowed
+VAL/T03C publication/T04A source-lock finite gate passed `84` nodes with `76`
+warnings, exit `0` in two runs; the measured repeat took `78.726475s`.
+Compileall, Ruff F/I, and diff-check passed. Detailed
+commands, raw markers, hashes, and the post-guard are recorded in
+[20260912T1708Z-r5-f02-publication-recovery.md](evidence/20260912T1708Z-r5-f02-publication-recovery.md)
+and the fresh external lane evidence.
+
+Protected migration/model/T03A test files were not edited. The exact
+pre-existing untracked `work/` tree was not cleaned or staged and is checked
+against the manager snapshot in
+[20260913T-post-guard-r5-f02.json](evidence/20260913T-post-guard-r5-f02.json).
+The guard reports `VERIFIED`, `103` entries, `0` failures, including the
+protected files and `work/`. This is a local transport checkpoint only, not
+an integration, approval, or closure claim.

@@ -1039,19 +1039,17 @@ def _recover_pre_receipt_publication(
     except PublicationError:
         return False
     expected_sha = manifest.get("expected_sha256") or manifest.get("authority_sha256")
-    candidate = _candidate_path(manifest)
-    if intent is not None:
-        if not _intent_matches_run(
-            intent,
-            run,
-            run_id=run_id,
-            workspace_id=workspace_id,
-            project_id=project_id,
-            final=final,
-            expected_sha=str(expected_sha or ""),
-        ):
-            return False
-        candidate = _intent_candidate_path(intent, manifest, run)
+    if intent is None or not _intent_matches_run(
+        intent,
+        run,
+        run_id=run_id,
+        workspace_id=workspace_id,
+        project_id=project_id,
+        final=final,
+        expected_sha=str(expected_sha or ""),
+    ):
+        return False
+    candidate = _intent_candidate_path(intent, manifest, run)
     if sidecar.is_symlink() or candidate is None or not candidate.is_file():
         return False
     try:
@@ -1062,7 +1060,7 @@ def _recover_pre_receipt_publication(
         return False
     if same_inode or candidate_sha != actual_sha:
         return False
-    if intent is not None and intent.get("candidate_sha256") != candidate_sha:
+    if intent.get("candidate_sha256") != candidate_sha:
         return False
     if sidecar.exists():
         if not sidecar.is_file():
@@ -1073,8 +1071,6 @@ def _recover_pre_receipt_publication(
             return False
         if stored_sha != actual_sha:
             return False
-    elif intent is None:
-        return False
     if expected_sha and str(expected_sha).lower() != actual_sha:
         return False
     _require_ready(session, workspace_id=workspace_id, project_id=project_id)
