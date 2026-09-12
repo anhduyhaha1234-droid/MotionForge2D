@@ -197,3 +197,19 @@ and its unfiltered workspace-scoped Job rows. Ambiguous, wrong-scope, tampered,
 query-failed, enqueue-failed or bind-failed identities roll back with zero new
 Run/Job rows. The initial-submit idempotency key remains unchanged and no
 global JobService or unrelated domain table is modified.
+
+## S12-LC3-R5 initial replay and lineage denial
+
+Initial submission resolves the union of workspace idempotency and natural-key
+identities read-only before inserting a run. If an equivalent run already
+exists, replay validates its exact bound Job and all matching workspace/key Job
+rows before returning the original run/Job pair; it does not enqueue, repair or
+commit. A missing, ambiguous, mismatched or corrupt binding fails closed with
+zero Run/Job delta. Only a fresh identity proceeds to run and Job creation.
+
+Malformed retry ancestry is a deterministic `S12_EXPORT_INVALID_LINEAGE`
+denial (`409`), including an invalid predecessor attempt while a later
+successor already exists. Retry preparation, lookup, enqueue and bind failures
+are rolled back without commit reconciliation. Reconciliation is reserved for
+an exception raised by the commit operation itself, where the exact successor
+and Job pair is reread to converge after a genuinely uncertain acknowledgment.

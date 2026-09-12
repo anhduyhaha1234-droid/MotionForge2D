@@ -87,3 +87,38 @@ once; and a lost commit acknowledgement replays the exact pair. Existing
 sequential replay controls remain separate. Fresh raw evidence belongs under
 `C:\Users\Admin\Documents\Codex\2026-09-11\tr-x20\outputs\s12-r4-owner-submission\20260911T195310Z\RETRY`;
 runtime belongs under the matching `C:\Users\Admin\Documents\Codex\work\s12-r4\20260911T195310Z\RETRY`.
+
+## R5 bounded correction — F01 / F03
+
+Owner/session remains `01a08982-4ec8-7271-beb7-67dc770ce118`, thread
+`01a08e92-7385-7a21-beb7-67dc770ce118`; route is `gpt-5.6-luna`, reasoning
+`high`, fallback `OFF`. R5 resumed on clean HEAD
+`2c9d793eb96ea330ba4d9ee1028ce45909cb9ea6` in the same RETRY worktree.
+No schema/model/migration, T03A, QA/VAL/UI/demo/MAIN or candidate integration
+file is writable in this correction.
+
+R5 pre-red reproduced the frozen reviewer nodes on this owner source:
+`test_review_r4_retry.py::test_public_initial_replay_generation_zero_mutation[True]`
+failed because denied replay increased Jobs `1 -> 2`; and
+`test_review_r4_retry.py::test_retry_reconciliation_does_not_bypass_invalid_predecessor[True]`
+failed because attempt `9` returned the existing attempt-2 successor. The new
+local micro nodes are `test_public_initial_replay_resolves_run_and_job_before_create`
+and `test_invalid_predecessor_lineage_is_typed_and_not_reconciled`; the existing
+valid lost-ack control remains
+`test_repair_commit_uncertainty_and_replay_have_exact_pair`.
+
+F01 uses read-only union identity resolution before any run insert; an existing
+run must map to exactly one workspace-scoped canonical Job whose ID equals the
+run pointer and whose manifest/generation passes `bind_job`. Replay returns
+that exact pair with no enqueue or commit. F03 raises a typed
+`S12_EXPORT_INVALID_LINEAGE` denial. Preparation errors roll back directly;
+only exceptions from `session.commit()` enter exact-pair reconciliation.
+
+The R3 matrix authority remains unchanged: 62 tracked rows are
+C01-C32 + S01-S10 + P01-P10 + R01-R10, not 62 passes. R5 maps F01/F03 to the
+existing R03/S03/C06/C07/C15 meanings and retains the R01 attempt-chain,
+R02 contested-operation/all-row, sequential replay, malformed-lineage and
+commit/lost-ack controls without renaming or deleting rows. Evidence and
+runtime use the R5 roots at
+`C:\Users\Admin\Documents\Codex\2026-09-11\tr-x20\outputs\s12-r5-owner-submission\20260912T164057Z\RETRY`
+and `C:\Users\Admin\Documents\Codex\work\s12-r5\20260912T164057Z\RETRY`.
