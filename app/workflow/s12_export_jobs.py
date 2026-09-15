@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -54,6 +55,225 @@ class S12ExportLineageError(S12ExportSubmitError):
 
     def __init__(self, message: str) -> None:
         super().__init__(f"{self.code}: {message}")
+
+
+# ── Durable Job discovery / classification (R6 F01 union identity) ───────
+#
+# ONE discovery/classification contract resolves which durable Job (if
+# any) actually claims an export Run.  The claim set is a UNION gathered
+# BEFORE any scope/type filter: (a) the run's own durable pointer, (b) the
+# canonical key ``s12_export_job:{run.id}`` in ANY workspace, (c) any Job
+# whose ``input_manifest_json.run_id`` is this run (ANY key/workspace),
+# and (d) relevant generation/owner evidence.  A Job that still carries
+# the manifest run identity claims the run even when its key or workspace
+# was changed — such a claimant is never filtered away.  Equal
+# ``input_generation`` alone is NOT a unique Run identity: valid retry
+# attempts legitimately share ``run.plan_hash``, so generation/owner
+# evidence only forbids treating a run as a true orphan.
+
+
+@dataclass(frozen=True)
+class _JobClaim:
+    """One durable Job observed while resolving a run's claimed Job."""
+
+    job: Any
+    sources: tuple[str, ...]
+    problems: tuple[str, ...]
+
+
+def _parse_job_claim_manifest(job: Any) -> dict[str, Any]:
+    """Parse a candidate Job's input manifest, failing closed on corruption."""
+    try:
+        payload = json.loads(getattr(job, "input_manifest_json", None) or "")
+    except (TypeError, ValueError) as err:
+        raise S12ExportSubmitError(
+            f"durable Job {getattr(job, 'id', None)!r} has malformed input "
+            "manifest JSON; refusing (fail closed)"
+        ) from err
+    if not isinstance(payload, dict):
+        raise S12ExportSubmitError(
+            f"durable Job {getattr(job, 'id', None)!r} input manifest is not "
+            "a JSON object; refusing (fail closed)"
+        )
+    return payload
+
+
+def _run_job_claim_problems(run: Any, job: Any) -> tuple[str, ...]:
+    """Identity problems of *job* as a claim on *run* (empty == valid claim).
+
+    Mirrors the durable ``bind_job`` contract: workspace, job type, owner,
+    canonical key, pinned generation, the full manifest run identity and
+    every present immutable lineage field must agree.  Unparseable
+    manifests raise (fail closed) instead of being classified.
+    """
+    problems: list[str] = []
+    canonical_key = f"s12_export_job:{run.id}"
+    if str(job.workspace_id) != str(run.workspace_id):
+        problems.append(f"workspace {job.workspace_id!r} != {run.workspace_id!r}")
+    if job.job_type != S12_EXPORT_JOB_TYPE:
+        problems.append(f"job_type {job.job_type!r}")
+    if job.owner_type != "project" or str(job.owner_id) != str(run.project_id):
+        problems.append(f"owner {job.owner_type!r}/{job.owner_id!r}")
+    if job.idempotency_key != canonical_key:
+        problems.append(f"canonical key {job.idempotency_key!r} != {canonical_key!r}")
+    if str(job.input_generation) != str(run.plan_hash):
+        problems.append("generation mismatch")
+    manifest = _parse_job_claim_manifest(job)
+    for key, expected in (
+        ("run_id", run.id),
+        ("workspace_id", run.workspace_id),
+        ("project_id", run.project_id),
+        ("video_item_id", run.video_item_id),
+        ("plan_hash", run.plan_hash),
+        ("checkpoint_hash", run.checkpoint_hash),
+    ):
+        if str(manifest.get(key)) != str(expected):
+            problems.append(f"manifest {key} mismatch")
+    optional_identity = {
+        "manifest_id": run.manifest_id,
+        "manifest_generation": run.manifest_generation,
+        "lineage_id": run.lineage_id,
+        "predecessor_run_id": run.predecessor_run_id,
+        "attempt": run.attempt,
+    }
+    for key, expected in optional_identity.items():
+        if key in manifest and manifest[key] != expected:
+            problems.append(f"manifest {key} mismatch")
+    if "chunk_config" in manifest:
+        try:
+            stored_chunk_config = json.loads(run.chunk_config_json)
+        except (TypeError, ValueError) as err:
+            raise S12ExportSubmitError(
+                f"export run {run.id!r} has corrupt chunk configuration"
+            ) from err
+        if manifest["chunk_config"] != stored_chunk_config:
+            problems.append("manifest chunk_config mismatch")
+    return tuple(problems)
+
+
+def _weak_generation_candidates(session: Any, run: Any) -> list[Any]:
+    """Jobs with relevant generation/owner evidence but no claim on *run*.
+
+    A candidate attributable to another run — its manifest names a run, or
+    another run's durable pointer is this Job — is not evidence against
+    this run (valid retry chains legitimately share ``plan_hash``).
+    Anything else is unresolved relevant evidence: it forbids treating
+    this run as a true zero-Job orphan.
+    """
+    from app.persistence.models import Job as JobRow  # noqa: PLC0415
+    from app.persistence.models import S12ExportRun  # noqa: PLC0415
+
+    rows = session.scalars(
+        select(JobRow).where(
+            JobRow.job_type == S12_EXPORT_JOB_TYPE,
+            JobRow.owner_type == "project",
+            JobRow.owner_id == run.project_id,
+            JobRow.input_generation == run.plan_hash,
+        )
+    )
+    weak: list[Any] = []
+    for job in rows:
+        manifest = _parse_job_claim_manifest(job)
+        if str(manifest.get("run_id") or ""):
+            continue  # attributable to its own run's manifest identity
+        claimed_elsewhere = session.scalars(
+            select(S12ExportRun.id).where(
+                S12ExportRun.job_id == job.id,
+                S12ExportRun.id != run.id,
+            )
+        ).first()
+        if claimed_elsewhere is not None:
+            continue  # attributable to another run's durable pointer
+        weak.append(job)
+    return weak
+
+
+def _resolve_run_durable_job(session: Any, run: Any) -> Any | None:
+    """Union discovery + classification of the durable Job claiming *run*.
+
+    Returns the single VALID claimant Job row, or ``None`` when the run is
+    a true zero-Job orphan (repair allowed exactly once by the caller).
+    Typed denials (:class:`S12ExportSubmitError`, zero mutation) are raised
+    for contradictory or ambiguous claimants, unresolved relevant
+    candidates, a dangling run pointer, and every read/parse failure.  The
+    SAME contract serves initial replay, retry preparation and fresh
+    commit reconciliation (enqueue/bind/commit/lost-ack).
+    """
+    from app.persistence.models import Job as JobRow  # noqa: PLC0415
+    from app.persistence.models import S12ExportRun  # noqa: PLC0415
+
+    run_row = session.get(S12ExportRun, str(getattr(run, "id", run)))
+    if run_row is None:
+        raise S12ExportSubmitError(f"export run {run!r} not found")
+    run_id = str(run_row.id)
+    canonical_key = f"s12_export_job:{run_id}"
+    claims: dict[str, dict[str, Any]] = {}
+
+    def _add(job: Any, source: str) -> None:
+        entry = claims.setdefault(str(job.id), {"job": job, "sources": []})
+        if source not in entry["sources"]:
+            entry["sources"].append(source)
+
+    # (a) the run's own durable pointer.
+    if run_row.job_id is not None:
+        pointed = session.get(JobRow, str(run_row.job_id))
+        if pointed is None:
+            raise S12ExportSubmitError(
+                f"export run {run_id!r} durable Job pointer "
+                f"{run_row.job_id!r} has no Job row (corrupt pointer)"
+            )
+        _add(pointed, "pointer")
+    # (b) the canonical key — ANY workspace (cross-scope claimants are
+    #     denied by classification, never filtered away).
+    for job in session.scalars(
+        select(JobRow).where(JobRow.idempotency_key == canonical_key)
+    ):
+        _add(job, "key")
+    # (c) the manifest run identity — ANY key/workspace.
+    for job in session.scalars(
+        select(JobRow).where(
+            JobRow.input_manifest_json.contains(run_id, autoescape=True)
+        )
+    ):
+        if str(_parse_job_claim_manifest(job).get("run_id") or "") == run_id:
+            _add(job, "manifest")
+
+    valid: list[Any] = []
+    contradictory: list[tuple[Any, tuple[str, ...]]] = []
+    for entry in claims.values():
+        problems = _run_job_claim_problems(run_row, entry["job"])
+        if problems:
+            contradictory.append((entry["job"], problems))
+        else:
+            valid.append(entry["job"])
+    if contradictory:
+        job, problems = contradictory[0]
+        raise S12ExportSubmitError(
+            f"S12_EXPORT_JOB_IDENTITY_CONTRADICTION: run {run_id!r} has a "
+            f"contradictory durable Job claimant {job.id!r} "
+            f"({'; '.join(problems)}); refusing with zero mutation"
+        )
+    if len(valid) > 1:
+        raise S12ExportSubmitError(
+            f"S12_EXPORT_JOB_IDENTITY_AMBIGUOUS: run {run_id!r} resolves to "
+            f"{len(valid)} durable Job claimants "
+            f"({', '.join(sorted(str(j.id) for j in valid))}); refusing "
+            "first-match"
+        )
+    if len(valid) == 1:
+        return valid[0]
+    # (d) unresolved relevant generation/owner evidence forbids orphan
+    #     repair (a contradictory claimant cannot become an orphan).
+    weak = _weak_generation_candidates(session, run_row)
+    if weak:
+        raise S12ExportSubmitError(
+            f"S12_EXPORT_JOB_IDENTITY_UNRESOLVED: run {run_id!r} has "
+            f"{len(weak)} unresolved relevant Job candidate(s) "
+            f"({', '.join(sorted(str(j.id) for j in weak))}) with "
+            "generation/owner evidence but no canonical or manifest claim; "
+            "refusing orphan repair"
+        )
+    return None
 
 
 def submit_export_job(
@@ -94,7 +314,7 @@ def submit_export_job(
     only commits the ``pending`` run row and the ``queued`` job row.
     """
     from app.persistence.jobs import JobRepository  # noqa: PLC0415
-    from app.persistence.models import Job  # noqa: PLC0415
+    from app.persistence.models import S12ExportRun  # noqa: PLC0415
     from app.persistence.s12_export import (  # noqa: PLC0415
         S12ExportRepository,
         StaleIdentityError,
@@ -132,31 +352,63 @@ def submit_export_job(
         except StaleIdentityError as err:
             session.rollback()
             raise S12ExportSubmitError(str(err)) from err
+        manifest: dict[str, Any] = {
+            "schema_version": 1,
+            "run_id": run.id,
+            "workspace_id": workspace_id,
+            "project_id": project_id,
+            "video_item_id": video_item_id,
+            "profile_id": profile_id,
+            "plan_hash": plan_hash,
+            "checkpoint_hash": checkpoint_hash,
+            "frame_count": frame_count,
+            "source_path": source_path,
+            "fps": float(fps),
+            "chunk_dir": chunk_dir,
+            "scratch_dir": scratch_dir,
+            "output_path": output_path,
+            "audio_source": audio_source,
+            "max_frames_per_chunk": int(chunk_config.get("max_frames", 120)),
+            "overlap_frames": int(chunk_config.get("overlap", 4)),
+            "expected_sha256": expected_sha256,
+            "fps_num": int(fps_num),
+            "fps_den": int(fps_den),
+        }
+        job_key = f"s12_export_job:{run.id}"
         if not created:
+            # Existing run: resolve the durable pair through the SAME union
+            # discovery/classification contract used by retry preparation
+            # and commit reconciliation (R6 F01).  Exactly one valid
+            # claimant replays (a missing pointer is restored once); a true
+            # zero-Job orphan is repaired exactly once; contradictory,
+            # ambiguous or unresolved identity denies with zero mutation.
             try:
-                if run.job_id is None:
-                    raise S12ExportSubmitError(
-                        f"existing export run {run.id!r} has no durable Job pointer"
+                claimant = _resolve_run_durable_job(session, run)
+                if claimant is None:
+                    repaired_job, bound_run = _enqueue_and_bind_job(
+                        job_service,
+                        factory=factory,
+                        run=run,
+                        manifest=manifest,
+                        workspace_id=workspace_id,
+                        project_id=project_id,
+                        job_key=job_key,
+                        input_generation=plan_hash,
+                        priority=int(priority),
                     )
-                matching_jobs = list(
-                    session.scalars(
-                        select(Job).where(
-                            Job.workspace_id == workspace_id,
-                            Job.idempotency_key == f"s12_export_job:{run.id}",
-                        )
-                    )
-                )
-                if (
-                    len(matching_jobs) != 1
-                    or str(matching_jobs[0].id) != str(run.job_id)
-                ):
-                    raise S12ExportSubmitError(
-                        f"existing export run {run.id!r} does not resolve to exactly "
-                        "its actual durable Job"
-                    )
-                job_record = JobRepository(session).get_job(str(run.job_id))
-                repo.bind_job(run.id, str(run.job_id))
+                    session.rollback()
+                    return bound_run, repaired_job, False
+                run_row = session.get(S12ExportRun, str(run.id))
+                pointer_was_missing = run_row is None or run_row.job_id is None
+                job_record = JobRepository(session).get_job(str(claimant.id))
+                repo.bind_job(run.id, str(claimant.id))
                 replay_job = job_service._job_info(job_record)
+                if pointer_was_missing:
+                    # Repair-once: a restored durable pointer must persist.
+                    session.commit()
+                else:
+                    # Ordinary replay is read-only.
+                    session.rollback()
             except S12ExportSubmitError:
                 session.rollback()
                 raise
@@ -165,8 +417,6 @@ def submit_export_job(
                 raise S12ExportSubmitError(
                     f"existing export Run/Job replay failed closed: {err}"
                 ) from err
-            # Replay is read-only: do not enqueue, repair, or commit anything.
-            session.rollback()
             return run, replay_job, False
         # Commit the run BEFORE opening the second writer for the job —
         # one SQLite writer at a time (S10-C10 precedent).
@@ -176,29 +426,6 @@ def submit_export_job(
             session.rollback()
             raise S12ExportSubmitError(f"export run commit failed: {err}") from err
 
-    manifest: dict[str, Any] = {
-        "schema_version": 1,
-        "run_id": run.id,
-        "workspace_id": workspace_id,
-        "project_id": project_id,
-        "video_item_id": video_item_id,
-        "profile_id": profile_id,
-        "plan_hash": plan_hash,
-        "checkpoint_hash": checkpoint_hash,
-        "frame_count": frame_count,
-        "source_path": source_path,
-        "fps": float(fps),
-        "chunk_dir": chunk_dir,
-        "scratch_dir": scratch_dir,
-        "output_path": output_path,
-        "audio_source": audio_source,
-        "max_frames_per_chunk": int(chunk_config.get("max_frames", 120)),
-        "overlap_frames": int(chunk_config.get("overlap", 4)),
-        "expected_sha256": expected_sha256,
-        "fps_num": int(fps_num),
-        "fps_den": int(fps_den),
-    }
-    job_key = f"s12_export_job:{run.id}"
     job, run = _enqueue_and_bind_job(
         job_service,
         factory=factory,
@@ -231,9 +458,11 @@ def submit_retry_export_job(
     priority: int = 50,
 ) -> tuple[Any, Any, bool]:
     """Append one successor and its Job in one durable transaction."""
+    from sqlalchemy.exc import IntegrityError  # noqa: PLC0415
+
     from app.persistence import StepInput  # noqa: PLC0415
-    from app.persistence.jobs import JobRepository  # noqa: PLC0415
-    from app.persistence.models import Job, S12ExportRun  # noqa: PLC0415
+    from app.persistence.jobs import IdempotencyKeyInUse, JobRepository  # noqa: PLC0415
+    from app.persistence.models import S12ExportRun  # noqa: PLC0415
     from app.persistence.s12_export import (  # noqa: PLC0415
         IdempotencyConflictError,
         InvalidLineageError,
@@ -286,41 +515,52 @@ def submit_retry_export_job(
         }
 
     def ensure_pair(session: Any, run: Any, manifest: dict[str, Any]) -> Any:
+        """Resolve the run's ONE durable Job under the union contract (R6 F01).
+
+        Same discovery/classification contract as initial replay and fresh
+        commit reconciliation: exactly one valid claimant is accepted (a
+        missing pointer is restored once); a true zero-Job orphan is
+        repaired with exactly one Job creation, converging on a concurrent
+        winner; a contradictory, ambiguous or unresolved identity denies
+        with zero mutation — a changed key/workspace/manifest claimant is
+        never filtered away and never becomes a second Job.
+        """
         jobs = JobRepository(session)
         repo = S12ExportRepository(session)
-        rows = list(
-            session.scalars(
-                select(Job).where(
-                    Job.workspace_id == workspace_id,
-                    Job.idempotency_key == f"s12_export_job:{run.id}",
-                )
-            )
-        )
-        if len(rows) > 1:
-            raise S12ExportSubmitError(
-                f"retry Job identity is ambiguous for run {run.id!r}"
-            )
-        if run.job_id is not None:
-            if len(rows) != 1 or str(rows[0].id) != str(run.job_id):
-                raise S12ExportSubmitError(
-                    f"retry run {run.id!r} has a corrupt durable Job pointer"
-                )
-            job_record = jobs.get_job(str(run.job_id))
-        elif rows:
-            job_record = jobs.get_job(str(rows[0].id))
+        claimant = _resolve_run_durable_job(session, run)
+        if claimant is not None:
+            job_record = jobs.get_job(str(claimant.id))
         else:
-            job_record = jobs.create_job(
-                workspace_id=workspace_id,
-                job_type=S12_EXPORT_JOB_TYPE,
-                owner_type="project",
-                owner_id=project_id,
-                input_manifest=manifest,
-                idempotency_key=f"s12_export_job:{run.id}",
-                input_generation=run.plan_hash,
-                priority=int(priority),
-                steps=[StepInput(step_code="run", position=0, step_type="sync")],
-                actor="api",
-            )
+            try:
+                job_record = jobs.create_job(
+                    workspace_id=workspace_id,
+                    job_type=S12_EXPORT_JOB_TYPE,
+                    owner_type="project",
+                    owner_id=project_id,
+                    input_manifest=manifest,
+                    idempotency_key=f"s12_export_job:{run.id}",
+                    input_generation=run.plan_hash,
+                    priority=int(priority),
+                    steps=[StepInput(step_code="run", position=0, step_type="sync")],
+                    actor="api",
+                )
+            except (IdempotencyKeyInUse, IntegrityError) as err:
+                # A concurrent creator won the orphan race: converge on the
+                # durable winner through the SAME union contract.  The only
+                # payload on these paths is the conflicted attempt itself, so
+                # a post-flush broken session is safely rolled back and
+                # re-resolved from durable truth — never a second Job.
+                try:
+                    converged = _resolve_run_durable_job(session, run)
+                except Exception:
+                    session.rollback()
+                    converged = _resolve_run_durable_job(session, run)
+                if converged is None:
+                    raise S12ExportSubmitError(
+                        f"retry Job creation conflicted for run {run.id!r} and "
+                        f"convergence found no durable claimant: {err}"
+                    ) from err
+                job_record = jobs.get_job(str(converged.id))
         repo.bind_job(run.id, job_record.id)
         return job_record
 
@@ -422,8 +662,10 @@ def _enqueue_and_bind_job(
         if type(err).__name__ not in ("IdempotencyKeyInUse", "IntegrityError"):
             raise S12ExportSubmitError(f"export job enqueue failed: {err}") from err
         try:
-            existing = _find_job_by_key(factory, workspace_id, job_key)
-            job = job_service._job_info(existing)
+            claimant = _resolve_claim_after_enqueue_conflict(factory, run)
+            job = job_service._job_info(claimant)
+        except S12ExportSubmitError:
+            raise
         except Exception as lookup_err:
             raise S12ExportSubmitError(
                 f"export Job replay lookup failed closed: {lookup_err}"
@@ -442,23 +684,25 @@ def _enqueue_and_bind_job(
     return job, bound_run
 
 
-def _find_job_by_key(factory: Callable[[], Any], workspace_id: str, key: str) -> Any:
-    """Return the exact durable Job, propagating query failures."""
+def _resolve_claim_after_enqueue_conflict(factory: Callable[[], Any], run: Any) -> Any:
+    """Resolve the enqueue-conflict winner through the SAME union contract.
+
+    An ``IdempotencyKeyInUse``/``IntegrityError`` on creation means some
+    durable contender exists; it is accepted only when the union discovery
+    classifies it as this run's single valid claimant.  Contradictory,
+    ambiguous or unresolved identity fails closed — never a first-key-wins
+    adoption; query failures propagate to the caller's fail-closed map.
+    """
     from app.persistence.jobs import JobRepository  # noqa: PLC0415
-    from app.persistence.models import Job  # noqa: PLC0415
 
     with factory() as session:
-        job = session.scalar(
-            select(Job).where(
-                Job.workspace_id == workspace_id,
-                Job.idempotency_key == key,
-            )
-        )
-        if job is None:
+        claimant = _resolve_run_durable_job(session, run)
+        if claimant is None:
             raise S12ExportSubmitError(
-                f"durable Job replay lookup found no Job for key {key!r}"
+                f"export Job enqueue conflict for run {run.id!r} resolved to "
+                "no durable claimant"
             )
-        return JobRepository(session).get_job(job.id)
+        return JobRepository(session).get_job(str(claimant.id))
 
 
 def _s12_export_handler(ctx: Any) -> dict[str, Any]:

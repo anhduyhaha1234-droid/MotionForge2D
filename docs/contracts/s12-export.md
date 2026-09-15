@@ -202,10 +202,13 @@ global JobService or unrelated domain table is modified.
 
 Initial submission resolves the union of workspace idempotency and natural-key
 identities read-only before inserting a run. If an equivalent run already
-exists, replay validates its exact bound Job and all matching workspace/key Job
-rows before returning the original run/Job pair; it does not enqueue, repair or
-commit. A missing, ambiguous, mismatched or corrupt binding fails closed with
-zero Run/Job delta. Only a fresh identity proceeds to run and Job creation.
+exists, replay resolves its durable Job through the shared R6 union
+discovery/classification contract below before returning the original run/Job
+pair; an ordinary replay does not enqueue, repair or commit, while the two
+bounded repairs (missing-pointer restore, true zero-Job orphan creation) are
+each applied exactly once. A missing, ambiguous, mismatched or corrupt binding
+fails closed with zero Run/Job delta. Only a fresh identity proceeds to run
+and Job creation.
 
 Malformed retry ancestry is a deterministic `S12_EXPORT_INVALID_LINEAGE`
 denial (`409`), including an invalid predecessor attempt while a later
@@ -213,3 +216,25 @@ successor already exists. Retry preparation, lookup, enqueue and bind failures
 are rolled back without commit reconciliation. Reconciliation is reserved for
 an exception raised by the commit operation itself, where the exact successor
 and Job pair is reread to converge after a genuinely uncertain acknowledgment.
+
+## S12-LC3-R6 union Job discovery/classification (F01 addendum)
+
+One discovery/classification contract resolves which durable Job actually
+claims an export Run, and the same contract serves initial replay, retry
+preparation, and fresh commit reconciliation (enqueue/bind/lost-ack). The
+claim set is a UNION gathered BEFORE any scope/type filter: the run's durable
+pointer, the canonical key `s12_export_job:{run.id}` in ANY workspace, any Job
+whose `input_manifest_json.run_id` is this run (ANY key/workspace), and
+relevant generation/owner evidence. A Job that still carries the manifest run
+identity claims the run even when its key or workspace changed, so it is never
+filtered away; equal `input_generation` alone is not a Run identity (valid
+retry attempts legitimately share `run.plan_hash`).
+
+Exactly one valid claimant is accepted (a missing pointer is restored once);
+a true zero-Job orphan (pointer null, no claimant, no unresolved evidence) is
+repaired with exactly one Job creation, converging on a concurrent winner.
+Contradictory, ambiguous or unresolved identity — off-key, cross-workspace,
+generation/type/owner/manifest mismatch, multiple claimants, unreadable or
+malformed relevant JSON — is a typed `S12ExportSubmitError` denial (`409`)
+with zero mutation: Run/Job rows, revisions, pointers and artifacts are
+preserved. Read/parse failures fail closed before any mutation.

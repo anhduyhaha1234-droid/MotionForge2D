@@ -122,3 +122,42 @@ commit/lost-ack controls without renaming or deleting rows. Evidence and
 runtime use the R5 roots at
 `C:\Users\Admin\Documents\Codex\2026-09-11\tr-x20\outputs\s12-r5-owner-submission\20260912T164057Z\RETRY`
 and `C:\Users\Admin\Documents\Codex\work\s12-r5\20260912T164057Z\RETRY`.
+
+## R6 F01 union identity correction (Hermes owner, 2026-09-15)
+
+Owner transfer: S12-LC3-RETRY carried over once from the Codex owner to this
+Hermes session (`20260915_201417_80e003`, model `ocg/deepseek-v4.1-flash`,
+provider `custom`, fallback OFF) at user request
+(USER_REQUESTED_PLATFORM_MODEL_TRANSFER). Wave base synced with the single
+guarded `git merge --ff-only 83af5167e9dddc931bc8590f547684c0c811784b`
+(fast-forward from `c60235f`, clean tree, no conflict).
+
+F01 correction (R6_ACCEPTANCE M01-M19): `app/workflow/s12_export_jobs.py` now
+resolves a Run's durable Job through ONE union discovery/classification
+contract used by initial replay, retry preparation and fresh commit
+reconciliation (enqueue/bind/lost-ack). Discovery gathers the claim UNION
+before any scope/type filter: run pointer, canonical key in ANY workspace,
+manifest `run_id` claims (ANY key/workspace), and relevant generation/owner
+evidence; equal generation alone is not identity. Exactly one valid claimant
+is accepted (missing pointer restored once); a true zero-Job orphan is
+repaired exactly once (converging on a concurrent winner); contradictory,
+ambiguous or unresolved identity is a typed 409 denial with zero mutation;
+read/malformed-JSON failures fail closed.
+
+Verification: new `tests/s12/s12-lc3-retry/test_r6_identity_resolution.py`
+46/46 passed (79.92s, fresh migrated DBs, basetemp `%TEMP%/s12r6d_1`).
+Affected lane modules re-run: test_export_jobs_api / test_r4_retry_execution /
+test_r5_f01_f03 / test_retry_identity_matrix / test_retry_migration /
+test_s12_t03c_c1_closure -> 39/39 passed (57.07s). `ruff check --select F`
+clean, py_compile OK. Documentation: bounded R5-text correction + R6 addendum
+in `docs/contracts/s12-export.md`.
+
+A savepoint-based orphan-convergence draft was removed during this correction:
+the pysqlite legacy transaction mode can auto-commit a savepoint's contents
+when the session has no prior DML, breaking atomicity (probe:
+`probe_savepoint.py` in the runtime lane). Convergence now rolls back the
+conflicted attempt and re-resolves from durable truth.
+
+Evidence: `...\outputs\s12-r6-hermes\20260915T131158Z\RETRY` (runtime:
+`...\Codex\work\s12h\20260915T131158Z\RETRY`, live COMMAND_LEDGER.jsonl).
+Transport checkpoint only - NOT approved; Codex review remains the gate.
