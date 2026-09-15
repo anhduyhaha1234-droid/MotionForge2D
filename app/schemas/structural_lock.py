@@ -1,10 +1,11 @@
 """Pydantic schemas for the StructuralLock persistence domain (S09-T00-I01).
 
 Strict, finite-only, extra-forbidden DTOs mirroring the durable core in
-``app.persistence.structural_lock``.  This module is CONTRACT-ONLY for the
-persistence surface: no API router exists yet (app/api/app.py is out of
-scope), so these models are the typed shape that later S09 tasks (T01
-mapping contract, T06 apply) consume when exposing or pinning locks.
+``app.persistence.structural_lock``.  These models are the typed shape
+S09 consumers (mapping contract, T06 apply) use when exposing or pinning
+locks, plus the bounded public producer request/response added by
+S09-LOCK-PRODUCER-B01 (router ``app/api/routes/structural_lock.py``,
+mounted in ``app/api/app.py``).
 
 Invariants (mirroring sibling schema modules):
 - ``model_config = ConfigDict(extra="forbid")`` on every model — unknown
@@ -189,6 +190,40 @@ class CheckpointLockPinSet(_StrictBase):
     lock_policy_version: PolicyVersion | None = None
 
 
+class StructuralLockProduceRequest(_StrictBase):
+    """Bounded public producer request (S09-LOCK-PRODUCER-B01).
+
+    The client may ONLY select the documented policy version and assert the
+    expected CURRENT identity (a stale expectation fails closed as a typed
+    conflict).  It never supplies authority: workspace ids, filesystem
+    paths, routes, manifest blobs or readiness flags are NOT fields, and
+    any unknown key is rejected (``extra="forbid"`` → 422).
+    """
+
+    expected_source_generation: SourceGeneration | None = None
+    expected_source_sha256: Sha256Hex | None = None
+    policy_version: PolicyVersion | None = None
+    idempotency_key: str | None = Field(default=None, min_length=1, max_length=255)
+
+
+class StructuralLockProduceResponse(_StrictBase):
+    """Durable identity of the produced/replayed StructuralLockManifest."""
+
+    workspace_id: str = Field(..., min_length=1, max_length=64)
+    project_id: str = Field(..., min_length=1, max_length=64)
+    video_item_id: str = Field(..., min_length=1, max_length=64)
+    manifest_id: str = Field(..., min_length=1, max_length=36)
+    manifest_hash: Sha256Hex
+    source_generation: SourceGeneration
+    policy_version: PolicyVersion
+    version: int = Field(..., ge=1)
+    status: Literal["draft", "active", "superseded", "voided"]
+    created: bool
+    segment_count: int = Field(..., ge=0)
+    route_decisions_created: int = Field(..., ge=0)
+    reasons: list[str] = Field(default_factory=list)
+
+
 # Re-exported single authority so downstream modules never re-declare the enum.
 RENDERER_ROUTE_VALUES: tuple[str, ...] = RENDERER_ROUTES
 
@@ -202,5 +237,7 @@ __all__ = [
     "ReskinLockPinUpdate",
     "SegmentRenderRouteCreate",
     "StructuralLockManifestPayload",
+    "StructuralLockProduceRequest",
+    "StructuralLockProduceResponse",
     "Timebase",
 ]

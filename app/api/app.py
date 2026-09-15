@@ -47,6 +47,7 @@ from app.api.routes import (
     s12_export,
     s12_export_preflight,
     structural_evidence,
+    structural_lock,
 )
 from app.api.security import (
     InvalidPathIdentifierError,
@@ -205,6 +206,13 @@ app.include_router(s12_export_preflight.router)
 # S12 export durable jobs (S12-T03C) — submit/status/cancel/retry; the
 # request pins rows only, the durable worker renders outside the request.
 app.include_router(s12_export.router)
+
+
+# Public StructuralLock producer (S09-LOCK-PRODUCER-B01) — POST
+# /api/v2/projects/{project_id}/videos/{video_item_id}/structural-lock;
+# server-derived current source/evidence lock, disjoint from every legacy
+# route and from the /api/v2/structural-evidence namespace.
+app.include_router(structural_lock.router)
 
 
 @app.get("/health")
