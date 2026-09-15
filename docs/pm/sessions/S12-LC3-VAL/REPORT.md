@@ -396,3 +396,61 @@ against the manager snapshot in
 The guard reports `VERIFIED`, `103` entries, `0` failures, including the
 protected files and `work/`. This is a local transport checkpoint only, not
 an integration, approval, or closure claim.
+
+## R6 correction — F02 foreign-inode adoption / F03 stale-owner publication
+
+Verdict carried in: CHANGES_REQUESTED (R5 F02, F03). Both mechanisms are
+corrected on `app/services/s12_export/publication.py` from wave base
+`83af5167e9dddc931bc8590f547684c0c811784b`.
+
+**F02 — the fix.** Publication ownership is now proven by durable inode
+identity, never by SHA equality or by a prewritten intent alone. The
+publisher stages a private copy of the validated candidate before the seam
+and records the staged inode's identity (volume + file index + size +
+mtime) in the intent *before* the exclusive link; the receipt records the
+published inode's identity; and every recovery path (pre-receipt companion
+rebuild, full receipt reconciliation) adopts the public file only when its
+inode provably equals that recorded identity. A byte-equal foreign copy is
+a different inode — adoption, receipting and completion are denied and
+nothing foreign is deleted, moved or rewritten (V02–V05; the reviewer's own
+reproduction `test_foreign_final_arrives_after_real_intent_must_not_be_adopted[False/True]`
+now passes). All four genuine own-crash windows still converge to the exact
+1 Run / 1 Job pair (V06), as do commit-failure and lost-ack (V07) and a
+killed real publisher process converged by a fresh process (V08).
+
+**F03 — the fix.** The public mutation is serialized by a real
+cross-process publication lock (`_PublicationGuard`: `msvcrt` byte-range
+lock on Windows / `flock` elsewhere, on `<final>.publication.lock`) held
+across ownership re-validation → intent → exclusive creation →
+sidecar/receipt → fenced transitions. Under the release-A-first schedule the
+expired participant is re-validated *inside* the lock and denied with a
+typed fence-loss error — it performs no public publication at all — while
+the current owner completes with its own bytes; the B-first control passes;
+both live participants are joined and reaped with recorded PIDs/timeline
+(V09–V11, including the equal-bytes case where ownership is independent of
+SHA). The reviewer's handoff reproduction
+(`test_lease_handoff_at_final_primitive_never_publishes_stale_owner[B/A]`)
+now passes in both release orders.
+
+**Compatibility and bounds.** `_publish_candidate_exclusive` keeps its exact
+two-argument call shape (the staged path travels via a thread-scoped
+contextvar), so the immutable t03c harnesses and the reviewer probes re-ran
+unchanged; `tests/s12/s12-t03c/test_publication.py` is byte-identical
+(`50b139bc…`, no edit). One bounded lane-test patch (`+4/-2`,
+`test_r2_ownership_recovery.py`) updates the stale-loser expectation to the
+new typed denial while keeping every zero-mutation and winner-identity
+assertion. The lock file is an empty coordination artifact (never read as
+data) and is validated in path preflight before any public write.
+
+**Results.** New frozen V01–V15 nodes in
+`tests/s12/s12-lc3-val/test_r6_publication_ownership.py`; VAL lane full run
+`59 passed` (119.06s) exit 0; t03c module `20 passed`; affected t03c-extras
++ T04A `89 passed`; R5 reviewer probes re-run `4 passed`; Ruff `--select F`
+clean with exactly the 4 inherited full-ruleset findings left explicit (no
+compatibility-breaking exception rename). Raw per-command ledger, per-case
+JSON and stdout/stderr are retained in the lane evidence directories; design
+and identity detail in
+[20260915T-r6-f02-f03.md](evidence/20260915T-r6-f02-f03.md). Open: human
+playback and the public product chain remain NOT_REVIEWED / outside this
+correction (QA/INT scope). This remains a local transport checkpoint only,
+not an integration, approval, or closure claim.
