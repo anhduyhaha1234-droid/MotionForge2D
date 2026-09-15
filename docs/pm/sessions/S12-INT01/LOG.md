@@ -70,3 +70,15 @@ Full-SHA pin list: `C:/Users/Admin/MotionForge2D-evidence/s12/20260907-083200-s1
 - Mypy scope `s12_export`: 26 errors / 8 files (type-level only; runtime fully green). NOT an S12 gate; routed to Codex + owners.
 - Clean-machine: NOT_RUN (no clean VM; clean venv does not qualify). No beta-pass claim.
 - Finding F-OBS-01 → owner T01 (dims-only fallback in `classify_source_kind`; verifier read-only, repro in T06B LOG).
+
+## 7. R6 transport (Hermes owner, 2026-09-15)
+
+- Owner transfer (once): Codex `01a0898b-823a-7053-a1de-27d6fc24fce3` → Hermes session `20260915_201612_9c9e7c`; reason USER_REQUESTED_PLATFORM_MODEL_TRANSFER; route `ocg/deepseek-v4.1-flash` / provider custom / fallback OFF.
+- Pre-INT HEAD `83af5167e9dddc931bc8590f547684c0c811784b` clean; serial non-FF merges VAL → RETRY → B01 → QA, zero conflicts:
+  1. VAL source `535d7c136e0688bad1dc2905d4889a26869c995e` → merge `0b9ec15c4887422da995ff87cb392b3a7df8ffbb` (delta 6 paths exact).
+  2. RETRY source `1d9ed94f7a893967765e7d40a710cdcd99e90601` → merge `46abfba684ad94378be802ed872ac825b0d5e3fb` (delta 5 paths exact).
+  3. B01 source tip `c8830b342d678f5defdf17ec66b6c0ad3c6ef1cf` (chain `9caa22329cbb2cb0c0a07ee36e9878778b5a4496` + `c8830b3`) → merge `11e2de8f778783da9a8ce9d45fce7026e38849eb` (delta 8 paths exact).
+  4. QA source `69a1280cd7c0130083ed529f425339036c917df3` → merge `b5c62d151c758b6995a7a58ebd8edbb75efa27da` (delta 6 paths exact).
+- Union delta `83af5167 → b5c62d1`: 25 paths exact (6+5+8+6, disjoint); 6408 insertions / 144 deletions; `git diff --check` 0; porcelain clean after each merge.
+- Static changed-scope: `compileall` app 0; `py_compile` tests 0; `ruff check --select F` 0 (`All checks passed!`); informational full-ruleset 52 style diagnostics (4 inherited publication.py: N818/SIM103/SIM102/SIM105).
+- No broad pytest (Manager final gate after freeze); no push; no production/test hand edits by INT. Detail: R6_REPORT.md + evidence dir under `Documents/Codex/2026-09-11/tr-x20/outputs/s12-r6-hermes/20260915T131158Z/INT`.
