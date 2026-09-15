@@ -113,3 +113,21 @@ transport correction only, not an approval or closure claim.
 Exact commands, raw runtime paths, process markers, hashes, and guard files
 are in `evidence/20260912T-r4.md`. This remains a local transport checkpoint,
 not an approval or closure claim.
+
+## R6 F02/F03 ownership + serialization (Hermes owner; platform/model transfer)
+
+| UTC | Event | Result |
+|---|---|---|
+| 2026-09-15 | Wave-base ff-only sync to shared R5 candidate | `4f836627 → 83af5167e9dddc931bc8590f547684c0c811784b`, exit 0; pre-existing untracked `work/` preserved; no reset/clean/stash/rebase |
+| 2026-09-15 | F02/F03 correction on `app/services/s12_export/publication.py` | postimage `88bffc36c6aa7ebf41852cccda614e7cfbaab01b712eedadd87f0fe3240d7d4b`; git numstat `+353/-39`; t03c immutable test hash unchanged `50b139bc…` |
+| 2026-09-15 | t03c module re-run after ContextVar call-shape fix | 20 passed, 45.07s, exit 0 |
+| 2026-09-15 | VAL lane full: new V01–V15 file + 5 existing modules | 59 passed, 119.06s, exit 0 |
+| 2026-09-15 | R5 reviewer probes re-run on fixed bytes (fresh `S12_REVIEW_OUT`, packet untouched) | 4 passed (F02 ×2, F03 ×2) — R5 recorded 1 passed / 3 functional failures |
+| 2026-09-15 | Affected modules: t03c extras + T04A full | 89 passed, 28.67s, exit 0 (first collection attempt red preserved: moved `test_s12_t03c_c1_closure` requires the retry-lane path; no file edits) |
+| 2026-09-15 | Ruff `--select F` clean; full ruleset retains exactly the 4 inherited findings | N818/SIM103/SIM102/SIM105 explicit; no compatibility-breaking exception rename |
+
+Design, inode-identity contract, frozen node map and raw result tables are in
+`evidence/20260915T-r6-f02-f03.md`. Per-command argv/cwd/UTC/exit and
+stdout/stderr live in the lane `COMMAND_LEDGER.jsonl` at
+`s12-r6-hermes/20260915T131158Z/VAL/` (runtime temp `work/s12h/20260915T131158Z/VAL/`).
+This remains a local transport checkpoint, not integration, approval, or closure.

@@ -152,8 +152,10 @@ def test_r2_f01_real_handoff_cannot_overwrite_winner(
     )
     assert b_out["status"] == "completed"
     assert a_errors
-    assert isinstance(a_errors[0], pub.PublicationRaceLost)
-    assert getattr(a_errors[0], "code", None) == "S12_T03C_PUBLICATION_RACE_LOST"
+    # R6: the stale participant is re-validated INSIDE the real publication
+    # lock and denied there; it performs no public publication at all.
+    assert isinstance(a_errors[0], pub.PublicationError)
+    assert "fence lost before rename" in str(a_errors[0])
     assert final.read_bytes() == b_payload
     assert {str(path): _file_identity(path) for path in companions} == winner_files
     assert _durable_rows(factory, kw["run_id"]) == (winner_run, winner_job)

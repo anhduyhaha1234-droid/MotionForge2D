@@ -16,6 +16,10 @@ The run reaches ``completed`` ONLY through
    ``PASS``.  Exclusive creation lets a stale participant lose without
    an overwrite-capable rename touching a winner.  The private candidate
    remains until the fenced DB commit and is then cleaned by its owner.
+   A private staged copy of the candidate is created before the seam and
+   its inode identity (volume + file index) is recorded in the intent;
+   the public file is adopted later only when it is provably that exact
+   inode -- a byte-equal foreign copy is a different inode and is denied.
 5. **Validation** — the candidate scores ``PASS`` against server-owned
    source-locked expectations (T04A C2 contract; ``FAIL`` /
    ``NOT_MEASURED`` fails closed and lands the run ``failed``).
@@ -23,7 +27,10 @@ The run reaches ``completed`` ONLY through
    receipt are durable file operations; the run transitions
    ``running -> verifying -> completed`` under fence + revision CAS in a
    separate SQLite transaction.  The receipt makes that file/DB boundary
-   recoverable without unchecked overwrite.
+   recoverable without unchecked overwrite.  A real cross-process
+   publication lock (``_PublicationGuard``) serializes ownership
+   re-validation, intent, exclusive creation and companion writes, so an
+   expired participant performs no public publication at all.
 7. **Completed replay by bytes** — a replayed publication re-verifies
    the existing public artifact (sha256 vs the server-owned expected
    hash when asserted; never a bare status shortcut) before returning
@@ -32,9 +39,12 @@ The run reaches ``completed`` ONLY through
 
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import hashlib
 import json
 import os
+import time
 import uuid
 from pathlib import Path
 from typing import Any
@@ -81,6 +91,37 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _file_identity(path: Path) -> dict[str, int]:
+    """Durable inode identity: volume + file index + size + mtime_ns."""
+    stat = path.stat()
+    return {
+        "dev": int(stat.st_dev),
+        "ino": int(stat.st_ino),
+        "size": int(stat.st_size),
+        "mtime_ns": int(stat.st_mtime_ns),
+    }
+
+
+def _identity_matches(path: Path, recorded: Any) -> bool:
+    """True only when *path* is the exact inode one attempt recorded.
+
+    Byte equality is never sufficient: an external copy with identical
+    bytes is a different inode and must not be adopted.
+    """
+    if not isinstance(recorded, dict):
+        return False
+    try:
+        dev = int(recorded["dev"])
+        ino = int(recorded["ino"])
+    except (KeyError, TypeError, ValueError):
+        return False
+    try:
+        stat = path.stat()
+    except OSError:
+        return False
+    return int(stat.st_dev) == dev and int(stat.st_ino) == ino
+
+
 def _sidecar_path(final: Path) -> Path:
     """Sidecar holding the immutable byte identity of the public artifact."""
     return final.with_name(f"{final.name}.sha256")
@@ -97,6 +138,88 @@ _INTENT_SUFFIX = ".publication.intent"
 def _publication_intent_path(final: Path) -> Path:
     """Intent proving which private attempt may complete a public write."""
     return final.with_name(f"{final.name}{_INTENT_SUFFIX}")
+
+
+_PUBLICATION_LOCK_SUFFIX = ".publication.lock"
+_PUBLICATION_LOCK_POLL_SECONDS = 0.05
+_PUBLICATION_LOCK_WAIT_SECONDS = 30.0
+
+
+def _publication_lock_path(final: Path) -> Path:
+    """Cross-process lock file serializing the public mutation."""
+    return final.with_name(f"{final.name}{_PUBLICATION_LOCK_SUFFIX}")
+
+
+class _PublicationGuard:
+    """Real exclusive lock over ownership, intent, creation and companions.
+
+    The primitive is an OS-level advisory byte-range lock (``msvcrt`` on
+    Windows, ``flock`` elsewhere) held for the entire public mutation
+    span: ownership re-validation, intent, exclusive creation, sidecar
+    and receipt.  An expired participant therefore performs NO public
+    publication -- it is re-validated (and denied) inside one mutual
+    exclusion shared with every other live participant.  The empty lock
+    file is a coordination artifact and is never read as data.
+    """
+
+    def __init__(self, final: Path) -> None:
+        self._path = _publication_lock_path(final)
+        self._fd: int | None = None
+
+    def __enter__(self) -> _PublicationGuard:
+        native = _native_fs_path(self._path)
+        deadline = time.monotonic() + _PUBLICATION_LOCK_WAIT_SECONDS
+        while True:
+            try:
+                fd = os.open(native, os.O_CREAT | os.O_RDWR, 0o600)
+            except OSError as err:
+                raise PublicationError(
+                    f"publication lock is unavailable: {self._path}"
+                ) from err
+            try:
+                self._acquire_native(fd)
+            except OSError:
+                os.close(fd)
+                if time.monotonic() >= deadline:
+                    raise PublicationError(
+                        f"publication lock wait timed out: {self._path}"
+                    ) from None
+                time.sleep(_PUBLICATION_LOCK_POLL_SECONDS)
+                continue
+            self._fd = fd
+            return self
+
+    @staticmethod
+    def _acquire_native(fd: int) -> None:
+        os.lseek(fd, 0, os.SEEK_SET)
+        if os.name == "nt":
+            import msvcrt  # noqa: PLC0415
+
+            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl  # noqa: PLC0415
+
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    def __exit__(self, *exc: object) -> None:
+        fd = self._fd
+        self._fd = None
+        if fd is None:
+            return
+        try:
+            os.lseek(fd, 0, os.SEEK_SET)
+            if os.name == "nt":
+                import msvcrt  # noqa: PLC0415
+
+                msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl  # noqa: PLC0415
+
+                fcntl.flock(fd, fcntl.LOCK_UN)
+        except OSError:
+            pass
+        finally:
+            os.close(fd)
 
 
 def _exclusive_temp_path(
@@ -176,6 +299,34 @@ def _write_publication_intent(final: Path, payload: dict[str, Any]) -> None:
     )
 
 
+def _replace_publication_intent(final: Path, payload: dict[str, Any]) -> None:
+    """Refresh the intent for the SAME attempt (caller holds the guard).
+
+    A restaged copy of the same worker/fence attempt gets a new inode;
+    the durable record must name the inode the next link will expose.
+    """
+    path = _publication_intent_path(final)
+    temp = _exclusive_temp_path(path, str(payload["fence_token"]))
+    fd: int | None = None
+    try:
+        fd = os.open(
+            _native_fs_path(temp),
+            os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+            0o600,
+        )
+        with os.fdopen(fd, "wb") as handle:
+            fd = None
+            handle.write(_intent_bytes(payload))
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(_native_fs_path(temp), _native_fs_path(path))
+    finally:
+        if fd is not None:
+            os.close(fd)
+        with contextlib.suppress(OSError):
+            os.unlink(_native_fs_path(temp))
+
+
 def _receipt_payload(
     run: Any,
     *,
@@ -185,8 +336,13 @@ def _receipt_payload(
     fence_token: str,
     artifact_sha: str,
     verdict: Any,
+    artifact_identity: dict[str, int] | None = None,
 ) -> dict[str, Any]:
-    """Build the durable identity record shared by fresh and recovered writes."""
+    """Build the durable identity record shared by fresh and recovered writes.
+
+    ``artifact_identity`` names the exact published inode, so a receipt
+    can never authorize adopting a foreign (even byte-equal) copy.
+    """
     return {
         "version": 1,
         "run_id": run_id,
@@ -205,6 +361,11 @@ def _receipt_payload(
         "validation_probes": [
             p.name for p in verdict.probes if p.verdict == "PASS"
         ],
+        **(
+            {"artifact_identity": artifact_identity}
+            if artifact_identity is not None
+            else {}
+        ),
     }
 
 
@@ -220,8 +381,15 @@ def _intent_payload(
     candidate: Path,
     artifact_sha: str,
     expected_sha: str,
+    staged: Path | None = None,
 ) -> dict[str, Any]:
-    """Build the durable pre-publication identity used after a crash."""
+    """Build the durable pre-publication identity used after a crash.
+
+    ``candidate_identity`` records the private attempt's own inode;
+    ``staged_identity`` (when a staged copy exists) records the exact
+    inode that the exclusive link will expose publicly.  Recovery adopts
+    a public file only when it is provably ``staged_identity``.
+    """
     return {
         "version": 1,
         "kind": "s12-publication-intent",
@@ -240,6 +408,12 @@ def _intent_payload(
         "candidate_path": str(candidate),
         "candidate_sha256": artifact_sha,
         "expected_sha256": str(expected_sha or ""),
+        "candidate_identity": _file_identity(candidate),
+        **(
+            {"staged_identity": _file_identity(staged)}
+            if staged is not None
+            else {}
+        ),
     }
 
 
@@ -387,6 +561,10 @@ def _ensure_publication_intent(
     if same_owner:
         if existing.get("candidate_sha256") != payload["candidate_sha256"]:
             raise PublicationError(f"publication intent candidate changed: {path}")
+        if _intent_bytes(existing) != _intent_bytes(payload):
+            # The same attempt restaged its publishable copy: refresh the
+            # recorded inode identity so recovery can still prove adoption.
+            _replace_publication_intent(final, payload)
         return
     if _owner_is_live(
         repo,
@@ -420,13 +598,25 @@ def _remove_owned_publication_intent(
         pass
 
 
-def _publish_candidate_exclusive(candidate: Path, final: Path) -> None:
-    """Expose a distinct candidate inode exactly once without overwrite."""
-    temporary = candidate.with_name(f"{candidate.name}.{uuid.uuid4().hex}.tmp")
+#: Staged publishable copy for the CURRENT attempt thread; the two-argument
+#: exclusive primitive reads it so bounded harnesses keep their call shape.
+_STAGED_COPY: contextvars.ContextVar[Path | None] = contextvars.ContextVar(
+    "s12_staged_publication_copy", default=None
+)
+
+
+def _stage_publication_copy(candidate: Path) -> Path:
+    """Copy the validated candidate to an owner-unique staged inode.
+
+    The staged inode (never the private candidate itself) becomes the
+    public file through the exclusive link, so its durable identity can
+    be recorded in the intent *before* the irreversible public mutation.
+    """
+    staged = candidate.with_name(f"{candidate.name}.{uuid.uuid4().hex}.tmp")
     fd: int | None = None
     try:
         fd = os.open(
-            _native_fs_path(temporary),
+            _native_fs_path(staged),
             os.O_CREAT | os.O_EXCL | os.O_WRONLY,
             0o600,
         )
@@ -441,23 +631,43 @@ def _publish_candidate_exclusive(candidate: Path, final: Path) -> None:
                 target.write(block)
             target.flush()
             os.fsync(target.fileno())
-        # The temporary is in the owner scratch root, while the final link is
-        # exclusive.  Thus the candidate and final are never the same inode,
-        # and a winner cannot be replaced by a stale participant.
-        os.link(_native_fs_path(temporary), _native_fs_path(final))
+        return staged
+    except BaseException:
+        if fd is not None:
+            os.close(fd)
+        with contextlib.suppress(OSError):
+            os.unlink(_native_fs_path(staged))
+        raise
+
+
+def _publish_candidate_exclusive(candidate: Path, final: Path) -> dict[str, int]:
+    """Expose one owned inode at the public path exactly once.
+
+    The staged inode to expose travels via ``_STAGED_COPY`` (set by the
+    publish flow in this same thread); when it is absent -- e.g. a bounded
+    reviewer/harness that calls this two-argument primitive directly -- a
+    fresh owned copy of the candidate is staged here.  The staged inode's
+    identity is verified on the published file before any companion may
+    be written; the exclusive link never replaces a foreign inode.
+    """
+    staged = _STAGED_COPY.get(None)
+    if staged is None:
+        staged = _stage_publication_copy(candidate)
+    staged_identity = _file_identity(staged)
+    try:
+        os.link(_native_fs_path(staged), _native_fs_path(final))
     except FileExistsError as err:
         raise PublicationRaceLost(
             f"publication race lost: final already exists and is immutable: {final}"
         ) from err
     finally:
-        if fd is not None:
-            os.close(fd)
-        try:
-            os.unlink(_native_fs_path(temporary))
-        except FileNotFoundError:
-            pass
-        except OSError:
-            pass
+        with contextlib.suppress(OSError):
+            os.unlink(_native_fs_path(staged))
+    if not _identity_matches(final, staged_identity):
+        raise PublicationError(
+            f"published final is not the staged inode: {final}"
+        )
+    return staged_identity
 
 
 _MAX_PUBLICATION_COMPONENT_BYTES = 240
@@ -478,6 +688,23 @@ def _preflight_publication_paths(final: Path, *, owner_token: str = "") -> None:
         raise PublicationPathError(
             f"public output parent is not an owned directory: {final.parent}"
         )
+    # The coordination lock is created directly (no exclusive temp), so
+    # only its own name/path must be addressable -- never a temp bound.
+    lock = _publication_lock_path(final)
+    try:
+        lock_component_bytes = len(lock.name.encode("utf-8"))
+    except UnicodeError as err:
+        raise PublicationPathError(
+            f"public output lock name is not encodable: {lock.name!r}"
+        ) from err
+    if lock_component_bytes > _MAX_PUBLICATION_COMPONENT_BYTES:
+        raise PublicationPathError(
+            f"public output lock name is too long: {lock.name!r}"
+        )
+    if len(str(lock)) > _MAX_PUBLICATION_PATH_CHARS:
+        raise PublicationPathError(f"public output lock path is too long: {lock}")
+    if len(_native_fs_path(lock)) > _MAX_PUBLICATION_PATH_CHARS:
+        raise PublicationPathError(f"public output lock path is too long: {lock}")
     for path in paths:
         try:
             component_bytes = len(path.name.encode("utf-8"))
@@ -591,18 +818,19 @@ def publish_export_run(
         )
         raise
     if final.exists() or final.is_symlink():
-        recovered = _recover_pending_publication(
-            session,
-            repo,
-            run,
-            run_id=run_id,
-            workspace_id=workspace_id,
-            project_id=project_id,
-            worker_id=worker_id,
-            fence_token=fence_token,
-            manifest=manifest,
-            final=final,
-        )
+        with _PublicationGuard(final):
+            recovered = _recover_pending_publication(
+                session,
+                repo,
+                run,
+                run_id=run_id,
+                workspace_id=workspace_id,
+                project_id=project_id,
+                worker_id=worker_id,
+                fence_token=fence_token,
+                manifest=manifest,
+                final=final,
+            )
         if recovered is not None:
             _cleanup_publication_scratch(
                 manifest,
@@ -698,10 +926,24 @@ def publish_export_run(
             f"export validation {verdict.verdict} on {failing}; run failed (retryable)"
         )
 
-    # ONE immutable publication: exclusively create the public path from the
-    # validated private candidate, write its sidecar and receipt, then
-    # commit the fenced SQLite state.  Filesystem and SQLite are a recovery
-    # boundary, not one transaction; reconciliation never overwrites bytes.
+    # ONE immutable publication: stage the validated candidate, record the
+    # attempt's durable inode identity, then exclusively create the public
+    # path, write its sidecar and receipt and commit the fenced SQLite
+    # state -- all inside one cross-process publication lock so a stale
+    # participant can never win the public mutation.
+    try:
+        staged = _stage_publication_copy(candidate)
+    except OSError as err:
+        _cleanup_publication_scratch(
+            manifest,
+            session=session,
+            run_id=run_id,
+            worker_id=worker_id,
+            fence_token=fence_token,
+        )
+        _fail_run(repo, run_id, worker_id, fence_token, run.revision)
+        session.commit()
+        raise PublicationError(f"publication rename failed: {err}") from err
     intent_payload = _intent_payload(
         run,
         run_id=run_id,
@@ -717,11 +959,11 @@ def publish_export_run(
             or manifest.get("authority_sha256")
             or ""
         ),
+        staged=staged,
     )
     try:
-        # Re-read authority immediately before the irreversible filesystem
-        # mutation; a stale worker must not publish after validation.
-        _require_fence(repo, run_id, worker_id, fence_token)
+        # Publish the attempt identity before the seam: the recovery proof
+        # must be durable before any public mutation can happen.
         _ensure_publication_intent(
             final,
             intent_payload,
@@ -730,7 +972,36 @@ def publish_export_run(
             manifest=manifest,
         )
         _before_publication_primitive(candidate, final)
-        _publish_candidate_exclusive(candidate, final)
+        with _PublicationGuard(final):
+            # Inside ONE real mutual exclusion: re-validated ownership,
+            # refreshed intent, exclusive creation and every companion.
+            _require_fence(repo, run_id, worker_id, fence_token)
+            _ensure_publication_intent(
+                final,
+                intent_payload,
+                repo=repo,
+                run=run,
+                manifest=manifest,
+            )
+            staged_token = _STAGED_COPY.set(staged)
+            try:
+                _publish_candidate_exclusive(candidate, final)
+            finally:
+                _STAGED_COPY.reset(staged_token)
+            return _finalize_published_artifact(
+                session,
+                repo,
+                run=run,
+                run_id=run_id,
+                workspace_id=workspace_id,
+                project_id=project_id,
+                worker_id=worker_id,
+                fence_token=fence_token,
+                manifest=manifest,
+                final=final,
+                verdict=verdict,
+                intent_payload=intent_payload,
+            )
     except PublicationRaceLost:
         # The losing worker must not clean or mutate a winner's final,
         # sidecar, receipt, or a candidate belonging to a different fence.
@@ -768,8 +1039,35 @@ def publish_export_run(
             fence_token=fence_token,
         )
         raise
+
+
+def _finalize_published_artifact(
+    session: Any,
+    repo: Any,
+    *,
+    run: Any,
+    run_id: str,
+    workspace_id: str,
+    project_id: str,
+    worker_id: str,
+    fence_token: str,
+    manifest: dict[str, Any],
+    final: Path,
+    verdict: Any,
+    intent_payload: dict[str, Any],
+) -> dict[str, Any]:
+    """Serialized post-create finalization (caller holds the guard).
+
+    Binds the sidecar and receipt to the published inode's durable
+    identity, commits the fenced transitions and releases this attempt's
+    private scratch.  Nothing here deletes or replaces an inode this
+    attempt did not create.
+    """
+    from app.persistence.s12_export import FencedWorkerError  # noqa: PLC0415
+
     _after_publication_final(final)
     actual_sha = _sha256_file(final)
+    published_identity = _file_identity(final)
     sidecar_owned = False
     receipt_owned = False
     try:
@@ -800,6 +1098,7 @@ def publish_export_run(
                 fence_token=fence_token,
                 artifact_sha=actual_sha,
                 verdict=verdict,
+                artifact_identity=published_identity,
             ),
         )
         receipt_owned = True
@@ -936,6 +1235,11 @@ def _recover_pending_publication(
         return None
     if stored_sha != actual_sha:
         return None
+    if not _identity_matches(final, receipt.get("artifact_identity")):
+        # The published file must be the exact inode this attempt created;
+        # a byte-equal foreign copy is a different inode and is never
+        # adopted (nor removed) here.
+        return None
     if intent is not None and not _intent_matches_run(
         intent,
         run,
@@ -945,6 +1249,10 @@ def _recover_pending_publication(
         final=final,
         expected_sha=str(expected_sha or ""),
         candidate_sha=actual_sha,
+    ):
+        return None
+    if intent is not None and not _identity_matches(
+        final, intent.get("staged_identity")
     ):
         return None
     if any(
@@ -1049,6 +1357,11 @@ def _recover_pre_receipt_publication(
         expected_sha=str(expected_sha or ""),
     ):
         return False
+    if not _identity_matches(final, intent.get("staged_identity")):
+        # Adoption requires the published inode to be exactly the staged
+        # inode this attempt created; a foreign (even byte-equal) copy is
+        # preserved and never adopted, receipted or completed.
+        return False
     candidate = _intent_candidate_path(intent, manifest, run)
     if sidecar.is_symlink() or candidate is None or not candidate.is_file():
         return False
@@ -1094,6 +1407,7 @@ def _recover_pre_receipt_publication(
                 fence_token=fence_token,
                 artifact_sha=actual_sha,
                 verdict=verdict,
+                artifact_identity=_file_identity(final),
             ),
         )
     except OSError:
