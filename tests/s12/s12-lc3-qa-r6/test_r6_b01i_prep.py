@@ -33,7 +33,7 @@ DOCS = REPO_ROOT / "docs" / "pm" / "sessions" / "S12-LC3-QA"
 
 
 def test_b01i_plan_freezes_exact_node_and_command() -> None:
-    assert B01I_STATUS == "PREPPED_NOT_EXECUTED"
+    assert B01I_STATUS == "EXECUTED_BLOCKED_S10_SHOTS_OVERLAP"
     assert B01I_MODULE.startswith("tests/s12/s12-lc3-qa-r6/")
     assert B01I_MODULE.endswith("test_r6_b01i_public_chain.py")
     expected_node = (
@@ -55,7 +55,7 @@ def test_b01i_prep_is_recorded_in_owned_docs() -> None:
     inventory = (DOCS / "R6_INVENTORY.md").read_text(encoding="utf-8")
     report = (DOCS / "R6_REPORT.md").read_text(encoding="utf-8")
     for text in (inventory, report):
-        assert "PREPPED_NOT_EXECUTED" in text
+        assert B01I_STATUS in text
         assert B01I_NODE in text
         assert "S12_REVIEW_OUT" in text
 

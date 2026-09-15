@@ -135,25 +135,30 @@ def test_r6_finite_inventory_rows_are_complete_and_stable() -> None:
     )
     assert len(rows) == 43
     nodes: list[str] = []
+    node_owner: dict[str, str] = {}
     for row in rows:
         assert len(row) == 9, row
         _case, lane, module, node, params, outcome, counts, evidence, status = row
         assert lane in {"RETRY", "VAL", "B01", "QA"}, row
         assert module.startswith("tests/"), row
-        assert node.startswith("test_"), row
-        assert re.match(r"^test_(r6_|b01_|b01i_)", node), row
+        parts = [part.strip() for part in node.split(" + ")]
+        assert parts and all(re.match(r"^test_[A-Za-z0-9_]+$", part) for part in parts), row
         assert params and outcome and counts and evidence and status, row
         assert "s12-r6-hermes/<uniqueUTC>" in evidence, row
         assert "{before,after}.raw.txt" in evidence, row
-        nodes.append(node)
-    assert len(set(nodes)) == 43, "node IDs must be unique across all frozen cases"
+        assert len(set(parts)) == len(parts), ("duplicate node inside row", row[0])
+        for part in parts:
+            owner = node_owner.get(part)
+            if owner is not None and {owner, row[0]} != {"B01-D", "B01-G"}:
+                raise AssertionError((part, owner, row[0]))
+            node_owner[part] = row[0]
+        nodes.extend(parts)
+    assert len(nodes) == 55
     by_case = {row[0]: row for row in rows}
-    assert "corrupt_field" in by_case["M04"][4]
-    assert "replay_stage" in by_case["M04"][4]
-    assert "client_id" in by_case["M19"][4]
-    assert "release_b_first" in by_case["V09"][4]
-    assert "release_expired_a_first" in by_case["V10"][4]
-    assert "basename155plus" in by_case["V14"][4]
+    assert "field[" in by_case["M04"][4] and "site[" in by_case["M04"][4]
+    assert "client_ids[" in by_case["M19"][4]
+    assert "b_first" in by_case["V11"][4] and "a_first" in by_case["V11"][4]
+    assert "basename155" in by_case["V14"][4]
     assert "1/1" in by_case["M01"][6]
     assert "2/2" in by_case["M02"][6]
     assert "3/3" in by_case["M03"][6]
@@ -211,9 +216,9 @@ def test_r6_preserved_gates_r04_r07_r08_are_machine_checkable() -> None:
     assert "lost acknowledgement" in rows["M16"][5].lower()
     assert "lost ack" in rows["V07"][5].lower()
     assert "sha" in rows["V07"][5].lower() and "forbid" in rows["V07"][5].lower()
-    assert "basename155plus" in rows["V14"][4]
+    assert "basename155" in rows["V14"][4]
     assert "export_master.mp4" in rows["V14"][5]
-    assert "interrupted_temp" in rows["V15"][4]
+    assert "interrupted_temp" in rows["V15"][3]
 
 
 def test_r6_reviewer_assertion_provenance_hash_proven() -> None:
@@ -246,12 +251,14 @@ def test_r6_owner_modules_are_frozen_waiting_or_present() -> None:
         case, lane, module, node, _params, _outcome, _counts, _evidence, status = row
         target = REPO_ROOT / module
         if target.is_file():
-            assert node in _module_nodes(target), (case, module, node)
+            module_nodes = _module_nodes(target)
+            for part in (piece.strip() for piece in node.split(" + ")):
+                assert part in module_nodes, (case, module, part)
         else:
             assert status == WAITING_BY_LANE[lane], (case, lane, status)
     b01i_rows = _case_rows(text, r"B01-I")
     assert len(b01i_rows) == 1
-    assert b01i_rows[0][8] == "PREPPED_NOT_EXECUTED"
+    assert b01i_rows[0][8] == "EXECUTED_BLOCKED_S10_SHOTS_OVERLAP"
     assert b01i_rows[0][3].startswith("test_b01i_")
 
 
@@ -261,6 +268,7 @@ def test_r6_report_declares_boundaries_and_waiting_lanes() -> None:
     for token in ("RETRY", "VAL", "B01", "INT"):
         assert token in report, token
     assert "PREPPED_NOT_EXECUTED" in report
+    assert "EXECUTED_BLOCKED_S10_SHOTS_OVERLAP" in report
     assert "S12_REVIEW_OUT" in report
     assert "NOT_CLOSED" in report and "NOT_APPROVED" in report
     assert "20260915T131158Z" in report

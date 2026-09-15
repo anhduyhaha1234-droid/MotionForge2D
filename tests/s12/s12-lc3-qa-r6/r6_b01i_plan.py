@@ -1,13 +1,20 @@
-"""B01-I public product-chain runner plan — PREPPED, NOT EXECUTED.
+"""B01-I public product-chain runner plan — EXECUTED, blocked at S10.
 
 QA owns B01-I: one bounded public chain on the frozen integrated candidate
 (S10 -> S12 -> durable worker -> publisher -> result/media, then UI
-submit/reload) after RETRY/VAL/B01 are terminal and S12-LC3-INT has
-integrated. This module freezes the exact node ID, command, env contract and
-the exclusive evidence-output policy. It executes nothing: the dispatch guard
-refuses while any dependency is unsatisfied, and every run gets a NEW output
-directory created exclusively (S12_REVIEW_OUT style) so older evidence is
-never reused or overwritten.
+submit/reload). Executed 2026-09-15 on frozen candidate
+`0c18d2d19fdb40c7c62d88da9ac4d39a72e48385`: every upstream stage passed
+publicly (upload/analyze -> DISCOVER_OBJECTS -> roles -> pack -> cast/config
+-> producer 201 -> CAS pin -> S09 reapproval `full_apply_executable=true` ->
+authority executable) and the chain is BLOCKED at `s10_full_apply_submit`
+(HTTP 422, "shots overlap or non-monotonic", segment-vs-shot contract
+collision; exact evidence under outputs/.../QA/B01-I/20260915T164349Z).
+
+This module freezes the exact node ID, command, env contract and the
+exclusive evidence-output policy: every run gets a NEW output directory
+created exclusively (S12_REVIEW_OUT style) so older evidence is never
+reused or overwritten; the dispatch guard refuses while any dependency is
+unsatisfied.
 """
 
 from __future__ import annotations
@@ -19,7 +26,7 @@ from typing import TypeVar
 
 _T = TypeVar("_T")
 
-B01I_STATUS = "PREPPED_NOT_EXECUTED"
+B01I_STATUS = "EXECUTED_BLOCKED_S10_SHOTS_OVERLAP"
 
 PYTHON311 = "C:/Users/Admin/AppData/Local/Programs/Python/Python311/python.exe"
 QA_R6_DIR = "tests/s12/s12-lc3-qa-r6"
