@@ -82,3 +82,9 @@ Full-SHA pin list: `C:/Users/Admin/MotionForge2D-evidence/s12/20260907-083200-s1
 - Union delta `83af5167 → b5c62d1`: 25 paths exact (6+5+8+6, disjoint); 6408 insertions / 144 deletions; `git diff --check` 0; porcelain clean after each merge.
 - Static changed-scope: `compileall` app 0; `py_compile` tests 0; `ruff check --select F` 0 (`All checks passed!`); informational full-ruleset 52 style diagnostics (4 inherited publication.py: N818/SIM103/SIM102/SIM105).
 - No broad pytest (Manager final gate after freeze); no push; no production/test hand edits by INT. Detail: R6_REPORT.md + evidence dir under `Documents/Codex/2026-09-11/tr-x20/outputs/s12-r6-hermes/20260915T131158Z/INT`.
+
+## 8. R6 round 2 — QA follow-up transport (Hermes INT, 2026-09-15)
+
+- Input QA2 `c5954d2ea465b1619f2c2613ae89ec456bee14ca` (parent `0c18d2d19fdb40c7c62d88da9ac4d39a72e48385` — QA build trực tiếp trên candidate đã tích hợp); merge `dd51f1f3a34e1a56510eb478a1c2a6a9e3085051` (parents `0c18d2d…` + `c5954d2…`), zero conflict, delta đúng 7 path (+1201/−68), diff-check 0, porcelain trống.
+- Static: `compileall` app 0; `py_compile` 4 file QA-r6 0; `ruff check --select F` 0; full-ruleset trên 4 file đó 0 (`All checks passed!`).
+- Evidence: R6_INT_RAW_PROVENANCE_R2.txt + COMMAND_LEDGER.jsonl (append, phase `r2_*`); không push; không sửa tay production/test.

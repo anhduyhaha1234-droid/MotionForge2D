@@ -113,3 +113,21 @@ The four publication.py diagnostics (N818 line 77, SIM103 line 511, SIM102 line 
 - Combined candidate now carries exact R6 bytes for F01 (RETRY), F02/F03 (VAL), B01 producer + E01/E02 (B01), and the frozen finite inventory + harness prep (QA).
 - Waiting on: final Manager/QA broad + product chain gates on this frozen candidate (B01-I public chain etc.), then Codex review. `NOT_CLOSED`.
 - No push was performed; this docs commit is a local transport checkpoint on `codex/s12-lc3-luna-integration` only.
+
+## Round 2 — QA follow-up transport (c5954d2)
+
+- Input: `c5954d2ea465b1619f2c2613ae89ec456bee14ca` (branch `codex/s12-lc3-luna-qa`, tip) — single commit; parent `0c18d2d19fdb40c7c62d88da9ac4d39a72e48385` (the round-1 INT docs commit), i.e. QA built directly on the integrated candidate. Ancestry verified before merge (merge-base(HEAD, c5954d2) = pre-merge HEAD; `83af5167…` and `69a1280…` confirmed ancestors).
+- Merge: `dd51f1f3a34e1a56510eb478a1c2a6a9e3085051`, parents `0c18d2d19fdb40c7c62d88da9ac4d39a72e48385` + `c5954d2ea465b1619f2c2613ae89ec456bee14ca`; Git default message; exit 0; same pre-existing geometric-repack stderr warning (exit 0, tree unaffected).
+- Delta (7, exact — matches the pinned expected list):
+  - `docs/pm/sessions/S12-LC3-QA/LOG.md`
+  - `docs/pm/sessions/S12-LC3-QA/R6_INVENTORY.md`
+  - `docs/pm/sessions/S12-LC3-QA/R6_REPORT.md`
+  - `tests/s12/s12-lc3-qa-r6/r6_b01i_plan.py`
+  - `tests/s12/s12-lc3-qa-r6/test_r6_b01i_prep.py`
+  - `tests/s12/s12-lc3-qa-r6/test_r6_b01i_public_chain.py` (new)
+  - `tests/s12/s12-lc3-qa-r6/test_r6_finite_inventory.py`
+  - stat: 7 files changed, 1201 insertions(+), 68 deletions(-).
+- `git diff --check` exit 0; `git status --porcelain` empty post-merge.
+- Static (changed scope): `python -m compileall -q app` exit 0; `python -m py_compile` on the 4 changed `.py` exit 0; `ruff check --select F` exit 0 (`All checks passed!`); full-ruleset `ruff check` on the same 4 files exit 0 (`All checks passed!`).
+- Content note (transport fidelity only): the QA2 commit subject reports the B01-I public chain executed and blocked at S10 shots-overlap with delivered-node reconciliation; INT transports these bytes verbatim and makes no assessment of that result.
+- Evidence: `R6_INT_RAW_PROVENANCE_R2.txt`; `COMMAND_LEDGER.jsonl` appended with round-2 entries (phase `r2_*`, same schema).
