@@ -122,3 +122,16 @@ Status: `R6_INVENTORY_FROZEN` — QA preparation checkpoint only; no product, me
 - Reviewer provenance: R3 authority `98C929...` and corrected R5 probes hash-recorded and verified; R5 docs in this session remain byte-immutable (never overwritten).
 - Waiting: WAITING_FOR RETRY/VAL/B01 executable nodes and INT transport -> B01-I stays PREPPED_NOT_EXECUTED; B01 remains BLOCKED_DEPENDENCY.
 - Evidence lane: `C:/Users/Admin/Documents/Codex/2026-09-11/tr-x20/outputs/s12-r6-hermes/20260915T131158Z/QA/` (raw pytest, node lists, guards/snapshots, COMMAND_LEDGER.jsonl). No push; no APPROVED/CLOSED claim.
+
+---
+
+# S12-LC3-QA — R6 B01-I product-chain execution (append 2026-09-15)
+
+Status: `EXECUTED_BLOCKED_S10_SHOTS_OVERLAP` — honest blocker, not an approval.
+
+- Frozen tip run: `0c18d2d19fdb40c7c62d88da9ac4d39a72e48385` (ff-synced from `69a1280`); five bounded runs, newest last; final recorded run `20260915T164349Z`.
+- PASSED publicly (real returned IDs): upload/analyze/import/proxy/scene; DISCOVER_OBJECTS worker; roles; character pack publish (6 slots); ProjectCast/ReskinConfig per role; producer 201 (manifest `5111dbcd-7d9c-460b-8035-2315f99fb6e5`); CAS pin; S09 reapproval (`full_apply_executable=true`, checkpoint `83bccabe-...`); authority executable.
+- BLOCKED: `POST /api/v2/projects/e5e93c5c336a/full-apply` → 422 `shots overlap or non-monotonic: shot 29963538-7ff4-5bb8-9212-aea7fc70c26d [0,119] and 627b554b-4bbb-55b6-8600-65df9edd3de4 [0,119]` — S10 segment-vs-shot contract collision; proposal for minimal owner/write-set recorded in R6_REPORT.md (S10 shot derivation from manifest shot_order; or producer typed denial). Codex decision required.
+- Not reached: S10 run/publication, audio attach, QC/readiness, S12 context/preflight/submit, worker/publisher/media, UI submit/reload, replay checks. Browser UI NOT_RUN (no `frontend/node_modules`); human playback NOT_REVIEWED.
+- Evidence: `outputs/s12-r6-hermes/20260915T131158Z/QA/B01-I/20260915T164349Z/` (b01i-chain.json `72BB20C7...`, b01i-stages.jsonl `FA50652D...`, summary, raw pytest). Runtime: `work/s12h/20260915T131158Z/QA/B01-I/20260915T164349Z/`.
+- Bookkeeping: finite inventory reconciled to delivered node IDs (freeze names preserved); no case meaning/outcome/count weakened; R04/R07/R08 retained gates unchanged.
