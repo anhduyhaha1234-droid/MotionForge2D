@@ -38,4 +38,10 @@
   `a10b11c12d3e`; repo head is `d4e5f6a7b8c9` from commit f966225, an
   ancestor of the base — untouched by this write-set). Ruff `--select F`
   clean on all five changed files.
-- 2026-09-15 — Commit (local only, no push): see REPORT.md.
+- 2026-09-15 — Commit (local only, no push):
+  `9caa22329cbb2cb0c0a07ee36e9878778b5a4496`, parent
+  `83af5167e9dddc931bc8590f547684c0c811784b`, 8 files, +2728/-4.
+- 2026-09-15 — Post-commit gate on the frozen commit:
+  `python -B -m pytest tests/test_s09_structural_lock_producer.py -q
+  -p no:cacheprovider` → 17 passed (67.40s), exit 0; `git status --short`
+  empty; all five write-set hashes re-verified unchanged.

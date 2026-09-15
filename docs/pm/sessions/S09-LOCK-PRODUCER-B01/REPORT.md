@@ -9,6 +9,9 @@ pending independent review (no APPROVED/CLOSED claimed).
 - Worktree: `C:/Users/Admin/Documents/Codex/2026-09-11/tr-x20/work/s12-r6-b01`
   · branch `codex/s09-lock-producer-b01-r6` · base
   `83af5167e9dddc931bc8590f547684c0c811784b`.
+- Transport commit: `9caa22329cbb2cb0c0a07ee36e9878778b5a4496` (parent =
+  base; 8 files, +2728/-4; local only, NO push). Post-commit gate re-run:
+  `17 passed in 67.40s` on the frozen commit.
 
 ## Files changed (exact)
 
