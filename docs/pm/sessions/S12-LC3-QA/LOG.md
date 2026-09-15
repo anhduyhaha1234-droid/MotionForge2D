@@ -107,3 +107,18 @@ verified all 45 entries with the sole allowed content change listed above:
 ```
 
 The guard report is saved as `evidence/post-qa-q0-guard-report.json`.
+
+---
+
+# S12-LC3-QA — R6 finite inventory freeze + harness prep (Hermes owner transfer)
+
+Status: `R6_INVENTORY_FROZEN` — QA preparation checkpoint only; no product, mechanism, UI, video or audio pass is claimed; NOT_CLOSED / NOT_APPROVED.
+
+- Owner/session: Hermes owner after one-time transfer (USER_REQUESTED_PLATFORM_MODEL_TRANSFER), session `20260915_201612_aeb5e3`; route `ocg/deepseek-v4.1-flash` / provider `custom` / fallback OFF.
+- Wave-base sync: `git merge --ff-only 83af5167e9dddc931bc8590f547684c0c811784b` fast-forwarded from `b6ab84e7e80ce673dda7a5c1ce517732fea06688`; clean status after sync.
+- Frozen (new): `R6_INVENTORY.md` locks node/parameter IDs, typed outcomes, Run/Job counts and evidence templates for M01-M19 (RETRY), V01-V15 (VAL), B01-A-B01-I; `R6_REPORT.md` records the checkpoint.
+- New QA micro: `tests/s12/s12-lc3-qa-r6/` (finite inventory checks, 62-row recheck, R04/R07/R08 retained-gate assertions, hash-proven reviewer assertion provenance, B01-I prepped-not-executed harness with exclusive per-run output dirs).
+- Retained gates restored as machine-checkable assertions: R04 lost-ack/SHA prohibition, R07 interrupted temp / basename155+ / export_master.mp4, R08 exact collection/full modules/no extra skips.
+- Reviewer provenance: R3 authority `98C929...` and corrected R5 probes hash-recorded and verified; R5 docs in this session remain byte-immutable (never overwritten).
+- Waiting: WAITING_FOR RETRY/VAL/B01 executable nodes and INT transport -> B01-I stays PREPPED_NOT_EXECUTED; B01 remains BLOCKED_DEPENDENCY.
+- Evidence lane: `C:/Users/Admin/Documents/Codex/2026-09-11/tr-x20/outputs/s12-r6-hermes/20260915T131158Z/QA/` (raw pytest, node lists, guards/snapshots, COMMAND_LEDGER.jsonl). No push; no APPROVED/CLOSED claim.
