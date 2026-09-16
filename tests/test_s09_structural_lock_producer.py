@@ -19,6 +19,16 @@ ENGINEERING EVIDENCE built through ORM rows in the isolated temp DB; the
 MAIN/real database is never targeted and no SQL seed is used against any
 shared database.
 
+R7 correction (F03): the producer must PROVE exact source timing from the
+CURRENT source artifact BYTES (verified import probe + managed-root
+checksum), never from defaults or a rounded duration.  The seeds therefore
+build REAL deterministic media (ffmpeg testsrc2) at the managed root and
+persist the SAME probe facts the verified import would (rational
+r_frame_rate, duration, dimensions); the F03 block freezes the typed
+zero-mutation denials (missing numerator/denominator, zero duration,
+unproven/tampered bytes, VFR source, persisted-vs-probe mismatch) and the
+exact-frame-count/CFR controls for 30/1 and 30000/1001.
+
 Run: ``python -B -m pytest tests/test_s09_structural_lock_producer.py -q
 -p no:cacheprovider``
 """
@@ -27,6 +37,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import tempfile
 import threading
 from pathlib import Path
@@ -43,7 +54,15 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 # The AppConfig singleton resolves MOTIONFORGE_ROOT at import time; set it to
 # a fresh temp root FIRST so neither the imported app nor the lifespan can
 # ever target the MAIN/real database.  MOTIONFORGE_DATABASE_URL is stripped.
-_RUNTIME_ROOT = Path(tempfile.mkdtemp(prefix="s09b01_"))
+# R7: when the runner provides an isolated runtime dir (S09B01_RUNTIME_DIR)
+# the per-session root lives INSIDE it; otherwise a fresh temp root is used.
+_RUNTIME_PARENT = os.environ.get("S09B01_RUNTIME_DIR")
+if _RUNTIME_PARENT and Path(_RUNTIME_PARENT).is_dir():
+    _RUNTIME_ROOT = Path(
+        tempfile.mkdtemp(prefix="s09b01_", dir=_RUNTIME_PARENT)
+    )
+else:
+    _RUNTIME_ROOT = Path(tempfile.mkdtemp(prefix="s09b01_"))
 os.environ["MOTIONFORGE_ROOT"] = str(_RUNTIME_ROOT)
 os.environ.setdefault("MOTIONFORGE_OUTPUT", str(_RUNTIME_ROOT / "output"))
 os.environ.setdefault("MOTIONFORGE_MODELS", str(_RUNTIME_ROOT / "models"))
@@ -59,6 +78,7 @@ from app.persistence import (  # noqa: E402
     create_engine_for_path,
     create_session_factory,
 )
+from app.persistence.artifacts import hash_file  # noqa: E402
 from app.persistence.models import (  # noqa: E402
     ApplyCheckpoint,
     Artifact,
@@ -76,6 +96,8 @@ from app.persistence.models import (  # noqa: E402
     VideoItem,
     Workspace,
 )
+from app.services.ffmpeg_utils import find_ffmpeg  # noqa: E402
+from app.services.video_import import probe_source  # noqa: E402
 from app.workflow.analyze_orchestrator import (  # noqa: E402
     reset_analyze_orchestrator,
 )
@@ -118,6 +140,7 @@ class Graph:
         self.video = ""
         self.video_b = ""
         self.source = ""
+        self.source_sha = ""
         self.scene_ids: list[str] = []
         self.role = ""
         self.role_b = ""
@@ -129,25 +152,99 @@ class Graph:
         self.mask = ""
 
 
+def _encode_source_media(
+    managed_root: Path,
+    relative_path: str,
+    *,
+    rate: str,
+    duration_s: float,
+    width: int,
+    height: int,
+    vfr_select: str | None = None,
+) -> tuple[Path, dict[str, Any]]:
+    """Generate REAL deterministic source media at the managed root and
+    return ``(absolute path, verified probe payload)`` (R7 F03).
+
+    Engineering evidence only: deterministic synthetic testsrc2 + ultrafast
+    H.264 — but real bytes at the managed root, so the producer's exact
+    timing proof runs against a genuine artifact.  ``rate`` is the ffmpeg
+    rational text (``"30"``, ``"30000/1001"``); ``vfr_select`` produces a
+    variable-frame-rate file for the VFR denial control.
+    """
+    target = Path(managed_root) / relative_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        find_ffmpeg(),
+        "-y",
+        "-v",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        f"testsrc2=size={width}x{height}:rate={rate}:duration={duration_s}",
+    ]
+    if vfr_select is not None:
+        cmd += ["-vf", vfr_select, "-fps_mode", "vfr"]
+    cmd += [
+        "-pix_fmt",
+        "yuv420p",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "ultrafast",
+        str(target),
+    ]
+    completed = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    assert completed.returncode == 0, completed.stderr
+    return target, probe_source(target)
+
+
 def _seed_graph(
     session: Any,
     *,
+    managed_root: Path | None = None,
+    rate: str = "10",
+    duration_s: float = 20.0,
+    media_width: int = 256,
+    media_height: int = 256,
     with_scenes: bool = True,
     with_segments: bool = True,
     with_configs: bool = True,
     scenes_count: int = 2,
 ) -> Graph:
-    """Seed the isolated graph (engineering evidence; temp DB only)."""
+    """Seed the isolated graph (engineering evidence; temp DB only).
+
+    R7 F03: the source artifact is REAL media written at the managed root
+    (ffmpeg testsrc2) and the persisted VideoItem timing facts are taken
+    from the SAME verified import probe, exactly like a real import — so
+    the producer's proof holds on the valid path and every timing denial is
+    a genuine mutation of proven facts.
+    """
     g = Graph()
     session.add(Workspace(id=WS, name=WS))
     session.add(Workspace(id=WS_B, name=WS_B))
+    if managed_root is None:
+        managed_root = Path(tempfile.mkdtemp(prefix="s09b01m_"))
+    source_rel = "b01/src-b01.mp4"
+    source_path, probe = _encode_source_media(
+        managed_root,
+        source_rel,
+        rate=rate,
+        duration_s=duration_s,
+        width=media_width,
+        height=media_height,
+    )
+    stream = probe["video_stream"]
+    source_sha = hash_file(source_path)
+    g.source_sha = source_sha
     source = Artifact(
         workspace_id=WS,
         kind="video",
-        relative_path="b01/src-b01.mp4",
+        relative_path=source_rel,
         state="ready",
-        sha256=_sha(1),
-        size_bytes=4096,
+        sha256=source_sha,
+        size_bytes=source_path.stat().st_size,
+        mime_type="video/mp4",
     )
     session.add(source)
     session.flush()
@@ -162,11 +259,11 @@ def _seed_graph(
         title="V-B01",
         position=0,
         source_artifact_id=source.id,
-        width=256,
-        height=256,
-        duration_ms=20000,
-        fps_num=10,
-        fps_den=1,
+        width=int(stream["width"]),
+        height=int(stream["height"]),
+        duration_ms=round(float(probe["container"]["duration_seconds"]) * 1000),
+        fps_num=int(stream["r_frame_rate"]["num"]),
+        fps_den=int(stream["r_frame_rate"]["den"]),
     )
     session.add(video)
     session.flush()
@@ -182,7 +279,7 @@ def _seed_graph(
             owner_id=video.id,
             state="completed",
             input_generation=GEN,
-            input_manifest_json=json.dumps({"source_sha256": _sha(1)}),
+            input_manifest_json=json.dumps({"source_sha256": source_sha}),
         )
     )
     session.flush()
@@ -408,7 +505,9 @@ def runtime(tmp_path: Path):  # type: ignore[no-untyped-def]
 
     def seed(**kwargs: Any) -> Graph:
         with factory() as session:
-            return _seed_graph(session, **kwargs)
+            return _seed_graph(session, managed_root=managed_root, **kwargs)
+
+    seed.managed_root = managed_root  # type: ignore[attr-defined]
 
     try:
         with TestClient(producer_app, raise_server_exceptions=False) as client:
@@ -525,7 +624,7 @@ def test_tampered_source_and_evidence_denied_typed(runtime) -> None:  # type: ig
 
     with factory() as session:
         source = session.get(Artifact, graph.source)
-        source.sha256 = _sha(1)
+        source.sha256 = graph.source_sha
         segment = session.get(OccurrenceSegment, graph.segment)
         segment.prompt_json = "{not-json"
         session.commit()
@@ -874,6 +973,8 @@ def test_B01_A_success_current_source_evidence_graph(runtime) -> None:  # type: 
     assert body["policy_version"] == POLICY
     assert body["version"] == 1
     assert body["segment_count"] == 2
+    assert body["source_frame_count"] == 200
+    assert (body["source_fps_num"], body["source_fps_den"]) == (10, 1)
     assert body["route_decisions_created"] == 2
     assert len(body["manifest_hash"]) == 64
 
@@ -994,7 +1095,9 @@ def test_B01_C_two_live_callers_exactly_one_creator(runtime) -> None:  # type: i
 
     def _caller(index: int) -> None:
         with factory() as session:
-            producer = StructuralLockProducer(session)
+            producer = StructuralLockProducer(
+                session, managed_root=seed.managed_root
+            )
             barrier.wait(timeout=10)
             try:
                 outcome = producer.produce(
@@ -1114,14 +1217,26 @@ def test_B01_E_generation_change_and_supersession(runtime) -> None:  # type: ign
 
     # Source replaced + a NEW completed generation → the old lock is never
     # the current authority for the new generation (explicitly validated).
+    # R7 F03: the replacement is a REAL second artifact at the managed root
+    # whose persisted timing facts match the same verified probe profile.
+    v2_path, _ = _encode_source_media(
+        seed.managed_root,
+        "b01/src-b01-v2.mp4",
+        rate="10",
+        duration_s=20.0,
+        width=256,
+        height=256,
+    )
+    v2_sha = hash_file(v2_path)
     with factory() as session:
         source_v2 = Artifact(
             workspace_id=WS,
             kind="video",
             relative_path="b01/src-b01-v2.mp4",
             state="ready",
-            sha256=_sha(2),
-            size_bytes=8192,
+            sha256=v2_sha,
+            size_bytes=v2_path.stat().st_size,
+            mime_type="video/mp4",
         )
         session.add(source_v2)
         session.flush()
@@ -1135,7 +1250,7 @@ def test_B01_E_generation_change_and_supersession(runtime) -> None:  # type: ign
                 owner_id=graph.video,
                 state="completed",
                 input_generation="2",
-                input_manifest_json=json.dumps({"source_sha256": _sha(2)}),
+                input_manifest_json=json.dumps({"source_sha256": v2_sha}),
             )
         )
         for index, (start, end) in enumerate(((0, 99), (100, 199))):
@@ -1242,7 +1357,7 @@ def test_B01_F_pin_and_reapproval_full_apply_executable(runtime) -> None:  # typ
 
     authority_block = authority_body["full_apply_authority"]
     assert authority_block["identity"]["source_generation"] == GEN
-    assert authority_block["source"]["sha256"] == _sha(1)
+    assert authority_block["source"]["sha256"] == graph.source_sha
     assert authority_block["source"]["source_artifact_id"] == graph.source
     segments = authority_block["segments"]
     assert len(segments) == 2
@@ -1307,3 +1422,181 @@ def test_B01_H_read_failure_typed_denial(runtime, monkeypatch) -> None:  # type:
     assert failed.status_code == 422, failed.text
     assert _detail_code(failed) == "STRUCTURAL_LOCK_READ_ERROR"
     assert _counts(factory) == before
+
+
+# ── R7 F03: exact source timing proof (denials + valid controls) ──────────
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [("fps_num", None), ("fps_den", None), ("duration_ms", 0)],
+)
+def test_F03_missing_or_zero_source_timing_is_denied(runtime, field, value) -> None:  # type: ignore[no-untyped-def]
+    """Reviewer-probe parity (adapted 1:1): fps_num=None / fps_den=None /
+    duration_ms=0 → typed denial with zero durable mutation (no manifest,
+    no route, no job).  The producer never defaults missing timing."""
+    client, factory, seed = runtime
+    graph = seed()
+    with factory() as session:
+        video = session.get(VideoItem, graph.video)
+        setattr(video, field, value)
+        session.commit()
+    before = _counts(factory)
+    response = _post(client, graph.project, graph.video)
+    after = _counts(factory)
+    assert response.status_code in (409, 422), response.text
+    assert (
+        _detail_code(response) == "STRUCTURAL_LOCK_SOURCE_TIMING_MISSING"
+    ), response.text
+    assert before == after
+    assert after == {"manifests": 0, "routes": 0, "checkpoints": 0, "configs": 1}
+
+
+def test_F03_unproven_or_tampered_source_bytes_denied(runtime) -> None:  # type: ignore[no-untyped-def]
+    """Bytes missing or no longer matching the recorded checksum are a
+    typed denial; restoring the EXACT bytes restores the valid path."""
+    client, factory, seed = runtime
+    graph = seed()
+    path = seed.managed_root / "b01/src-b01.mp4"
+    original = path.read_bytes()
+    before = _counts(factory)
+
+    path.unlink()
+    missing = _post(client, graph.project, graph.video)
+    assert missing.status_code == 422
+    assert _detail_code(missing) == "STRUCTURAL_LOCK_SOURCE_TIMING_UNPROVEN"
+    assert _counts(factory) == before
+
+    path.write_bytes(original + b"tamper")
+    tampered = _post(client, graph.project, graph.video)
+    assert tampered.status_code == 422
+    assert _detail_code(tampered) == "STRUCTURAL_LOCK_SOURCE_TIMING_UNPROVEN"
+    assert _counts(factory) == before
+
+    path.write_bytes(original)
+    restored = _post(client, graph.project, graph.video)
+    assert restored.status_code == 201, restored.text
+    assert _counts(factory) == {**before, "manifests": 1, "routes": 2}
+
+
+def test_F03_persisted_timing_mismatch_denied(runtime) -> None:  # type: ignore[no-untyped-def]
+    """Persisted facts that disagree with the exact probe (rational FPS or
+    frame-exact duration) are typed zero-mutation denials."""
+    client, factory, seed = runtime
+    graph = seed()
+    before = _counts(factory)
+
+    with factory() as session:
+        video = session.get(VideoItem, graph.video)
+        video.fps_num = 25  # the file is 10/1 → persisted disagrees
+        session.commit()
+    wrong_fps = _post(client, graph.project, graph.video)
+    assert wrong_fps.status_code == 422
+    assert _detail_code(wrong_fps) == "STRUCTURAL_LOCK_SOURCE_TIMING_MISMATCH"
+
+    with factory() as session:
+        video = session.get(VideoItem, graph.video)
+        video.fps_num = 10
+        video.duration_ms = 20001  # off-by-one ms is not the exact timing
+        session.commit()
+    wrong_duration = _post(client, graph.project, graph.video)
+    assert wrong_duration.status_code == 422
+    assert (
+        _detail_code(wrong_duration) == "STRUCTURAL_LOCK_SOURCE_TIMING_MISMATCH"
+    )
+    assert _counts(factory) == before
+
+
+def test_F03_vfr_source_denied_typed(runtime) -> None:  # type: ignore[no-untyped-def]
+    """A VFR source (r_frame_rate != avg_frame_rate) is refused even when
+    every persisted fact matches the probed rational — frame-exact locking
+    needs CFR."""
+    client, factory, seed = runtime
+    graph = seed()
+    vfr_path, vfr_probe = _encode_source_media(
+        seed.managed_root,
+        "b01/src-b01.mp4",
+        rate="30",
+        duration_s=1.0,
+        width=256,
+        height=256,
+        vfr_select="select='not(mod(n,3))'",
+    )
+    stream = vfr_probe["video_stream"]
+    assert stream["fps_classification"] == "VFR"
+    vfr_sha = hash_file(vfr_path)
+    with factory() as session:
+        source = session.get(Artifact, graph.source)
+        source.sha256 = vfr_sha
+        source.size_bytes = vfr_path.stat().st_size
+        video = session.get(VideoItem, graph.video)
+        video.fps_num = int(stream["r_frame_rate"]["num"])
+        video.fps_den = int(stream["r_frame_rate"]["den"])
+        video.duration_ms = round(
+            float(vfr_probe["container"]["duration_seconds"]) * 1000
+        )
+        job = session.scalars(
+            select(Job).where(Job.owner_id == graph.video)
+        ).first()
+        assert job is not None
+        job.input_manifest_json = json.dumps({"source_sha256": vfr_sha})
+        session.commit()
+    before = _counts(factory)
+    response = _post(client, graph.project, graph.video)
+    assert response.status_code == 422, response.text
+    assert _detail_code(response) == "STRUCTURAL_LOCK_SOURCE_VFR"
+    assert _counts(factory) == before
+
+
+@pytest.mark.parametrize(
+    "rate,duration_s,fps_pair,frame_count,time_base",
+    [
+        ("30", 1.0, (30, 1), 30, "1/30"),
+        ("30000/1001", 1.001, (30000, 1001), 30, "1001/30000"),
+    ],
+)
+def test_F03_valid_rational_control_exact_count_and_cfr(  # type: ignore[no-untyped-def]
+    runtime, rate, duration_s, fps_pair, frame_count, time_base
+) -> None:
+    """Known valid 30/1 and 30000/1001 CFR sources produce the EXACT
+    container frame count + exact rational timebase — never a default
+    30fps/denominator-1 route or a rounded duration estimate."""
+    client, factory, seed = runtime
+    graph = seed(
+        rate=rate, duration_s=duration_s, media_width=64, media_height=64
+    )
+    response = _post(
+        client,
+        graph.project,
+        graph.video,
+        {"idempotency_key": f"f03-{fps_pair[0]}-{fps_pair[1]}"},
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+    # Exactness: a FRESH independent probe of the very same bytes.
+    fresh = probe_source(seed.managed_root / "b01/src-b01.mp4")
+    exact_frames = int(fresh["video_stream"]["nb_frames"])
+    assert body["source_frame_count"] == exact_frames == frame_count
+    assert (body["source_fps_num"], body["source_fps_den"]) == fps_pair
+    with factory() as session:
+        row = session.get(StructuralLockManifest, body["manifest_id"])
+        manifest = json.loads(row.manifest_json)
+        assert manifest["frame_count"] == exact_frames
+        assert manifest["timebase"]["time_base"] == time_base
+        assert manifest["timebase"]["fps"] == fps_pair[0] / fps_pair[1]
+
+
+@pytest.mark.parametrize("field", ["fps_num", "fps_den"])
+def test_F03_database_rejects_zero_rational_components(runtime, field) -> None:  # type: ignore[no-untyped-def]
+    """Positive control (reviewer parity): the DB already rejects zero
+    rational components — retained as-is, nothing to fix there."""
+    from sqlalchemy.exc import IntegrityError
+
+    _client, factory, seed = runtime
+    graph = seed()
+    with factory() as session:
+        video = session.get(VideoItem, graph.video)
+        setattr(video, field, 0)
+        with pytest.raises(IntegrityError):
+            session.commit()
+        session.rollback()

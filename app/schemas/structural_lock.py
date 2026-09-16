@@ -215,6 +215,9 @@ class StructuralLockProduceResponse(_StrictBase):
     manifest_id: str = Field(..., min_length=1, max_length=36)
     manifest_hash: Sha256Hex
     source_generation: SourceGeneration
+    source_frame_count: int = Field(..., ge=1)
+    source_fps_num: int = Field(..., ge=1)
+    source_fps_den: int = Field(..., ge=1)
     policy_version: PolicyVersion
     version: int = Field(..., ge=1)
     status: Literal["draft", "active", "superseded", "voided"]

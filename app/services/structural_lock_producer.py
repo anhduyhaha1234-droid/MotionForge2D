@@ -34,6 +34,13 @@ Producer contract (fail-closed, zero client authority):
   evidence (prompt/segmentation points/boxes), an in-scope role, a role
   mapping (ReskinConfig for that role in this project) whose pack version
   is published/ready, and an in-workspace mask artifact when referenced.
+- Source timing (R7 F03 correction): the exact frame count + CFR are
+  PROVED from the CURRENT source artifact bytes through the existing
+  verified facilities (``app.services.structural_lock_source_timing`` →
+  ``video_import.probe_source`` + managed-root ``hash_file``).  Missing
+  numerator/denominator/duration, an unproven or tampered artifact, a VFR
+  source, or any persisted-vs-probe mismatch is a typed denial — no 30fps /
+  denominator-1 / one-frame default exists anywhere on this path.
 - Creation goes through ``StructuralLockRepository.create_manifest`` ONLY:
   idempotent replay converges on the same row (``created=False``), a
   materially different payload under the same key conflicts (409), and a
@@ -48,6 +55,7 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import select
@@ -83,6 +91,11 @@ from app.persistence.structural_lock import (
     StructuralLockRepository,
 )
 from app.services.s09_approval import FULL_APPLY_EXECUTABLE_ROUTES
+from app.services.structural_lock_source_timing import (
+    SourceTimingError,
+    SourceTimingProof,
+    prove_source_timing,
+)
 
 __all__ = [
     "PRODUCER_DEFAULT_ROUTE",
@@ -191,6 +204,8 @@ class SourceGraph:
     source_sha256: str
     frame_count: int
     fps: float
+    fps_num: int
+    fps_den: int
     time_base: str
     shot_order: tuple[str, ...]
     segment_ids: tuple[str, ...]
@@ -281,9 +296,15 @@ def _parse_geometry(raw: str | None, path: str) -> dict[str, Any] | None:
 class StructuralLockProducer:
     """Derives and freezes the CURRENT StructuralLockManifest for a video."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(
+        self,
+        session: Session,
+        *,
+        managed_root: str | Path | None = None,
+    ) -> None:
         self._session = session
         self._lock = StructuralLockRepository(session)
+        self._managed_root = managed_root
 
     # ── public surface ───────────────────────────────────────────────────
 
@@ -378,7 +399,10 @@ class StructuralLockProducer:
                     "no replacement segment is available for a lock",
                 )
 
-            frame_count, fps, time_base = self._timebase(video)
+            timing = self._timebase(video, source)
+            frame_count = timing.frame_count
+            fps = timing.fps
+            time_base = timing.time_base
             manifest = {
                 "frame_count": frame_count,
                 "timebase": {
@@ -438,6 +462,8 @@ class StructuralLockProducer:
             source_sha256=str(source.sha256),
             frame_count=frame_count,
             fps=fps,
+            fps_num=timing.fps_num,
+            fps_den=timing.fps_den,
             time_base=time_base,
             shot_order=tuple(shot_order),
             segment_ids=tuple(plan.segment.id for plan in plans),
@@ -842,29 +868,24 @@ class StructuralLockProducer:
 
     # ── timebase / manifest creation ─────────────────────────────────────
 
-    def _timebase(self, video: VideoItem) -> tuple[int, float, str]:
-        if (
-            video.width is None
-            or video.height is None
-            or video.duration_ms is None
-        ):
-            raise ProducerValidationError(
-                CODE_SOURCE_NOT_READY,
-                "video item has no canonical probe dimensions/duration; the "
-                "source generation is not ready for a structural lock",
+    def _timebase(self, video: VideoItem, source: Artifact) -> SourceTimingProof:
+        """Exact source timing proof (R7 F03) — never defaulted, never
+        rounded: only the verified probe's exact ``nb_frames`` + CFR-equal
+        rationals, cross-checked against every persisted fact, can pass.
+
+        Missing numerator/denominator/duration, an unproven/tampered source
+        artifact, a VFR source or any persisted-vs-probe mismatch is a
+        typed denial (zero-durable-mutation, fail closed)."""
+        try:
+            return prove_source_timing(
+                managed_root=self._managed_root,
+                video=video,
+                source_artifact=source,
             )
-        fps_num = int(video.fps_num or 30)
-        fps_den = int(video.fps_den or 1)
-        if fps_num <= 0 or fps_den <= 0:
+        except SourceTimingError as err:
             raise ProducerValidationError(
-                CODE_SOURCE_TAMPERED,
-                "video item fps metadata is not a positive rational",
-            )
-        frame_count = max(
-            1, round((int(video.duration_ms) / 1000.0) * (fps_num / fps_den))
-        )
-        fps = fps_num / fps_den
-        return frame_count, fps, f"{fps_den}/{fps_num}"
+                err.code, str(err), reasons=err.reasons
+            ) from err
 
     def _create_manifest(
         self,

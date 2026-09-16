@@ -29,7 +29,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Response
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.api.deps import SessionDep
+from app.api.deps import SessionDep, get_managed_root
 from app.persistence import DEFAULT_WORKSPACE_ID
 from app.schemas.structural_lock import (
     StructuralLockProduceRequest,
@@ -63,7 +63,7 @@ def produce_structural_lock(
     Server-derived from the current source/evidence graph only; any
     denial leaves ZERO durable mutation behind.
     """
-    producer = StructuralLockProducer(session)
+    producer = StructuralLockProducer(session, managed_root=get_managed_root())
     try:
         outcome = producer.produce(
             WORKSPACE_ID,
@@ -129,6 +129,9 @@ def produce_structural_lock(
         manifest_id=record.id,
         manifest_hash=record.manifest_hash_hex,
         source_generation=record.source_generation,
+        source_frame_count=int(outcome.graph.frame_count),
+        source_fps_num=int(outcome.graph.fps_num),
+        source_fps_den=int(outcome.graph.fps_den),
         policy_version=record.policy_version,
         version=int(record.version),
         status=record.status,
