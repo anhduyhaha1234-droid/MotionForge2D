@@ -173,4 +173,5 @@ gốc — inventory D2 vẫn `DELIVERED VERBATIM 27`; đây là additions covera
 
 Gates follow-up: suite **31 passed** (27+4; 88.18s, exit 0 — raw
 `phase2_q4/q4_micro_31.*`); `ruff check --select F` 2 file changed exit 0;
-`git diff --check` exit 0; protected 18/18 **bad=0**. Commit: (điền sau commit).
+`git diff --check` exit 0; protected 18/18 **bad=0**. Commit:
+`db1c66c6f63d5fd29f97102a48452747c9a82149` (+ hash-record commit cho dòng này).
