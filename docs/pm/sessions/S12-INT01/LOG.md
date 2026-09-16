@@ -88,3 +88,10 @@ Full-SHA pin list: `C:/Users/Admin/MotionForge2D-evidence/s12/20260907-083200-s1
 - Input QA2 `c5954d2ea465b1619f2c2613ae89ec456bee14ca` (parent `0c18d2d19fdb40c7c62d88da9ac4d39a72e48385` — QA build trực tiếp trên candidate đã tích hợp); merge `dd51f1f3a34e1a56510eb478a1c2a6a9e3085051` (parents `0c18d2d…` + `c5954d2…`), zero conflict, delta đúng 7 path (+1201/−68), diff-check 0, porcelain trống.
 - Static: `compileall` app 0; `py_compile` 4 file QA-r6 0; `ruff check --select F` 0; full-ruleset trên 4 file đó 0 (`All checks passed!`).
 - Evidence: R6_INT_RAW_PROVENANCE_R2.txt + COMMAND_LEDGER.jsonl (append, phase `r2_*`); không push; không sửa tay production/test.
+
+## 9. R7 round 1 transport — 5 lanes (Hermes INT, 2026-09-16)
+
+- Wave-base `35f6cb2`; serial non-FF merges zero conflict, đúng thứ tự Manager B: VAL `86b1a2a`→`0ea57b5` (8 files); RETRY `4ce3b136c8c9d7bd7c1aeace590dfb6a8c2d15ab`→`2942efb` (3 files; literal 41-char typo trong prompt/handoff đã ghi rõ trong R7_REPORT.md); B01 `a027c59`→`4cd2966` (8 files); BRIDGE `dae7632`→`761414a` (13 files); QA `958d021`→`8704ec0` (6 files).
+- Transport tip `8704ec020960e67205cfeb93f4e54bda019205ae`; union delta 38 paths exact (+7573/−249); diff-check 0; porcelain trống sau từng merge.
+- Static: `compileall` app 0; `py_compile` 24 file 0; `ruff check --select F` 0 (`All checks passed!`); full-ruleset informational 136 style-class diagnostics (chi tiết trong R7_REPORT.md).
+- Evidence: `outputs/s12-r7-two-managers/20260916T0351Z/B/INT/` (COMMAND_LEDGER.jsonl + R7_INT_RAW_PROVENANCE.txt + manifests). Không push; không sửa source/test.
