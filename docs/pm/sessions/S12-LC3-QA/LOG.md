@@ -135,3 +135,15 @@ Status: `EXECUTED_BLOCKED_S10_SHOTS_OVERLAP` — honest blocker, not an approval
 - Not reached: S10 run/publication, audio attach, QC/readiness, S12 context/preflight/submit, worker/publisher/media, UI submit/reload, replay checks. Browser UI NOT_RUN (no `frontend/node_modules`); human playback NOT_REVIEWED.
 - Evidence: `outputs/s12-r6-hermes/20260915T131158Z/QA/B01-I/20260915T164349Z/` (b01i-chain.json `72BB20C7...`, b01i-stages.jsonl `FA50652D...`, summary, raw pytest). Runtime: `work/s12h/20260915T131158Z/QA/B01-I/20260915T164349Z/`.
 - Bookkeeping: finite inventory reconciled to delivered node IDs (freeze names preserved); no case meaning/outcome/count weakened; R04/R07/R08 retained gates unchanged.
+
+---
+
+# S12-LC3-QA — R7 prep + compatibility (append 2026-09-16, wave-base 35f6cb2)
+
+Status: R7_PREP_EXECUTED — no public chain; no closure claim.
+
+- Q01 (evidence claims corrected): B01-I chain stops at `s10_full_apply_submit`; S12 preflight = NOT_REACHED / NOT_REEXECUTED (F05 acknowledged); “missing producer”/“B01 BLOCKED_DEPENDENCY” obsolete (P07 `PRODUCER_PRESENT_WITH_OPEN_F03`); “single residual” obsolete (open F01–F05). Corrected in `R6_REPORT.md` appendix + `R6_INVENTORY.md` (old text retained as provenance).
+- Q02 (T03A migration compat, bounded exception): `tests/s12/s12-t03a/test_s12_export_migration.py` — TARGET_REV `c3d4e5f6a7b8` vs CURRENT_HEAD `d4e5f6a7b8c9` separated; both linear edges + linear walk asserted; fresh/retained-data/lineage-backfill at head executed on real temp DBs; both downgrade guards retained (exact messages), empty unwind verified. Full module: 9 passed / 0 failed (baseline 4 failed / 2 passed). No migration/model edit, no xfail/skip, coverage added only.
+- Q03 (R5 audit env): exact values `S12_R5_CANDIDATE_ROOT=C:/Users/Admin/MotionForge2D-worktrees/s12-lc3-luna-integration`, `S12_R5_EXPECTED_CANDIDATE_SHA=35f6cb2f2bd540c162d5a2f0e3ae8e152e392b86`; invocation + verify procedure in `R7_PREP.md` §Q03. Full R5 module with env: 3 passed / 0 failed (baseline without env: env-assert failure). Provenance assertions untouched.
+- R7 freeze: original 62 + R6 unchanged; R7 rows (A01–A06, B01–B06, Q01–Q04, P01–P03) frozen in `R6_INVENTORY.md` §“R7 additions” with owners/outcomes/raw destinations; unimplemented nodes marked “to be frozen by owner”.
+- Evidence: `outputs/s12-r7-two-managers/20260916T0351Z/B/QA/` (`baseline-t03a.*`, `t03a-fixed-v1.*`, `baseline-r5.*`, `r5-env.*`, guards, this prep record). Honest labels retained; B01-I still blocked at F04; NOT_CLOSED / NOT_APPROVED.
