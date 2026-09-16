@@ -180,3 +180,28 @@ Status: R7_PREP_EXECUTED — no public chain; no closure claim.
   R7-F1 is ruled).
 - Evidence: `.../B/QA/chain/20260916T084317Z/` + `.../B/QA/ui-20260916T084317Z/` +
   `r5-env-c3cf.*`; commit for this turn recorded at the end of this file.
+
+### 2026-09-16 — R5 inventory sync to Q02-delivered T03A names (finding R7-B2)
+
+Bounded exception (Manager B, `FINDING_r7b2_r5_inventory_rename.md`): sync the
+static probe inventory to the authorized Q02 renames; no assertion/provenance edits.
+
+- Programmatic enumeration (eval of the closed EXPECTED_PROBES literal vs AST
+  function names of the `8a9d793` integration worktree): **52 probes, exactly 5
+  stale**, all in `tests/s12/s12-t03a/test_s12_export_migration.py`:
+  * `test_single_head_is_new_revision` -> `test_single_head_is_current_head`
+  * `test_upgrade_from_parent_retains_data` -> `test_upgrade_from_parent_retains_data_to_current_head`
+  * `test_downgrade_with_rows_refuses` -> `test_downgrade_with_rows_refuses_at_current_head`
+  * `test_history_links_parent` -> `test_history_links_both_linear_edges`
+  * `test_empty_downgrade_drops_only_new_tables` -> `test_empty_downgrade_unwinds_lineage_then_tables`
+- Patch A: the 5 `EXPECTED_PROBES` rows (names only, `# R7-B2` comment).
+  Patch B (required by the test's own doc-vs-constants equality): the same 5 node
+  names in `R5_MATRIX.md` rows (name substring only; evidence classes untouched).
+  Diff scope: exactly 2 files, 10 insertions / 10 deletions.
+- Full `tests/s12/s12-lc3-qa-r5/` with env root=integration worktree,
+  SHA `8a9d79365866f0e12d77d21b0d64845d07c9edf0`: **3 passed** (exit 0).
+- Negative control: same command with a wrong SHA -> `1 failed, 2 passed`
+  (exit 1) — env/provenance checks fail closed, not weakened.
+- Evidence: `.../B/QA/r5-sync-enumeration.json`, `r5-sync-names.json`,
+  `r5-sync-matrix-doc.json`, `r5-sync-post2.stdout.txt`,
+  `r5-sync-negative-control.stdout.txt`.

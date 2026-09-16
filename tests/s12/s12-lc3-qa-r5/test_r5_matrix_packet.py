@@ -166,12 +166,12 @@ EXPECTED_PROBES = tuple(
     ("R08-migration", path, node)
     for path, node in (
         (RETRY_MIGRATION, "test_upgrade_retains_terminal_rows_hashes_and_binds_existing_job"),
-        (MIGRATION, "test_single_head_is_new_revision"),
+        (MIGRATION, "test_single_head_is_current_head"),  # R7-B2: Q02-delivered rename
         (MIGRATION, "test_fresh_upgrade_creates_tables"),
-        (MIGRATION, "test_upgrade_from_parent_retains_data"),
-        (MIGRATION, "test_downgrade_with_rows_refuses"),
-        (MIGRATION, "test_history_links_parent"),
-        (MIGRATION, "test_empty_downgrade_drops_only_new_tables"),
+        (MIGRATION, "test_upgrade_from_parent_retains_data_to_current_head"),  # R7-B2: Q02-delivered rename
+        (MIGRATION, "test_downgrade_with_rows_refuses_at_current_head"),  # R7-B2: Q02-delivered rename
+        (MIGRATION, "test_history_links_both_linear_edges"),  # R7-B2: Q02-delivered rename
+        (MIGRATION, "test_empty_downgrade_unwinds_lineage_then_tables"),  # R7-B2: Q02-delivered rename
     )
 ) + tuple(
     ("R08-stale-readiness", path, node)
