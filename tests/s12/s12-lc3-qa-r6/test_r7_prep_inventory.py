@@ -26,10 +26,10 @@ R7_IDS = (
 NOT_YET_IMPLEMENTED = (
     [f"A0{i}" for i in range(1, 7)]
     + ["B01", "B02"]
-    + [f"B0{i}" for i in range(3, 7)]
     + ["Q04"]
     + [f"P0{i}" for i in range(1, 4)]
 )
+DELIVERED_BRIDGE = ("B03", "B04", "B05", "B06")
 EXPECTED_T03A_NODES = (
     "test_single_head_is_current_head",
     "test_history_links_both_linear_edges",
@@ -90,6 +90,9 @@ def test_r7_additions_table_freezes_all_case_ids_with_owner_and_outcome() -> Non
         assert "s12-r7-two-managers/20260916T0351Z" in destination, case_id
     for case_id in NOT_YET_IMPLEMENTED:
         assert "to be frozen by owner" in by_id[case_id][3], case_id
+    for case_id in DELIVERED_BRIDGE:
+        assert "DELIVERED VERBATIM @c49a578" in by_id[case_id][3], case_id
+        assert "tests/s12/s12-public-authority-bridge/" in by_id[case_id][2], case_id
     assert "EXECUTED_THIS_TURN" in by_id["Q01"][3]
     assert "DELIVERED_THIS_TURN_VERIFIED" in by_id["Q02"][3]
     assert "EXECUTED_THIS_TURN_VERIFIED" in by_id["Q03"][3]
