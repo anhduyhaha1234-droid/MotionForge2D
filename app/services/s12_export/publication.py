@@ -49,6 +49,11 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from app.services.s12_export.publication_lease_guard import (
+    publication_lease_guard,
+    sqlite_db_path_from_session,
+)
+
 __all__ = [
     "PublicationError",
     "PublicationPathError",
@@ -818,7 +823,12 @@ def publish_export_run(
         )
         raise
     if final.exists() or final.is_symlink():
-        with _PublicationGuard(final):
+        with (
+            publication_lease_guard(
+                run_id, db_path=sqlite_db_path_from_session(session)
+            ),
+            _PublicationGuard(final),
+        ):
             recovered = _recover_pending_publication(
                 session,
                 repo,
@@ -972,9 +982,17 @@ def publish_export_run(
             manifest=manifest,
         )
         _before_publication_primitive(candidate, final)
-        with _PublicationGuard(final):
-            # Inside ONE real mutual exclusion: re-validated ownership,
-            # refreshed intent, exclusive creation and every companion.
+        with (
+            publication_lease_guard(
+                run_id, db_path=sqlite_db_path_from_session(session)
+            ),
+            _PublicationGuard(final),
+        ):
+            # The run ownership transition is serialized OUT of this entire
+            # section: a claim cannot interleave with the verified owner's
+            # public mutation and fenced transitions.  Inside ONE real
+            # mutual exclusion: re-validated ownership, refreshed intent,
+            # exclusive creation and every companion.
             _require_fence(repo, run_id, worker_id, fence_token)
             _ensure_publication_intent(
                 final,
@@ -1120,6 +1138,11 @@ def _finalize_published_artifact(
         _fail_run(repo, run_id, worker_id, fence_token, run.revision)
         session.commit()
         raise PublicationError(f"publication receipt failed: {err}") from err
+    # Inside the held publication section, extend this owner's own lease so
+    # the fenced transitions below remain authorized: ownership claims are
+    # serialized out of the section, so a token-CAS extension without an
+    # expiry predicate is safe and authoritative here.
+    repo.extend_lease_for_publication(run_id, worker_id, fence_token)
     try:
         rec = repo.transition_run(
             run_id,

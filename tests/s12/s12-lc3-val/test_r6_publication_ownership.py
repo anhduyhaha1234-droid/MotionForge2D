@@ -759,6 +759,9 @@ def _run_handoff(
         "final_files": final_files,
         "reaped": reaped,
         "b_recovery": recovery,
+        # R7 (F01) additions: current-candidate states + exclusive-success list.
+        "candidates": {owner: _file_state(path) for owner, path in candidates.items()},
+        "successes": [x["owner"] for x in timeline if x["event"] == "exclusive-success"],
     }
     _record("v09" if release_first == "B" else "v10", data)
     return data
@@ -777,6 +780,30 @@ def _handoff_assertions(
     assert len(data["final_rows"]["job"]) == 1
     assert len(data["baseline_rows"]["s12_export_run"]) == 1
     assert data["reaped"] is True
+    # R7 (F01) additions: one lease owner (B, v2); A's intent released;
+    # winner final hash+inode+mtime stable across the stale release; stale A
+    # never reached the exclusive link (successes == ["B"]).
+    lease_rows = data["final_rows"]["s12_export_lease"]
+    assert len(lease_rows) == 1
+    assert lease_rows[0]["worker_id"] == "worker-r6-B"
+    assert lease_rows[0]["lease_version"] == 2
+    assert data["successes"] == ["B"]
+    assert data["final_files"][str(pub._publication_intent_path(final))]["exists"] is False
+    if data["release_first"] == "B":
+        assert data["first_files"][str(final)]["ino"] == data["final_files"][str(final)]["ino"]
+        assert (
+            data["first_files"][str(final)]["mtime_ns"]
+            == data["final_files"][str(final)]["mtime_ns"]
+        )
+    else:
+        # A was released first and denied BEFORE its section: no winner final
+        # may exist until B's release, and B's single publication then carries
+        # one consistent identity (recorded in final_files).
+        assert data["both_paused_files"][str(final)]["exists"] is False
+        assert data["first_files"][str(final)]["exists"] is False
+        assert data["final_files"][str(final)]["exists"] is True
+    assert data["candidates"]["A"]["exists"] is True, "stale owner's private candidate lost"
+    assert data["candidates"]["B"]["exists"] is False, "completed owner kept its candidate"
 
 
 def test_v09_handoff_release_b_first_b_is_sole_publisher(
@@ -879,11 +906,16 @@ def test_v12_interruption_between_companions_stale_cleanup_cannot_corrupt(
             "interrupted_final": interrupted[str(final)],
             "after_final": after[str(final)],
             "identity_match": pub._identity_matches(final, receipt.get("artifact_identity")),
+            # R7 (F01): current-candidate state for the interrupted winner.
+            "candidate": _file_state(
+                Path(kw["manifest"]["scratch_dir"]) / "candidate_final.mp4"
+            ),
         },
     )
     assert out.get("recovered") is True
     assert after[str(final)]["ino"] == interrupted[str(final)]["ino"]
     assert after[str(final)]["sha256"] == interrupted[str(final)]["sha256"]
+    assert after[str(final)]["mtime_ns"] == interrupted[str(final)]["mtime_ns"]
     assert pub._identity_matches(final, receipt.get("artifact_identity"))
 
 

@@ -839,6 +839,35 @@ class S12ExportRepository:
         ttl_seconds: int = 300,
         job_id: str | None = None,
     ) -> LeaseRecord:
+        """Claim the run for *worker_id* under the publication-lease guard.
+
+        The whole claim transaction is serialized against the publisher's
+        publication section for the same run: while a section is active the
+        claimant waits a bounded time and then fails with
+        :class:`~app.services.s12_export.publication_lease_guard.PublicationInProgressError`
+        and zero mutation.  See :meth:`_claim_run_locked` for the atomic
+        lease semantics.
+        """
+        from app.services.s12_export.publication_lease_guard import (  # noqa: PLC0415
+            publication_lease_guard,
+            sqlite_db_path_from_session,
+        )
+
+        with publication_lease_guard(
+            run_id, db_path=sqlite_db_path_from_session(self._session)
+        ):
+            return self._claim_run_locked(
+                run_id, worker_id, ttl_seconds=ttl_seconds, job_id=job_id
+            )
+
+    def _claim_run_locked(
+        self,
+        run_id: str,
+        worker_id: str,
+        *,
+        ttl_seconds: int = 300,
+        job_id: str | None = None,
+    ) -> LeaseRecord:
         """Atomically claim the run for *worker_id* (exactly one winner).
 
         The claim is a guarded single write on the ``s12_export_lease`` row:
@@ -1102,6 +1131,53 @@ class S12ExportRepository:
             raise FencedWorkerError(
                 f"release rejected for run {run_id}: lease is not live "
                 f"for worker {worker_id!r} (expired/released/reclaimed)",
+                run_id=run_id,
+            )
+        self._session.flush()
+
+    def extend_lease_for_publication(
+        self,
+        run_id: str,
+        worker_id: str,
+        fence_token: str,
+        *,
+        ttl_seconds: int = 300,
+    ) -> None:
+        """Extend the CURRENT owner's lease inside a held publication section.
+
+        Conditional DB UPDATE on ``run_id``/``worker_id``/``fence_token``
+        only — deliberately WITHOUT an ``expires_at > now`` predicate: this
+        may only be called while the caller holds
+        :func:`app.services.s12_export.publication_lease_guard.publication_lease_guard`
+        for the run, which serializes ownership claims out of the section.
+        The extension keeps the section's fenced transitions authorized
+        even when the wall-clock TTL lapsed mid-section; a superseded token
+        still fails here (rowcount 0) and mutates nothing.
+        """
+        now = datetime.now(UTC)
+        expires = now + timedelta(seconds=ttl_seconds)
+        result = cast(
+            "CursorResult[Any]",
+            self._session.execute(
+                update(S12ExportLease)
+                .where(
+                    S12ExportLease.run_id == run_id,
+                    S12ExportLease.worker_id == worker_id,
+                    S12ExportLease.fence_token == fence_token,
+                )
+                .values(
+                    expires_at=expires,
+                    heartbeat_at=now,
+                    ttl_seconds=ttl_seconds,
+                )
+            ),
+        )
+        if result.rowcount != 1:
+            self._session.rollback()
+            raise LeaseConflictError(
+                f"publication lease extension lost for run {run_id}: the "
+                f"lease is not held by worker {worker_id!r} with the caller's "
+                "fence token (superseded)",
                 run_id=run_id,
             )
         self._session.flush()
