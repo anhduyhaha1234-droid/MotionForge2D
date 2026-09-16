@@ -151,39 +151,48 @@ def _run_job_claim_problems(run: Any, job: Any) -> tuple[str, ...]:
     return tuple(problems)
 
 
-def _weak_generation_candidates(session: Any, run: Any) -> list[Any]:
-    """Jobs with relevant generation/owner evidence but no claim on *run*.
+def _manifest_sibling_proof(session: Any, job: Any, manifest: dict[str, Any]) -> bool:
+    """True only when the manifest names another run that OWNS this Job.
 
-    A candidate attributable to another run — its manifest names a run, or
-    another run's durable pointer is this Job — is not evidence against
-    this run (valid retry chains legitimately share ``plan_hash``).
-    Anything else is unresolved relevant evidence: it forbids treating
-    this run as a true zero-Job orphan.
+    Sibling attribution requires PROOF (reviewer F02): the referenced run
+    must exist and its durable pointer must be this exact Job.  A manifest
+    run reference that is absent, names a nonexistent run, or names a run
+    that does not own the Job proves nothing — the candidate stays
+    unresolved and the caller must fail closed.
     """
-    from app.persistence.models import Job as JobRow  # noqa: PLC0415
     from app.persistence.models import S12ExportRun  # noqa: PLC0415
 
+    referenced_run_id = str(manifest.get("run_id") or "")
+    if not referenced_run_id:
+        return False
+    referenced = session.get(S12ExportRun, referenced_run_id)
+    if referenced is None:
+        return False
+    return str(referenced.job_id or "") == str(job.id)
+
+
+def _weak_generation_candidates(session: Any, run: Any) -> list[Any]:
+    """Relevant unresolved Job evidence that forbids orphan repair.
+
+    Discovery deliberately does NOT trust ``job_type`` / ``workspace_id`` /
+    ``owner_id`` / key fields before classification — any of them may be
+    the corrupted field (reviewer F02).  Every Job whose pinned generation
+    matches the run's plan is a candidate regardless of those fields.  A
+    candidate is excluded only with the proof of
+    :func:`_manifest_sibling_proof` (valid retry chains legitimately share
+    ``plan_hash``); everything else is unresolved relevant evidence, and
+    the caller refuses to treat this run as a true zero-Job orphan.
+    """
+    from app.persistence.models import Job as JobRow  # noqa: PLC0415
+
     rows = session.scalars(
-        select(JobRow).where(
-            JobRow.job_type == S12_EXPORT_JOB_TYPE,
-            JobRow.owner_type == "project",
-            JobRow.owner_id == run.project_id,
-            JobRow.input_generation == run.plan_hash,
-        )
+        select(JobRow).where(JobRow.input_generation == run.plan_hash)
     )
     weak: list[Any] = []
     for job in rows:
         manifest = _parse_job_claim_manifest(job)
-        if str(manifest.get("run_id") or ""):
-            continue  # attributable to its own run's manifest identity
-        claimed_elsewhere = session.scalars(
-            select(S12ExportRun.id).where(
-                S12ExportRun.job_id == job.id,
-                S12ExportRun.id != run.id,
-            )
-        ).first()
-        if claimed_elsewhere is not None:
-            continue  # attributable to another run's durable pointer
+        if _manifest_sibling_proof(session, job, manifest):
+            continue  # proven: an existing run's durable pointer owns it
         weak.append(job)
     return weak
 
@@ -229,7 +238,10 @@ def _resolve_run_durable_job(session: Any, run: Any) -> Any | None:
         select(JobRow).where(JobRow.idempotency_key == canonical_key)
     ):
         _add(job, "key")
-    # (c) the manifest run identity — ANY key/workspace.
+    # (c) the manifest run identity — ANY key/workspace.  The raw substring
+    #     is only a pre-filter; the deciding value is always the SEMANTIC
+    #     manifest ``run_id`` (``json.loads`` handles \uXXXX-escaped and
+    #     reformatted JSON that a raw byte match would miss).
     for job in session.scalars(
         select(JobRow).where(
             JobRow.input_manifest_json.contains(run_id, autoescape=True)
@@ -237,6 +249,17 @@ def _resolve_run_durable_job(session: Any, run: Any) -> Any | None:
     ):
         if str(_parse_job_claim_manifest(job).get("run_id") or "") == run_id:
             _add(job, "manifest")
+    # (d) semantic manifest claims discovered through the pinned-generation
+    #     union (ANY type/workspace/owner/key): a Job that semantically
+    #     names this run is a claimant even when its raw bytes were escaped
+    #     or reformatted, and it must be classified — never assumed absent.
+    for job in session.scalars(
+        select(JobRow).where(JobRow.input_generation == run_row.plan_hash)
+    ):
+        if str(job.id) in claims:
+            continue
+        if str(_parse_job_claim_manifest(job).get("run_id") or "") == run_id:
+            _add(job, "generation")
 
     valid: list[Any] = []
     contradictory: list[tuple[Any, tuple[str, ...]]] = []
@@ -262,8 +285,8 @@ def _resolve_run_durable_job(session: Any, run: Any) -> Any | None:
         )
     if len(valid) == 1:
         return valid[0]
-    # (d) unresolved relevant generation/owner evidence forbids orphan
-    #     repair (a contradictory claimant cannot become an orphan).
+    # (e) unresolved relevant generation evidence forbids orphan repair
+    #     (a contradictory or unresolved claimant cannot become an orphan).
     weak = _weak_generation_candidates(session, run_row)
     if weak:
         raise S12ExportSubmitError(
