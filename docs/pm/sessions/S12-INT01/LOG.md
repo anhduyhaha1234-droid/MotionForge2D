@@ -111,3 +111,11 @@ Full-SHA pin list: `C:/Users/Admin/MotionForge2D-evidence/s12/20260907-083200-s1
 - Static: `compileall` app 0; `py_compile` 3 test file 0; `ruff check --select F` 0 (`All checks passed!`); full-ruleset informational 3×E501 style-class (dòng tên dài trong r5 matrix packet).
 - Transport tip `05eed0f269f8578cc777e39234e752e7a59e40ae`; delta tổng vs wave-base `35f6cb2` = 43 paths (thêm `R5_MATRIX.md` + `test_r5_matrix_packet.py` + `test_r6_b01i_public_chain.py` so với 40 trước đó).
 - Evidence: COMMAND_LEDGER.jsonl (append, phase `r7r3_*`) + R7_INT_RAW_PROVENANCE_R3.txt; không push; không sửa source/test.
+
+## 12. R7 round 4 — QA pin re-freeze (Hermes INT, 2026-09-16)
+
+- Input `5947088e4145d71bee6863bfb2619c8e45c2f1d4` (parent `3444a49…`; branch `codex/s12-lc3-luna-qa` tip; worktree porcelain trống): 3 files (+20/−2) — QA LOG +18, `R6_INVENTORY.md` ±1, `test_r6_finite_inventory.py` ±1 (pin re-freeze, R7-B2 addendum) → merge `f44600453a596b3f5d9324618b1bcca35222b33c`.
+- Zero conflict; diff-check 0; porcelain trống.
+- Static: `compileall` app 0; `py_compile` finite_inventory 0; `ruff check --select F` 0 (`All checks passed!`); full-ruleset 0 (`All checks passed!`).
+- Transport tip `f44600453a596b3f5d9324618b1bcca35222b33c`; delta tổng vs `35f6cb2` = 44 paths (+1: `tests/s12/s12-lc3-qa-r6/test_r6_finite_inventory.py`).
+- Evidence: COMMAND_LEDGER.jsonl (append, phase `r7r4_*`) + R7_INT_RAW_PROVENANCE_R4.txt; không push; không sửa source/test.
