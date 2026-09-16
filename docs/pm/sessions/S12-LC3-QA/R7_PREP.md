@@ -33,6 +33,28 @@ When the integration owner transports a new verified wave (VAL/RETRY/B01/BRIDGE/
 
 Evidence: `r5-env.stdout.txt` / `r5-env.stderr.txt` (this evidence dir) — full module `3 passed in 2.14s`, exit 0, including `test_r5_probe_inventory_is_static_and_exactly_mapped` with the env above. Baseline (env absent, before this turn): exit 1, `S12_R5_CANDIDATE_ROOT must identify the audited integration checkout` — recorded in `baseline-r5.stdout.txt`.
 
+### A.1 R7 refresh (wave-base `c3cf0955ffea02cb2070c0f6a3ce694c10ed3c5e`)
+
+```
+export S12_R5_CANDIDATE_ROOT="C:/Users/Admin/MotionForge2D-worktrees/s12-lc3-luna-integration"
+export S12_R5_EXPECTED_CANDIDATE_SHA="c3cf0955ffea02cb2070c0f6a3ce694c10ed3c5e"
+```
+
+Run on the R7 integrated tip (root/branch verified: `codex/s12-lc3-luna-integration` @ `c3cf0955`, clean):
+`2 passed`, **1 failed** — `test_r5_probe_inventory_is_static_and_exactly_mapped`.
+Exact cause (cross-lane interaction, NOT a greenness regression in R5 semantics):
+the QA Q02 bounded correction renamed five `tests/s12/s12-t03a/test_s12_export_migration.py`
+nodes (e.g. `test_single_head_is_new_revision` → `test_single_head_is_current_head`);
+the R5 packet test still pins the pre-Q02 probe names (lines 169–174: `test_single_head_is_new_revision`,
+`test_upgrade_from_parent_retains_data`, `test_downgrade_with_rows_refuses`,
+`test_history_links_parent`, `test_empty_downgrade_drops_only_new_tables`), and the delivered
+candidate root now carries the renamed nodes. Raw: `r5-env-c3cf.stdout.txt` / `r5-env-c3cf.stderr.txt`.
+Minimal proposal (needs a bounded exception — `tests/s12/s12-lc3-qa-r5/**` is outside the current
+QA write-set; not edited): update those five probe references to the Q02 names in the R5 packet
+test with an explicit `R5_PROBE_RENAMES`/comment mapping (assertions retained, matrix doc bytes
+untouched; preimage exists). Until granted, this node stays red on the R7 tip and is labelled as
+such here — no silent xfail, no assertion loosening.
+
 ## Q02 — T03A migration test compatibility (bounded exception)
 
 `tests/s12/s12-t03a/test_s12_export_migration.py` was written for revision `c3d4e5f6a7b8`; the current sole head is `d4e5f6a7b8c9` (additive retry-lineage + durable Job binding on top). The correction separates the two revisions explicitly and never replaces `NEW_REV` blindly:
@@ -162,3 +184,105 @@ Programmatic diff (AST-extracted delivered test names vs the §D2 table in this 
 ### 5. Legacy client-copy alias — BOUNDED, NO HOLE
 
 `_legacy_aliases` + `_canonical_compare_legacy` (`app/services/s10_full_apply.py:356–488`): the alias exists ONLY inside the client-copy compare; the plan is always rebuilt from canonical inputs. Mapping is deterministic and unambiguous: `occurrence → scene` only for occurrence ids of this authority that do NOT collide with frozen scene ids; `role → occurrence` ONLY when the role owns exactly ONE occurrence (repeated roles → no alias → mismatch fails closed). Every supplied field still must equal canonical after alias; any mismatch (range/extra shot/route/region/pack/hash/policy) raises 422 BEFORE any run/job, and the tamper-matrix control proves the same payload with canonical copies succeeds (202). Independently re-run by QA: `test_client_legacy_authority_tamper_fails_closed_zero_run_job` → **1 passed in 4.01s, exit 0**. Residual note (informational): the alias is a transition shim for legacy clients; no sunset date needed for this sprint — removal decision is Codex/Manager scope.
+
+## R7 PUBLIC CHAIN execution on `c3cf0955ffea02cb2070c0f6a3ce694c10ed3c5e` (Q04 + P01-P03)
+
+Status: **BLOCKED_EXACT_S12_READINESS** — canonical run `20260916T084317Z`.
+Evidence: `.../s12-r7-two-managers/20260916T0351Z/B/QA/chain/20260916T084317Z/`
+(`b01i-chain.json` sha256 84D87DEC…B045A1, `b01i-stages.jsonl` sha256 74CCDD5C…487CBF,
+`b01i-summary.json`, `b01i-sidecar-sample.json`, `pytest.stdout.txt`).
+Node: `tests/s12/s12-lc3-qa-r6/test_r6_b01i_public_chain.py::test_b01i_public_product_chain_submit_worker_publisher_result_media_ui`
+(1 failed / by design: BLOCKED re-raise; no false green).
+
+### What the public chain PROVED (all real, no seed/SQL/shortcut)
+
+- Upload → analyze → proxy → DISCOVER_OBJECTS → extraction graph (1 scene, 2 character
+  occurrences: Hero + Twin, both mapped from `segmentation.boxes[0]`, pixel-scale).
+- Per-role character packs: 2 characters / 2 published pack versions, each attached the
+  role's OWN extraction mask artifact (Hero `candidate_01_mask.png`, Twin
+  `candidate_02_mask.png`). A shared pack cannot truthfully compose two different regions
+  (layer evidence crops its own region) — this fixture shape is now the QA norm.
+- Producer → structural lock manifest -> CAS pin (2 configs) → S09 **reapproval**:
+  checkpoint snapshot carries the frozen `full_apply_authority.timeline`
+  (`timeline_version s09.full-apply-timeline/v1`, frame_count 120, fps 30/1,
+  partition_valid true, 1 shot [0,119], 2 occurrences with `raw_box` + `scale_mode=pixel`
+  + clipped `affected_region` + per-occurrence `pack_version_id`) — the R7 Q9/v0.2.1
+  format is live end-to-end. `checkpoint_hash df90782d…4046e`.
+- S10 Full Apply (the old B01-I blocker): submit **202** (no more 422 shots-overlap),
+  durable worker rendered 6 chunks, stitch completed, publication created
+  (`plan_id/hash e67889ba…`-class values recorded per run), audio attach completed.
+  B06 sidecar verified against frozen §Q9: `per_layer_evidence` rows = 6 (3 chunk runs ×
+  2 layers), every row contributed, `threshold 0.01`, before≠after, co-active rows carry
+  DISTINCT layer artifacts (no dedup). Sample kept in evidence dir.
+- QC: full scope recorded as a typed refusal (below). The composable audio scope ran
+  (attach-driven durable job `RUN_QC_CHECKS`, adopted via its active idempotency) →
+  completed.
+
+Counts (all rows): before_chain all-zero → after_s10 {projects 1, video_items 1,
+reskin_configs 2, manifests 1, checkpoints 1, s10_runs 1, s10_publications 1,
+artifacts 14, jobs 5} → at_failure {artifacts 15, jobs 7, rest unchanged}.
+
+### The blocker (exact, reproducible)
+
+1. S12 preflight (and submit) requires readiness `ready`; server answered
+   `eligible: false`, reasons `["S12_EXPORT_NOT_READY"]` with readiness status `not_run`
+   (`routes/s12_export.py:324-331` gate).
+2. Readiness needs a completed **SCOPE_FULL** RUN_QC_CHECKS run; the readiness payload's
+   own detail: *"no SCOPE_FULL RUN_QC_CHECKS job has ever been submitted for this video
+   (audio-only/partial runs never create full-run authority…)"*.
+3. The only public submission path refuses scope `full`:
+   `422 QC_RUN_EVIDENCE_UNAVAILABLE: no server-side evidence composition path for scope
+   'full' detector 'trajectory_drift'; refusing to fabricate check inputs`
+   (`compose_check_run_args` implements ONLY the audio band). Recorded verbatim in the
+   chain evidence (`qc_full_scope_refused`).
+4. Corroboration: the S12 project's own E2E (`frontend/e2e/s12-export-seed.py`,
+   `_seed_completed_check_run`) writes the completed FULL run row directly — readiness
+   was never reached through public APIs there either.
+
+Impact: upload → … → S10 publication is fully green on the combined candidate; the
+S12 export leg (submit → worker → publisher → result/video/audio) is unreachable
+through public APIs until either (a) server-side composition exists for the non-audio
+detectors, or (b) Manager/Codex rules the readiness gate relaxable for this wave.
+QA does not fabricate the full run (GAP-8 semantics preserved).
+
+### P02 — real UI flow (disposable copy, prod build)
+
+Evidence: `.../B/QA/ui-20260916T084317Z/` (`ui-flow.json`, screenshots ui-01…ui-05).
+Runtime: frontend copy at `.../s12r7/0351/B/QA/ui/frontend` (original worktree source,
+`npm ci` — lockfile bytes unchanged, sha before==after), backend uvicorn on :8901
+(`MOTIONFORGE_ROOT` = copied chain runtime), `next build` + `next start` on :3101,
+Chromium 390×844 (mobile) via Playwright, fresh profile for the reopen leg.
+
+- context: rendered real server truth ("B01-I public chain · 640×360 · imported").
+- preflight: REAL server verdict rendered — BLOCKED, Readiness `not_run`, reason
+  `S12_EXPORT_NOT_READY · Project chưa sẵn sàng để export.`, profile checks PASS.
+- submit: disabled (fail-closed) — the UI surfaces the same server gate as the API.
+- reload + reopen (fresh browser profile, no storage): same server-derived state.
+- UI copy deviations (disclosed): two route-segment-config-only lines
+  (`export const dynamic = "force-dynamic"`) added to `(app)/characters/page.tsx` and
+  `(app)/layout.tsx` IN THE COPY ONLY (shas: 3e44c7f0…9426c + 4fe00669…620c35), because
+  the candidate frontend does NOT build as-is with Next 16.2.12 (`useSearchParams()
+  should be wrapped in a suspense boundary` prerender errors at `/characters` then
+  `/apply` — pre-existing, blocks any production build). Dev-mode (`next dev --webpack`)
+  did not hydrate in this environment (no React fiber, zero API calls, HMR ws broken);
+  prod build was the only faithful path and is the proven QA pattern. A zero-edit UI
+  run therefore needs the frontend build blocker ruled on.
+
+### P03 — media probe
+
+Source-side facts only this run (export leg not reached via the S12 gate): source
+640×360, 120 frames, 30/1 fps, audio AAC 48 kHz mono (440 Hz tone), stream order
+video+audio; S10 publication decoded chunks carry per-layer evidence per Q9 (above).
+Export-side duration/fps/order/audio-policy probes are **NOT_REACHED** — they require a
+real S12 export run and must not be claimed before one exists. C11 quality items
+(human playback, hands/blur, 30-minute throughput) remain NOT_REVIEWED.
+
+### Open items for Manager/Codex (this turn)
+
+- R7-F1: S12 export unreachable via public API on the combined candidate (readiness
+  gate vs missing full-scope composition; exact 3-part evidence above) — ruling or fix.
+- R7-F2: R5 packet test probe-name pin vs Q02 renames (see §A.1; bounded-exception
+  proposal).
+- R7-F3: candidate frontend cannot `next build` as-is (Next 16 `useSearchParams`
+  prerender; pre-existing; blocks prod UI runs without the copy-local route config).
+- FINDING_r7b1 (BRIDGE, earlier) remains open with its 3 reds.

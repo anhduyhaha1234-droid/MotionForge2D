@@ -33,10 +33,11 @@ RUN_ENV_KEYS = ("S12_REVIEW_OUT", "S12_R6_CANDIDATE_ROOT", "S12_R6_EXPECTED_CAND
 _MISSING_ENV = [key for key in RUN_ENV_KEYS if not os.environ.get(key)]
 
 B01I_OUTPUT_ROOT = Path(
-    "C:/Users/Admin/Documents/Codex/2026-09-11/tr-x20/outputs/s12-r6-hermes/20260915T131158Z/QA/B01-I"
+    "C:/Users/Admin/Documents/Codex/2026-09-11/tr-x20/outputs/"
+    "s12-r7-two-managers/20260916T0351Z/B/QA/chain"
 )
 RUNTIME_ROOT_TEMPLATE = (
-    "C:/Users/Admin/Documents/Codex/work/s12h/20260915T131158Z/QA/B01-I/<run_id>"
+    "C:/Users/Admin/Documents/Codex/work/s12r7/0351/B/QA/chain/<run_id>"
 )
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -215,7 +216,7 @@ def _verify_recorded_run() -> None:
     if status.startswith("FAILED") or status.startswith("BLOCKED"):
         blocked = summary.get("stage_status", {}).get("blocked")
         raise AssertionError(
-            f"B01-I recorded run {latest.name} is {status} at "
+            f"Recorded chain run {latest.name} is {status} at "
             f"{blocked or 'unknown stage'}: {summary.get('failure')}"
         )
     assert status in {"PASS", "PASS_WITH_FINDINGS"}, status
@@ -508,45 +509,62 @@ def test_b01i_public_product_chain_submit_worker_publisher_result_media_ui() -> 
             stage("structural_evidence_segments", _rec(segments_read))
             chain["identities"]["role_ids"] = role_ids
 
-            # 3) character pack (6 core pose slots -> published)
-            character = client.post(
-                "/api/v2/characters",
-                json={"name": "B01-I Character", "code": f"B01I_{project_id[:8]}"},
+            # 3) per-role character packs (6 core pose slots -> published).
+            #    Each role gets its OWN character + pack whose assets are the
+            #    role's own extraction mask artifact: a layer must contribute
+            #    pixels inside its own region, so sharing one role's asset
+            #    across two different regions cannot compose truthfully.
+            graph_segments = (chain["stages"]["extraction_graph"]["body"] or {}).get(
+                "segments", []
             )
-            stage("character_create", _rec(character))
-            assert character.status_code == 201, character.text
-            character_id = character.json()["id"]
-            version = client.post(f"/api/v2/characters/{character_id}/versions")
-            stage("character_version_create", _rec(version))
-            assert version.status_code == 201, version.text
-            version_id = version.json()["id"]
-            outputs_body = chain["stages"]["extraction_outputs"]["body"]
-            output_rows = outputs_body.get("outputs", []) if isinstance(outputs_body, dict) else []
-            image_outputs = [
-                row for row in output_rows if str(row.get("mime_type", "")).startswith("image/")
-            ]
-            assert image_outputs, "no ready image artifact from extraction to attach"
-            artifact_id = str(image_outputs[0]["artifact_id"])
-            for slot in ("front", "three_quarter", "side", "back", "sitting", "walking"):
-                attach = client.post(
-                    f"/api/v2/characters/versions/{version_id}/assets",
-                    json={"pose_slot": slot, "artifact_id": artifact_id},
+            role_mask = {
+                str(seg.get("role_id")): str(seg.get("mask_artifact_id"))
+                for seg in graph_segments
+                if seg.get("role_id") and seg.get("mask_artifact_id")
+            }
+            character_ids: list[str] = []
+            version_ids: list[str] = []
+            artifact_ids: list[str] = []
+            for index, role_id in enumerate(role_ids):
+                mask_artifact = role_mask.get(role_id)
+                assert mask_artifact, f"role {role_id} has no mask artifact to attach"
+                character = client.post(
+                    "/api/v2/characters",
+                    json={
+                        "name": f"B01-I Character {index}",
+                        "code": f"B01I_{project_id[:8]}_{index}",
+                    },
                 )
-                stage(f"asset_attach_{slot}", _rec(attach))
-                assert attach.status_code == 200, attach.text
-            validation = client.get(f"/api/v2/characters/versions/{version_id}/validation")
-            stage("character_validation", _rec(validation))
-            publish = client.post(
-                f"/api/v2/characters/versions/{version_id}/publish",
-                json={"revision": int(version.json()["revision"])},
-            )
-            stage("character_publish", _rec(publish))
-            assert publish.status_code == 200, publish.text
+                stage(f"character_create_{index}", _rec(character))
+                assert character.status_code == 201, character.text
+                character_id = character.json()["id"]
+                version = client.post(f"/api/v2/characters/{character_id}/versions")
+                stage(f"character_version_create_{index}", _rec(version))
+                assert version.status_code == 201, version.text
+                version_id = version.json()["id"]
+                for slot in ("front", "three_quarter", "side", "back", "sitting", "walking"):
+                    attach = client.post(
+                        f"/api/v2/characters/versions/{version_id}/assets",
+                        json={"pose_slot": slot, "artifact_id": mask_artifact},
+                    )
+                    stage(f"asset_attach_{index}_{slot}", _rec(attach))
+                    assert attach.status_code == 200, attach.text
+                validation = client.get(f"/api/v2/characters/versions/{version_id}/validation")
+                stage(f"character_validation_{index}", _rec(validation))
+                publish = client.post(
+                    f"/api/v2/characters/versions/{version_id}/publish",
+                    json={"revision": int(version.json()["revision"])},
+                )
+                stage(f"character_publish_{index}", _rec(publish))
+                assert publish.status_code == 200, publish.text
+                character_ids.append(character_id)
+                version_ids.append(version_id)
+                artifact_ids.append(mask_artifact)
             chain["identities"].update(
                 {
-                    "character_id": character_id,
-                    "pack_version_id": version_id,
-                    "pack_artifact_id": artifact_id,
+                    "character_ids": character_ids,
+                    "pack_version_ids": version_ids,
+                    "pack_artifact_ids": artifact_ids,
                 }
             )
 
@@ -569,8 +587,8 @@ def test_b01i_public_product_chain_submit_worker_publisher_result_media_ui() -> 
                     json={
                         "project_id": project_id,
                         "object_role_id": role_id,
-                        "character_id": character_id,
-                        "pack_version_id": version_id,
+                        "character_id": character_ids[index],
+                        "pack_version_id": version_ids[index],
                         "idempotency_key": f"b01i-cast-{index}-{project_id}",
                     },
                 )
@@ -582,8 +600,8 @@ def test_b01i_public_product_chain_submit_worker_publisher_result_media_ui() -> 
                     json={
                         "project_id": project_id,
                         "object_role_id": role_id,
-                        "character_id": character_id,
-                        "pack_version_id": version_id,
+                        "character_id": character_ids[index],
+                        "pack_version_id": version_ids[index],
                         "cast_mapping_id": cast_ids[-1],
                         "params": params,
                         "idempotency_key": f"b01i-config-{index}-{project_id}",
@@ -654,7 +672,7 @@ def test_b01i_public_product_chain_submit_worker_publisher_result_media_ui() -> 
                 json={
                     "reskin_config_id": config_id,
                     "expected_reskin_revision": pinned_revision,
-                    "pack_version_ids": [version_id],
+                    "pack_version_ids": version_ids,
                     "idempotency_key": f"b01i-reapprove-{project_id}",
                     "note": "B01-I public chain; not a product approval",
                 },
@@ -669,6 +687,14 @@ def test_b01i_public_product_chain_submit_worker_publisher_result_media_ui() -> 
                 "full_apply_executable\": true" in checkpoint_blob
                 or '"full_apply_executable": true' in checkpoint_blob
             )
+            timeline_in_checkpoint = (
+                '"timeline"' in checkpoint_blob
+                and "s09.full-apply-timeline" in checkpoint_blob
+            )
+            chain["flags"]["timeline_in_checkpoint"] = timeline_in_checkpoint
+            assert timeline_in_checkpoint, (
+                "R7 checkpoint payload carries no frozen timeline block"
+            )
             chain["identities"]["apply_checkpoint_id"] = checkpoint_id
             chain["identities"]["checkpoint_hash"] = checkpoint_hash
 
@@ -681,6 +707,37 @@ def test_b01i_public_product_chain_submit_worker_publisher_result_media_ui() -> 
             authority_blob = json.dumps(authority_read.json())
             chain["flags"]["authority_executable"] = (
                 '"executable": true' in authority_blob or '"executable":true' in authority_blob
+            )
+            authority_body = authority_read.json()
+            timeline = authority_body.get("timeline")
+            if not isinstance(timeline, dict) or not timeline:
+                ffa = authority_body.get("full_apply_authority")
+                if isinstance(ffa, dict):
+                    timeline = ffa.get("timeline")
+            if not isinstance(timeline, dict) or not timeline:
+                snapshot = authority_body.get("snapshot")
+                if isinstance(snapshot, str):
+                    with contextlib.suppress(Exception):
+                        snapshot = json.loads(snapshot)
+                if isinstance(snapshot, dict):
+                    timeline = (snapshot.get("full_apply_authority") or {}).get("timeline")
+            assert isinstance(timeline, dict) and timeline, (
+                "authority carries no frozen timeline block"
+            )
+            chain["timeline"] = {
+                "timeline_version": timeline.get("timeline_version"),
+                "frame_count": timeline.get("frame_count"),
+                "fps_num": timeline.get("fps_num"),
+                "fps_den": timeline.get("fps_den"),
+                "shots": timeline.get("shots"),
+                "occurrences": timeline.get("occurrences"),
+            }
+            chain["flags"]["timeline_shots"] = len(timeline.get("shots") or [])
+            chain["flags"]["timeline_occurrences"] = len(timeline.get("occurrences") or [])
+            assert chain["flags"]["timeline_shots"] >= 1, chain["timeline"]
+            assert chain["flags"]["timeline_occurrences"] >= 1, chain["timeline"]
+            assert timeline.get("timeline_version") == "s09.full-apply-timeline/v1", (
+                timeline.get("timeline_version")
             )
 
             # 7) S10 Full Apply (durable job -> completed publication)
@@ -699,6 +756,8 @@ def test_b01i_public_product_chain_submit_worker_publisher_result_media_ui() -> 
             fa_body = full_apply.json()
             fa_run_id = str(fa_body.get("run_id") or fa_body.get("id"))
             chain["identities"]["s10_run_id"] = fa_run_id
+            chain["identities"]["s10_plan_id"] = fa_body.get("plan_id")
+            chain["flags"]["s10_submit_passed_prev_overlap_422"] = True
             fa_poll = _poll(
                 client,
                 f"/api/v2/full-apply/{fa_run_id}",
@@ -710,8 +769,69 @@ def test_b01i_public_product_chain_submit_worker_publisher_result_media_ui() -> 
             assert fa_final.get("status") == "completed", (
                 f"S10 full apply did not complete: {json.dumps(fa_final)[:2000]}"
             )
+            chain["s10_final"] = fa_final
             stage("counts_after_s10", counts())
             chain["counts"]["after_s10"] = chain["stages"]["counts_after_s10"]
+
+            # 7a) B06 per-layer decoded evidence sidecar (frozen Q9 format)
+            sidecar_candidates = sorted(
+                (managed_root / "s10_full_apply" / fa_run_id).glob("full_*.mp4.evidence.json")
+            )
+            assert sidecar_candidates, (
+                f"no stitched evidence sidecar under s10_full_apply/{fa_run_id}"
+            )
+            sidecar_path = sidecar_candidates[0]
+            sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+            side_rows = sidecar.get("per_layer_evidence") or []
+            q9_required = {
+                "shot_id",
+                "range",
+                "layer_id",
+                "role_id",
+                "route",
+                "visibility",
+                "z_order",
+                "artifact_sha256",
+                "artifact_size_bytes",
+                "region_norm",
+                "region_px",
+                "sampled_frames",
+                "region_crop_sha256_before",
+                "region_crop_sha256_after",
+                "final_crop_sha256",
+                "changed_pixel_count",
+                "changed_ratio",
+                "threshold",
+                "verdict",
+            }
+            assert side_rows, "sidecar carries no per_layer_evidence rows"
+            for row in side_rows:
+                assert q9_required <= set(row), (q9_required - set(row))
+                assert row["threshold"] == 0.01, row
+                assert row["verdict"] == "contributed", row
+                assert (
+                    row["region_crop_sha256_before"] != row["region_crop_sha256_after"]
+                ), row
+            covering = [row for row in side_rows if row["range"][0] == 0]
+            assert len({row["layer_id"] for row in covering}) >= 2, (
+                "first chunk run must cover both co-active layers"
+            )
+            assert len({row["artifact_sha256"] for row in covering}) == len(covering), (
+                "co-active rows must carry distinct layer artifacts (no dedup)"
+            )
+            chain["stages"]["s10_sidecar_evidence"] = {
+                "path": str(sidecar_path),
+                "sha256": _sha256_file(sidecar_path),
+                "rows": len(side_rows),
+                "layers": sorted({str(row["layer_id"]) for row in side_rows}),
+                "decoded_frame_count": sidecar.get("decoded_frame_count"),
+            }
+            chain["flags"]["sidecar_rows"] = len(side_rows)
+            chain["flags"]["sidecar_layers"] = len({row["layer_id"] for row in side_rows})
+            with contextlib.suppress(Exception):
+                (s12_review_out / "b01i-sidecar-sample.json").write_bytes(
+                    sidecar_path.read_bytes()
+                )
 
             # 7b) original-audio attach (durable ATTACH_ORIGINAL_AUDIO)
             audio_attach = client.post(
@@ -731,15 +851,54 @@ def test_b01i_public_product_chain_submit_worker_publisher_result_media_ui() -> 
             )
             stage("audio_attach_job", audio_poll)
             audio_final = audio_poll["final"]["body"] if audio_poll["final"] else {}
-            chain["flags"]["audio_attach_state"] = audio_final.get("state")
+            chain["flags"]["audio_attach_state"] = (
+                audio_final.get("status") or audio_final.get("state")
+            )
 
-            # 8) QC check run (readiness ready is required by S12 submit)
-            qc = client.post(
+            # 8) QC check runs (readiness 'ready' is required by S12 submit).
+            #    Full scope: server-side evidence composition exists only for
+            #    the audio band; non-audio detectors refuse closed with
+            #    QC_RUN_EVIDENCE_UNAVAILABLE - recorded as the exact finding,
+            #    not papered over.  The composable audio scope then runs.
+            qc_full = client.post(
                 f"/api/v2/projects/{project_id}/qc-check-runs",
                 json={"video_item_id": video_id, "scope": "full"},
             )
+            stage("qc_full_scope_refused", _rec(qc_full))
+            chain["flags"]["qc_full_scope_status"] = qc_full.status_code
+            assert qc_full.status_code == 422, qc_full.text
+            assert "QC_RUN_EVIDENCE_UNAVAILABLE" in qc_full.text, qc_full.text
+
+            qc = client.post(
+                f"/api/v2/projects/{project_id}/qc-check-runs",
+                json={"video_item_id": video_id, "scope": "audio"},
+            )
             stage("qc_check_run_submit", _rec(qc))
-            assert qc.status_code == 202, qc.text
+            chain["flags"]["qc_audio_submit_status"] = qc.status_code
+            if qc.status_code == 409:
+                # The audio attach flow already auto-enqueued the audio-scope
+                # RUN_QC_CHECKS job (same fingerprint+scope idempotency key
+                # still active); adopt the existing durable job instead of
+                # duplicating it.
+                qc_detail = str(qc.json().get("detail") or qc.text)
+                qc_job_id = qc_detail.split("job ", 1)[1].split(" ", 1)[0]
+                chain["flags"]["qc_audio_existing_job"] = qc_job_id
+            else:
+                assert qc.status_code == 202, qc.text
+                qc_job_id = str(qc.json().get("job_id"))
+            chain["identities"]["qc_job_id"] = qc_job_id
+            qc_job_poll = _poll(
+                client,
+                f"/api/jobs/{qc_job_id}",
+                terminal={"completed", "failed", "cancelled"},
+                timeout_seconds=300.0,
+                state_key="status",
+            )
+            stage("qc_run_job", qc_job_poll)
+            qc_job_final = qc_job_poll["final"]["body"] if qc_job_poll["final"] else {}
+            chain["flags"]["qc_job_state"] = (
+                qc_job_final.get("status") or qc_job_final.get("state")
+            )
             qc_poll = _poll(
                 client,
                 f"/api/v2/projects/{project_id}/qc-check-runs/{video_id}",
@@ -794,7 +953,32 @@ def test_b01i_public_product_chain_submit_worker_publisher_result_media_ui() -> 
             assert preflight.status_code == 200, preflight.text
             preflight_body = preflight.json()
             chain["flags"]["preflight_eligible"] = preflight_body.get("eligible")
-            assert preflight_body.get("eligible") is True, preflight_body.get("reasons")
+            if preflight_body.get("eligible") is not True:
+                chain["status"] = "BLOCKED_EXACT_S12_READINESS"
+                chain["blocker"] = {
+                    "code": "S12_EXPORT_NOT_READY",
+                    "preflight_reasons": preflight_body.get("reasons"),
+                    "readiness_status": chain["flags"].get("readiness_status"),
+                    "readiness_detail": (
+                        (chain["stages"].get("qc_readiness") or {}).get("body") or {}
+                    ).get("check_state_detail"),
+                    "full_scope_submit": (
+                        "422 QC_RUN_EVIDENCE_UNAVAILABLE - compose_check_run_args has "
+                        "no server-side evidence composition path for non-audio "
+                        "detectors (trajectory_drift first); refusing to fabricate"
+                    ),
+                    "corroboration": (
+                        "frontend/e2e/s12-export-seed.py seeds a completed FULL "
+                        "RUN_QC_CHECKS run directly; the S12 E2E itself never reaches "
+                        "readiness through public APIs"
+                    ),
+                }
+                raise AssertionError(
+                    "BLOCKED_EXACT: S12 export preflight ineligible on the public chain "
+                    f"(reasons={preflight_body.get('reasons')}; readiness="
+                    f"{chain['flags'].get('readiness_status')!r}; full-scope QC submit "
+                    "refused 422 QC_RUN_EVIDENCE_UNAVAILABLE)"
+                )
 
             submit = client.post(
                 "/s12-exports/submit",
@@ -859,6 +1043,21 @@ def test_b01i_public_product_chain_submit_worker_publisher_result_media_ui() -> 
             chain["flags"]["export_frames"] = exp_v.get("frame_count")
             chain["flags"]["audio_present_source"] = bool(source_facts.get("audio"))
             chain["flags"]["audio_present_export"] = bool(export_facts.get("audio"))
+            chain["flags"]["streams_source"] = [
+                s.get("codec_type") for s in (source_probe.get("streams") or [])
+            ]
+            chain["flags"]["streams_export"] = [
+                s.get("codec_type") for s in (export_probe.get("streams") or [])
+            ]
+            chain["flags"]["frame_count_preserved"] = (
+                chain["flags"]["source_frames"] == chain["flags"]["export_frames"]
+            )
+            chain["flags"]["order_note"] = (
+                "single-scene deterministic fixture: order discriminator is frame "
+                "count/sequence equality (120==120); this fixture carries no temporal "
+                "signature to distinguish a reshuffle beyond count - recorded as fact, "
+                "not claimed beyond it"
+            )
 
             # 11) replay / reload: zero extra Run/Job rows
             before_replay = counts()
@@ -895,6 +1094,114 @@ def test_b01i_public_product_chain_submit_worker_publisher_result_media_ui() -> 
             assert chain["replay"]["extra_runs"] == 0, chain["replay"]
             assert chain["replay"]["extra_jobs"] == 0, chain["replay"]
 
+            # 12) freeze the worker, fresh restart on the same DB (matrix C27)
+            service.stop_worker(timeout=10.0)
+            restart_before = counts()
+            service.start_worker()
+            time.sleep(2.0)
+            service.stop_worker(timeout=10.0)
+            restart_after = counts()
+            chain["stages"]["worker_restart_counts"] = {
+                "before": restart_before,
+                "after": restart_after,
+            }
+            chain["flags"]["restart_no_duplicate"] = (
+                restart_after["s10_publications"] == restart_before["s10_publications"]
+                and restart_after["s12_export_runs"] == restart_before["s12_export_runs"]
+                and restart_after["jobs"] == restart_before["jobs"]
+            )
+            assert chain["flags"]["restart_no_duplicate"], chain["stages"]["worker_restart_counts"]
+
+            # 13) cancel leg (matrix C27): second checkpoint cycle -> S10 run2 created
+            #     with the worker stopped (never claimed) -> public cancel BEFORE any
+            #     render; the following restart proves the cancelled job stays
+            #     unprocessed.
+            pin2 = client.patch(
+                f"/api/v2/reskin-configs/{config_id}",
+                json={
+                    "revision": pinned_revision,
+                    "structural_lock_manifest_id": manifest_id,
+                },
+            )
+            stage("reskin_config_repin2", _rec(pin2))
+            chain["flags"]["cycle2_pin_status"] = pin2.status_code
+            if pin2.status_code == 200:
+                revision2 = int(pin2.json()["revision"])
+                reapprove2 = client.post(
+                    "/api/v2/s09-approvals/reapprove",
+                    params={"workspace_id": "default"},
+                    json={
+                        "reskin_config_id": config_id,
+                        "expected_reskin_revision": revision2,
+                        "pack_version_ids": version_ids,
+                        "idempotency_key": f"b01i-reapprove2-{project_id}",
+                        "note": "B01-I cancel leg; not a product approval",
+                    },
+                )
+                stage("s09_reapproval2", _rec(reapprove2))
+                assert reapprove2.status_code in (200, 201), reapprove2.text
+                checkpoint2 = reapprove2.json()
+                checkpoint2_id = str(checkpoint2["id"])
+                checkpoint2_hash = str(checkpoint2["checkpoint_hash"])
+                chain["flags"]["checkpoint2_new_identity"] = (
+                    checkpoint2_id != checkpoint_id
+                    or checkpoint2_hash != checkpoint_hash
+                )
+                if chain["flags"]["checkpoint2_new_identity"]:
+                    fa2 = client.post(
+                        f"/api/v2/projects/{project_id}/full-apply",
+                        params={"workspace_id": "default"},
+                        json={
+                            "video_item_id": video_id,
+                            "apply_checkpoint_id": checkpoint2_id,
+                            "expected_checkpoint_hash": checkpoint2_hash,
+                            "expected_checkpoint_revision": revision2,
+                        },
+                    )
+                    stage("s10_full_apply_submit2", _rec(fa2))
+                    assert fa2.status_code == 202, fa2.text
+                    fa2_run = str(fa2.json().get("run_id") or fa2.json().get("id"))
+                    chain["identities"]["s10_run2_id"] = fa2_run
+                    cancel2 = client.post(f"/api/v2/full-apply/{fa2_run}/cancel")
+                    stage("s10_cancel_run2", _rec(cancel2))
+                    assert cancel2.status_code in (200, 202), cancel2.text
+                    run2_view = client.get(f"/api/v2/full-apply/{fa2_run}")
+                    stage("s10_cancel_run2_state", _rec(run2_view))
+                    run2_state = (run2_view.json() or {}).get("status")
+                    chain["flags"]["s10_run2_state"] = run2_state
+                    assert run2_state in ("cancelled", "cancelling"), run2_state
+                else:
+                    chain["flags"]["cycle2_note"] = (
+                        "equivalent reapproval returned the same checkpoint; cancel leg "
+                        "not applicable on an unchanged authority"
+                    )
+            else:
+                chain["flags"]["cycle2_note"] = (
+                    f"re-pin produced no new revision (status {pin2.status_code}); "
+                    "cancel leg not applicable on an unchanged authority"
+                )
+
+            # S12 cancel route terminal guard (public fail-closed control)
+            s12_cancel_terminal = client.post(f"/s12-exports/{run_id_export}/cancel")
+            stage("s12_cancel_terminal_guard", _rec(s12_cancel_terminal))
+            chain["flags"]["s12_cancel_terminal_status"] = s12_cancel_terminal.status_code
+
+            # fresh restart after the cancel leg: cancelled work stays unprocessed
+            service.start_worker()
+            time.sleep(2.0)
+            service.stop_worker(timeout=10.0)
+            post_cancel_counts = counts()
+            chain["counts"]["after_cancel_leg"] = post_cancel_counts
+            chain["flags"]["cancelled_job_not_processed"] = (
+                post_cancel_counts["s10_publications"] == restart_after["s10_publications"]
+                and post_cancel_counts["s12_export_runs"] == restart_after["s12_export_runs"]
+            )
+            chain["flags"]["expiry_control"] = (
+                "NOT_RUN: no public expiry endpoint for this chain; lease expiry/handoff "
+                "is covered by the VAL lane (A02/R06) - not fabricated here"
+            )
+            assert chain["flags"]["cancelled_job_not_processed"], chain["counts"]
+
             chain["status"] = "PASS"
             if source_facts.get("audio") and not export_facts.get("audio"):
                 chain["status"] = "PASS_WITH_FINDINGS"
@@ -903,7 +1210,8 @@ def test_b01i_public_product_chain_submit_worker_publisher_result_media_ui() -> 
                 )
     except Exception as exc:  # preserve every reached stage, then re-raise
         failure = exc
-        chain["status"] = f"FAILED_{type(exc).__name__}"
+        if not str(chain.get("status", "")).startswith("BLOCKED_"):
+            chain["status"] = f"FAILED_{type(exc).__name__}"
         chain["failure"] = str(exc)[:4000]
         with contextlib.suppress(Exception):
             chain["counts"]["at_failure"] = counts()
@@ -936,9 +1244,12 @@ def test_b01i_public_product_chain_submit_worker_publisher_result_media_ui() -> 
                 handle.write(json.dumps({"stage": name, "payload": chain["stages"][name]}) + "\n")
         downstream = [
             "s10_full_apply_run",
+            "s10_sidecar_evidence",
             "counts_after_s10",
             "original_audio_attach",
             "audio_attach_job",
+            "qc_full_scope_refused",
+            "qc_run_job",
             "qc_check_run_submit",
             "qc_check_run_state",
             "qc_readiness",
@@ -950,6 +1261,13 @@ def test_b01i_public_product_chain_submit_worker_publisher_result_media_ui() -> 
             "s12_media_http",
             "s12_context_reload",
             "s12_replay_submit",
+            "worker_restart_counts",
+            "reskin_config_repin2",
+            "s09_reapproval2",
+            "s10_full_apply_submit2",
+            "s10_cancel_run2",
+            "s10_cancel_run2_state",
+            "s12_cancel_terminal_guard",
         ]
         blocked_stage = None
         for name in stage_order:

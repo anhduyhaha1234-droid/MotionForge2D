@@ -147,3 +147,36 @@ Status: R7_PREP_EXECUTED — no public chain; no closure claim.
 - Q03 (R5 audit env): exact values `S12_R5_CANDIDATE_ROOT=C:/Users/Admin/MotionForge2D-worktrees/s12-lc3-luna-integration`, `S12_R5_EXPECTED_CANDIDATE_SHA=35f6cb2f2bd540c162d5a2f0e3ae8e152e392b86`; invocation + verify procedure in `R7_PREP.md` §Q03. Full R5 module with env: 3 passed / 0 failed (baseline without env: env-assert failure). Provenance assertions untouched.
 - R7 freeze: original 62 + R6 unchanged; R7 rows (A01–A06, B01–B06, Q01–Q04, P01–P03) frozen in `R6_INVENTORY.md` §“R7 additions” with owners/outcomes/raw destinations; unimplemented nodes marked “to be frozen by owner”.
 - Evidence: `outputs/s12-r7-two-managers/20260916T0351Z/B/QA/` (`baseline-t03a.*`, `t03a-fixed-v1.*`, `baseline-r5.*`, `r5-env.*`, guards, this prep record). Honest labels retained; B01-I still blocked at F04; NOT_CLOSED / NOT_APPROVED.
+
+### 2026-09-16 — R7 PUBLIC CHAIN on c3cf0955 (Q04 + P01-P03)
+
+- Wave-base `c3cf0955ffea02cb2070c0f6a3ce694c10ed3c5e` verified first (`git rev-parse`,
+  clean tree, QA worktree already on the integration tip).
+- Section A: R5 env refreshed to the new tip and the module re-run — 2 passed, 1 failed:
+  the R5 packet still pins five pre-Q02 probe names (`test_single_head_is_new_revision`…)
+  which the QA Q02 correction intentionally renamed; proposal recorded in R7_PREP §A.1
+  (bounded exception needed — R5 test not in this lane's write-set; no silent xfail).
+- Section B: one bounded public chain (extended node) executed against the frozen
+  candidate; result **BLOCKED_EXACT_S12_READINESS** (canonical run 20260916T084317Z):
+  * GREEN through S10: reapproval checklist carries the frozen timeline block
+    (`s09.full-apply-timeline/v1`, 2 occurrences, pixel-scale boxes, clipped regions),
+    the old 422 shots-overlap boundary is GONE, S10 completed + publication + B06
+    `per_layer_evidence` sidecar verified 6 rows / 2 layers (Q9 frozen format, distinct
+    artifacts, no dedup) once each role got its own pack/mask artifact.
+  * BLOCKER: S12 preflight `S12_EXPORT_NOT_READY` — readiness `not_run` because the
+    product has no public path to a completed SCOPE_FULL QC run (`compose_check_run_args`
+    refuses every non-audio detector with 422 QC_RUN_EVIDENCE_UNAVAILABLE); audio scope
+    completed but is not full-run authority. Corroborated by the S12 E2E seed writing
+    the full run row directly. Exact evidence + minimal options in R7_PREP.
+  * Replay/cancel/restart/expiry legs: NOT_REACHED behind the S12 gate (honest labels).
+- Section C (P02): real UI on a disposable copy (npm ci, lockfile unchanged; prod build
+  + next start :3101; backend :8901 with the chain's copied runtime; Chromium 390×844):
+  context + preflight rendered REAL server truth, submit disabled fail-closed by the same
+  S12 gate, reload + reopen (fresh profile) preserve the server state. Two copy-local
+  route-config lines disclosed (candidate cannot build as-is under Next 16.2.12 —
+  `useSearchParams` prerender errors; pre-existing finding R7-F3).
+- Section D: R6_INVENTORY §R7 rows P01-P03 moved to EXECUTED/PARTIAL/BLOCKED labels with
+  evidence run ids; Q04 row annotated (combined-candidate gate cannot be green until
+  R7-F1 is ruled).
+- Evidence: `.../B/QA/chain/20260916T084317Z/` + `.../B/QA/ui-20260916T084317Z/` +
+  `r5-env-c3cf.*`; commit for this turn recorded at the end of this file.
