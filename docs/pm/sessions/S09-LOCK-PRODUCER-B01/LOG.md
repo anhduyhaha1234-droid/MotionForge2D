@@ -72,3 +72,10 @@
   read-only copy in runtime dir) → 3 passed on the final bytes, all cases
   http 422 `STRUCTURAL_LOCK_SOURCE_TIMING_MISSING` + before == after; ruff
   `--select F` clean; py_compile OK; `git diff --check` exit 0.
+- 2026-09-16 — Transport commit (local only, no push):
+  `2871f8fb7e1cbedc76a14626646b14ba532e4b3c`, parent
+  `35f6cb2f2bd540c162d5a2f0e3ae8e152e392b86`, 8 files, +741/-46. Known
+  pre-existing git hook notice `error: task 'geometric-repack' failed`
+  (exit 0, same as R6) and LF→CRLF autocrlf warnings only.
+- 2026-09-16 — Post-commit gate on the frozen commit: 27 passed (78.03s),
+  exit 0; `git status --porcelain` empty; committed == worktree bytes.

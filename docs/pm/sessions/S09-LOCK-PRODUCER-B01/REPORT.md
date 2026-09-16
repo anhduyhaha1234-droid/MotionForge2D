@@ -76,6 +76,10 @@ Execution: 17 passed x2 (`python -B -m pytest tests/test_s09_structural_lock_pro
 
 F03 (P1) closed on wave base `35f6cb2f2bd540c162d5a2f0e3ae8e152e392b86`:
 
+- Transport commit: `2871f8fb7e1cbedc76a14626646b14ba532e4b3c` (parent = wave
+  base; 8 files, +741/-46; local only, NO push). Post-commit gate on the
+  frozen commit: `27 passed in 78.03s`, exit 0.
+
 - Root cause: `_timebase` used `video.fps_num or 30` / `video.fps_den or 1`
   and `max(1, round(duration × fps))` — missing rationals became invented
   defaults and zero duration became a nonempty source (reviewer probe:
