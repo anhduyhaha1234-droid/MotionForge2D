@@ -24,6 +24,10 @@ Base: `83af5167e9dddc931bc8590f547684c0c811784b` (branch `codex/s09-lock-produce
 | 422 | `STRUCTURAL_LOCK_UNSUPPORTED_POLICY` | `policy_version` outside the documented set (`structural-thresholds-v1`) |
 | 422 | `STRUCTURAL_LOCK_SOURCE_NOT_READY` | no source artifact / not ready / missing probe metadata |
 | 422 | `STRUCTURAL_LOCK_SOURCE_TAMPERED` | source checksum missing or not a lowercase sha256 hex |
+| 422 | `STRUCTURAL_LOCK_SOURCE_TIMING_MISSING` | fps numerator/denominator/duration/dimensions missing or non-positive; probe reports no exact `nb_frames`/positive rational |
+| 422 | `STRUCTURAL_LOCK_SOURCE_TIMING_UNPROVEN` | source artifact missing/unreadable, bytes ≠ recorded checksum, or the verified probe failed |
+| 422 | `STRUCTURAL_LOCK_SOURCE_VFR` | source is not constant frame rate (`r_frame_rate` ≠ `avg_frame_rate`) |
+| 422 | `STRUCTURAL_LOCK_SOURCE_TIMING_MISMATCH` | persisted facts disagree with the exact probe (rational FPS, dimensions, or frame-exact duration |
 | 422 | `STRUCTURAL_LOCK_EVIDENCE_MISSING` | no scenes, no current active segments, or removal-only-only graph |
 | 422 | `STRUCTURAL_LOCK_EVIDENCE_TAMPERED` | corrupt/non-finite stored evidence JSON; foreign project scope |
 | 422 | `STRUCTURAL_LOCK_GEOMETRY_MISSING` | segment without segmentation/prompt points or boxes |
@@ -44,9 +48,19 @@ blobs, readiness flags — are rejected at the schema boundary (422,
 - `source_generation` — `ObjectIntelligenceRepository.current_generation`
   (video's current source-artifact sha + newest completed `DISCOVER_OBJECTS`
   job), the same backend authority the extraction pipeline uses.
-- `frame_count` / `timebase` — exact source truth: `max(1, round(duration_ms
-  / 1000 * fps_num / fps_den))`, `{fps: fps_num/fps_den, time_base:
-  "{fps_den}/{fps_num}", start_time_ms: 0}`.
+- `frame_count` / `timebase` — R7 F03 EXACT source-timing proof
+  (`app/services/structural_lock_source_timing.py`): persisted
+  fps_num/fps_den/duration_ms/width/height must all be present and positive;
+  the managed source artifact bytes must hash to the recorded checksum; the
+  verified bounded import probe (`video_import.probe_source`) must classify
+  the source CFR with EQUAL `r_frame_rate`/`avg_frame_rate` rationals; the
+  frame count is the container's exact `nb_frames` (never
+  `round(duration × fps)` — a persisted duration that differs by even 1 ms
+  is denied) and every persisted fact must equal the probe (rational FPS,
+  dimensions, and `duration_ms == round(nb_frames × den × 1000 / num)` via
+  exact Fraction arithmetic). `{fps: num/den, time_base: "{den}/{num}",
+  start_time_ms: 0}` is stamped from the proof; the response also reports
+  `source_frame_count`, `source_fps_num`, `source_fps_den`.
 - `shot_order` — durable Scene ids ordered by position (unique, non-empty).
 - `segments` — the CURRENT ACTIVE occurrence segments of the current
   generation; removal-only role kinds (`source_overlay`) are excluded by

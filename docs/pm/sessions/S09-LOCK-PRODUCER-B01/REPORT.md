@@ -72,6 +72,49 @@ Execution: 17 passed x2 (`python -B -m pytest tests/test_s09_structural_lock_pro
   the base; no migration touched by this write-set).
 - Ruff `--select F` clean on all five changed files.
 
+## R7 correction (F03) — exact source timing, no fabrication
+
+F03 (P1) closed on wave base `35f6cb2f2bd540c162d5a2f0e3ae8e152e392b86`:
+
+- Transport commit: `2871f8fb7e1cbedc76a14626646b14ba532e4b3c` (parent = wave
+  base; 8 files, +741/-46; local only, NO push). Post-commit gate on the
+  frozen commit: `27 passed in 78.03s`, exit 0.
+
+- Root cause: `_timebase` used `video.fps_num or 30` / `video.fps_den or 1`
+  and `max(1, round(duration × fps))` — missing rationals became invented
+  defaults and zero duration became a nonempty source (reviewer probe:
+  201 + 1 manifest + 2 routes for each of fps_num=None / fps_den=None /
+  duration_ms=0).
+- Fix: NEW `app/services/structural_lock_source_timing.py` proves timing
+  from the CURRENT source artifact BYTES via existing verified facilities
+  (`ManagedRoot.resolve` + `hash_file` + `video_import.probe_source`):
+  persisted facts present/positive → bytes resolve + hash equal the recorded
+  checksum → probe classifies CFR with EQUAL r/avg rationals → exact
+  `nb_frames` as the frame count → persisted FPS/dimensions/duration equal
+  the probe (duration equality via exact Fraction frame math). Producer
+  `_timebase` never defaults/rounds; route reports
+  `source_frame_count`/`source_fps_num`/`source_fps_den`.
+- Denials (all typed 422, zero durable mutation):
+  `STRUCTURAL_LOCK_SOURCE_TIMING_MISSING` (missing/zero components),
+  `STRUCTURAL_LOCK_SOURCE_TIMING_UNPROVEN` (missing/tampered bytes, probe
+  failure), `STRUCTURAL_LOCK_SOURCE_VFR` (r ≠ avg),
+  `STRUCTURAL_LOCK_SOURCE_TIMING_MISMATCH` (persisted ≠ probe).
+- Reviewer-probe parity: the reviewer's own case
+  `test_review_r6_producer.py::test_missing_or_zero_source_timing_is_denied`
+  (read-only copy) now returns **422** for all three variants with
+  before == after — raw: `reviewer-probe-repro-r2/` + raw log.
+- Valid controls: real 30/1 and 30000/1001 CFR sources succeed with the
+  EXACT container `nb_frames` (30) and exact rational timebase
+  (`1/30`, `1001/30000`); DB zero/negative rational rejection retained as
+  positive controls (nothing changed there).
+- Harness: seeds now generate real deterministic media at the managed root
+  and persist import-identical probe facts; the original 17 nodes keep
+  their assertions (only the two source-sha expectations now compare the
+  REAL file hash via `graph.source_sha`; response additions asserted).
+- Gates: 27 passed x2; reviewer probe 3 passed; ruff F clean; py_compile OK;
+  diff-check 0. Evidence:
+  `outputs/s12-r7-two-managers/20260916T0351Z/B/B01/`.
+
 ## Consumer observations (exact, for the reviewer)
 
 1. `ReskinConfig` CAS pin re-enforces the S07 compatibility policy: a pin is

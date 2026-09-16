@@ -45,3 +45,37 @@
   `python -B -m pytest tests/test_s09_structural_lock_producer.py -q
   -p no:cacheprovider` → 17 passed (67.40s), exit 0; `git status --short`
   empty; all five write-set hashes re-verified unchanged.
+- 2026-09-16 — R7 resume (Manager B `20260915_194636_b5ea4c`): verified HEAD
+  `35f6cb2f2bd540c162d5a2f0e3ae8e152e392b86` (wave base, clean tree), read
+  the full R7 packet (MANAGER_B_PROMPT §5, ACCEPTANCE_R7 rows B01/B02,
+  REVIEW.md F03, SHARED_CONTRACT timing clause, reviewer probe case, own
+  docs) and the guard captures (allow 8 / protected 18).
+- 2026-09-16 — F03 root cause: `_timebase` fabricated timing
+  (`fps_num or 30`, `fps_den or 1`, `max(1, round(duration × fps))`).
+  Empirical media experiment (runtime dir) fixed the exact probe facts for
+  CFR 10/1, 30/1, 30000/1001 and a VFR file.
+- 2026-09-16 — Fix: NEW `app/services/structural_lock_source_timing.py`
+  (exact proof: persisted facts + managed-root checksum + verified import
+  probe + CFR rational equality + container `nb_frames` + exact Fraction
+  duration equality); producer `_timebase` now returns the proof (no
+  defaults anywhere); route passes the managed root and reports
+  `source_frame_count`/`source_fps_num`/`source_fps_den`; bounded schema
+  additions.
+- 2026-09-16 — Harness R7: seeds now build REAL deterministic media at the
+  managed root and persist the SAME verified-probe facts (import-identical
+  formula); 10 new F03 nodes (3 reviewer-parity timing denials,
+  unproven/tampered bytes, persisted mismatch, VFR denial, 30/1 + 30000/1001
+  exact-count/CFR controls, 2 DB positive controls). Original 17 nodes keep
+  their assertions.
+- 2026-09-16 — Gates: full file 27 passed (77.96s / 79.03s re-run);
+  reviewer probe file (`test_review_r6_producer.py::test_missing_or_zero_source_timing_is_denied`,
+  read-only copy in runtime dir) → 3 passed on the final bytes, all cases
+  http 422 `STRUCTURAL_LOCK_SOURCE_TIMING_MISSING` + before == after; ruff
+  `--select F` clean; py_compile OK; `git diff --check` exit 0.
+- 2026-09-16 — Transport commit (local only, no push):
+  `2871f8fb7e1cbedc76a14626646b14ba532e4b3c`, parent
+  `35f6cb2f2bd540c162d5a2f0e3ae8e152e392b86`, 8 files, +741/-46. Known
+  pre-existing git hook notice `error: task 'geometric-repack' failed`
+  (exit 0, same as R6) and LF→CRLF autocrlf warnings only.
+- 2026-09-16 — Post-commit gate on the frozen commit: 27 passed (78.03s),
+  exit 0; `git status --porcelain` empty; committed == worktree bytes.
