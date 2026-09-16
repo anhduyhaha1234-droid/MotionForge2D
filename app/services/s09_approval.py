@@ -65,6 +65,7 @@ from app.persistence.models import (
     OccurrenceSegment,
     ReskinConfig,
     S09Correction,
+    Scene,
     VideoItem,
 )
 from app.persistence.reskin_config import (
@@ -79,6 +80,54 @@ from app.persistence.structural_lock import (
 )
 from app.persistence.structural_lock import (
     manifest_hash as structural_manifest_hash,
+)
+from app.services.source_locked_timeline import (
+    TIMELINE_VERSION as _TIMELINE_VERSION,
+)
+from app.services.source_locked_timeline import (
+    CODE_BOX_AMBIGUOUS as _CODE_BOX_AMBIGUOUS,
+)
+from app.services.source_locked_timeline import (
+    CODE_BOX_MISSING as _CODE_BOX_MISSING,
+)
+from app.services.source_locked_timeline import (
+    CODE_GEOMETRY_TAMPERED as _CODE_GEOMETRY_TAMPERED,
+)
+from app.services.source_locked_timeline import (
+    CODE_OCCURRENCE_OUT_OF_RANGE as _CODE_OCCURRENCE_OUT_OF_RANGE,
+)
+from app.services.source_locked_timeline import (
+    CODE_ORDER_MISMATCH as _CODE_ORDER_MISMATCH,
+)
+from app.services.source_locked_timeline import (
+    CODE_ROLE_UNMAPPED as _CODE_ROLE_UNMAPPED,
+)
+from app.services.source_locked_timeline import (
+    CODE_ROUTE_NOT_EXECUTABLE as _CODE_ROUTE_NOT_EXECUTABLE,
+)
+from app.services.source_locked_timeline import (
+    CODE_SCENE_MISSING as _CODE_SCENE_MISSING,
+)
+from app.services.source_locked_timeline import (
+    CODE_TIME_BASE_UNAVAILABLE as _CODE_TIME_BASE_UNAVAILABLE,
+)
+from app.services.source_locked_timeline import (
+    TimelineAuthorityError as _TimelineAuthorityError,
+)
+from app.services.source_locked_timeline import (
+    derive_region as _derive_region,
+)
+from app.services.source_locked_timeline import (
+    parse_time_base as _parse_time_base,
+)
+from app.services.source_locked_timeline import (
+    pick_partition_code as _pick_partition_code,
+)
+from app.services.source_locked_timeline import (
+    select_occurrence_box as _select_occurrence_box,
+)
+from app.services.source_locked_timeline import (
+    validate_partition as _validate_partition,
 )
 
 __all__ = [
@@ -772,6 +821,7 @@ class S09ApprovalRepository:
         manifest_id = config.structural_lock_manifest_id
         policy_version = config.lock_policy_version
         route_evidence: list[dict[str, Any]] = []
+        timeline_authority: dict[str, Any] | None = None
 
         if manifest_id is None:
             # Demo approval may still exist without a manifest, but Full
@@ -897,22 +947,48 @@ class S09ApprovalRepository:
             unsupported_routes = []
 
             # EXACT manifest-selected segments (never route alternatives).
+            src_dims = (video_item.width, video_item.height)
             segments_authority = []
+            segment_derived: dict[str, dict[str, Any]] = {}
             role_mapping_by_role: dict[str, dict[str, Any]] = {}
             for seg in manifest.manifest.get("segments", []):
-                seg_entry, seg_reasons, seg_unsupported = (
+                seg_entry, seg_reasons, seg_unsupported, seg_derived = (
                     self._build_segment_authority(
                         workspace_id,
                         project_id,
                         manifest.source_generation,
                         seg,
                         role_mapping_by_role,
+                        src_dims,
                     )
                 )
                 segments_authority.append(seg_entry)
+                segment_derived[str(seg_entry["occurrence_segment_id"])] = seg_derived
                 authority_reasons.extend(seg_reasons)
                 unsupported_routes.extend(seg_unsupported)
             role_mappings = list(role_mapping_by_role.values())
+
+            # Additive frozen timeline block (CONTRACT §5): scene partition +
+            # per-occurrence intervals/regions/visibility + rational timing
+            # pins + source pins, all covered by the checkpoint hash.
+            timeline_authority, _timeline_problems = self._build_timeline_authority(
+                video_item_id=str(manifest.video_item_id),
+                frame_count=int(manifest.manifest.get("frame_count") or 0),
+                timebase=dict(manifest.manifest.get("timebase") or {}),
+                shot_order=[str(x) for x in manifest.manifest.get("shot_order", [])],
+                segments_authority=segments_authority,
+                segment_derived=segment_derived,
+                role_mapping_by_role=role_mapping_by_role,
+                source_authority=source_authority,
+                structural_lock=structural_lock,
+                identity_source_generation=manifest.source_generation,
+            )
+            if _timeline_problems:
+                code = _pick_partition_code(_timeline_problems)
+                authority_reasons.append(
+                    f"{code}: scene partition invalid — "
+                    + "; ".join(_timeline_problems)
+                )
 
         # Pack eligibility (approved published/ready — mirrors the S10
         # checkpoint binding check; never a silent downgrade).
@@ -967,6 +1043,7 @@ class S09ApprovalRepository:
                 "segments": segments_authority,
                 "role_mappings": role_mappings,
                 "eligibility": eligibility,
+                "timeline": timeline_authority,
             },
         }
         _reject_non_finite(snapshot)
@@ -1114,14 +1191,18 @@ class S09ApprovalRepository:
         manifest_generation: str,
         manifest_seg: dict[str, Any],
         role_mapping_by_role: dict[str, dict[str, Any]],
-    ) -> tuple[dict[str, Any], list[str], list[str]]:
+        src_dims: tuple[Any, Any] = (None, None),
+    ) -> tuple[dict[str, Any], list[str], list[str], dict[str, Any]]:
         """Freeze ONE exact manifest-selected segment (route/range/identity).
 
         Cross-scope segment/generation references fail closed
         (:class:`ApprovalValidationError`) BEFORE any write.  Eligibility is
-        computed per segment: unsupported route (never downgraded), missing
-        geometry and missing role mapping are each recorded with a precise
-        immutable reason.
+        computed per segment: unsupported route (never downgraded), boxed
+        geometry that cannot be derived into a normalized region (never
+        guessed — Q1/v0.2) and missing role mapping are each recorded with a
+        precise immutable reason.  Returns ``(entry, reasons, unsupported,
+        derived)`` where ``derived`` carries the frozen region/scale/provenance
+        payload used to assemble the timeline block.
         """
         seg_id = manifest_seg["occurrence_segment_id"]
         seg_row = self._session.get(OccurrenceSegment, seg_id)
@@ -1153,11 +1234,50 @@ class S09ApprovalRepository:
             )
 
         geometry = self._segment_geometry(seg_row)
-        if not geometry["has_geometry"]:
-            reasons.append(
-                f"segment {seg_id}: missing/ambiguous affected geometry "
-                "(segmentation/prompt evidence)"
-            )
+        derived: dict[str, Any] = {
+            "region": None,
+            "raw_box": None,
+            "scale_mode": None,
+            "geometry_source": None,
+            "code": None,
+            "scene_id": str(seg_row.scene_id) if seg_row.scene_id else None,
+            "visibility": str(seg_row.visibility),
+            "z_order": int(seg_row.z_order),
+        }
+        box, geometry_source, box_code = _select_occurrence_box(geometry)
+        if box_code is None:
+            try:
+                region_norm, scale_mode = _derive_region(
+                    box, src_dims[0], src_dims[1]
+                )
+            except _TimelineAuthorityError as err:
+                derived["code"] = err.code
+                reasons.append(f"segment {seg_id}: {err}")
+            else:
+                derived.update(
+                    {
+                        "region": region_norm,
+                        "raw_box": box,
+                        "scale_mode": scale_mode,
+                        "geometry_source": geometry_source,
+                    }
+                )
+        else:
+            derived["code"] = box_code
+            detail = {
+                _CODE_BOX_MISSING: (
+                    "missing/ambiguous affected geometry (no boxed "
+                    "segmentation/prompt evidence)"
+                ),
+                _CODE_BOX_AMBIGUOUS: (
+                    "multiple differing boxes inside one evidence key "
+                    "(ambiguous geometry — no rectangle is guessed)"
+                ),
+                _CODE_GEOMETRY_TAMPERED: (
+                    "affected geometry evidence is corrupt or not numeric"
+                ),
+            }.get(box_code, "affected geometry unavailable")
+            reasons.append(f"segment {seg_id}: {box_code}: {detail}")
 
         role_entry: dict[str, Any] | None = None
         role = self._session.get(ObjectRole, seg_row.role_id) if seg_row.role_id else None
@@ -1201,7 +1321,7 @@ class S09ApprovalRepository:
 
         segment_executable = (
             route_executable
-            and geometry["has_geometry"]
+            and derived["region"] is not None
             and role_entry is not None
             and role is not None
             and role.id in role_mapping_by_role
@@ -1231,7 +1351,238 @@ class S09ApprovalRepository:
             },
             reasons,
             unsupported,
+            derived,
         )
+
+    def _resolve_scene_shots(
+        self, video_item_id: str, shot_order: list[str]
+    ) -> tuple[list[Scene], str, list[str]]:
+        """Resolve the frozen shot partition (CONTRACT §2 / ruling Q2/Q7).
+
+        Partition bounds ALWAYS come from the persisted Scene rows (ordered
+        by ``position, id``).  The manifest ``shot_order`` is the
+        manifest-selected order when it cleanly describes those scenes; a
+        shot_order entry naming a scene of ANOTHER video fails closed.
+        Legacy/test-era entries that resolve to nothing (occurrence ids or
+        synthetic ids) are tolerated only as recorded provenance — the
+        canonical scene order is used and a warning is frozen.
+
+        Returns ``(scenes, order_source, warnings)``.
+        """
+        scenes = list(
+            self._session.scalars(
+                select(Scene)
+                .where(Scene.video_item_id == video_item_id)
+                .order_by(Scene.position, Scene.id)
+            ).all()
+        )
+        if not scenes:
+            raise ApprovalValidationError(
+                f"{_CODE_SCENE_MISSING}: video item has no persisted scene "
+                "rows; the timeline partition cannot be derived"
+            )
+        warnings: list[str] = []
+        scene_ids = {str(s.id) for s in scenes}
+        canonical_order = [str(s.id) for s in scenes]
+        order = [str(x) for x in shot_order]
+        unresolved = [x for x in order if x not in scene_ids]
+        if order and not unresolved:
+            if order != canonical_order:
+                raise ApprovalValidationError(
+                    f"{_CODE_ORDER_MISMATCH}: manifest shot_order is not the "
+                    "canonical scene (position, id) order"
+                )
+            return scenes, "manifest", warnings
+        if order and len(unresolved) != len(order):
+            raise ApprovalValidationError(
+                f"{_CODE_ORDER_MISMATCH}: manifest shot_order mixes scene "
+                "ids with unresolved entries"
+            )
+        if unresolved:
+            foreign = [
+                str(row)
+                for row in self._session.scalars(
+                    select(Scene.id).where(Scene.id.in_(unresolved))
+                ).all()
+            ]
+            if foreign:
+                raise ApprovalValidationError(
+                    f"{_CODE_SCENE_MISSING}: manifest shot_order references "
+                    f"scene ids outside this video: {sorted(foreign)}"
+                )
+            occ_ids = {
+                str(row)
+                for row in self._session.scalars(
+                    select(OccurrenceSegment.id).where(
+                        OccurrenceSegment.video_item_id == video_item_id,
+                        OccurrenceSegment.id.in_(unresolved),
+                    )
+                ).all()
+            }
+            if occ_ids == set(unresolved):
+                warnings.append(
+                    "manifest shot_order holds occurrence-segment ids "
+                    "(legacy fixture shape); canonical scene order used"
+                )
+                return scenes, "legacy_occurrence_ids", warnings
+            warnings.append(
+                "manifest shot_order ids do not resolve to scenes or "
+                "occurrences; canonical scene order used"
+            )
+            return scenes, "scene_position", warnings
+        warnings.append("manifest shot_order is empty; canonical scene order used")
+        return scenes, "scene_position", warnings
+
+    def _build_timeline_authority(
+        self,
+        *,
+        video_item_id: str,
+        frame_count: int,
+        timebase: dict[str, Any],
+        shot_order: list[str],
+        segments_authority: list[dict[str, Any]],
+        segment_derived: dict[str, dict[str, Any]],
+        role_mapping_by_role: dict[str, dict[str, Any]],
+        source_authority: dict[str, Any] | None,
+        structural_lock: dict[str, Any],
+        identity_source_generation: str,
+    ) -> tuple[dict[str, Any], list[str]]:
+        """Freeze the additive immutable timeline block (CONTRACT §5).
+
+        Built EXCLUSIVELY from persisted rows: the Scene partition, the
+        manifest-selected order, the already-derived per-occurrence
+        region/scale/visibility payload, and the frozen source/lock pins.
+        Hard integrity failures (timebase unprovable, order conflicts,
+        cross-scope ids, occurrence ranges outside the source) deny the
+        approval; scene-partition problems are returned so the caller records
+        them as conservative non-executability reasons (recorded, never
+        silent — consumption re-validates and fails closed).
+        """
+        if not isinstance(frame_count, int) or isinstance(frame_count, bool) or frame_count < 1:
+            raise ApprovalValidationError(
+                f"{_CODE_TIME_BASE_UNAVAILABLE}: manifest frame_count "
+                f"{frame_count!r} is not a positive integer"
+            )
+        timebase_raw = timebase if isinstance(timebase, dict) else {}
+        try:
+            fps_num, fps_den = _parse_time_base(
+                timebase_raw.get("time_base"), timebase_raw.get("fps")
+            )
+        except _TimelineAuthorityError as err:
+            raise ApprovalValidationError(str(err)) from err
+        start_time_ms = timebase_raw.get("start_time_ms", 0)
+        if not isinstance(start_time_ms, int) or isinstance(start_time_ms, bool) or start_time_ms < 0:
+            raise ApprovalValidationError(
+                f"{_CODE_TIME_BASE_UNAVAILABLE}: timebase.start_time_ms "
+                f"{start_time_ms!r} must be a non-negative int"
+            )
+
+        scenes, order_source, warnings = self._resolve_scene_shots(
+            video_item_id, shot_order
+        )
+        shot_entries = [
+            {
+                "shot_id": str(scene.id),
+                "position": int(scene.position),
+                "start_frame": int(scene.start_frame),
+                "end_frame": int(scene.end_frame),
+            }
+            for scene in scenes
+        ]
+        problems = _validate_partition(shot_entries, frame_count)
+        if problems:
+            warnings.append("scene partition invalid: " + "; ".join(problems))
+
+        occurrences: list[dict[str, Any]] = []
+        excluded: list[dict[str, Any]] = []
+        for entry in segments_authority:
+            seg_id = str(entry["occurrence_segment_id"])
+            derived = segment_derived.get(seg_id) or {}
+            role = entry.get("role") or {}
+            role_id = role.get("object_role_id") if isinstance(role, dict) else None
+            mapping = role_mapping_by_role.get(str(role_id)) if role_id else None
+            if derived.get("region") is None:
+                excluded.append(
+                    {
+                        "occurrence_segment_id": seg_id,
+                        "reason_code": str(derived.get("code") or _CODE_BOX_MISSING),
+                    }
+                )
+                continue
+            if mapping is None:
+                excluded.append(
+                    {
+                        "occurrence_segment_id": seg_id,
+                        "reason_code": _CODE_ROLE_UNMAPPED,
+                    }
+                )
+                continue
+            if entry.get("route") not in FULL_APPLY_EXECUTABLE_ROUTES:
+                excluded.append(
+                    {
+                        "occurrence_segment_id": seg_id,
+                        "reason_code": _CODE_ROUTE_NOT_EXECUTABLE,
+                    }
+                )
+                continue
+            start = entry.get("start_frame")
+            end = entry.get("end_frame")
+            if (
+                not isinstance(start, int)
+                or isinstance(start, bool)
+                or not isinstance(end, int)
+                or isinstance(end, bool)
+                or start < 0
+                or end < start
+                or end >= frame_count
+            ):
+                raise ApprovalValidationError(
+                    f"{_CODE_OCCURRENCE_OUT_OF_RANGE}: segment {seg_id} range "
+                    f"[{start!r},{end!r}] outside [0,{frame_count})"
+                )
+            occurrences.append(
+                {
+                    "layer_id": seg_id,
+                    "logical_id": entry.get("logical_id"),
+                    "lineage_version": entry.get("lineage_version"),
+                    "role_id": role_id,
+                    "scene_id": derived.get("scene_id"),
+                    "start_frame": start,
+                    "end_frame": end,
+                    "visibility": derived.get("visibility"),
+                    "z_order": derived.get("z_order"),
+                    "route": entry.get("route"),
+                    "anchor": entry.get("anchor"),
+                    "affected_region": derived.get("region"),
+                    "raw_box": derived.get("raw_box"),
+                    "scale_mode": derived.get("scale_mode"),
+                    "geometry_source": derived.get("geometry_source"),
+                    "pack_version_id": mapping.get("pack_version_id"),
+                }
+            )
+        block: dict[str, Any] = {
+            "timeline_version": _TIMELINE_VERSION,
+            "frame_count": frame_count,
+            "fps_num": fps_num,
+            "fps_den": fps_den,
+            "cfr": True,
+            "start_time_ms": start_time_ms,
+            "shots": shot_entries,
+            "occurrences": occurrences,
+            "excluded": excluded,
+            "source_pins": {
+                "source_generation": identity_source_generation,
+                "source_artifact_id": (source_authority or {}).get(
+                    "source_artifact_id"
+                ),
+                "artifact_sha256": (source_authority or {}).get("sha256"),
+                "manifest_hash": structural_lock.get("manifest_hash"),
+            },
+            "order_source": order_source,
+            "warnings": list(warnings),
+            "partition_valid": not problems,
+        }
+        return block, problems
 
     def _build_role_mapping(
         self,

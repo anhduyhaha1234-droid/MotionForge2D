@@ -25,8 +25,11 @@ C4 (S10-C2 correction C1-F1/F5):
   probed timebase, stored evidence content-hash AND the pinned plan content_hash
   all match; otherwise it quarantines and recomputes, never advancing the
   checkpoint past an unverified chunk.
-- Stitch dedup is by (shot_id, core_start_frame, core_end_frame) so overlapping
-  multi-layer chunks produce exactly the deterministic frame count (100 not 200).
+- Stitch COMPOSES (never dedups): every output frame is the source frame with
+  ALL active visible/occluded layers applied in deterministic order; ranges
+  with no active layer keep source frames verbatim.  Per-layer decoded-region
+  evidence (frozen Q9 format) proves each layer contributed; missing evidence
+  or a no_delta row fails the run closed (no publication).
 """
 from __future__ import annotations
 
@@ -306,8 +309,53 @@ def _authoritative_mapping_by_layer(authority: dict[str, Any]) -> dict[str, dict
             "pack_version": m.get("pack_version") or m.get("pack_version_id") or "v1",
             "mapping_id": m.get("mapping_id") or m.get("id") or f"mapping_{layer_id}",
             "deps": sorted(str(d) for d in m.get("deps", []) or []),
+            # BRIDGE timeline feed (CONTRACT §3/§8): occurrence-scoped identity
+            # and deterministic order keys; defaults keep legacy mappings
+            # (role-as-layer) working unchanged.
+            "role_id": str(m.get("role_id") or ""),
+            "visibility": str(m.get("visibility") or "visible"),
+            "z_order": int(m.get("z_order") or 0),
+            "logical_id": str(m.get("logical_id") or layer_id),
+            "lineage_version": int(m.get("lineage_version") or 1),
+            "start_frame": m.get("start_frame"),
+            "end_frame": m.get("end_frame"),
         }
     return out
+
+
+def _stage_layer_asset(
+    managed_root: Path,
+    run_id: str,
+    layer_id: str,
+    manifest: dict[str, Any],
+    mapping_entry: dict[str, Any],
+) -> Path:
+    """Resolve + verify + stage ONE occurrence layer's replacement asset.
+
+    The canonical job manifest keys ``replacement_assets`` by object role id
+    (built by the submit route from ``role_mappings``) while occurrence-scoped
+    plans key chunks by the occurrence ``layer_id``.  This adapter resolves
+    through the frozen mapping entry, verifies the manifest pin (SHA/size)
+    against the managed artifact, then stages a byte-identical copy as
+    ``<layer_id>.png`` in a per-layer directory — the T02 executor resolves
+    assets by exactly that name (``assets_dir / f"{layer_id}.png"``).
+    Returns the staging directory to use as ``assets_dir``.
+    """
+    asset_key = str(mapping_entry.get("role_id") or layer_id)
+    source_abs = _load_replacement_asset(managed_root, manifest, asset_key)
+    src_hash = hash_file(source_abs)
+    stage_dir = _lp(managed_root / f"s10_full_apply/{run_id}/_assets/{layer_id}")
+    stage_dir.mkdir(parents=True, exist_ok=True)
+    staged = _lp(stage_dir / f"{layer_id}.png")
+    if not staged.is_file() or hash_file(staged) != src_hash:
+        import shutil as _shutil
+
+        _shutil.copyfile(source_abs, staged)
+        if hash_file(staged) != src_hash:
+            raise S10FullApplyJobError(
+                f"staged asset copy mismatch for layer {layer_id!r} (fail closed)"
+            )
+    return stage_dir
 
 
 def _render_chunk_via_real_executor(
@@ -348,8 +396,9 @@ def _render_chunk_via_real_executor(
     layer_route = mapping_by_layer[layer_id]["route"]
 
     source_media = _load_source_media(managed_root, manifest)
-    asset_abs = _load_replacement_asset(managed_root, manifest, layer_id)
-    assets_dir = asset_abs.parent
+    assets_dir = _stage_layer_asset(
+        managed_root, run_id, layer_id, manifest, mapping_by_layer[layer_id]
+    )
 
     sha_marker = hashlib.sha256(f"{run_id}:{core_start}-{core_end}:{layer_route}".encode()).hexdigest()[:12]
     rel: Path = Path(f"s10_full_apply/{run_id}/chunk_{chunk_index:04d}_{layer_id}_{sha_marker}.mp4")
@@ -418,6 +467,108 @@ def _render_chunk_via_real_executor(
     return rel, sha, size, evidence
 
 
+def _png_crop_bytes(crop_bgr: Any) -> bytes:
+    """Deterministic PNG-encoded RGB8 crop bytes (frozen Q9 hashing input)."""
+    import cv2
+
+    rgb = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2RGB)
+    ok, buf = cv2.imencode(".png", rgb, [int(cv2.IMWRITE_PNG_COMPRESSION), 6])
+    if not ok:
+        raise S10FullApplyJobError(
+            "STITCH_LAYER_EVIDENCE_MISSING: PNG crop encode failed (fail closed)"
+        )
+    return buf.tobytes()
+
+
+def _crops_sha256(crops: list[Any]) -> str:
+    """sha256 over the concatenated deterministic PNG bytes of the crops."""
+    digest = hashlib.sha256()
+    for crop in crops:
+        digest.update(_png_crop_bytes(crop))
+    return digest.hexdigest()
+
+
+def _compose_layer_unit(
+    *,
+    svc: Any,
+    unit: dict[str, Any],
+    buffer_frames: list[Any],
+    managed_root: Path,
+    source_media: Path,
+    output_dir: Path,
+    fps_num: int,
+    fps_den: int,
+    workspace_id: str,
+    project_id: str,
+    video_item_id: str,
+) -> None:
+    """Apply ONE verified layer unit onto the running frame buffer IN PLACE.
+
+    The unit (shot ∩ occurrence ∩ chunk run) is composited through the EXACT
+    facilities the chunk render used: the T02 request builder consumes the
+    same role payload + staged ``<layer_id>.png`` asset, and the deterministic
+    composite functions run over the running buffer window (sequential
+    composition — every layer contributes; range-dedup is never used).
+    """
+    from app.services.renderer_contract import SourceTimebase
+
+    start = int(unit["core_start_frame"])
+    end = int(unit["core_end_frame"])
+    layer_id = str(unit["layer_id"])
+    mapping_entry = unit["mapping"]
+    role_raw = {
+        "role_id": f"role_{layer_id}",
+        "layer_id": layer_id,
+        "route": unit["route"],
+        "pack_version": mapping_entry.get("pack_version") or "v1",
+        "mapping_id": mapping_entry.get("mapping_id") or f"mapping_{layer_id}",
+        "deps": list(mapping_entry.get("deps") or []),
+        "z_order": int(unit.get("z_order") or 0),
+        "affected_region": list(mapping_entry["affected_region"]),
+    }
+    plan = svc.build_plan(
+        roles=[role_raw],
+        shots=[{"shot_id": unit["shot_id"], "start_frame": start, "end_frame": end}],
+        chunk_config={"chunk_frames": end - start + 1, "overlap_frames": 0},
+    )
+    rm = plan.roles[0]
+    ch_list = list(plan.per_role_chunks.get(role_raw["role_id"]) or [])
+    if not ch_list:
+        raise S10FullApplyJobError(
+            "STITCH_LAYER_EVIDENCE_MISSING: composition produced no T02 chunk "
+            f"for layer {layer_id!r}"
+        )
+    request = svc._build_render_request_for_chunk(
+        rm=rm,
+        chunk=ch_list[0],
+        workspace_root=_lp(managed_root),
+        source_media=source_media,
+        output_media=_lp(output_dir / f"compose_{layer_id}_{start}_{end}.mp4"),
+        assets_dir=unit["assets_dir"],
+        source_timebase=SourceTimebase(fps_num=fps_num, fps_den=fps_den),
+        workspace_id=workspace_id,
+        project_id=project_id,
+        video_item_id=video_item_id,
+    )
+    window = buffer_frames[start : end + 1]
+    if str(unit["route"]) == "pose_swap":
+        from app.services.renderer_routes.composite import composite_pose_swap_frames
+
+        applied = composite_pose_swap_frames(window, request)
+    else:
+        from app.services.renderer_routes.composite import composite_sprite_affine_frames
+
+        applied = composite_sprite_affine_frames(window, request)
+    expected = end - start + 1
+    if len(applied) != expected:
+        raise S10FullApplyJobError(
+            "STITCH_FRAME_COVERAGE_MISMATCH: composition produced "
+            f"{len(applied)} frames for layer {layer_id!r} range [{start},{end}]"
+        )
+    for offset, frame in enumerate(applied):
+        buffer_frames[start + offset] = frame
+
+
 def _stitch_verified_chunks(
     *,
     managed_root: Path,
@@ -427,64 +578,337 @@ def _stitch_verified_chunks(
     ws: str,
     fps_num: int,
     fps_den: int,
+    authority: dict[str, Any] | None = None,
+    manifest: dict[str, Any] | None = None,
+    frame_count: int | None = None,
 ) -> tuple[Path, str, int, dict[str, Any]]:
-    """Deterministically stitch verified core chunks into one playable MP4.
+    """Deterministically COMPOSE verified core chunks into one playable MP4.
 
-    Dedup key is (shot_id, core_start_frame, core_end_frame): overlapping
-    multi-layer chunks sharing the same core range are included exactly once,
-    so the full-video frame_count/order/cuts are deterministic (100 not 200).
+    CONTRACT §8 / ruling Q9: every output frame is the source frame with ALL
+    active visible/occluded layers composited in the deterministic order
+    (z_order asc, tie → (logical_id, lineage_version)); ranges with no active
+    layer keep the source frames verbatim (background-only coverage).
+    Dedup-to-first-layer is FORBIDDEN — each active (shot ∩ occurrence ∩
+    chunk run) unit is applied and proved by its own frozen-format per-layer
+    decoded-region evidence row.  A missing artifact, missing/`no_delta`
+    evidence, or a frame-coverage mismatch fails closed (run failed, zero
+    publication).
     """
-    from app.services.renderer_routes.composite import decode_rgb_frames, write_frames_mp4
+    import numpy as np
 
-    fps = fps_num / fps_den if fps_den else 30.0
-    all_frames: list[Any] = []
-    shot_order: list[str] = []
-    seen_shots: set[str] = set()
-    seen_ranges: set[tuple[str, int, int]] = set()
+    from app.services.renderer_routes.composite import (
+        _region_px,
+        decode_rgb_frames,
+        write_frames_mp4,
+    )
+
+    if not isinstance(authority, dict) or not isinstance(manifest, dict):
+        raise S10FullApplyJobError(
+            "STITCH_LAYER_EVIDENCE_MISSING: composition requires the frozen "
+            "authority + manifest (fail closed)"
+        )
+    scene_manifest = authority.get("scene_manifest")
+    sl_manifest = authority.get("structural_lock_manifest")
+    if not isinstance(scene_manifest, dict) or not isinstance(sl_manifest, dict):
+        raise S10FullApplyJobError(
+            "STITCH_LAYER_EVIDENCE_MISSING: composition requires the frozen "
+            "scene partition + manifest pins (fail closed)"
+        )
+    expected_frame_count = sl_manifest.get("frame_count")
+    if not isinstance(expected_frame_count, int) or expected_frame_count < 1:
+        raise S10FullApplyJobError(
+            "STITCH_FRAME_COVERAGE_MISMATCH: timeline frame_count is invalid"
+        )
+    if frame_count is not None and int(frame_count) != expected_frame_count:
+        raise S10FullApplyJobError(
+            f"STITCH_FRAME_COVERAGE_MISMATCH: plan frame_count {frame_count} "
+            f"!= timeline frame_count {expected_frame_count}"
+        )
+
+    mapping_by_layer = _authoritative_mapping_by_layer(authority)
+    shots = [s for s in (scene_manifest.get("shots") or []) if isinstance(s, dict)]
+    shot_by_id = {str(s.get("shot_id")): s for s in shots}
+    shot_index = {str(s.get("shot_id")): idx for idx, s in enumerate(shots)}
+
+    source_media = _load_source_media(managed_root, manifest)
+    src_frames = decode_rgb_frames(source_media)
+    if len(src_frames) != expected_frame_count:
+        raise S10FullApplyJobError(
+            f"STITCH_FRAME_COVERAGE_MISMATCH: source decodes to "
+            f"{len(src_frames)} frames; timeline frame_count is "
+            f"{expected_frame_count}"
+        )
+    buffer_frames: list[Any] = list(src_frames)
+    frame_h, frame_w = buffer_frames[0].shape[:2]
+
+    # ── expected units: (shot ∩ render-active occurrence) pairs ──────────
+    expected: dict[tuple[str, str], dict[str, Any]] = {}
+    for shot in shots:
+        sid = str(shot.get("shot_id"))
+        s0 = int(shot["start_frame"])
+        s1 = int(shot["end_frame"])
+        for lid, m in mapping_by_layer.items():
+            if m["visibility"] not in ("visible", "occluded"):
+                continue
+            ms = m.get("start_frame")
+            me = m.get("end_frame")
+            p0 = max(s0, int(ms)) if isinstance(ms, int) else s0
+            p1 = min(s1, int(me)) if isinstance(me, int) else s1
+            if p1 < p0:
+                continue
+            expected[(sid, lid)] = {"shot_id": sid, "pair_start": p0, "pair_end": p1}
+
+    # ── group DB chunk rows per pair; tile/validate ──────────────────────
+    rows_by_pair: dict[tuple[str, str], list[dict[str, Any]]] = {}
     for ch in chunks:
-        aid = ch.get("artifact_id")
+        sid = str(ch.get("shot_id") or "")
+        lid = str(ch.get("layer_id") or "")
+        rows_by_pair.setdefault((sid, lid), []).append(ch)
+
+    for key, pair_rows in rows_by_pair.items():
+        sid, lid = key
+        if sid not in shot_by_id:
+            raise S10FullApplyJobError(
+                f"STITCH_LAYER_ARTIFACT_MISSING: chunk references unknown "
+                f"shot {sid!r} (fail closed)"
+            )
+        if lid not in mapping_by_layer:
+            raise S10FullApplyJobError(
+                f"STITCH_LAYER_ARTIFACT_MISSING: chunk references layer "
+                f"{lid!r} not in the frozen mapping (fail closed)"
+            )
+        m = mapping_by_layer[lid]
+        if m["visibility"] not in ("visible", "occluded"):
+            raise S10FullApplyJobError(
+                f"STITCH_LAYER_ARTIFACT_MISSING: chunk references non-render "
+                f"layer {lid!r} (stale plan, fail closed)"
+            )
+        exp = expected.get(key)
+        if exp is None:
+            raise S10FullApplyJobError(
+                f"STITCH_LAYER_ARTIFACT_MISSING: chunk rows for {sid}/{lid} "
+                "outside the active intersection (fail closed)"
+            )
+        cursor = exp["pair_start"]
+        for row in sorted(pair_rows, key=lambda c: int(c["core_start_frame"])):
+            a = int(row["core_start_frame"])
+            b = int(row["core_end_frame"])
+            if a != cursor or b < a:
+                raise S10FullApplyJobError(
+                    f"STITCH_LAYER_ARTIFACT_MISSING: {sid}/{lid} chunks do "
+                    f"not tile [{exp['pair_start']},{exp['pair_end']}] "
+                    "(gap/overlap, fail closed)"
+                )
+            cursor = b + 1
+        if cursor != exp["pair_end"] + 1:
+            raise S10FullApplyJobError(
+                f"STITCH_LAYER_ARTIFACT_MISSING: {sid}/{lid} chunks end at "
+                f"{cursor - 1}; pair range ends at {exp['pair_end']} "
+                "(fail closed)"
+            )
+    missing_pairs = [key for key in expected if key not in rows_by_pair]
+    if missing_pairs:
+        raise S10FullApplyJobError(
+            "STITCH_LAYER_ARTIFACT_MISSING: no verified chunk artifacts for "
+            "active pairs "
+            + ", ".join(f"{sid}/{lid}" for sid, lid in sorted(missing_pairs))
+        )
+
+    # ── deterministic order: shot, z_order asc, (logical, lineage), layer ─
+    staged_dirs: dict[str, Path] = {}
+    units: list[dict[str, Any]] = []
+    for ch in chunks:
+        sid = str(ch.get("shot_id") or "")
+        lid = str(ch.get("layer_id") or "")
+        m = mapping_by_layer[lid]
+        if lid not in staged_dirs:
+            staged_dirs[lid] = _stage_layer_asset(managed_root, run_id, lid, manifest, m)
+        units.append(
+            {
+                "shot_id": sid,
+                "layer_id": lid,
+                "chunk_id": str(ch.get("id")),
+                "core_start_frame": int(ch["core_start_frame"]),
+                "core_end_frame": int(ch["core_end_frame"]),
+                "artifact_id": ch.get("artifact_id"),
+                "route": m["route"],
+                "mapping": m,
+                "z_order": m["z_order"],
+                "logical_id": m["logical_id"],
+                "lineage_version": m["lineage_version"],
+                "assets_dir": staged_dirs[lid],
+            }
+        )
+    units.sort(
+        key=lambda u: (
+            shot_index.get(u["shot_id"], 0),
+            int(u["z_order"]),
+            str(u["logical_id"]),
+            int(u["lineage_version"]),
+            str(u["layer_id"]),
+            int(u["core_start_frame"]),
+        )
+    )
+
+    svc = _multi_role_service()
+    composition_dir = _lp(managed_root / f"s10_full_apply/{run_id}/composition")
+    composition_dir.mkdir(parents=True, exist_ok=True)
+
+    per_layer_evidence: list[dict[str, Any]] = []
+    final_crop_specs: list[tuple[dict[str, Any], tuple[int, int, int, int], list[int]]] = []
+    for unit in units:
+        aid = unit["artifact_id"]
         if not aid:
-            raise S10FullApplyJobError(f"chunk {ch['id']} has no artifact")
+            raise S10FullApplyJobError(
+                f"STITCH_LAYER_ARTIFACT_MISSING: chunk {unit['chunk_id']} has "
+                "no verified artifact (fail closed)"
+            )
+        start = int(unit["core_start_frame"])
+        end = int(unit["core_end_frame"])
+        layer_id = str(unit["layer_id"])
+        m = unit["mapping"]
         with session_factory() as s:
             art = s.execute(
-                sa_text("SELECT relative_path, workspace_id, state FROM artifact WHERE id=:aid"),
+                sa_text(
+                    "SELECT relative_path, workspace_id, state, sha256, size_bytes "
+                    "FROM artifact WHERE id=:aid"
+                ),
                 {"aid": str(aid)},
             ).mappings().first()
-            if art is None or str(art["workspace_id"]) != ws or str(art["state"]) != "ready":
-                raise S10FullApplyJobError(f"artifact {aid} not ready for stitch")
+            if (
+                art is None
+                or str(art["workspace_id"]) != ws
+                or str(art["state"]) != "ready"
+                or not art["sha256"]
+                or not art["size_bytes"]
+            ):
+                raise S10FullApplyJobError(
+                    f"STITCH_LAYER_ARTIFACT_MISSING: artifact {aid} not ready "
+                    "for stitch (fail closed)"
+                )
             rel = str(art["relative_path"])
             if ".partial" in rel:
-                raise S10FullApplyJobError("stitch cannot use .partial artifact")
+                raise S10FullApplyJobError(
+                    f"STITCH_LAYER_ARTIFACT_MISSING: artifact {aid} is "
+                    ".partial (fail closed)"
+                )
             abs_p = _lp(managed_root / rel)
             if not abs_p.is_file():
-                raise S10FullApplyJobError(f"stitch missing file {rel}")
+                raise S10FullApplyJobError(
+                    f"STITCH_LAYER_ARTIFACT_MISSING: stitch missing file {rel} "
+                    "(fail closed)"
+                )
+            artifact_sha = str(art["sha256"])
+            artifact_size = int(art["size_bytes"])
             chunk_frames = decode_rgb_frames(abs_p)
-            rng = (str(ch.get("shot_id") or ""), int(ch.get("core_start_frame", 0)), int(ch.get("core_end_frame", 0)))
-            if rng in seen_ranges:
-                continue
-            seen_ranges.add(rng)
-            all_frames.extend(chunk_frames)
-            shot_id = str(ch.get("shot_id") or "shot")
-            if shot_id not in seen_shots:
-                shot_order.append(shot_id)
-                seen_shots.add(shot_id)
-    total = len(all_frames)
-    if total == 0:
-        raise S10FullApplyJobError("stitch produced zero frames")
-    stitch_hash = hashlib.sha256(f"stitch:{run_id}:{total}:{fps_num}/{fps_den}".encode()).hexdigest()[:12]
+        expected_len = end - start + 1
+        if len(chunk_frames) != expected_len:
+            raise S10FullApplyJobError(
+                f"STITCH_LAYER_ARTIFACT_MISSING: layer {layer_id!r} artifact "
+                f"decodes to {len(chunk_frames)} frames; expected "
+                f"{expected_len} (fail closed)"
+            )
+
+        region = [float(v) for v in m["affected_region"]]
+        rx0, ry0, rx1, ry1 = _region_px(
+            (region[0], region[1], region[2], region[3]), frame_w, frame_h
+        )
+        sampled = [start] if start == end else [start, end]
+        before_crops = [buffer_frames[f][ry0:ry1, rx0:rx1].copy() for f in sampled]
+        before_hash = _crops_sha256(before_crops)
+
+        _compose_layer_unit(
+            svc=svc,
+            unit=unit,
+            buffer_frames=buffer_frames,
+            managed_root=managed_root,
+            source_media=source_media,
+            output_dir=composition_dir,
+            fps_num=fps_num,
+            fps_den=fps_den,
+            workspace_id=ws,
+            project_id=str(manifest.get("project_id") or ""),
+            video_item_id=str(manifest.get("video_item_id") or ""),
+        )
+
+        after_crops = [buffer_frames[f][ry0:ry1, rx0:rx1].copy() for f in sampled]
+        after_hash = _crops_sha256(after_crops)
+        changed = 0
+        for before_crop, after_crop in zip(before_crops, after_crops):
+            changed += int(np.any(before_crop != after_crop, axis=2).sum())
+        area = max((rx1 - rx0) * (ry1 - ry0), 1)
+        changed_ratio = changed / float(area * len(sampled))
+        row = {
+            "shot_id": unit["shot_id"],
+            "range": [start, end],
+            "layer_id": layer_id,
+            "role_id": str(m.get("role_id") or layer_id),
+            "route": str(unit["route"]),
+            "visibility": str(m["visibility"]),
+            "z_order": int(m["z_order"]),
+            "artifact_sha256": artifact_sha,
+            "artifact_size_bytes": artifact_size,
+            "region_norm": region,
+            "region_px": [int(rx0), int(ry0), int(rx1), int(ry1)],
+            "sampled_frames": sampled,
+            "region_crop_sha256_before": before_hash,
+            "region_crop_sha256_after": after_hash,
+            "final_crop_sha256": None,
+            "changed_pixel_count": int(changed),
+            "changed_ratio": float(changed_ratio),
+            "threshold": 0.01,
+            "verdict": "contributed" if changed_ratio >= 0.01 else "no_delta",
+        }
+        per_layer_evidence.append(row)
+        final_crop_specs.append((row, (rx0, ry0, rx1, ry1), sampled))
+
+    # ── Q9 acceptance: every unit proved; no_delta is a failure ──────────
+    if len(per_layer_evidence) != len(chunks):
+        raise S10FullApplyJobError(
+            f"STITCH_LAYER_EVIDENCE_MISSING: {len(per_layer_evidence)} "
+            f"evidence rows for {len(chunks)} active units (fail closed)"
+        )
+    no_delta = [r for r in per_layer_evidence if r["verdict"] != "contributed"]
+    if no_delta:
+        raise S10FullApplyJobError(
+            "STITCH_LAYER_EVIDENCE_MISSING: layers without decoded-region "
+            "contribution "
+            + ", ".join(
+                f"{r['layer_id']}@{r['range']} ratio={r['changed_ratio']:.6f}"
+                for r in no_delta
+            )
+            + " (dropped/not composited — fail closed, no publication)"
+        )
+
+    for row, (rx0, ry0, rx1, ry1), sampled in final_crop_specs:
+        row["final_crop_sha256"] = _crops_sha256(
+            [buffer_frames[f][ry0:ry1, rx0:rx1] for f in sampled]
+        )
+
+    total = len(buffer_frames)
+    if total != expected_frame_count:
+        raise S10FullApplyJobError(
+            f"STITCH_FRAME_COVERAGE_MISMATCH: composed {total} frames; "
+            f"timeline frame_count is {expected_frame_count}"
+        )
+    fps = fps_num / fps_den if fps_den else 30.0
+    stitch_hash = hashlib.sha256(
+        f"stitch:{run_id}:{total}:{fps_num}/{fps_den}".encode()
+    ).hexdigest()[:12]
     stitch_rel = Path(f"s10_full_apply/{run_id}/full_{stitch_hash}.mp4")
     abs_out = _lp(managed_root / stitch_rel)
     abs_out.parent.mkdir(parents=True, exist_ok=True)
-    write_frames_mp4(all_frames, abs_out, fps=fps)
+    write_frames_mp4(buffer_frames, abs_out, fps=fps)
     sha = hash_file(abs_out)
     size = abs_out.stat().st_size
     metadata = {
         "frame_count": total,
         "fps_num": fps_num,
         "fps_den": fps_den,
-        "shot_order": shot_order,
+        "shot_order": [str(s.get("shot_id")) for s in shots],
         "cuts": [],
         "timebase": f"{fps_num}/{fps_den}",
+        "per_layer_evidence": per_layer_evidence,
     }
     return stitch_rel, sha, size, metadata
 
@@ -557,7 +981,7 @@ def s10_full_apply_handler(ctx: WorkerContext) -> dict[str, Any]:
         with session_factory() as _s:
             row = _s.execute(
                 sa_text(
-                    "SELECT fps_num, fps_den, plan_id, plan_hash, status, video_item_id, project_id, chunk_config_json "
+                    "SELECT fps_num, fps_den, frame_count, plan_id, plan_hash, status, video_item_id, project_id, chunk_config_json "
                     "FROM s10_full_apply_run WHERE id=:rid AND workspace_id=:ws"
                 ),
                 {"rid": run_id, "ws": ws},
@@ -713,6 +1137,9 @@ def s10_full_apply_handler(ctx: WorkerContext) -> dict[str, Any]:
                 ws=ws,
                 fps_num=fps_num,
                 fps_den=fps_den,
+                authority=authority,
+                manifest=manifest,
+                frame_count=int(run_row.get("frame_count") or 0) or None,
             )
         except Exception as exc:
             _mark_run_status(session_factory, ws, run_id, "failed")
@@ -1068,6 +1495,8 @@ def _create_full_publication(session_factory, ws: str, run_id: str, managed_root
         frame_metadata["content_hash"] = content_hash
         frame_metadata["stitch_sha256"] = stitch_sha
         frame_metadata["stitch_size_bytes"] = stitch_size
+        _per_layer_evidence = list(stitch_meta.get("per_layer_evidence") or [])
+        frame_metadata.pop("per_layer_evidence", None)
         from app.persistence.s10_full_apply import S10ApplyRepository
 
         repo = S10ApplyRepository(session)
@@ -1091,6 +1520,7 @@ def _create_full_publication(session_factory, ws: str, run_id: str, managed_root
                 "effective_adapter": "stitch",
                 "artifact_sha256": stitch_sha,
                 "artifact_size_bytes": stitch_size,
+                "per_layer_evidence": _per_layer_evidence,
             },
         )
         return pub.id
@@ -1120,6 +1550,8 @@ def _create_full_publication(session_factory, ws: str, run_id: str, managed_root
         frame_metadata["content_hash"] = content_hash
         frame_metadata["stitch_sha256"] = stitch_sha
         frame_metadata["stitch_size_bytes"] = stitch_size
+        _per_layer_evidence = list(stitch_meta.get("per_layer_evidence") or [])
+        frame_metadata.pop("per_layer_evidence", None)
         from app.persistence.s10_full_apply import S10ApplyRepository
 
         repo = S10ApplyRepository(s)
@@ -1147,6 +1579,7 @@ def _create_full_publication(session_factory, ws: str, run_id: str, managed_root
             "effective_adapter": "stitch",
             "artifact_sha256": stitch_sha,
             "artifact_size_bytes": stitch_size,
+            "per_layer_evidence": _per_layer_evidence,
         },
     )
     return pub.id
