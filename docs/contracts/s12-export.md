@@ -238,3 +238,23 @@ generation/type/owner/manifest mismatch, multiple claimants, unreadable or
 malformed relevant JSON — is a typed `S12ExportSubmitError` denial (`409`)
 with zero mutation: Run/Job rows, revisions, pointers and artifacts are
 preserved. Read/parse failures fail closed before any mutation.
+
+## S12-LC3-R7 semantic identity and sibling proof (F02 addendum)
+
+Manifest run identity is ALWAYS decided semantically (parsed JSON), never by
+raw byte/substring equality: a run id encoded with JSON `\uXXXX` escapes or
+merely reformatted whitespace must not change classification. Candidate
+discovery for a Run's durable Job is a union gathered BEFORE trusting
+`job_type` / `workspace_id` / `owner_id` / key fields — any of them may be the
+corrupted field: the run pointer, the canonical key in any scope, raw
+manifest mentions, and every Job whose pinned generation matches the run's
+plan. Keeping a candidate out of classification requires PROOF that it
+belongs to another run: its manifest run identity must name a run that EXISTS
+and whose durable pointer IS that Job. A candidate whose manifest run
+reference is absent, names a nonexistent run, or names a run that does not
+own it is unresolved relevant evidence: the run is neither re-bound nor
+repaired (typed `S12_EXPORT_JOB_IDENTITY_UNRESOLVED`, zero mutation). A Job
+that semantically claims the run but fails identity — pointer-discovered,
+canonical-key, or semantic manifest claim — is a
+`S12_EXPORT_JOB_IDENTITY_CONTRADICTION` denial. Valid same-generation
+siblings (proven ownership) and the bounded repairs above are unchanged.
