@@ -4,7 +4,9 @@
   `ocg/deepseek-v4.1-flash` / provider custom / fallback OFF / native thinking).
 - Worktree: `C:/Users/Admin/Documents/Codex/work/s12-r7-authority-bridge` —
   branch `codex/s12-r7-authority-bridge`; wave-base `35f6cb2…`; phase-1 docs
-  commit `3963d31…`; phase-2 commit: *xem `git log -1` ở report cuối turn*.
+  commit `3963d31…`; phase-2 commits: `b6108d4` (4 service files + CONTRACT +
+  LOG, +1251/−148) và `34e680c` (new module + tests + report, +2444); không
+  rewrite history (`-am` không nhận file mới nên tách 2 commit cùng prefix).
 - Status: `PRODUCTION_B03_B06_DELIVERED_PENDING_MANAGER_B_QA_REVIEW` (không push).
 
 ## Files changed (post-patch sha256/size/lines — `phase2/post_patch_hashes.json`)

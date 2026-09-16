@@ -135,6 +135,11 @@ HEAD `3963d31` (commit phase-1 docs), parent = wave-base `35f6cb2`. Freeze input
 
 - Ledger phase 2: 17 entries (argv/cwd/UTC/exit/elapsed_ms; log riêng trong
   `phase2/COMMAND_LEDGER.jsonl` của evidence BRIDGE).
-- Commit local: (điền sau commit) — message
-  `S12-PUBLIC-AUTHORITY-BRIDGE: R7 production B03-B06 (timeline authority + planner + composition)`.
+- Commit local (2 commit cùng prefix, do `-am` không nhận file mới; không
+  rewrite history):
+  - `b6108d4` — `S12-PUBLIC-AUTHORITY-BRIDGE: R7 production B03-B06 (timeline authority + planner + composition)` — 6 file, +1251/−148 (4 service + CONTRACT + LOG).
+  - `34e680c` — `S12-PUBLIC-AUTHORITY-BRIDGE: R7 production B03-B06 (new module + tests + report)` — 7 file mới, +2444.
+  - Anomaly khi commit 2: `fatal: bad object refs/codex/turn-diffs/…` +
+    `failed to perform geometric repack` — thuộc nhóm pre-existing đã biết
+    (exit commit = 0, tree sạch sau đó).
   Không push. Status: `PRODUCTION_B03_B06_DELIVERED_PENDING_MANAGER_B_QA_REVIEW`.
