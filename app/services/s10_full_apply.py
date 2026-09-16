@@ -25,6 +25,16 @@ from app.persistence.s10_full_apply import (
     S10RunRecord,
 )
 from app.services.s10_chunk_plan import ChunkPlanError, plan_full_apply
+from app.services.source_locked_timeline import (
+    CODE_DUPLICATE_IDENTITY as _CODE_DUPLICATE_IDENTITY,
+    CODE_LEGACY_AUTHORITY as _CODE_LEGACY_AUTHORITY,
+    CODE_ROLE_UNMAPPED as _CODE_ROLE_UNMAPPED,
+    CODE_ROUTE_NOT_EXECUTABLE as _CODE_ROUTE_NOT_EXECUTABLE,
+    TimelineAuthorityError as _TimelineAuthorityError,
+    derive_region as _derive_region,
+    select_occurrence_box as _select_occurrence_box,
+    validate_timeline_block as _validate_timeline_block,
+)
 from app.services.s09_approval import (
     FULL_APPLY_EXECUTABLE_ROUTES,
     ApprovalNotFoundError as _S09ApprovalNotFoundError,
@@ -142,33 +152,28 @@ def _authority_fingerprint(authority: dict[str, Any]) -> str:
     return hashlib.sha256(_canonical(authority).encode()).hexdigest()
 
 
-def _segment_region_from_geometry(geometry: dict[str, Any] | None) -> list[float] | None:
-    """Derive the canonical affected region [x, y, w, h] from frozen geometry.
+def _segment_region_from_geometry(
+    geometry: dict[str, Any] | None,
+    src_w: Any = None,
+    src_h: Any = None,
+) -> list[float] | None:
+    """Derive the canonical NORMALIZED affected region ``[x, y, w, h]``.
 
-    Only boxed evidence (segmentation/prompt boxes) is authoritative — a
-    missing/ambiguous region is NEVER guessed from points or hard-coded.
-    Returns ``None`` when no box exists (caller fails closed).
+    Frozen amendment v0.2 (dual-mode, deterministic): Mode A keeps boxes that
+    are already normalized ``[0,1]``; Mode B divides pixel-scale boxes by the
+    persisted source dims and clips to the physical frame.  Only boxed
+    evidence (segmentation/prompt boxes, first entry) is authoritative — a
+    missing/ambiguous/tampered box or an unresolvable scale is NEVER guessed;
+    returns ``None`` (caller fails closed with a typed code).
     """
-    if not isinstance(geometry, dict):
+    box, _source, code = _select_occurrence_box(geometry)
+    if code is not None or box is None:
         return None
-    for key in ("segmentation", "prompt"):
-        ev = geometry.get(key)
-        if isinstance(ev, dict):
-            boxes = ev.get("boxes")
-            if isinstance(boxes, list) and boxes:
-                b = boxes[0]
-                if isinstance(b, dict):
-                    # Canonical C1-F6 shape: {"x","y","w","h"}
-                    try:
-                        return [float(b["x"]), float(b["y"]), float(b["w"]), float(b["h"])]
-                    except (TypeError, ValueError, KeyError):
-                        return None
-                if isinstance(b, (list, tuple)) and len(b) >= 4:
-                    try:
-                        return [float(v) for v in b[:4]]
-                    except (TypeError, ValueError):
-                        return None
-    return None
+    try:
+        region, _mode = _derive_region(box, src_w, src_h)
+    except _TimelineAuthorityError:
+        return None
+    return region
 
 
 def _canonical_planner_inputs(
@@ -188,7 +193,7 @@ def _canonical_planner_inputs(
     identity = authority.get("identity") or {}
     source = authority.get("source")
     sl = authority.get("structural_lock") or {}
-    segments = authority.get("segments") or []
+    timeline = authority.get("timeline")
     role_mappings = authority.get("role_mappings") or []
     eligibility = authority.get("eligibility") or {}
 
@@ -213,62 +218,117 @@ def _canonical_planner_inputs(
             "v2 authority not executable for full apply: " + ("; ".join(reasons) if reasons else "no reason")
         )
 
-    # Exact manifest-selected segments in canonical order (never alternatives).
-    if not segments:
-        raise FullApplyServiceError("v2 authority has zero segments (incomplete authority)")
+    # Legacy classification (CONTRACT §5 / ruling Q7): a v2 authority without
+    # the frozen timeline block predates the bridge representation and
+    # requires a public reapproval.  Stored bytes/hashes are never touched,
+    # backfilled or silently reinterpreted.
+    if not isinstance(timeline, dict):
+        raise FullApplyServiceError(
+            f"{_CODE_LEGACY_AUTHORITY}: v2 authority predates the frozen "
+            "timeline block; public reapproval is required (legacy rows are "
+            "never backfilled or reinterpreted)"
+        )
+    try:
+        _validate_timeline_block(timeline, frame_count=frame_count)
+    except _TimelineAuthorityError as err:
+        raise FullApplyServiceError(f"corrupted timeline authority: {err}") from err
+
     by_role: dict[str, dict[str, Any]] = {}
     for rm in role_mappings:
         if isinstance(rm, dict) and rm.get("object_role_id"):
             by_role[str(rm["object_role_id"])] = rm
 
+    # Scene shots = the disjoint contiguous temporal partition (CONTRACT §2);
+    # validated above by the shared timeline validator.
     shots: list[dict[str, Any]] = []
+    for shot in timeline.get("shots") or []:
+        shot_id = shot.get("shot_id")
+        start = shot.get("start_frame")
+        end = shot.get("end_frame")
+        if (
+            not isinstance(shot_id, str)
+            or not shot_id
+            or not isinstance(start, int)
+            or not isinstance(end, int)
+        ):
+            raise FullApplyServiceError(
+                "timeline shot entry is malformed (corrupted authority)"
+            )
+        shots.append({"shot_id": shot_id, "start_frame": start, "end_frame": end})
+
+    # Occurrence intervals = active layers inside the partition (§3).  Only
+    # visible/occluded occurrences render (ruling Q3); each keeps its own
+    # occurrence-scoped layer_id — repeated roles are never deduplicated.
     mappings: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for seg in segments:
-        if not isinstance(seg, dict):
-            raise FullApplyServiceError("v2 authority segment must be a dict (tampered)")
-        seg_id = seg.get("occurrence_segment_id")
-        if not isinstance(seg_id, str) or not seg_id:
-            raise FullApplyServiceError("v2 authority segment missing occurrence_segment_id (tampered)")
-        if seg_id in seen:
-            raise FullApplyServiceError(f"v2 authority duplicate segment {seg_id!r} (tampered)")
-        seen.add(seg_id)
-        start = seg.get("start_frame")
-        end = seg.get("end_frame")
-        if not isinstance(start, int) or not isinstance(end, int) or start < 0 or end < start:
-            raise FullApplyServiceError(f"segment {seg_id} has invalid frame range (tampered)")
-        route = seg.get("route")
+    for occ in timeline.get("occurrences") or []:
+        if not isinstance(occ, dict):
+            raise FullApplyServiceError("timeline occurrence must be a dict (corrupted authority)")
+        layer_id = occ.get("layer_id")
+        if not isinstance(layer_id, str) or not layer_id:
+            raise FullApplyServiceError(
+                "timeline occurrence missing layer_id (corrupted authority)"
+            )
+        if layer_id in seen:
+            raise FullApplyServiceError(
+                f"{_CODE_DUPLICATE_IDENTITY}: occurrence {layer_id!r} appears twice (tampered)"
+            )
+        seen.add(layer_id)
+        visibility = occ.get("visibility")
+        if visibility not in ("visible", "occluded"):
+            # represented in the authority, no chunks / no pixels (Q3)
+            continue
+        route = occ.get("route")
         if not isinstance(route, str) or route not in FULL_APPLY_EXECUTABLE_ROUTES:
             raise FullApplyServiceError(
-                f"segment {seg_id} route {route!r} not executable by full apply — no downgrade (fail closed)"
+                f"{_CODE_ROUTE_NOT_EXECUTABLE}: occurrence {layer_id!r} route "
+                f"{route!r} not executable by full apply — no downgrade (fail closed)"
             )
-        role = seg.get("role") or {}
-        role_id = role.get("object_role_id") if isinstance(role, dict) else None
+        region = occ.get("affected_region")
+        if not (isinstance(region, (list, tuple)) and len(region) == 4):
+            raise FullApplyServiceError(
+                f"PLAN_INPUT_GEOMETRY_MISSING: occurrence {layer_id!r} has no "
+                "derived boxed region — region cannot be derived (fail closed)"
+            )
+        role_id = occ.get("role_id")
         rm = by_role.get(str(role_id)) if role_id is not None else None
         if rm is None:
             raise FullApplyServiceError(
-                f"segment {seg_id} has no frozen role mapping (incomplete authority)"
-            )
-        region = _segment_region_from_geometry(seg.get("geometry"))
-        if region is None:
-            raise FullApplyServiceError(
-                f"segment {seg_id} has no boxed affected geometry — region cannot be derived (fail closed)"
+                f"{_CODE_ROLE_UNMAPPED}: occurrence {layer_id!r} has no frozen "
+                "role mapping (incomplete authority)"
             )
         pack_version_id = rm.get("pack_version_id")
         if not isinstance(pack_version_id, str) or not pack_version_id:
             raise FullApplyServiceError(
-                f"segment {seg_id} role mapping has no frozen pack_version_id (incomplete authority)"
+                f"occurrence {layer_id!r} role mapping has no frozen "
+                "pack_version_id (incomplete authority)"
             )
-        shots.append({"shot_id": seg_id, "start_frame": start, "end_frame": end})
+        start = occ.get("start_frame")
+        end = occ.get("end_frame")
+        if not isinstance(start, int) or not isinstance(end, int):
+            raise FullApplyServiceError(
+                f"occurrence {layer_id!r} has invalid frame range (tampered)"
+            )
         mappings.append(
             {
-                "layer_id": str(role_id),
+                "layer_id": layer_id,
                 "role_id": str(role_id),
                 "route": route,
-                "affected_region": region,
+                "affected_region": [float(v) for v in region],
                 "pack_version_id": pack_version_id,
                 "deps": [],
+                "start_frame": start,
+                "end_frame": end,
+                "z_order": int(occ.get("z_order") or 0),
+                "logical_id": str(occ.get("logical_id") or layer_id),
+                "lineage_version": int(occ.get("lineage_version") or 1),
+                "visibility": str(visibility),
             }
+        )
+
+    if not mappings:
+        raise FullApplyServiceError(
+            "v2 authority has zero render-active occurrences (incomplete authority)"
         )
 
     # Deterministic order: shots by start_frame, mappings by layer_id.
@@ -293,9 +353,53 @@ def _canonical_planner_inputs(
     }
 
 
+def _legacy_aliases(
+    authority: dict[str, Any],
+) -> tuple[dict[str, str], dict[str, str], set[str]]:
+    """Bounded legacy id-alias maps for the client-copy canonical-compare.
+
+    The pre-bridge server canonical used segment-as-shot / role-as-layer ids.
+    Clients that echo that legacy shape remain accepted ONLY through this
+    deterministic, unambiguous alias mapping:
+
+    - ``occurrence -> scene``: a legacy "shot id" that is really an occurrence
+      id of the same video resolves to that occurrence's frozen scene;
+    - ``role -> occurrence`` ONLY when the role owns exactly ONE occurrence
+      (repeated roles are ambiguous → no alias → fail closed);
+    - the set of frozen scene ids for direct new-shape copies.
+
+    The alias NEVER alters the plan — the plan is always rebuilt from the
+    canonical inputs; this only keeps legacy client validation available
+    during the transition.
+    """
+    timeline = authority.get("timeline") or {}
+    shots = timeline.get("shots") or []
+    occurrences = timeline.get("occurrences") or []
+    scene_ids = {
+        str(s.get("shot_id"))
+        for s in shots
+        if isinstance(s, dict) and s.get("shot_id")
+    }
+    occ_to_scene: dict[str, str] = {}
+    role_occ: dict[str, list[str]] = {}
+    for occ in occurrences:
+        if not isinstance(occ, dict):
+            continue
+        layer_id = occ.get("layer_id")
+        scene_id = occ.get("scene_id")
+        role_id = occ.get("role_id")
+        if isinstance(layer_id, str) and isinstance(scene_id, str) and scene_id:
+            occ_to_scene[layer_id] = scene_id
+        if isinstance(layer_id, str) and isinstance(role_id, str) and role_id:
+            role_occ.setdefault(role_id, []).append(layer_id)
+    role_to_occ = {role: ids[0] for role, ids in role_occ.items() if len(ids) == 1}
+    return occ_to_scene, role_to_occ, scene_ids
+
+
 def _canonical_compare_legacy(
     canonical: dict[str, Any],
     *,
+    authority: dict[str, Any],
     approved_checkpoint: Any,
     structural_lock_manifest: Any,
     scene_manifest: Any,
@@ -305,10 +409,11 @@ def _canonical_compare_legacy(
     """Fail-closed canonical-compare of optional legacy client authority.
 
     When a legacy client sends copies of the authority objects, every supplied
-    field MUST equal the server-derived canonical value.  Mismatch anywhere in
-    manifest/scene/shot/range/route/mapping/region/pack/source/policy raises
-    BEFORE any run/job/publication is created.  Client authority is never
-    preferred or merged.
+    field MUST equal the server-derived canonical value (after the bounded
+    legacy id-alias of :func:`_legacy_aliases` for shot/layer identity only).
+    Mismatch anywhere in manifest/scene/shot/range/route/mapping/region/pack/
+    source/policy raises BEFORE any run/job/publication is created.  Client
+    authority is never preferred or merged.
     """
     if approved_checkpoint is not None:
         if not isinstance(approved_checkpoint, dict):
@@ -330,15 +435,48 @@ def _canonical_compare_legacy(
                     f"structural_lock_manifest.{key} mismatch vs server v2 authority "
                     f"(client {structural_lock_manifest[key]!r} != server {c[key]!r})"
                 )
+    occ_to_scene, role_to_occ, scene_ids = _legacy_aliases(authority)
     if scene_manifest is not None:
         client_shots = _normalize_client_shots(scene_manifest)
-        if client_shots != canonical["scene_manifest"]["shots"]:
+        aliased_shots: list[dict[str, Any]] = []
+        for shot in client_shots:
+            shot_id = str(shot["shot_id"])
+            if shot_id not in scene_ids and shot_id in occ_to_scene:
+                shot_id = occ_to_scene[shot_id]
+            aliased_shots.append(
+                {
+                    "shot_id": shot_id,
+                    "start_frame": shot["start_frame"],
+                    "end_frame": shot["end_frame"],
+                }
+            )
+        aliased_shots.sort(key=lambda s: (s["start_frame"], s["shot_id"]))
+        if aliased_shots != canonical["scene_manifest"]["shots"]:
             raise FullApplyServiceError(
                 "scene_manifest shots mismatch vs server v2 authority (client scene cannot alter plan)"
             )
     if mapping is not None:
         client_mappings = _normalize_client_mappings(mapping)
-        if client_mappings != canonical["mapping"]["mappings"]:
+        occ_ids = set(occ_to_scene.keys())
+        aliased_mappings: list[dict[str, Any]] = []
+        for entry in client_mappings:
+            layer_id = str(entry["layer_id"])
+            if layer_id not in occ_ids and layer_id in role_to_occ:
+                layer_id = role_to_occ[layer_id]
+            aliased_mappings.append({**entry, "layer_id": layer_id})
+        aliased_mappings.sort(key=lambda m: m["layer_id"])
+        canonical_legacy = [
+            {
+                "layer_id": m["layer_id"],
+                "role_id": m["role_id"],
+                "route": m["route"],
+                "affected_region": m["affected_region"],
+                "pack_version_id": m["pack_version_id"],
+                "deps": list(m.get("deps", [])),
+            }
+            for m in canonical["mapping"]["mappings"]
+        ]
+        if aliased_mappings != canonical_legacy:
             raise FullApplyServiceError(
                 "mapping mismatch vs server v2 authority (client mapping cannot alter plan)"
             )
@@ -398,6 +536,9 @@ def _normalize_client_mappings(mapping: Any) -> list[dict[str, Any]]:
         pack_version_id = m.get("pack_version_id")
         if not isinstance(layer_id, str) or not layer_id or not isinstance(route, str) or not route:
             raise FullApplyServiceError(f"mapping[{i}] missing layer_id/route")
+        role_id_field = m.get("role_id")
+        if not isinstance(role_id_field, str) or not role_id_field:
+            role_id_field = layer_id
         region_norm: list[float] | None = None
         if isinstance(region, (list, tuple)) and len(region) >= 4:
             try:
@@ -407,7 +548,7 @@ def _normalize_client_mappings(mapping: Any) -> list[dict[str, Any]]:
         out.append(
             {
                 "layer_id": layer_id,
-                "role_id": layer_id,
+                "role_id": role_id_field,
                 "route": route,
                 "affected_region": region_norm,
                 "pack_version_id": pack_version_id if isinstance(pack_version_id, str) else None,
@@ -494,6 +635,7 @@ class FullApplyService:
         # mismatch fails closed BEFORE any run/job/publication.
         _canonical_compare_legacy(
             canonical,
+            authority=authority,
             approved_checkpoint=approved_checkpoint,
             structural_lock_manifest=structural_lock_manifest,
             scene_manifest=scene_manifest,

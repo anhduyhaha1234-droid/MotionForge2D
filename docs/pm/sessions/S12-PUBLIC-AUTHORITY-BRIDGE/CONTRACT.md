@@ -189,7 +189,7 @@ recomputation from the stored row only, `:265–293`):
 
 ```
 full_apply_authority.timeline = {
-  "timeline_version": "s09.full-apply-timeline/v1",     # name/version frozen at Q6
+  "timeline_version": "s09.full-apply-timeline/v1",     # frozen name (Q6)
   "frame_count": <int>,                                  # == partition coverage
   "fps_num": <int>, "fps_den": <int>, "cfr": true,       # rational timing pins (§6)
   "start_time_ms": <int>,
@@ -201,13 +201,23 @@ full_apply_authority.timeline = {
      "start_frame": <int>, "end_frame": <int>,
      "visibility": "visible|occluded|out_of_frame|hidden", "z_order": <int>,
      "route": ..., "anchor": {"x": ..., "y": ...},
-     "affected_region": [x,y,w,h], "geometry_source": "...",
-     "regionalized": true} ... ],
+     "affected_region": [x,y,w,h],           # normalized (ruling v0.2)
+     "raw_box": [...], "scale_mode": "normalized|pixel",   # ruling v0.2 §3
+     "geometry_source": "<key>.boxes[0]", "pack_version_id": ...} ... ],
   "excluded": [ {"occurrence_segment_id": ..., "reason_code": ...} ... ],
   "source_pins": {"source_generation": ..., "source_artifact_id": ...,
-                  "artifact_sha256": ..., "manifest_hash": ...}
+                  "artifact_sha256": ..., "manifest_hash": ...},
+  "order_source": "manifest|legacy_occurrence_ids|scene_position",
+  "warnings": [...], "partition_valid": true|false
 }
 ```
+
+Implementation note (delivered): scene-partition problems are recorded as
+`warnings` + `partition_valid=false` + a conservative non-executability reason
+at approval time; consumption re-validates the stored block and fails closed
+(`TIMELINE_COVERAGE_*`, zero S10 rows).  Hard integrity failures (unprovable
+timebase, order conflicts, cross-scope scene ids, occurrence ranges outside
+the source) deny the approval outright.
 
 - **Built at S09 approval** (`submit_checkpoint_v2`) from: verified current-generation
   persisted `Scene` rows; the current-generation active `OccurrenceSegment` rows of
@@ -345,13 +355,23 @@ goal). Required contract behavior:
    remaining active layers of the same range onto that canvas in order (sequential
    composition), never skipping a layer.
 3. **Decoded-frame evidence per layer** (QA must be able to verify without eyeballing
-   a video): for every composed range, record decoded evidence proving each visible
-   layer contributed — at minimum per-layer `layer_id`, range, route,
-   `region_crop_sha256` for the layer's region before/after composition (or an
-   equivalent per-layer region-pixel proof frozen at Q9), next to the existing
-   `decoded_sha256` / `decoded_frame_count` sidecar pattern
-   (`_write_evidence_sidecar`, `:1155–1173`). B06's "real decoded regions/pixels for
-   both objects" is satisfied only by this per-layer evidence.
+   a video): every composed range records `per_layer_evidence` rows in the
+   ``<stitched artifact>.evidence.json`` sidecar — the exact frozen definition is
+   `R7_PREP.md §Q9` (QA, commit `d22d069`, NORMATIVE): one row per active
+   (shot ∩ occurrence ∩ chunk run) unit carrying `shot_id`, `range`,
+   `layer_id`, `role_id`, `route`, `visibility`, `z_order`, `artifact_sha256`,
+   `artifact_size_bytes`, `region_norm`, `region_px`, `sampled_frames`,
+   `region_crop_sha256_before`, `region_crop_sha256_after`, `final_crop_sha256`,
+   `changed_pixel_count`, `changed_ratio`, `threshold` (0.01, frozen) and
+   `verdict` (`contributed` iff `changed_ratio >= threshold` on at least one
+   sampled frame, else `no_delta`).  Crop hashes = sha256 over the
+   deterministically PNG-encoded RGB8 crop bytes (fixed encoder settings) of
+   the crop at each sampled frame, concatenated in order.  Acceptance: every
+   active unit row present with `verdict == "contributed"` (a `no_delta` row
+   means the layer was dropped/not composited → `STITCH_LAYER_EVIDENCE_MISSING`,
+   run failed, no publication); in an overlap fixture the co-active rows show
+   distinct `artifact_sha256` and `before != after` (no-dedup proof).  QA
+   verifies presence/format/coherence of these hashes, not recomputation.
 4. **No fallback**: any missing layer artifact/evidence → run `failed`, no
    publication, no dedup fallback, no partial stitch. Zero-chunk runs stay
    fail-closed (existing behavior).
@@ -365,7 +385,7 @@ goal). Required contract behavior:
    `:924–996`); composition runs after all chunks are verified, before the
    pre-publication cancel fence — the cancel/CAS fences stay exactly where they are.
 
-## 9. Open questions for the freeze meeting (Manager B + QA)
+## 9. Open questions for the freeze meeting (Manager B + QA) — RESOLVED (see "Freeze outcome & amendments")
 
 1. **Q1 — Multi-box ambiguity**: adopt `boxes[0]` + frozen `geometry_source`
    provenance (deterministic, preserves existing chains) or hard-deny when a key
@@ -409,6 +429,36 @@ goal). Required contract behavior:
     the pair's last chunk (no overlap bleeding across a cut or into an inactive
     interval).
 
+## Freeze outcome & amendments (rulings applied)
+
+Freeze partners' rulings (Manager B `BRIDGE_CONTRACT_FREEZE_REVIEW.md`; QA sign-off `R7_PREP.md` §Q1–Q9, commit `d22d069`) are the frozen basis. Resolutions:
+
+- **Q1 multi-box**: adopted — 0 boxes → `OCCURRENCE_GEOMETRY_BOX_MISSING`; within-key differing boxes → `OCCURRENCE_GEOMETRY_AMBIGUOUS`; all equal → select + freeze `geometry_source`; cross-key precedence `segmentation.boxes → prompt.boxes` (rule, not guess).
+- **Q2 global frames**: adopted (occurrence MAY cross scene bounds; chunked per shot, split at cuts; outside `[0,frame_count)` → `TIMELINE_OCCURRENCE_OUT_OF_RANGE`). Multi-scene fixtures seed GLOBAL ranges (provider scene-local quirk = S08 scope).
+- **Q3 visibility**: adopted (visible + occluded render; `out_of_frame`/`hidden` represented in the timeline with no chunks/pixels).
+- **Q4 REVISE** → amendment v0.2 below (dual-mode region derivation; `OCCURRENCE_REGION_SCALE_UNRESOLVED` added).
+- **Q5 tie order**: adopted — `z_order` asc, tie → `(logical_id, lineage_version)`; the order keys are recorded on plan chunk rows when the mapping carries them.
+- **Q6 naming**: `timeline` / `s09.full-apply-timeline/v1` frozen.
+- **Q7 legacy**: adopted — pre-timeline v2 → `LEGACY_AUTHORITY_REAPPROVAL_REQUIRED`; v1 keeps `REAPPROVAL_REQUIRED`; stored bytes/hashes never touched.
+- **Q8 D1**: parse-and-validate path implemented exactly (`time_base` `"{den}/{num}"` exact-int parse + `fps` cross-check; unprovable → `TIMELINE_TIME_BASE_UNAVAILABLE`). B01's enforcement-only fix keeps the format — the path stays valid; only a future producer change dropping the parseable fields would block the dependent branch.
+- **Q9**: normative text cited in §8.3 (frozen format).
+- **Q10**: adopted — `overlap_before := 0` at the pair-first chunk, `overlap_after := 0` at the pair-last chunk (no bleed across cuts/inactive ranges).
+
+### Amendment v0.2 (Q4) — delivered derivation
+
+Dual-mode per `BRIDGE_RULING_Q4_region_scale_v0.2.md` §2 (Mode A normalized; Mode B pixel ÷ persisted dims), with ONE documented hardening **flagged to Manager B/Codex**: the ruling's Mode-B containment bounds (`x+w <= src_w`, `y+h <= src_h`) reject the SANCTIONED chain's own padded boxes (observed on 640×360: `{100,100,300,300}` → y+h=400; `{400,100,250,250}` → x+w=650). Delivered behavior: Mode B requires the box to INTERSECT the frame (`x < src_w`, `y < src_h`; `w,h > 0`) and clips the derived normalized region to the physical frame (`x2=min(x+w, src_w)`, `y2=min(y+h, src_h)`); a box fully outside the frame → `OCCURRENCE_REGION_OUT_OF_BOUNDS`; pixel-scale with dims unavailable → `OCCURRENCE_REGION_SCALE_UNRESOLVED`. Pixels outside the frame do not exist; the rule is deterministic and evidence-derived (no guessing). The timeline records `raw_box` + `scale_mode` + `affected_region` (normalized) + `geometry_source` per occurrence (v0.2 §3).
+
+## Lane inventory (D2 node IDs — frozen by this owner, delivered)
+
+`tests/s12/s12-public-authority-bridge/` — the D2 table names implemented verbatim (27 nodes; the dispatch prompt's "23" summary is an arithmetic miscount — all listed names are delivered, nothing dropped):
+
+| Acceptance | File | Node IDs |
+|---|---|---|
+| B03 | `test_b03_partition_layers.py` | `test_b03_cooccurring_graph_all_occurrences_active_layers` · `test_b03_partition_covers_every_frame_once` · `test_b03_two_visible_characters_plus_object_overlap` · `test_b03_repeated_role_distinct_routes_regions_ranges` · `test_b03_background_only_interval_source_verbatim` · `test_b03_one_frame_boundary_case` · `test_b03_multiscene_global_vs_local_ranges` · `test_b03_no_cartesian_inactive_layer_application` |
+| B04 | `test_b04_eligibility.py` | `test_b04_points_only_ineligible_same_reason_and_zero_s10_rows` · `test_b04_missing_and_ambiguous_geometry_ineligible` · `test_b04_within_key_differing_boxes_ambiguous_deny` · `test_b04_unsupported_route_ineligible_no_unintended_rows` · `test_b04_valid_boxed_authority_proceeds` · `test_b04_no_guessed_rectangle_no_readiness_bypass` |
+| B05 | `test_b05_authority_freeze.py` | `test_b05_timeline_block_inside_checkpoint_hash` · `test_b05_live_scene_mutations_after_approval_frozen` · `test_b05_stale_source_requires_reapproval` · `test_b05_legacy_v2_pre_timeline_public_reapproval_bytes_preserved` · `test_b05_legacy_v1_reapproval_required_unchanged` · `test_b05_corrupted_timeline_fails_closed_no_live_fallback` |
+| B06 | `test_b06_composition.py` | `test_b06_stitch_composes_all_visible_layers_overlap` · `test_b06_per_layer_decoded_evidence_contribution_frozen_format` · `test_b06_no_dedup_first_layer_only_distinct_artifacts` · `test_b06_occluded_layer_composed_before_occluder` · `test_b06_missing_artifact_or_evidence_fails_closed_no_publication` · `test_b06_frame_count_rational_fps_preserved_no_double_timeline` · `test_b06_voice_policy_unchanged_and_audio_gap_reported` |
+
 ## Dependencies, scope, non-goals
 
 - **D1**: B01 corrected producer timing interface (Q8) — BRIDGE depends on it for the
@@ -437,3 +487,7 @@ goal). Required contract behavior:
   grounding read of the 5 service files, R7 review artifacts, RULES, SHARED_CONTRACT,
   ACCEPTANCE_R7, REVIEW F04. Two reviewer raw artifacts (planner-1) and one producer
   raw artifact (new-producer-4 points-only) cross-checked against the code paths.
+- v0.2 (2026-09-16, same session) — freeze outcomes applied: Manager B rulings
+  (Q1 revised, Q2–Q10), QA sign-off `d22d069` (§Q9 cited normatively in §8.3),
+  Q4 ruling amendment (dual-mode derivation + frame-intersection hardening
+  flagged), final timeline-block field list, D2 lane inventory (27 nodes).

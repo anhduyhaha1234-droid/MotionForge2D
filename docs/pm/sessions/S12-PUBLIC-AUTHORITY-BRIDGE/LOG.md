@@ -61,3 +61,80 @@ Production chỉ bắt đầu sau khi contract được freeze (prompt kế ti�
 4 service file + optional NEW `app/services/source_locked_timeline.py` + NEW
 `tests/s12/s12-public-authority-bridge/**` + docs lane; file hiện hữu patch-only
 (preimage/postimage hash).
+
+## 2026-09-16 — PHASE 2: PRODUCTION B03–B06 (freeze đã hoàn tất)
+
+Route: `ocg/deepseek-v4.1-flash` / provider custom / fallback OFF. Bắt đầu tại
+HEAD `3963d31` (commit phase-1 docs), parent = wave-base `35f6cb2`. Freeze inputs
+đã đọc đủ: `BRIDGE_CONTRACT_FREEZE_REVIEW.md` (Q1 revised, Q2–Q10),
+`BRIDGE_RULING_Q4_region_scale_v0.2.md`, QA `R7_PREP.md` §Q9 (normative, commit
+`d22d069`) + §D2 (danh sách node).
+
+### Deliverables (chưa push)
+
+- **NEW** `app/services/source_locked_timeline.py` — primitives dùng chung:
+  Q1 box selection, dual-mode region derivation (ruling v0.2; **hardening
+  frame-intersection được flag** vì bounds nghiêm của ruling từ chối chính các
+  box padded của chain sanctioned: {100,100,300,300} trên 640×360 và
+  {400,100,250,250}), timeline-block validator, `pick_partition_code`,
+  `TIMELINE_VERSION = "s09.full-apply-timeline/v1"`.
+- `app/services/s09_approval.py` — additive timeline build trong
+  `submit_checkpoint_v2` (scene partition + manifest order + persisted boxed
+  evidence + timing pins `fps_num/fps_den/frame_count` + source pins);
+  eligibility per-segment = boxed-region derivable (points-only/missing/
+  ambiguity → typed ineligibility; zero S10 rows); legacy classification:
+  pre-timeline v2 → `LEGACY_AUTHORITY_REAPPROVAL_REQUIRED` (v1 giữ nguyên).
+- `app/services/s10_full_apply.py` — `_canonical_planner_inputs` xây từ
+  timeline (shots = scene partition; mappings = occurrence layers với
+  `layer_id = occurrence_segment_id` + range/z/visibility/role); derivation
+  dual-mode thay `_segment_region_from_geometry` raw-return; alias legacy có
+  giới hạn (unambiguous) trong client-copy compare để giữ 202-control compat.
+- `app/services/s10_chunk_plan.py` — optional active range per-layer +
+  pair-intersection chunking + Q10 edge overlap (pair-first/pair-last = 0);
+  không bypass validation; plan hash byte-stable cho legacy inputs.
+- `app/workflow/s10_full_apply_jobs.py` — **composition thay dedup** trong
+  `_stitch_verified_chunks`: mọi frame = source + ALL visible/occluded layers
+  theo thứ tự z_order asc (tie → (logical_id, lineage_version)); reuse T02
+  request builder + `composite_*`; per-unit Q9 evidence (19 trường theo frozen
+  list) trong sidecar `<artifact>.evidence.json`; asset staging
+  `<layer_id>.png` + resolve role-keyed manifest; codes mới
+  `STITCH_LAYER_ARTIFACT_MISSING` / `STITCH_LAYER_EVIDENCE_MISSING` /
+  `STITCH_FRAME_COVERAGE_MISMATCH`; cancel/CAS/lease fences nguyên vẹn.
+- `tests/s12/s12-public-authority-bridge/**` — 27 node đúng tên D2 (B03×8,
+  B04×6, B05×6, B06×7) + conftest harness (DB isolated, media thật, GLOBAL
+  ranges; lưu ý: prompt ghi "23" nhưng bảng D2 liệt kê 27 — giữ đủ cả 27).
+
+### Iterations (bằng output thật)
+
+- micro v1: 4/27 → nguyên nhân đều là harness: worker composition đọc
+  `render_authority` shape (không có `timeline` key — sửa worker dùng
+  `scene_manifest.shots` + `structural_lock_manifest.frame_count`),
+  `run_counts` đếm luôn DISCOVER job của fixture (lọc `job_type`),
+  `pick_partition_code` rename sót 1 call-site, fixture B05 thiếu
+  `policy_version`/timebase-fingerprint mismatch. Không có lỗi logic.
+- micro v2: 26/27 → B06 frame-order threshold 40 → 20 (ramp + composite
+  regions), node re-run xanh.
+- `tests/test_s09_t06_backend_authority.py` (ngoài gate): 3 fail — 2 fail
+  theo HỢP ĐỒNG (fixture points-only giờ ineligible; đúng B04/F04, cần owner
+  cập nhật fixture/assertion), 1 fail PRE-EXISTING (alembic head constant
+  `a10b11c12d3e` cũ so với head hiện tại `d4e5f6a7b8c9` — S12 migrations đã
+  land trước lane này; chứng minh bằng diff scope: lane không chạm migrations).
+
+### Gates (final, revision đóng băng — raw trong `phase2/`)
+
+| Gate | Command | Result | Raw |
+|---|---|---|---|
+| Micro B03–B06 | `pytest tests/s12/s12-public-authority-bridge/` | **27 passed** (124.90s) | `g4_final_micro.*` |
+| Affected s10 API | `pytest tests/test_s10_full_apply_api.py` | **71 passed** (165.72s) | `g5_final_api.*` |
+| Affected s12 reg | `pytest tests/s12/s12-t03c/test_publication.py tests/s12/s12-lc3-retry/test_r6_identity_resolution.py` | **66 passed** (152.82s) | `g6_final_reg.*` |
+| Static | `ruff check --select F` (5 file + suite) | clean (exit 0) | `s1_ruff.*`, `s1b_ruff_recheck.*` |
+| Static | `py_compile` 5 file + `compileall -q app` | exit 0 | `s2_pycompile.*`, `s3_compileall.*` |
+| Diff | `git diff --check` | exit 0 | `s4_diff_check.*` |
+| Guards | protected 18/18 (sha256+size) | **bad=0** | `v1_guard_protected.*` |
+| Guards | allow-pre drift | đúng 4 file allow (viết-set) | `post_patch_hashes.json` |
+
+- Ledger phase 2: 17 entries (argv/cwd/UTC/exit/elapsed_ms; log riêng trong
+  `phase2/COMMAND_LEDGER.jsonl` của evidence BRIDGE).
+- Commit local: (điền sau commit) — message
+  `S12-PUBLIC-AUTHORITY-BRIDGE: R7 production B03-B06 (timeline authority + planner + composition)`.
+  Không push. Status: `PRODUCTION_B03_B06_DELIVERED_PENDING_MANAGER_B_QA_REVIEW`.

@@ -231,6 +231,36 @@ def _normalize_mappings(raw: Any) -> list[dict[str, Any]]:
             entry["object_role_id"] = m["object_role_id"]
         if "pack_version_id" in m and isinstance(m["pack_version_id"], str) and m["pack_version_id"]:
             entry["pack_version_id"] = m["pack_version_id"]
+        # Occurrence-scoped active range + deterministic order keys (BRIDGE
+        # timeline feed; CONTRACT §3 / ruling Q5/Q10).  Optional — legacy
+        # mappings without them keep the historical whole-shot behavior.
+        for key in ("start_frame", "end_frame"):
+            if key in m and m[key] is not None:
+                value = m[key]
+                if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+                    raise ChunkPlanError(f"mapping[{idx}].{key} must be int >= 0")
+                entry[key] = value
+        if (
+            "start_frame" in entry
+            and "end_frame" in entry
+            and entry["end_frame"] < entry["start_frame"]
+        ):
+            raise ChunkPlanError(f"mapping[{idx}] end_frame < start_frame")
+        for key in ("visibility", "logical_id"):
+            if key in m and isinstance(m[key], str) and m[key]:
+                entry[key] = m[key]
+        if "z_order" in m and m["z_order"] is not None:
+            if not isinstance(m["z_order"], int) or isinstance(m["z_order"], bool):
+                raise ChunkPlanError(f"mapping[{idx}].z_order must be int")
+            entry["z_order"] = m["z_order"]
+        if "lineage_version" in m and m["lineage_version"] is not None:
+            if (
+                not isinstance(m["lineage_version"], int)
+                or isinstance(m["lineage_version"], bool)
+                or m["lineage_version"] < 1
+            ):
+                raise ChunkPlanError(f"mapping[{idx}].lineage_version must be int >= 1")
+            entry["lineage_version"] = m["lineage_version"]
         normalized.append(entry)
 
     # deterministic order by layer_id
@@ -374,14 +404,21 @@ def plan_full_apply(
         shot_id: str = shot["shot_id"]
         s_start: int = shot["start_frame"]
         s_end: int = shot["end_frame"]
-        shot_frame_count = s_end - s_start + 1
-        # number of core chunks for this shot
-        num_chunks = (shot_frame_count + cfg["chunk_frames"] - 1) // cfg["chunk_frames"]
         for layer in mappings:
             layer_id: str = layer["layer_id"]
+            # Occurrence-scoped active range clipped to this shot (BRIDGE
+            # CONTRACT §3): a pair with an empty intersection produces NO
+            # chunks — inactive layers are never applied.  Legacy mappings
+            # without a range keep the historical whole-shot behavior.
+            p_start = max(s_start, int(layer.get("start_frame", s_start)))
+            p_end = min(s_end, int(layer.get("end_frame", s_end)))
+            if p_end < p_start:
+                continue
+            pair_frames = p_end - p_start + 1
+            num_chunks = (pair_frames + cfg["chunk_frames"] - 1) // cfg["chunk_frames"]
             for ci in range(num_chunks):
-                core_start = s_start + ci * cfg["chunk_frames"]
-                core_end = min(core_start + cfg["chunk_frames"] - 1, s_end)
+                core_start = p_start + ci * cfg["chunk_frames"]
+                core_end = min(core_start + cfg["chunk_frames"] - 1, p_end)
                 # deterministic chunk_id from pinned_hash + position
                 identity = {
                     "layer_id": layer_id,
@@ -398,18 +435,24 @@ def plan_full_apply(
         shot_id = shot["shot_id"]
         s_start = shot["start_frame"]
         s_end = shot["end_frame"]
-        shot_frame_count = s_end - s_start + 1
-        num_chunks = (shot_frame_count + cfg["chunk_frames"] - 1) // cfg["chunk_frames"]
         for layer_idx, layer in enumerate(mappings):
             layer_id = layer["layer_id"]
             route: str = layer["route"]
+            p_start = max(s_start, int(layer.get("start_frame", s_start)))
+            p_end = min(s_end, int(layer.get("end_frame", s_end)))
+            if p_end < p_start:
+                continue
+            pair_frames = p_end - p_start + 1
+            num_chunks = (pair_frames + cfg["chunk_frames"] - 1) // cfg["chunk_frames"]
             # structural deps from layer mapping (sorted)
             base_deps: list[str] = list(layer.get("deps", []))
             for ci in range(num_chunks):
-                core_start = s_start + ci * cfg["chunk_frames"]
-                core_end = min(core_start + cfg["chunk_frames"] - 1, s_end)
+                core_start = p_start + ci * cfg["chunk_frames"]
+                core_end = min(core_start + cfg["chunk_frames"] - 1, p_end)
+                # Q10: zero at the pair edges — no overlap bleed across a cut
+                # or into an inactive interval.
                 overlap_before = cfg["overlap_frames"] if ci > 0 else 0
-                overlap_after = cfg["overlap_frames"] if core_end < s_end else 0
+                overlap_after = cfg["overlap_frames"] if core_end < p_end else 0
                 # deps: previous chunk in same shot/layer + same-index chunk from previous layer
                 deps: list[str] = list(base_deps)
                 if ci > 0:
@@ -418,7 +461,6 @@ def plan_full_apply(
                 if layer_idx > 0:
                     prev_layer_id = mappings[layer_idx - 1]["layer_id"]
                     # same chunk index in previous layer, if that layer also has this index
-                    # (all layers have same num_chunks per shot since chunking is per shot)
                     prev_layer_cid = chunk_id_by_position.get((shot_id, prev_layer_id, ci))
                     if prev_layer_cid is not None:
                         deps.append(prev_layer_cid)
@@ -439,20 +481,24 @@ def plan_full_apply(
                     "deps": deps,
                 }
                 content_hash_input = _sha256_hex(_canonical_json(content_input))
-                chunks.append(
-                    {
-                        "chunk_id": chunk_id,
-                        "shot_id": shot_id,
-                        "layer_id": layer_id,
-                        "core_start_frame": core_start,
-                        "core_end_frame": core_end,
-                        "overlap_before": overlap_before,
-                        "overlap_after": overlap_after,
-                        "route": route,
-                        "deps": deps,
-                        "content_hash_input": content_hash_input,
-                    }
-                )
+                record: dict[str, Any] = {
+                    "chunk_id": chunk_id,
+                    "shot_id": shot_id,
+                    "layer_id": layer_id,
+                    "core_start_frame": core_start,
+                    "core_end_frame": core_end,
+                    "overlap_before": overlap_before,
+                    "overlap_after": overlap_after,
+                    "route": route,
+                    "deps": deps,
+                    "content_hash_input": content_hash_input,
+                }
+                # Q5: the deterministic layer order keys are RECORDED in the
+                # plan rows when the mapping carries them (timeline feed).
+                for key in ("z_order", "logical_id", "lineage_version", "visibility"):
+                    if key in layer:
+                        record[key] = layer[key]
+                chunks.append(record)
 
     # Deterministic order: sort by shot start_frame, then layer_id, then core_start
     # Build shot order map for stable sort
