@@ -102,3 +102,12 @@ Full-SHA pin list: `C:/Users/Admin/MotionForge2D-evidence/s12/20260907-083200-s1
 - Merge `a30f71bf4eef8fe34f2acc20875346d62ac1e24a` (parents `c3cf095…` + `396a3c8…`), zero conflict; diff-check 0; porcelain trống.
 - Static: `compileall` app 0; `py_compile` test file 0; `ruff check --select F` 0 (`All checks passed!`); full-ruleset informational 14×N802 style-class (không F-class).
 - Evidence: COMMAND_LEDGER.jsonl (append, phase `r7r2_*`) + R7_INT_RAW_PROVENANCE_R2.txt; không push; không sửa source/test.
+
+## 11. R7 round 3 — QA chain + R5 sync (Hermes INT, 2026-09-16)
+
+- Input `393e1bfad7328c349cc81202cdf54c9df9b7274d` (parent `c3cf095…`): 5 files (+537/−56) — QA LOG/R6_INVENTORY/R7_PREP + `test_r6_b01i_public_chain.py` chain-rewrite + `test_r7_prep_inventory.py` → merge `159b61d295d1a608b20023b0424910ade504d0e7`.
+- Input `3444a498c0f865070d4e2c24af0dd9a506b6628c` (parent `393e1bf…`): 3 files (+35/−10) — QA LOG + `R5_MATRIX.md` + `test_r5_matrix_packet.py` (R7-B2 bounded exception) → merge `05eed0f269f8578cc777e39234e752e7a59e40ae`.
+- Zero conflict cả 2 merge; diff-check 0; porcelain trống sau từng merge.
+- Static: `compileall` app 0; `py_compile` 3 test file 0; `ruff check --select F` 0 (`All checks passed!`); full-ruleset informational 3×E501 style-class (dòng tên dài trong r5 matrix packet).
+- Transport tip `05eed0f269f8578cc777e39234e752e7a59e40ae`; delta tổng vs wave-base `35f6cb2` = 43 paths (thêm `R5_MATRIX.md` + `test_r5_matrix_packet.py` + `test_r6_b01i_public_chain.py` so với 40 trước đó).
+- Evidence: COMMAND_LEDGER.jsonl (append, phase `r7r3_*`) + R7_INT_RAW_PROVENANCE_R3.txt; không push; không sửa source/test.
