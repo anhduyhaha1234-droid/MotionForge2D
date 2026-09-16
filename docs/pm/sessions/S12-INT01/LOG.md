@@ -95,3 +95,10 @@ Full-SHA pin list: `C:/Users/Admin/MotionForge2D-evidence/s12/20260907-083200-s1
 - Transport tip `8704ec020960e67205cfeb93f4e54bda019205ae`; union delta 38 paths exact (+7573/−249); diff-check 0; porcelain trống sau từng merge.
 - Static: `compileall` app 0; `py_compile` 24 file 0; `ruff check --select F` 0 (`All checks passed!`); full-ruleset informational 136 style-class diagnostics (chi tiết trong R7_REPORT.md).
 - Evidence: `outputs/s12-r7-two-managers/20260916T0351Z/B/INT/` (COMMAND_LEDGER.jsonl + R7_INT_RAW_PROVENANCE.txt + manifests). Không push; không sửa source/test.
+
+## 10. R7 round 2 — B01 CR2 transport (Hermes INT, 2026-09-16)
+
+- Input CR2 `396a3c81589ea19b6c5b119e446b1bd4c7f4b754` (parent `c3cf0955…` = HEAD round 1; branch `codex/s09-lock-producer-b01-r6` tip; worktree B01 porcelain trống). 1 commit, delta đúng 4 paths: `tests/test_s09_structural_lock_producer.py` + S09 `{CONTRACT,LOG,REPORT}.md` (test+docs only, +148/−7).
+- Merge `a30f71bf4eef8fe34f2acc20875346d62ac1e24a` (parents `c3cf095…` + `396a3c8…`), zero conflict; diff-check 0; porcelain trống.
+- Static: `compileall` app 0; `py_compile` test file 0; `ruff check --select F` 0 (`All checks passed!`); full-ruleset informational 14×N802 style-class (không F-class).
+- Evidence: COMMAND_LEDGER.jsonl (append, phase `r7r2_*`) + R7_INT_RAW_PROVENANCE_R2.txt; không push; không sửa source/test.
