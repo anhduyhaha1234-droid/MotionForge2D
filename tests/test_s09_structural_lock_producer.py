@@ -120,6 +120,13 @@ VALID_PARAMS = {
     "opacity": 1.0,
 }
 
+#: Sanctioned persisted geometry (frozen B04 / ruling Q1): normalized boxes
+#: are the SAME interface the extraction provider persists
+#: (``segmentation.boxes`` preferred, ``prompt.boxes`` fallback) and are
+#: valid for any source dims (mode A of derive_region).
+BOX_SEGMENT_1 = {"x": 0.10, "y": 0.10, "w": 0.30, "h": 0.30}
+BOX_SEGMENT_2 = {"x": 0.55, "y": 0.40, "w": 0.30, "h": 0.30}
+
 
 def _sha(n: int) -> str:
     return f"{n:064x}"
@@ -207,6 +214,7 @@ def _seed_graph(
     duration_s: float = 20.0,
     media_width: int = 256,
     media_height: int = 256,
+    boxed: bool = True,
     with_scenes: bool = True,
     with_segments: bool = True,
     with_configs: bool = True,
@@ -386,14 +394,12 @@ def _seed_graph(
             start_time_ms=0,
             end_time_ms=9900,
             source_generation=GEN,
-            prompt_json=json.dumps(
-                {
-                    "points": [],
-                    "boxes": [{"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2}],
-                }
-            ),
+            prompt_json=json.dumps({"points": [], "boxes": []}),
             segmentation_json=json.dumps(
-                {"points": [{"x": 0.2, "y": 0.2}], "boxes": []}
+                {
+                    "boxes": [dict(BOX_SEGMENT_1)] if boxed else [],
+                    "points": [{"x": 0.2, "y": 0.2}],
+                }
             ),
             mask_artifact_id=mask.id,
             confidence=0.9,
@@ -420,6 +426,12 @@ def _seed_graph(
             end_time_ms=19900,
             source_generation=GEN,
             prompt_json=json.dumps({"points": [{"x": 0.6, "y": 0.6}], "boxes": []}),
+            segmentation_json=json.dumps(
+                {
+                    "boxes": [dict(BOX_SEGMENT_2)] if boxed else [],
+                    "points": [{"x": 0.6, "y": 0.6}],
+                }
+            ),
             confidence=0.9,
             confidence_source="model",
             z_order=1,
@@ -1372,6 +1384,83 @@ def test_B01_F_pin_and_reapproval_full_apply_executable(runtime) -> None:  # typ
         == manifest_id
     )
     assert authority_block["structural_lock"]["policy_version"] == POLICY
+
+    # Frozen F04/B04 semantics (R7-CR2): the authority carries the immutable
+    # timeline block, and with sanctioned BOXED geometry every occurrence is
+    # eligible — nothing excluded, no guessed rectangle.
+    timeline = authority_block["timeline"]
+    assert timeline["timeline_version"] == "s09.full-apply-timeline/v1"
+    assert timeline["excluded"] == []
+    assert {occ["layer_id"] for occ in timeline["occurrences"]} == {
+        graph.segment,
+        graph.segment2,
+    }
+    for occ in timeline["occurrences"]:
+        assert occ["geometry_source"] == "segmentation.boxes[0]"
+        assert occ["scale_mode"] == "normalized"
+
+
+def test_B04_geometryless_occurrence_ineligible_typed_zero_mutation(runtime) -> None:  # type: ignore[no-untyped-def]
+    """Frozen F04/B04 semantics (R7-CR2): occurrences WITHOUT boxed geometry
+    still pass the producer (points are legitimate extraction evidence) but
+    the public reapproval authority MUST mark them ineligible with the typed
+    ``OCCURRENCE_GEOMETRY_BOX_MISSING`` reason — never a guessed rectangle —
+    and the durable rows stay exactly the expected ones of this chain
+    (zero extra mutation).  Backfills the fixture that used to be a
+    false-green positive on the single-lane candidate."""
+    client, factory, seed = runtime
+    graph = seed(boxed=False)
+    produced = _post(
+        client, graph.project, graph.video, {"idempotency_key": "b04-unboxed"}
+    )
+    assert produced.status_code == 201, produced.text
+    manifest_id = produced.json()["manifest_id"]
+
+    pin = client.patch(
+        f"/api/v2/reskin-configs/{graph.config}",
+        json={"revision": 1, "structural_lock_manifest_id": manifest_id},
+    )
+    assert pin.status_code == 200, pin.text
+
+    reapprove = client.post(
+        "/api/v2/s09-approvals/reapprove",
+        params={"workspace_id": WS},
+        json={
+            "reskin_config_id": graph.config,
+            "expected_reskin_revision": 2,
+            "pack_version_ids": [graph.pack],
+            "idempotency_key": "b04-unboxed-reapprove",
+            "note": "B04 negative control; engineering evidence",
+        },
+    )
+    assert reapprove.status_code in (200, 201), reapprove.text
+    checkpoint = reapprove.json()
+
+    authority = client.get(
+        f"/api/v2/s09-approvals/{checkpoint['id']}/full-apply-authority",
+        params={"workspace_id": WS},
+    )
+    assert authority.status_code == 200, authority.text
+    authority_body = authority.json()
+    assert authority_body["verified"] is True
+    eligibility = authority_body["eligibility"]
+    assert eligibility["full_apply_executable"] is False, authority_body
+    assert "OCCURRENCE_GEOMETRY_BOX_MISSING" in " ".join(eligibility["reasons"])
+
+    timeline = authority_body["full_apply_authority"]["timeline"]
+    assert timeline["occurrences"] == []
+    assert {
+        entry["reason_code"] for entry in timeline["excluded"]
+    } == {"OCCURRENCE_GEOMETRY_BOX_MISSING"}
+    assert len(timeline["excluded"]) == 2
+
+    # Exactly the expected durable rows of this chain — no extra mutation.
+    assert _counts(factory) == {
+        "manifests": 1,
+        "routes": 2,
+        "checkpoints": 1,
+        "configs": 1,
+    }
 
 
 def test_B01_H_transaction_failure_no_partial_state_then_retry(
