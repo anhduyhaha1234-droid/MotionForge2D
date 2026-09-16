@@ -143,3 +143,34 @@ HEAD `3963d31` (commit phase-1 docs), parent = wave-base `35f6cb2`. Freeze input
     `failed to perform geometric repack` — thuộc nhóm pre-existing đã biết
     (exit commit = 0, tree sạch sau đó).
   Không push. Status: `PRODUCTION_B03_B06_DELIVERED_PENDING_MANAGER_B_QA_REVIEW`.
+
+## 2026-09-16 — FOLLOW-UP: Q4-coverage nodes (QA review `958d021`, bounded)
+
+QA verdict phase-2: D2 `VERBATIM_27` + re-run 27 passed, Q9 `CONFORMANT 19/19`,
+alias `BOUNDED NO-HOLE`, clip code v0.2.1 `ACCEPTED` — còn **coverage gap cho
+ruling v0.2 §5**. Bổ sung 4 node test (KHÔNG sửa production; nằm NGOÀI bảng D2
+gốc — inventory D2 vẫn `DELIVERED VERBATIM 27`; đây là additions coverage):
+
+- `test_b04_mode_b_padded_clip_positive` — box {400,100,250,250} trên 640×360
+  → region clip [0.625, 0.2777…, 0.375, 0.6944…] xác nhận qua HAI đường: công
+  thức clip viết độc lập trong test + `derive_region(...)` thật (shared module);
+  `scale_mode="pixel"`, `raw_box` giữ nguyên, `geometry_source` frozen;
+  authority PROCEEDS (submit 202).
+- `test_b04_scale_unresolved_negative` — pixel-scale box + dims NULL
+  (harness `hide_dims=True`) → typed deny `OCCURRENCE_REGION_SCALE_UNRESOLVED`
+  (cả direct `derive_region` raise code + authority excluded/reason + submit
+  422) và zero mutation (0 runs / 0 jobs).
+- `test_b04_fully_outside_deny` — box {700,100,50,50} trên 640×360 (x>=src_w)
+  → typed deny `OCCURRENCE_REGION_OUT_OF_BOUNDS`, zero mutation.
+- `test_b04_cross_key_precedence_geometry_source` — dùng fixture
+  `cross_key_conflict` (segmentation.boxes={16,12,80,60} vs prompt.boxes=
+  {30,20,50,50} KHÁC nhau): region lấy từ segmentation (precedence chốt),
+  `geometry_source="segmentation.boxes[0]"` frozen, prompt evidence giữ
+  nguyên verbatim; PROCEEDS (202). Fixture đã khớp semantics ruling Q1 nên
+  KHÔNG cần chỉnh.
+- Harness: `build_graph(..., hide_dims=True)` — VideoItem.width/height nullable
+  (ràng buộc schema `width IS NULL OR width >= 0`).
+
+Gates follow-up: suite **31 passed** (27+4; 88.18s, exit 0 — raw
+`phase2_q4/q4_micro_31.*`); `ruff check --select F` 2 file changed exit 0;
+`git diff --check` exit 0; protected 18/18 **bad=0**. Commit: (điền sau commit).

@@ -155,6 +155,7 @@ def build_graph(
     shot_order_mode: str = "scene",
     with_timeline_probe: bool = False,
     submit_approval: bool = True,
+    hide_dims: bool = False,
 ) -> dict[str, Any]:
     """Build a full persisted authority graph and submit the v2 approval.
 
@@ -220,8 +221,8 @@ def build_graph(
             project_id=proj,
             title="BridgeVid",
             position=0,
-            width=width,
-            height=height,
+            width=None if hide_dims else width,
+            height=None if hide_dims else height,
             duration_ms=int(frame_count / fps * 1000),
             fps_num=int(round(fps)),
             fps_den=1,

@@ -98,6 +98,23 @@ my side.
   pre-existing class, exit 0.
 - No data-model/migration/API/producer/publication-producer files touched.
 
+## Q4-coverage additions beyond D2 (follow-up, QA review `958d021`)
+
+QA accepted the v0.2.1 clip code but flagged a COVERAGE GAP for ruling v0.2 §5.
+Added 4 test nodes (production untouched; they are ADDITIONS — the D2 inventory
+already stands DELIVERED VERBATIM at 27):
+
+| New node | Covers |
+|---|---|
+| `test_b04_mode_b_padded_clip_positive` | padded pixel box {400,100,250,250}/640×360 → clip region `[0.625, 0.2777…, 0.375, 0.6944…]` asserted via independent formula AND real `derive_region`; authority PROCEEDS (202) |
+| `test_b04_scale_unresolved_negative` | pixel-scale box + dims NULL (`hide_dims`) → `OCCURRENCE_REGION_SCALE_UNRESOLVED`, zero mutation (0 runs/0 jobs) |
+| `test_b04_fully_outside_deny` | box {700,100,50,50}/640×360 (x≥src_w) → `OCCURRENCE_REGION_OUT_OF_BOUNDS`, zero mutation |
+| `test_b04_cross_key_precedence_geometry_source` | `cross_key_conflict` fixture: differing segmentation vs prompt boxes → segmentation wins, `geometry_source="segmentation.boxes[0]"` frozen, prompt evidence preserved, PROCEEDS (202) |
+
+Suite after additions: **31 passed** (27+4; 88.18s, exit 0; raw
+`phase2_q4/q4_micro_31.*`). ruff `--select F` + `git diff --check` exit 0;
+protected 18/18 bad=0.
+
 ## Next
 
 Manager B + QA review of this packet (artifacts in
