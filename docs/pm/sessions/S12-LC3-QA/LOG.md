@@ -205,3 +205,21 @@ static probe inventory to the authorized Q02 renames; no assertion/provenance ed
 - Evidence: `.../B/QA/r5-sync-enumeration.json`, `r5-sync-names.json`,
   `r5-sync-matrix-doc.json`, `r5-sync-post2.stdout.txt`,
   `r5-sync-negative-control.stdout.txt`.
+
+### 2026-09-16 — Pin re-freeze for authorized R5-sync change (finding R7-B2 addendum)
+
+Manager finite v3 (`7c5e3cd`) red: `test_r6_reviewer_assertion_provenance_hash_proven`
+— `IN_REPO_IMMUTABLE[R5_MATRIX.md]` expected `D601E8FA…`, actual `9E136CC4…`.
+
+- Programmatic reconcile of ALL 12 pins (PROVENANCE 9 + IN_REPO_IMMUTABLE 3) vs
+  on-disk truth (LF-normalized sha256): exactly ONE drift — `R5_MATRIX.md`.
+  Git-proven cause: newest touching commit `3444a49` (authorized R5-sync, R7-B2),
+  and the preimage at `3444a49^` hashes to the OLD pin `D601E8FA…` — the drift is
+  exactly the authorized change; unexplained drifts: none.
+- Re-freeze applied: test pin `D601E8FA…` -> `9E136CC4…`; the digest citation in
+  `R6_INVENTORY.md` synced to match (1 occurrence). Diff: 2 files, +2/-2.
+- Full finite module: **7 passed** (exit 0). Micro dir: 16 passed + 1
+  (chain BLOCKED re-raise, by design). ruff F clean.
+- Evidence: `r7b2-refreeze-reconcile.json` (per-pin table + git analysis),
+  `r7b2-refreeze-applied.json`, `r7b2-refreeze-finite.stdout.txt`,
+  `r7b2-refreeze-micro.stdout.txt`.
