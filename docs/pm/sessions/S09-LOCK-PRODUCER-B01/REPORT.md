@@ -115,6 +115,40 @@ F03 (P1) closed on wave base `35f6cb2f2bd540c162d5a2f0e3ae8e152e392b86`:
   diff-check 0. Evidence:
   `outputs/s12-r7-two-managers/20260916T0351Z/B/B01/`.
 
+## R7 correction round 2 (combined-candidate interaction, CR2)
+
+Manager B finite gate on the combined candidate
+`c3cf0955ffea02cb2070c0f6a3ce694c10ed3c5e` (195 passed / 1 failed): the only
+red was `test_B01_F_pin_and_reapproval_full_apply_executable` — its fixture
+seeded occurrences WITHOUT boxed geometry, and the frozen F04/B04 semantics
+(BRIDGE) now honestly mark such occurrences ineligible
+(`OCCURRENCE_GEOMETRY_BOX_MISSING: missing/ambiguous affected geometry (no
+boxed segmentation/prompt evidence)`).  NOT a production bug — a superseded
+test expectation (same class as FINDING r7b1); the fix is bounded to this
+module's fixture.
+
+- Fixture: `_seed_graph` now persists the SANCTIONED boxed geometry the
+  extraction provider uses (`segmentation.boxes`, normalized boxes valid for
+  any dims — same interface as
+  `tests/s12/s12-public-authority-bridge/conftest.py`); a new `boxed=False`
+  variant reproduces the old points-only shape for the negative control.
+- B01_F (positive control, kept): reapproval →
+  `full_apply_executable=true`, `reasons=[]`; PLUS the authority now carries
+  the frozen timeline block asserted in the same test
+  (`timeline_version="s09.full-apply-timeline/v1"`, `excluded=[]`, both
+  occurrences present with `geometry_source="segmentation.boxes[0]"`,
+  `scale_mode="normalized"`).
+- NEW negative node
+  `test_B04_geometryless_occurrence_ineligible_typed_zero_mutation`:
+  points-only occurrences (no boxes) still pass the producer but reapproval →
+  ineligible with the typed `OCCURRENCE_GEOMETRY_BOX_MISSING` reason,
+  `timeline.occurrences=[]`, both entries in `timeline.excluded`, and the
+  durable row counts stay exactly {manifests:1, routes:2, checkpoints:1,
+  configs:1} — no guessed rectangle, zero extra mutation.
+- Node count: 27 → **28 passed** on the combined candidate (75.00s first
+  run); ruff `--select F` clean; `git diff --check` 0; guard self-check
+  `protected_hits NONE` (changed vs candidate = this test file only).
+
 ## Consumer observations (exact, for the reviewer)
 
 1. `ReskinConfig` CAS pin re-enforces the S07 compatibility policy: a pin is

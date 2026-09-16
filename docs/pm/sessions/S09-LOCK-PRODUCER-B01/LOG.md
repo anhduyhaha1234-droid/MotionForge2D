@@ -79,3 +79,16 @@
   (exit 0, same as R6) and LF→CRLF autocrlf warnings only.
 - 2026-09-16 — Post-commit gate on the frozen commit: 27 passed (78.03s),
   exit 0; `git status --porcelain` empty; committed == worktree bytes.
+- 2026-09-16 — R7-CR2 (combined candidate `c3cf0955…`, Manager B finite gate
+  195/1): the single red `test_B01_F_…` was a superseded expectation — the
+  fixture's occurrences lacked boxed geometry, and frozen F04/B04 now marks
+  them ineligible (`OCCURRENCE_GEOMETRY_BOX_MISSING`).  NOT a production
+  bug; fix bounded to this module.
+- 2026-09-16 — Harness CR2: `_seed_graph` persists sanctioned boxed geometry
+  (`segmentation.boxes`, normalized — same interface as the BRIDGE conftest)
+  + `boxed=False` variant; B01_F asserts the frozen timeline block
+  (`s09.full-apply-timeline/v1`, no exclusions, both occurrences with
+  `geometry_source="segmentation.boxes[0]"`); NEW negative node
+  `test_B04_geometryless_occurrence_ineligible_typed_zero_mutation`.
+  Module re-run on the combined candidate: **28 passed** (75.00s), exit 0;
+  ruff F clean; diff-check 0; guard `protected_hits NONE`.

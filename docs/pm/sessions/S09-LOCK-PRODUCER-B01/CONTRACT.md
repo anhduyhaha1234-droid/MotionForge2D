@@ -67,7 +67,12 @@ blobs, readiness flags — are rejected at the schema boundary (422,
   contract (never replacement candidates); every included segment must carry
   geometry evidence, an in-scope role, a role mapping with a published/ready
   pack, and an in-workspace mask when referenced. Zero eligible segments is a
-  typed denial — an empty manifest is never a success.
+  typed denial — an empty manifest is never a success.  Downstream, the
+  frozen S09 authority (B04) additionally requires sanctioned BOXED geometry
+  per occurrence (`segmentation.boxes` preferred, `prompt.boxes` fallback;
+  normalized or pixel mode): points-only occurrences remain producer-valid
+  but are honestly reapproval-INELIGIBLE (`OCCURRENCE_GEOMETRY_BOX_MISSING`)
+  until a box exists — the producer never invents one.
 - Route decision (TARGET_PROFILE §4 P0-7): the CURRENT persisted
   `segment_render_route` decision (latest row) is reused; a non-executable
   route is refused without downgrade. When no decision exists, the producer
