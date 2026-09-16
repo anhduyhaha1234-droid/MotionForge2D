@@ -454,3 +454,67 @@ and identity detail in
 playback and the public product chain remain NOT_REVIEWED / outside this
 correction (QA/INT scope). This remains a local transport checkpoint only,
 not an integration, approval, or closure claim.
+
+## R7 correction — F01: lease transfer serialized with the publication section
+
+Verdict carried in: CHANGES_REQUESTED (F01, P1, owner VAL). Wave base
+`35f6cb2f…` (ff-only from `535d7c13…`; untracked `work/` untouched).
+
+**The defect and the fix.** F01 showed the filesystem lock serialized
+publishers while `claim_run` did not participate in that serialization: a
+lease transfer could complete after the publisher's last fence read and
+before its actual exclusive link, letting a stale owner install
+`stale-A-bytes` while the current owner got `PublicationRaceLost` — an
+incoherent end state. The correction (frozen design D1) serializes the
+ownership transition with the real filesystem mutation: a NEW per-run
+cross-process lock (`publication_lease_guard.py`) is taken by `claim_run`
+AND by the publisher's whole critical section (fence re-validation →
+intent → exclusive create → lease extension → sidecar/receipt → fenced
+transitions, plus both final-exists recovery branches). A claim arriving
+while a section is active waits bounded then fails typed
+(`PublicationInProgressError`, code `S12_T03C_PUBLICATION_IN_PROGRESS`,
+`S12ExportError` subclass, zero mutation); a publisher entering its section
+re-validates ownership first, so a claim that committed earlier is observed
+there. Inside the held section the current owner extends its own lease
+immediately before the transitions (`extend_lease_for_publication`,
+token-CAS without an expiry predicate — only safe because claims cannot
+interleave with the section), so the section's commits stay authorized even
+when the wall-clock TTL lapsed mid-section. This is not "another fence
+read": the entry read is the last read and the section it guards is
+claim-proof end-to-end. Dead processes release their locks via the OS.
+
+**Proof.** The reviewer's own F01 reproduction
+(`test_review_r6_inner_fence.py`, copied hash-identically, assertions
+unchanged) now passes: `final_bytes = current-B-bytes`, link-success
+`['B']`, lease `review-inner-B v2`, all participants reaped (`1 passed,
+18.28s`). New frozen nodes (8 nodes / 16 instances) cover: section-first
+prevention with the owner completing (typed denial, zero mutation, then a
+typed "cannot be claimed" refusal after completion); claim-first stale
+entry denial with B as sole publisher; a claim attempt at EVERY public
+mutation boundary (pre-link, post-link/pre-sidecar, post-sidecar/pre-receipt,
+receipt/precommit); the cross-process equivalent (real publisher child,
+typed denial from another process, child reaped); a real child killed
+post-link with a fresh process converging on the child's own inode; the
+expired/released/reclaimed token matrix; the ordering × bytes cross-product
+(ownership independent of SHA; foreign equal-SHA never owned); and
+lost-ack + mid-section stale cleanup with stable hash+inode+mtime. Full
+affected sweep: `184 passed` (172.61s) exit 0; `ruff --select F` clean with
+exactly the four inherited full-ruleset findings left explicit; guard
+`VERIFIED` (122 entries, 0 failures) and `work/` 58/58 byte-identical to
+the Manager snapshot.
+
+**Cross-lane mapping correction (§3).** The prompt stated the route maps
+`S12ExportError` to 409 at `s12_export.py:377–382` and that subclassing
+alone would satisfy the mapping. Read-code evidence: no
+`except S12ExportError` exists anywhere under `app/`; that route's 409
+branches catch `S12ExportSubmitError` (a ValueError subclass) and
+`IdempotencyConflictError` by name (submit path only — claims never flow
+through it). The real claim path is worker-internal
+(`s12_export_jobs.py:744`), where the durable worker classifies step
+exceptions (`app/workflow/durable_worker.py:891–905`) into a typed
+retryable failure envelope via `_fail_job`; `PublicationInProgressError`
+takes that path with its code visible and, being an `S12ExportError`
+subclass as frozen, stays compatible with any broad family handling. No
+RETRY file was touched, and none is required for F01. Full raw evidence in
+`evidence/20260916T-r7-f01.md` §3 and
+`…/A/VAL/r7_g3_mapping_evidence.txt`.

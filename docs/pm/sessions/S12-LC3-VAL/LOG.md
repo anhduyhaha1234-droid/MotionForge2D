@@ -131,3 +131,20 @@ Design, inode-identity contract, frozen node map and raw result tables are in
 stdout/stderr live in the lane `COMMAND_LEDGER.jsonl` at
 `s12-r6-hermes/20260915T131158Z/VAL/` (runtime temp `work/s12h/20260915T131158Z/VAL/`).
 This remains a local transport checkpoint, not integration, approval, or closure.
+
+## R7 F01 lease-serialization correction (Hermes owner)
+
+| UTC | Event | Result |
+|---|---|---|
+| 2026-09-16 | ff-only sync to wave base (resume after infra cut) | `535d7c13 → 35f6cb2f`, exit 0 / no-op re-check; `?? work/` (58 files) preserved |
+| 2026-09-16 | F01 fix: claim × publication-section serialization | new `publication_lease_guard.py` `214d615d…`; publication.py `88bffc36… → 596ae3ea…`; persistence `a8cae3b4… → 50f172fb…` |
+| 2026-09-16 | G1 reviewer micro hash-identical re-run (assertions unchanged) | `1 passed, 18.28s`, exit 0; probe sha `524d4a86…` unchanged; fresh raw `final_bytes=current-B-bytes`, links `['B']`, lease `review-inner-B v2` |
+| 2026-09-16 | G2 final sweep: 8 new nodes/16 instances + V01–V15 (28) + VAL lanes + t03c + t04a | `184 passed`, 172.61s, exit 0 |
+| 2026-09-16 | G3 static | py_compile OK; `ruff --select F` clean; full ruleset = exactly the 4 inherited findings |
+| 2026-09-16 | G4 owner guard (122 entries) + `work/` vs `snapshots/VAL-postsync` | `VERIFIED`, 0 failures; 58/58 work files byte-identical (0 diffs) |
+
+Mechanism, mapping-evidence correction (§3) and raw paths are in
+`evidence/20260916T-r7-f01.md`; raw ledger + per-case JSON in
+`s12-r7-two-managers/20260916T0354Z/A/VAL/` (runtime temp
+`work/s12r7/0354/A/VAL/`). This remains a local transport checkpoint, not
+integration, approval, or closure.
