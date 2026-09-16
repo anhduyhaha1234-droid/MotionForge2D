@@ -133,12 +133,12 @@ Static inventory against the clean pre-INT b6d620e candidate. PRESENT means sour
 | R08-audio | tests/s12/s12-lc3-val/test_r1_correction_boundaries.py::test_r03_audio_deadline_interrupts_blocked_decoder_pipe | PRESENT | AUDIO_DEADLINE_MECHANISM_NOT_R5_EXECUTED |
 | R08-audio | tests/s12/s12-lc3-val/test_r1_correction_boundaries.py::test_r03_stderr_pressure_and_nonzero_decoder_are_bounded | PRESENT | AUDIO_ERROR_MECHANISM_NOT_R5_EXECUTED |
 | R08-migration | tests/s12/s12-lc3-retry/test_retry_migration.py::test_upgrade_retains_terminal_rows_hashes_and_binds_existing_job | PRESENT | R4_REVIEW_RETAINED_DATA_CONTROL_PASSED_NOT_R5_EXECUTED |
-| R08-migration | tests/s12/s12-t03a/test_s12_export_migration.py::test_single_head_is_new_revision | PRESENT | INHERITED_COMPATIBILITY_FAILURE_RETAINED |
+| R08-migration | tests/s12/s12-t03a/test_s12_export_migration.py::test_single_head_is_current_head | PRESENT | INHERITED_COMPATIBILITY_FAILURE_RETAINED |
 | R08-migration | tests/s12/s12-t03a/test_s12_export_migration.py::test_fresh_upgrade_creates_tables | PRESENT | INHERITED_COMPATIBILITY_FAILURE_RETAINED |
-| R08-migration | tests/s12/s12-t03a/test_s12_export_migration.py::test_upgrade_from_parent_retains_data | PRESENT | INHERITED_COMPATIBILITY_FAILURE_RETAINED |
-| R08-migration | tests/s12/s12-t03a/test_s12_export_migration.py::test_downgrade_with_rows_refuses | PRESENT | INHERITED_COMPATIBILITY_FAILURE_RETAINED |
-| R08-migration | tests/s12/s12-t03a/test_s12_export_migration.py::test_history_links_parent | PRESENT | R4_REVIEW_CONTROL_PASSED_NOT_R5_EXECUTED |
-| R08-migration | tests/s12/s12-t03a/test_s12_export_migration.py::test_empty_downgrade_drops_only_new_tables | PRESENT | R4_REVIEW_CONTROL_PASSED_NOT_R5_EXECUTED |
+| R08-migration | tests/s12/s12-t03a/test_s12_export_migration.py::test_upgrade_from_parent_retains_data_to_current_head | PRESENT | INHERITED_COMPATIBILITY_FAILURE_RETAINED |
+| R08-migration | tests/s12/s12-t03a/test_s12_export_migration.py::test_downgrade_with_rows_refuses_at_current_head | PRESENT | INHERITED_COMPATIBILITY_FAILURE_RETAINED |
+| R08-migration | tests/s12/s12-t03a/test_s12_export_migration.py::test_history_links_both_linear_edges | PRESENT | R4_REVIEW_CONTROL_PASSED_NOT_R5_EXECUTED |
+| R08-migration | tests/s12/s12-t03a/test_s12_export_migration.py::test_empty_downgrade_unwinds_lineage_then_tables | PRESENT | R4_REVIEW_CONTROL_PASSED_NOT_R5_EXECUTED |
 | R08-stale-readiness | tests/s12/s12-t03a/test_s12_export_domain.py::test_create_stale_checkpoint_hash_fails_closed | PRESENT | RETAINED_MECHANISM_NOT_R5_EXECUTED |
 | R08-stale-readiness | tests/s12/s12-t03a/test_s12_export_domain.py::test_create_stale_checkpoint_revision_fails_closed | PRESENT | RETAINED_MECHANISM_NOT_R5_EXECUTED |
 | R08-stale-readiness | tests/s12/s12-t03a/test_s12_export_domain.py::test_create_stale_manifest_hash_fails_closed | PRESENT | RETAINED_MECHANISM_NOT_R5_EXECUTED |
