@@ -538,7 +538,9 @@ def anchor_eligibility(src_bgr: np.ndarray) -> dict:
     d = frame_degeneracy(src_bgr)
     return {
         "eligible_for_gates": not d["degenerate"],
+        "excluded_from_gates": d["degenerate"],
         "exclusion_code": d["exclusion_code"],
+        "counted_as_a_pass": False,
         "degeneracy": d,
         "note": ("degenerate anchors are excluded from the gates and reported separately; "
                  "they are never counted as geometry that held"),
