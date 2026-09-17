@@ -1,7 +1,7 @@
 {
   "target": "repo",
   "dest_root": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden",
-  "published_at_utc": "2026-09-17T12:16:16Z",
+  "published_at_utc": "2026-09-17T13:55:19Z",
   "file_count": 179,
   "copied_now_count": 3,
   "byte_verified_count": 179,
@@ -44,8 +44,8 @@
       "rel": "cutout_bounds_audit.json",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\cutout_bounds_audit.json",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\cutout_bounds_audit.json",
-      "sha256": "5744ea2d8a2572087d3774cce4dbed45bf540353635f9ad7cba8b100b6c5462a",
-      "bytes": 75273,
+      "sha256": "62cd9320426ed6ddb21bbd7cce4bd8ff399038f12d6c2c57fdacabdf3c9980fe",
+      "bytes": 119946,
       "copied_now": false
     },
     {
@@ -76,8 +76,8 @@
       "rel": "references/references_BOOK.json",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\references_BOOK.json",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\references\\references_BOOK.json",
-      "sha256": "c60566bac2ada83211df0c066df03be34db5d8c630ad16bc03c6c0332fcbd9f7",
-      "bytes": 12175,
+      "sha256": "dedf1d7ddbd19052490b411aee0e0784042fd96b724e9dadc89930c235b6e7c7",
+      "bytes": 17595,
       "copied_now": false
     },
     {
@@ -148,64 +148,64 @@
       "rel": "roles/BOOK/role_1_f1680.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\roles\\role_1_f1680.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\BOOK\\role_1_f1680.png",
-      "sha256": "f56cd7cb3495430789ad20d35be50270b51069d137a114096fe7e13ba94bf6f2",
-      "bytes": 24776,
+      "sha256": "7f9cf5cb50a8303bbd76ccf2a0a3a1227de139158cf7fcfc30df20078c404fbc",
+      "bytes": 25821,
       "copied_now": false
     },
     {
       "rel": "roles/BOOK/role_2_f1665.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\roles\\role_2_f1665.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\BOOK\\role_2_f1665.png",
-      "sha256": "9c89e2344f80cb531771a42658140266a979b8ba14e4332774c9f72e305a5c2d",
-      "bytes": 55885,
+      "sha256": "3e2b04b839e593e5659aba5d72048848b0f45540b64d8415f2b4323c74f4dabe",
+      "bytes": 57328,
       "copied_now": false
     },
     {
       "rel": "roles/BOOK/role_3_f1680.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\roles\\role_3_f1680.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\BOOK\\role_3_f1680.png",
-      "sha256": "16e63c15483822fb16ef7bf826ea08f2ffaa45e709da9f5619733301ae3757a0",
-      "bytes": 19208,
+      "sha256": "30ba6f399b3a08256aa5a979c56a93c968a2d9a15f346b039b4e6744c206936c",
+      "bytes": 18945,
       "copied_now": false
     },
     {
       "rel": "roles/BOOK/role_4_f1755.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\roles\\role_4_f1755.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\BOOK\\role_4_f1755.png",
-      "sha256": "e5254fa61b2d32c95814a2f40135d39e332975b4f61e0ab15cb207c997c0c5e0",
-      "bytes": 9431,
+      "sha256": "9f033f7b44e71bd90c177ea6ac527007e5f430ecc6ce80fb4dfa562f6661449d",
+      "bytes": 10237,
       "copied_now": false
     },
     {
       "rel": "roles/BOOK/role_5_f1695.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\roles\\role_5_f1695.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\BOOK\\role_5_f1695.png",
-      "sha256": "8ef5d9c451283c8d795c1a2e48a9e76f445b8e3ab91d22317ad0dfbc7700bad1",
-      "bytes": 30247,
+      "sha256": "c97781737d333a3fa8c7a0b1e8285990b57fdb9e7050cfcf8ce5504623a1f6b6",
+      "bytes": 30913,
       "copied_now": false
     },
     {
       "rel": "roles/BOOK/role_6_f1755.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\roles\\role_6_f1755.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\BOOK\\role_6_f1755.png",
-      "sha256": "9227c03ef040248693b94a809da45ce52290d741ba16a1df7e920f2b1134c938",
-      "bytes": 8583,
+      "sha256": "72d258372cdc46a0b8fe50327fe983365979bcef3219dfba35396b5c0b3aa97f",
+      "bytes": 8793,
       "copied_now": false
     },
     {
       "rel": "roles/BOOK/role_7_f1695.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\roles\\role_7_f1695.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\BOOK\\role_7_f1695.png",
-      "sha256": "2bddba0168967f7b06c982a18454a6faa975822ec262441442386a2ab76c1290",
-      "bytes": 5695,
+      "sha256": "9ee9c27060fbb214e7799557c82b77734ddaeeb958692f26d7e221831635712d",
+      "bytes": 5907,
       "copied_now": false
     },
     {
       "rel": "roles/BOOK/role_8_f1725.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\roles\\role_8_f1725.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\BOOK\\role_8_f1725.png",
-      "sha256": "fc54d4905db239260ce4ec7b8ee3bda16163b12c210eb63d7f9463b8ae5751f5",
-      "bytes": 3440,
+      "sha256": "b531be25d3f652795eefa6bf21124a91ee30ae0690244f9352340e4fc22ae89b",
+      "bytes": 3715,
       "copied_now": false
     },
     {
@@ -228,8 +228,8 @@
       "rel": "references/references_CAM_4212.json",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\references_CAM_4212.json",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\references\\references_CAM_4212.json",
-      "sha256": "9b047b5d93ae971c8f0ffd36bb6c6ee82cae786ea524f2b7c4d07d60cba788f6",
-      "bytes": 28525,
+      "sha256": "cf0aca79317b533e3bdcd2880bbfde69f3bffd01fc176b915fe60c77756f6164",
+      "bytes": 44597,
       "copied_now": false
     },
     {
@@ -300,200 +300,200 @@
       "rel": "roles/CAM_4212/role_10_f4242.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_10_f4242.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_10_f4242.png",
-      "sha256": "2ac76ffb7144f4860c7b1fa2fdbfb488f04acf67cc6b10570f93e7de2b3392a4",
-      "bytes": 2866,
+      "sha256": "a105fcd694fa9a8a1de3d3a6c59940dec8b2259e9e97d08ba48aa66853a7a332",
+      "bytes": 3001,
       "copied_now": false
     },
     {
       "rel": "roles/CAM_4212/role_11_f4257.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_11_f4257.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_11_f4257.png",
-      "sha256": "f01dd115b28250ea8418f2bb0d7141560f97203e34b9ae56f02c9ae33297bbf2",
-      "bytes": 18150,
+      "sha256": "bcdc81e4b1d83f629fce6c0731dd8af3ef2875dc681d534cab28f6d60e59ac26",
+      "bytes": 18667,
       "copied_now": false
     },
     {
       "rel": "roles/CAM_4212/role_12_f4257.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_12_f4257.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_12_f4257.png",
-      "sha256": "60d96fe0f5e16c56b47cf85897992493bda2f214217051ed371a1edcaca22c60",
-      "bytes": 19120,
+      "sha256": "681e298e4c1fb0577ac52bd5dfd114783e8dc48349702b2d61c2d3fa34db73fb",
+      "bytes": 19608,
       "copied_now": false
     },
     {
       "rel": "roles/CAM_4212/role_13_f4257.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_13_f4257.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_13_f4257.png",
-      "sha256": "2eb3c6d438966e1d955c7767eaf818beccc1c4953eee2e52d5996c4a271b19ea",
-      "bytes": 5706,
+      "sha256": "b112d38c9eedf8f54e78e6020a9df776d8fce0b44dc5b5ebecb11f008c78b3cd",
+      "bytes": 5914,
       "copied_now": false
     },
     {
       "rel": "roles/CAM_4212/role_14_f4257.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_14_f4257.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_14_f4257.png",
-      "sha256": "a92d3cdda0eae055eb373c21430134b5b4e86e5d9d9de296e96ff9a2766efb91",
-      "bytes": 2559,
+      "sha256": "49e74fd0ebd695d7bd38c526369b289c61de64fd20634543ffff7dae39a2925e",
+      "bytes": 2740,
       "copied_now": false
     },
     {
       "rel": "roles/CAM_4212/role_15_f4272.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_15_f4272.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_15_f4272.png",
-      "sha256": "d43f81d9b3e07be9f582964a666c39786ff1a2e660b46351290928535c219570",
-      "bytes": 52045,
+      "sha256": "042f8ccd0aaf00d0c28c5321f1d070a43fff586e8d50643c063bfba1356dbf77",
+      "bytes": 24916,
       "copied_now": false
     },
     {
       "rel": "roles/CAM_4212/role_16_f4272.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_16_f4272.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_16_f4272.png",
-      "sha256": "dd592108b00a3fe147a9a158f1cba7386790de6c705b811bd544abb0e5c15bf0",
-      "bytes": 26431,
+      "sha256": "ae472ad306b947cfdf8c0db9086687a6ef3e5b1fb179e34248a22a2a2847912a",
+      "bytes": 27021,
       "copied_now": false
     },
     {
       "rel": "roles/CAM_4212/role_17_f4302.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_17_f4302.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_17_f4302.png",
-      "sha256": "a417b52f33548fd37220cd3afa6542e44b4ece9dacc98a0b3c1aeff2e38e5c57",
-      "bytes": 22974,
+      "sha256": "f11ba2d06c35927483718f544babb24ec8f26fa1208344fb8fe90e5db59ebf13",
+      "bytes": 23523,
       "copied_now": false
     },
     {
       "rel": "roles/CAM_4212/role_18_f4287.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_18_f4287.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_18_f4287.png",
-      "sha256": "30c4002eb21e7c68f46a86ad433e9f700ba4191a1c6df1958ce88a631a6a5698",
-      "bytes": 21896,
+      "sha256": "2c7f5ebed23dcd760396371074a6c9048ed78061dce3b502b3231e1194b194b2",
+      "bytes": 22524,
       "copied_now": false
     },
     {
       "rel": "roles/CAM_4212/role_19_f4272.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_19_f4272.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_19_f4272.png",
-      "sha256": "3019013407eb352aaf81baa51a9717e5539a38fc3bbecbfc30e02aed244f9d99",
-      "bytes": 2700,
+      "sha256": "7b940a794b00fe5a0b0c707196070f2d8287bbffea9f64e535961dd4aa0fe7c4",
+      "bytes": 2846,
       "copied_now": false
     },
     {
       "rel": "roles/CAM_4212/role_1_f4212.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_1_f4212.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_1_f4212.png",
-      "sha256": "ca61bf1fd24a2fc6c5be9706cc86bc788cf4dc46c6525f82a729b4c31f946589",
-      "bytes": 2147,
+      "sha256": "e8adbd0ccfe7aae80fcdcbed154dbbd9b0e5e61e757f4af1ba41527bdeb4f9bf",
+      "bytes": 2218,
       "copied_now": false
     },
     {
       "rel": "roles/CAM_4212/role_20_f4287.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_20_f4287.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_20_f4287.png",
-      "sha256": "a97593207974e2e4d7f5590fb6d443463f783352fb2ec7653f28915049a582e2",
-      "bytes": 2201,
+      "sha256": "1e09898302ac92081fd091f6aa70ceaef40878d2e1d966ea520102f675a0ee2a",
+      "bytes": 2343,
       "copied_now": false
     },
     {
       "rel": "roles/CAM_4212/role_21_f4272.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_21_f4272.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_21_f4272.png",
-      "sha256": "129cbf4e8f73a6443db051b2c3f90beb71ddf217625c4a65fe2b9b50755ed7c9",
-      "bytes": 2636,
+      "sha256": "f60e599a3584375df2727eba44e83f9060766860d22c31517d6938e669d120f3",
+      "bytes": 2785,
       "copied_now": false
     },
     {
       "rel": "roles/CAM_4212/role_22_f4272.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_22_f4272.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_22_f4272.png",
-      "sha256": "823ad91bce3f3a9979157771f7a3d0f38891e1ede6685b686fb58280ee602b09",
-      "bytes": 2357,
+      "sha256": "4436738972f64b26275ff96cf27c6a3a3e49998c14125b935e2935980688dc29",
+      "bytes": 2502,
       "copied_now": false
     },
     {
       "rel": "roles/CAM_4212/role_23_f4272.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_23_f4272.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_23_f4272.png",
-      "sha256": "a5ed6dd62a34f1d25733e07e3c74e5789e693726af22bce23fca2f2747f0bd60",
-      "bytes": 2170,
+      "sha256": "c4373fe1d5330f0fbeeda15511b35dde226ea96b0ef385b1a178f992fee5d7a7",
+      "bytes": 2316,
       "copied_now": false
     },
     {
       "rel": "roles/CAM_4212/role_24_f4287.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_24_f4287.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_24_f4287.png",
-      "sha256": "77416b631505f195bf2363ed25e3d88f5822523af5cbc5299de6c300deb77c39",
-      "bytes": 1750,
+      "sha256": "23daa51816197e03af572aa83cecbaa9fd5edf3f56cbde14dd029aaa9d3f4c58",
+      "bytes": 1860,
       "copied_now": false
     },
     {
       "rel": "roles/CAM_4212/role_25_f4317.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_25_f4317.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_25_f4317.png",
-      "sha256": "035aed83f3616f7c2843d2390e03c102ceb5bb092dc79d00a0507fe6d6e6f769",
-      "bytes": 55654,
+      "sha256": "c4f142181ac713de9b3d0984f2e3328ccfac2b7b637826e036635fc862d04cb3",
+      "bytes": 55697,
       "copied_now": false
     },
     {
       "rel": "roles/CAM_4212/role_2_f4242.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_2_f4242.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_2_f4242.png",
-      "sha256": "5a595f144e8bdb8eb243a3126495a1a473630725befb7c8ead93be4036bce4df",
-      "bytes": 10157,
+      "sha256": "5d8b0481948d2bf238b5b8437990ceeafb48e9f67d444559be4608e05f6e5299",
+      "bytes": 10476,
       "copied_now": false
     },
     {
       "rel": "roles/CAM_4212/role_3_f4257.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_3_f4257.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_3_f4257.png",
-      "sha256": "caf235f610d4af67ceb8306c0f3cd937c368e1bdb148b45ff363e250efcb4cc2",
-      "bytes": 17791,
+      "sha256": "9673b552fd81c2b8b7b64ef3a4366f94908eb0b65a57752ad81ac4956e6f3eb9",
+      "bytes": 18336,
       "copied_now": false
     },
     {
       "rel": "roles/CAM_4212/role_4_f4272.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_4_f4272.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_4_f4272.png",
-      "sha256": "0c2375a4a713a06f67b729f751090b9662482ddd7dd2740e76b57e9ee990080e",
-      "bytes": 23651,
+      "sha256": "2b9e53c7e8d6a1ec25be3daa8c9456f6bfce68c37f53d7f8267c2c008ec34101",
+      "bytes": 24215,
       "copied_now": false
     },
     {
       "rel": "roles/CAM_4212/role_5_f4287.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_5_f4287.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_5_f4287.png",
-      "sha256": "afb2a832a4ce87a233a2536cbacb4d29d66f4b6832bdf0b5d408577dd18be288",
-      "bytes": 22390,
+      "sha256": "397a02aee6c45559b681c4a8f74d6cf28a4a43cf05ec2bb519a59c642899dfd0",
+      "bytes": 23009,
       "copied_now": false
     },
     {
       "rel": "roles/CAM_4212/role_6_f4257.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_6_f4257.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_6_f4257.png",
-      "sha256": "b0bd345ce7b4c352d8d0ae0fb827b2617859ac55f6816e9b2431aa1b32de978f",
-      "bytes": 16404,
+      "sha256": "a511459ed8c4446cec57a500a5f10cf16fe838da466eaf1bc69a21ff3c913aaa",
+      "bytes": 16763,
       "copied_now": false
     },
     {
       "rel": "roles/CAM_4212/role_7_f4242.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_7_f4242.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_7_f4242.png",
-      "sha256": "b80320657299c5c684b22f3b02636ecf0de06ba7e9c56ee59e2107d26e821e97",
-      "bytes": 9782,
+      "sha256": "07e00bd5f206076a03e4754d294da4c1b2c1ec2e571b83646c10bc6b6446eddc",
+      "bytes": 10158,
       "copied_now": false
     },
     {
       "rel": "roles/CAM_4212/role_8_f4242.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_8_f4242.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_8_f4242.png",
-      "sha256": "6b27a71b5a7249475e1f2a997f9854401b34cf42ebd6d1676d452b3b6c0b7089",
-      "bytes": 4571,
+      "sha256": "4579d758de29e17bd5d669247b78884513f6ba018863e74ea94a8104b030a19d",
+      "bytes": 4950,
       "copied_now": false
     },
     {
       "rel": "roles/CAM_4212/role_9_f4242.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_9_f4242.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_9_f4242.png",
-      "sha256": "3b941a6049a04497b0f38d2d15a37d900dd5609cc18c9cd440da032a1ba43134",
-      "bytes": 5574,
+      "sha256": "ea75e7080dc213b34ec8773ad6321030acd09da8cde7e26d25be182ccb3d890a",
+      "bytes": 5739,
       "copied_now": false
     },
     {
@@ -516,8 +516,8 @@
       "rel": "references/references_CUT_660.json",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\references_CUT_660.json",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\references\\references_CUT_660.json",
-      "sha256": "d38790f45a5d087165a214bf4ea8a20066cfcbc923eb5240272ba356e7792a46",
-      "bytes": 23560,
+      "sha256": "137ee7db4d8fc37cd2214cd76464770d5080b1b25b0523e35142c9f6942730d0",
+      "bytes": 36331,
       "copied_now": false
     },
     {
@@ -588,160 +588,160 @@
       "rel": "roles/CUT_660/role_10_f720.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_10_f720.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_10_f720.png",
-      "sha256": "1bcd65e707263eeb2ba059de89d231517341dbb428f4d5448103099be08a27b6",
-      "bytes": 140742,
+      "sha256": "6a38ef32022ba1511236ea26784912115fd1215d4947705fd6e73e934b3a9b7f",
+      "bytes": 140928,
       "copied_now": false
     },
     {
       "rel": "roles/CUT_660/role_11_f735.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_11_f735.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_11_f735.png",
-      "sha256": "6dd0e1c70e6d7074bc20b8f09f0a5a0dbef48340d62d88f4f548e87cb35fba74",
-      "bytes": 67641,
+      "sha256": "e75ee61e8d3cb7e4134dec1e9a647cca8a201c1634335105352c75e486962984",
+      "bytes": 68320,
       "copied_now": false
     },
     {
       "rel": "roles/CUT_660/role_12_f750.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_12_f750.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_12_f750.png",
-      "sha256": "5f554fff6edfc6332a3ef3dcbdf9bbdaa5ed7f5c8440b23e96cfc594cd58c787",
-      "bytes": 25694,
+      "sha256": "5e25c65c7a2adb12785368bddf2deecf1d993feb4a546fe8155108459c4ede89",
+      "bytes": 25895,
       "copied_now": false
     },
     {
       "rel": "roles/CUT_660/role_13_f750.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_13_f750.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_13_f750.png",
-      "sha256": "3a52fabe85610300e8803050ac203d6fa36a0779b6990cbcf5eda7bcd9a702a2",
-      "bytes": 6657,
+      "sha256": "6b8dfb95533c12ae29a73eb7e292fe32a9233960110cb2d1e067a07a0948b932",
+      "bytes": 7116,
       "copied_now": false
     },
     {
       "rel": "roles/CUT_660/role_14_f765.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_14_f765.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_14_f765.png",
-      "sha256": "fd165de2b7acc97f8523ac05abacb6c734d4162567884a768261e738ae5fb0cd",
-      "bytes": 6309,
+      "sha256": "924ad790f8c1b002174d03b9a49b0daa7a2c7f4557007b59d0d8e758314e3f89",
+      "bytes": 6697,
       "copied_now": false
     },
     {
       "rel": "roles/CUT_660/role_15_f750.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_15_f750.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_15_f750.png",
-      "sha256": "2029c05bea362ebeefe08fa9aa9b129a0d8cceb15175766d182f12f07a070122",
-      "bytes": 11274,
+      "sha256": "7bedd369f9993798c52fb0adbbd3b7fff3e228fc94982d424074cb2c4ca5df92",
+      "bytes": 11598,
       "copied_now": false
     },
     {
       "rel": "roles/CUT_660/role_16_f750.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_16_f750.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_16_f750.png",
-      "sha256": "c8596d3da6a0cd4f566f7c1276f2e440a162123945fd4a3686ce3693c718346f",
-      "bytes": 12081,
+      "sha256": "a15b17a70e8689a82d32a4ed6ae534a2e7499faa49ea8522104b9ed16cd20301",
+      "bytes": 12319,
       "copied_now": false
     },
     {
       "rel": "roles/CUT_660/role_17_f750.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_17_f750.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_17_f750.png",
-      "sha256": "8274d9fdef5bd47de55ae927348c0902f39e4ddb5d3919127e256fd3407e3a6e",
-      "bytes": 3958,
+      "sha256": "ecdd6ef49092fba851113f73f624596fb84fe2a2c7545da95535596eb493d2c8",
+      "bytes": 4330,
       "copied_now": false
     },
     {
       "rel": "roles/CUT_660/role_18_f750.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_18_f750.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_18_f750.png",
-      "sha256": "53abf5af64f5f80f62dad53001ea6796b8df7a9764d25fd638df913294332b8e",
-      "bytes": 9546,
+      "sha256": "032cac05e5d31d2f8e4ac84043eeeac3aa055ca0123772c58d8bdc3127bfb3a6",
+      "bytes": 9796,
       "copied_now": false
     },
     {
       "rel": "roles/CUT_660/role_19_f750.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_19_f750.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_19_f750.png",
-      "sha256": "3f785b06d78808768577a3762ab95d4fa7609f9c799d169ab2740609727f3ea3",
-      "bytes": 6484,
+      "sha256": "ca541a3c5ef32b0844900845816898c1098475493e7b83818cbb4c4cbce1bcdb",
+      "bytes": 6812,
       "copied_now": false
     },
     {
       "rel": "roles/CUT_660/role_1_f660.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_1_f660.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_1_f660.png",
-      "sha256": "381c52f7530ef3b61e89d07f45519d8f4f641092c1125e204f5e4bc7c4504b6f",
-      "bytes": 29552,
+      "sha256": "e433a8241217423081c507e7d676665cf2653e7108161d87b3a4e5d9baa63d57",
+      "bytes": 29949,
       "copied_now": false
     },
     {
       "rel": "roles/CUT_660/role_20_f750.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_20_f750.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_20_f750.png",
-      "sha256": "d6f0444c10c57e5e84017582d8632792b1bc7acc92ec2c479aec5317446f679a",
-      "bytes": 3542,
+      "sha256": "8568183628a188270bcecca26fec57343b4d33f4d05445d212c8ca097a0a877a",
+      "bytes": 3607,
       "copied_now": false
     },
     {
       "rel": "roles/CUT_660/role_2_f660.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_2_f660.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_2_f660.png",
-      "sha256": "c3ed45018892c8e749f3bf752afe3b6c241cfbde6f7ccf0defc48710555e076b",
-      "bytes": 5231,
+      "sha256": "e5d0729ef4abfdba30bf3ea4e0d94bbe76991a8433090120f6b7f9195c15d513",
+      "bytes": 5578,
       "copied_now": false
     },
     {
       "rel": "roles/CUT_660/role_3_f660.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_3_f660.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_3_f660.png",
-      "sha256": "03318522dbcbf424928d974c18741e32aff9994c155a23efef96877b934bb24d",
-      "bytes": 9757,
+      "sha256": "5e1280e3db8d4b2d147b2d05587c3b873ea5341b54a20235fba457d7503b1f6c",
+      "bytes": 10038,
       "copied_now": false
     },
     {
       "rel": "roles/CUT_660/role_4_f720.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_4_f720.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_4_f720.png",
-      "sha256": "27ca21c6a37ec195eddc9be70659a2842498297a02089731927bb510f19c0937",
-      "bytes": 3682,
+      "sha256": "8a3e3188a6e8a69600c8acc5c803f2576c660a125d7cab1eb9ae24a689fc903d",
+      "bytes": 3920,
       "copied_now": false
     },
     {
       "rel": "roles/CUT_660/role_5_f675.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_5_f675.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_5_f675.png",
-      "sha256": "30b3ab13098c4b61db83444d1f4716c69ad1b45a3e0e862c37a2536cd2766686",
-      "bytes": 6440,
+      "sha256": "b8037858a215daef04f0653b7396092c56ae9d266f218b0a07c2d705e234b21a",
+      "bytes": 6635,
       "copied_now": false
     },
     {
       "rel": "roles/CUT_660/role_6_f660.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_6_f660.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_6_f660.png",
-      "sha256": "237640f691032b27c5993a68eb912ebee573e239436eb919344dc09556e9c833",
-      "bytes": 4211,
+      "sha256": "1048c3cee2fc6ed679de106f6805d7e0e35af7093138afc2f257df7f5a6efd23",
+      "bytes": 4262,
       "copied_now": false
     },
     {
       "rel": "roles/CUT_660/role_7_f660.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_7_f660.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_7_f660.png",
-      "sha256": "0631d705e5ed3fe13b88562a6f5d01ab90e40e291bc62dd54780a7ce6f4347ea",
-      "bytes": 3159,
+      "sha256": "02853a80ad50b3b1ee63adeb62a1a9ddaed6d0314c5c18cb0e29e123f2ad118a",
+      "bytes": 3330,
       "copied_now": false
     },
     {
       "rel": "roles/CUT_660/role_8_f660.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_8_f660.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_8_f660.png",
-      "sha256": "d0b29a090b13f3b32903a31113581bef71ef462c508f5ed7835eb9e5da273078",
-      "bytes": 2541,
+      "sha256": "a9d31ea6f0db33f408d5ab32d5bdb54dec4ada3433d368e0f64a7a99723b088d",
+      "bytes": 2775,
       "copied_now": false
     },
     {
       "rel": "roles/CUT_660/role_9_f675.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_9_f675.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_9_f675.png",
-      "sha256": "a4f179a4a911a346513dcf305d31d6e264942f74ad4c37daf5a3402c395b7195",
-      "bytes": 1334,
+      "sha256": "0d0d76570604896692ff443e01d1a80826331b40b1b111aba294c18824b1ffe0",
+      "bytes": 1513,
       "copied_now": false
     },
     {
@@ -764,8 +764,8 @@
       "rel": "references/references_HOLDOUT_16231.json",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\references_HOLDOUT_16231.json",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\references\\references_HOLDOUT_16231.json",
-      "sha256": "c70db8abb86cd5d914771e9db3930fda045b8f030dbedc1f0a1adeb641ca1db9",
-      "bytes": 17432,
+      "sha256": "e81110e9589af5d74ff3c59c6a1a483e501809965e3669dd93da4a140e64724f",
+      "bytes": 25934,
       "copied_now": false
     },
     {
@@ -836,104 +836,104 @@
       "rel": "roles/HOLDOUT_16231/role_10_f16231.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_10_f16231.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\HOLDOUT_16231\\role_10_f16231.png",
-      "sha256": "df6df37fd2bde583159ce208a8a4c19cc11eaaf04a8bd3f26cd5be3f7e0d1cba",
-      "bytes": 2463,
+      "sha256": "a36525f6f55c59c7a6e20d3c3bc49cb3c9f4a584c2744fdc43f46bcb78391458",
+      "bytes": 2688,
       "copied_now": false
     },
     {
       "rel": "roles/HOLDOUT_16231/role_11_f16231.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_11_f16231.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\HOLDOUT_16231\\role_11_f16231.png",
-      "sha256": "dafd399a20ffb7494ac61c3a92184c01e2300766bbd016416e1cb5f1f173aeae",
-      "bytes": 1215,
+      "sha256": "72600ec9336c91c2144d5611f2375b42a43130cbc9beb2ed0a97bdeb8b999cbf",
+      "bytes": 1355,
       "copied_now": false
     },
     {
       "rel": "roles/HOLDOUT_16231/role_12_f16261.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_12_f16261.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\HOLDOUT_16231\\role_12_f16261.png",
-      "sha256": "3e161a14a3a26febe127f239ec892cf34d5e211f80f97c7bc38d8abc0af93b9d",
-      "bytes": 5189,
+      "sha256": "9cee6e7df1a8dafd228a840e6fa8244cb8b7c6476ced15f7ee01325b7e0b95f0",
+      "bytes": 5475,
       "copied_now": false
     },
     {
       "rel": "roles/HOLDOUT_16231/role_13_f16336.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_13_f16336.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\HOLDOUT_16231\\role_13_f16336.png",
-      "sha256": "bc5fce222a17d28873dd149415199f351a17d73181ddea3fbaa57b8b02f8d12e",
-      "bytes": 5268,
+      "sha256": "77a89bb74dd9740be4d21375d852b9a10e96fb46333bd336911a8a7a28bdabdf",
+      "bytes": 5557,
       "copied_now": false
     },
     {
       "rel": "roles/HOLDOUT_16231/role_1_f16276.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_1_f16276.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\HOLDOUT_16231\\role_1_f16276.png",
-      "sha256": "19a9a0e5bbba8ab03a118ad033a6ffae50e9cd23ac428011dd602ef17c489e8b",
-      "bytes": 104884,
+      "sha256": "195a0eab77f4f15fcf7714b526d23001d12d17b6b5c29607d8162c475269130e",
+      "bytes": 83963,
       "copied_now": false
     },
     {
       "rel": "roles/HOLDOUT_16231/role_2_f16306.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_2_f16306.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\HOLDOUT_16231\\role_2_f16306.png",
-      "sha256": "913ceb1c7f39f4f63993f5a6d04d5953f6286b123532948c9d6f32dec3ea942f",
-      "bytes": 33380,
+      "sha256": "59168cd2aa4067954c295682940cf9c19d511317cd841c914bf2d970f30c8341",
+      "bytes": 34268,
       "copied_now": false
     },
     {
       "rel": "roles/HOLDOUT_16231/role_3_f16321.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_3_f16321.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\HOLDOUT_16231\\role_3_f16321.png",
-      "sha256": "c8fd0c13bcdb8a4c6623be2612b4d5fee303b0342427aa7c6b2efb91d87a4150",
-      "bytes": 34684,
+      "sha256": "00537c290a627808a0a23d7c82862906ad52c50c7b3788a6a109e14a5faf0f3a",
+      "bytes": 35354,
       "copied_now": false
     },
     {
       "rel": "roles/HOLDOUT_16231/role_4_f16321.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_4_f16321.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\HOLDOUT_16231\\role_4_f16321.png",
-      "sha256": "624d4a3f2e3e5d6116e076ad927f47e5a625507be3573d87adba1395ad6c35db",
-      "bytes": 37003,
+      "sha256": "41ac6b995f6211666072674016a5a5be3d8ffa2f2fcb9ed0433b2259a92af927",
+      "bytes": 37608,
       "copied_now": false
     },
     {
       "rel": "roles/HOLDOUT_16231/role_5_f16231.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_5_f16231.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\HOLDOUT_16231\\role_5_f16231.png",
-      "sha256": "4965462bd6b3c3a8d37ca305d32d0c6f6b2fb4e382046ce336037a6ee873cfae",
-      "bytes": 33148,
+      "sha256": "f5acd3a5416ae7c0d54af09edeaca9565601b7066c7f589722d24afa89d8539b",
+      "bytes": 33716,
       "copied_now": false
     },
     {
       "rel": "roles/HOLDOUT_16231/role_6_f16231.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_6_f16231.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\HOLDOUT_16231\\role_6_f16231.png",
-      "sha256": "907acb6546aa48f01ab700059ee8edfbd78ff96c1b1facbfd049738e3566f358",
-      "bytes": 25346,
+      "sha256": "589cf1c38183035027a2007f1f8709b08b44a75c0be30b4dfa6d797925e27aa8",
+      "bytes": 25634,
       "copied_now": false
     },
     {
       "rel": "roles/HOLDOUT_16231/role_7_f16321.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_7_f16321.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\HOLDOUT_16231\\role_7_f16321.png",
-      "sha256": "bcd2e0277bd991e1a646260d50dba588ae62f2f21e3c1c54fabdaae04472a7e8",
-      "bytes": 5676,
+      "sha256": "f8188d975d7e308745a277593f944376641443bebcd80eb2d44b5e38f3de4d2c",
+      "bytes": 6059,
       "copied_now": false
     },
     {
       "rel": "roles/HOLDOUT_16231/role_8_f16231.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_8_f16231.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\HOLDOUT_16231\\role_8_f16231.png",
-      "sha256": "194d4d383826d9fda589fdc256cd81fce1501d1ad39766bb3fe29decd944a47d",
-      "bytes": 3231,
+      "sha256": "f37a5263b06ec0386623cedb1d1a23bec0a1128c57472b95f43300f9f832c448",
+      "bytes": 3452,
       "copied_now": false
     },
     {
       "rel": "roles/HOLDOUT_16231/role_9_f16261.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_9_f16261.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\HOLDOUT_16231\\role_9_f16261.png",
-      "sha256": "4bc39c469eb302a5d21ddc645c7ea1358690d4d9dd240c370d5cc058177e1956",
-      "bytes": 3407,
+      "sha256": "3eec1a070db6a82e17990a0719f5e0aea8535fddaacec269fff4246a450c6573",
+      "bytes": 3447,
       "copied_now": false
     },
     {
@@ -956,8 +956,8 @@
       "rel": "references/references_OCC_14768.json",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\references_OCC_14768.json",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\references\\references_OCC_14768.json",
-      "sha256": "2fee89415188a8daf998e965fc4e8dc70d03e9599816f29c2e76173a590e0fb0",
-      "bytes": 15328,
+      "sha256": "ddfb55170c5824eb20a98a15675f4081395dd31ca665c0400b96077f9a507a96",
+      "bytes": 22704,
       "copied_now": false
     },
     {
@@ -1028,88 +1028,88 @@
       "rel": "roles/OCC_14768/role_10_f14873.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_10_f14873.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\OCC_14768\\role_10_f14873.png",
-      "sha256": "85323d710be5c2f01fb34a9a0213981eef5d2f06d383ea86bfece63de020632e",
-      "bytes": 1889,
+      "sha256": "722c94bc797c13db90fbd9abd1a8f01e405a06ceb6ff99154917fada4b52eb83",
+      "bytes": 1909,
       "copied_now": false
     },
     {
       "rel": "roles/OCC_14768/role_11_f14873.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_11_f14873.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\OCC_14768\\role_11_f14873.png",
-      "sha256": "fd59c6cf390f8b13a819db545ffb845f5d73f42ddf0a6178c73e78ac0f88359f",
-      "bytes": 9101,
+      "sha256": "93f1d41e49167c745dd91f87411e24162fe3ff648e2e933e78cd7d04825b4d10",
+      "bytes": 9528,
       "copied_now": false
     },
     {
       "rel": "roles/OCC_14768/role_1_f14843.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_1_f14843.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\OCC_14768\\role_1_f14843.png",
-      "sha256": "dee070fe54fea06960a4f5383d1f84c05e458968bcf594a4aed58013a30e75f7",
-      "bytes": 17624,
+      "sha256": "074ea3c529a3e2d3f9c2f150687bbe6db7fb663be452a4cb7185d7bbcad7b320",
+      "bytes": 18607,
       "copied_now": false
     },
     {
       "rel": "roles/OCC_14768/role_2_f14768.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_2_f14768.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\OCC_14768\\role_2_f14768.png",
-      "sha256": "2e930a9570940a48fd33bbc76567192d4124d6ee60d9ce3cf88d1a412af236a7",
-      "bytes": 101380,
+      "sha256": "03479f2587c1ed2f93af78fa288cd7ded52e9a36f52babdef4ec8a68d7eeb921",
+      "bytes": 101539,
       "copied_now": false
     },
     {
       "rel": "roles/OCC_14768/role_3_f14873.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_3_f14873.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\OCC_14768\\role_3_f14873.png",
-      "sha256": "e7c2e7bd3cc2b9a69e4d2a2d413546e00b61fc11a89e9c701ca8e1dc7f868807",
-      "bytes": 3026,
+      "sha256": "6ece111783c1534cf3bc9a4c5152a14f5a0915276789bc72a1609fd412888a6e",
+      "bytes": 3237,
       "copied_now": false
     },
     {
       "rel": "roles/OCC_14768/role_4_f14813.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_4_f14813.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\OCC_14768\\role_4_f14813.png",
-      "sha256": "f1ff255f6cdd54a9cbd3688b2ae02d1b9a8c824e7dfecf88d05acd3d583f0266",
-      "bytes": 1718,
+      "sha256": "5b177d9124f1d24ceeaf1282c8ea71cb925d5b938ed82fc3b2527b7919df3db1",
+      "bytes": 1933,
       "copied_now": false
     },
     {
       "rel": "roles/OCC_14768/role_5_f14798.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_5_f14798.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\OCC_14768\\role_5_f14798.png",
-      "sha256": "38a9ae1146b3cd5bb66fdd24258b7579ec01c54e6676a85628d7afe8b58e1979",
-      "bytes": 1382,
+      "sha256": "6e9bd78de52a318e985b5b7d582ee896d294d4ee367facf22cbe022206ddbba9",
+      "bytes": 1539,
       "copied_now": false
     },
     {
       "rel": "roles/OCC_14768/role_6_f14858.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_6_f14858.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\OCC_14768\\role_6_f14858.png",
-      "sha256": "38a9ae1146b3cd5bb66fdd24258b7579ec01c54e6676a85628d7afe8b58e1979",
-      "bytes": 1382,
+      "sha256": "6927d38b835ee59067e2d48132a4b87095cfb4796348057617ffda6bc5105cc3",
+      "bytes": 1539,
       "copied_now": false
     },
     {
       "rel": "roles/OCC_14768/role_7_f14873.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_7_f14873.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\OCC_14768\\role_7_f14873.png",
-      "sha256": "38c105ac1301f7db9367c5bdef684a21ed5dc1c65c0209ee6ebb053a43e236aa",
-      "bytes": 54487,
+      "sha256": "8bd5e15d5994336deaaf902bff5f2c39439ccb8742f09e5f134e330a96005d58",
+      "bytes": 25387,
       "copied_now": false
     },
     {
       "rel": "roles/OCC_14768/role_8_f14873.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_8_f14873.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\OCC_14768\\role_8_f14873.png",
-      "sha256": "856d9f241e341791316f8c308e514b7f51aa877200f85ac2483732723824c69d",
-      "bytes": 97643,
+      "sha256": "b2adacfa312c89e4c1d0517eabd5a0aee0de93dd05d993cf71c88807e8c675cf",
+      "bytes": 78893,
       "copied_now": false
     },
     {
       "rel": "roles/OCC_14768/role_9_f14873.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_9_f14873.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\OCC_14768\\role_9_f14873.png",
-      "sha256": "e972cb0adac731658714797e1d86516f27fa1c87953ca1ef6b4c81a180bf13bd",
-      "bytes": 8570,
+      "sha256": "5502c58b8c008cf595cea8becc491b4eee28de41b07ddf13a7c0a01de34a638e",
+      "bytes": 8737,
       "copied_now": false
     },
     {
@@ -1132,8 +1132,8 @@
       "rel": "references/references_TURN_795.json",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\references_TURN_795.json",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\references\\references_TURN_795.json",
-      "sha256": "95077d41edaab7eab047dcf6dcaa2603949982eb36d406190a0ba62c09ecf1a4",
-      "bytes": 10363,
+      "sha256": "64301b4ecd913ea5dbc780996ed36af247ed0690f9459645b5a67e21882297c9",
+      "bytes": 14543,
       "copied_now": false
     },
     {
@@ -1204,48 +1204,48 @@
       "rel": "roles/TURN_795/role_1_f795.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\roles\\role_1_f795.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\TURN_795\\role_1_f795.png",
-      "sha256": "1ccd5edc5ce2187e442ec32573ddf825babef367339ee4cc2a57fd176fd72f7a",
-      "bytes": 93970,
+      "sha256": "d5b3ea8ab5ec92eed000de7f4ec78fd00e50b4b26cae9a0df14d60114efdb16b",
+      "bytes": 94103,
       "copied_now": false
     },
     {
       "rel": "roles/TURN_795/role_2_f900.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\roles\\role_2_f900.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\TURN_795\\role_2_f900.png",
-      "sha256": "e541076819e8a86634a0d6df0f6d13e39b16825d3632ccc08c39c4e8761e24e1",
-      "bytes": 128498,
+      "sha256": "0e70f09fe7caae4c923bd079ac8fce3226cce70a220d9ebddd022c0959c1295b",
+      "bytes": 129565,
       "copied_now": false
     },
     {
       "rel": "roles/TURN_795/role_3_f795.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\roles\\role_3_f795.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\TURN_795\\role_3_f795.png",
-      "sha256": "e36e75058591861c96aeb0c940b11b408a9a083364a43357e1216921b421bd4a",
-      "bytes": 22939,
+      "sha256": "5a1787464b7ca5b243d39a2d24da2a3233999b07281d3a6c652013682ecb969a",
+      "bytes": 23577,
       "copied_now": false
     },
     {
       "rel": "roles/TURN_795/role_4_f810.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\roles\\role_4_f810.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\TURN_795\\role_4_f810.png",
-      "sha256": "9c9cca6a928ac40048fbd2e322021ef48a77f7871e3f2d471f2a3749de9a00d5",
-      "bytes": 3153,
+      "sha256": "4c67dfb7feed4f0c267fc3a90c60b9f56ed30d5939a3ee149eaec8aeb1963683",
+      "bytes": 3382,
       "copied_now": false
     },
     {
       "rel": "roles/TURN_795/role_5_f840.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\roles\\role_5_f840.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\TURN_795\\role_5_f840.png",
-      "sha256": "37ac372401df03e00c09111e3f1169fa77ca594f4b3749253268783247da37cd",
-      "bytes": 3081,
+      "sha256": "b3b2dbe8cd1e7e67914ba8c1ff4bae288a59c660060c7ec858a568ae067322af",
+      "bytes": 3341,
       "copied_now": false
     },
     {
       "rel": "roles/TURN_795/role_6_f900.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\roles\\role_6_f900.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\TURN_795\\role_6_f900.png",
-      "sha256": "c9c34476247eb1c54e4755704917a290b1ad83b3581fad308ca6cbb4c422f764",
-      "bytes": 33605,
+      "sha256": "a3e3f425ad0f69448f3aca06bef69773df23d60651bf92663ba298a2870d3f1a",
+      "bytes": 34573,
       "copied_now": false
     },
     {
@@ -1268,8 +1268,8 @@
       "rel": "references/references_WALK_7927.json",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\references_WALK_7927.json",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\references\\references_WALK_7927.json",
-      "sha256": "2409693c914861abaed8c078c34c92d2a0ac3bc26d5ac279a127a649cbe1c0b7",
-      "bytes": 9521,
+      "sha256": "82b884c77aac3708c49333abd230d670fb9f57c40f58bf690e4d37171a363d7d",
+      "bytes": 13092,
       "copied_now": false
     },
     {
@@ -1340,107 +1340,107 @@
       "rel": "roles/WALK_7927/role_1_f7972.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\roles\\role_1_f7972.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\WALK_7927\\role_1_f7972.png",
-      "sha256": "48f7e0ca48f37aecf1b51ba033d7ee8f5041bba399edec8ed83599cfb89134e2",
-      "bytes": 109995,
+      "sha256": "28cccb9ef696fa5cf94a3b6a35ce632124068c0d33cc12157d37f85a14a1bac9",
+      "bytes": 107882,
       "copied_now": false
     },
     {
       "rel": "roles/WALK_7927/role_2_f8002.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\roles\\role_2_f8002.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\WALK_7927\\role_2_f8002.png",
-      "sha256": "1c3e447b1834dd20e396984b858af45486614b19847469ec6bafd37a07c29a6b",
-      "bytes": 12494,
+      "sha256": "ef6216cc318efbdf83626a88d0991d5e5aedddf96441aa75ee85c8a3238d49e7",
+      "bytes": 13208,
       "copied_now": false
     },
     {
       "rel": "roles/WALK_7927/role_3_f7942.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\roles\\role_3_f7942.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\WALK_7927\\role_3_f7942.png",
-      "sha256": "dbdce179117fde0a3459db2e7c722207d1ae8428e59ea671db6086a6b89334ff",
-      "bytes": 2998,
+      "sha256": "2e27fecb59f0eaa145df389c44f8d66e183b8be5a188c08ae95558fb98a3792a",
+      "bytes": 3271,
       "copied_now": false
     },
     {
       "rel": "roles/WALK_7927/role_4_f7942.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\roles\\role_4_f7942.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\WALK_7927\\role_4_f7942.png",
-      "sha256": "5410bcc6ddc49613faab546e23a28a4b26591f8fc1924bb2ba99f8b8a482474c",
-      "bytes": 1745,
+      "sha256": "35326a70bb380b7fa9c3889485380ddffa3577b7c5dab2a49f32abb8fa4a8c48",
+      "bytes": 1873,
       "copied_now": false
     },
     {
       "rel": "roles/WALK_7927/role_5_f8032.png",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\roles\\role_5_f8032.png",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\WALK_7927\\role_5_f8032.png",
-      "sha256": "e09bf5c23772984185ed15a1759b1f803e4f29f324d2dc298a71b89edb80656c",
-      "bytes": 99545,
+      "sha256": "e5d7a13d552be175a785b054787aaece11c6d5d3359529a774fdabcd1a6aee63",
+      "bytes": 99964,
       "copied_now": false
     },
     {
       "rel": "ledger/commands.jsonl",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\commands.jsonl",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\ledger\\commands.jsonl",
-      "sha256": "fb088bc4d75bf330584f862acc8956be52d86cdc9b04550873155330e4157fe1",
-      "bytes": 53997,
+      "sha256": "778723919f10d7c35cf0b33c1b63b9e9cf31c2e73ef435e6daca6a8688831b15",
+      "bytes": 61941,
       "copied_now": true,
-      "superseded_sha256": "97e454d16d77996630b603ca76d5130039700aeb85743feea92cfcbc2486ce60"
+      "superseded_sha256": "dfb36c9795a185a0485ee4488127e5e962681eb3a747e0563dfddc0eed95b69d"
     },
     {
       "rel": "guards/guard_baseline.json",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\guard_baseline.json",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\guards\\guard_baseline.json",
-      "sha256": "ffaf739d962f672d32eb5ad0fdfe917f9b4debe9e2f7ff4e7174ef46d60a5785",
-      "bytes": 65933,
+      "sha256": "5e98f842eef757ab7465ea5525a616735eaa8b7b78f0e440aed6709458a28f77",
+      "bytes": 345695,
       "copied_now": false
     },
     {
       "rel": "guards/guard_verify.json",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\guard_verify.json",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\guards\\guard_verify.json",
-      "sha256": "ecdf26430c5a52602231b92486b818fde11663e219f6322517a39ab4b82dee8e",
-      "bytes": 135322,
+      "sha256": "ef32299ea219c92d99c09daa917cc60678c9d0bb44f939d22d2af8fc30d3d931",
+      "bytes": 57976,
       "copied_now": true,
-      "superseded_sha256": "bd2d5eff30014f8dfc217465452032943ef5dec1ffab186802e0712b1ab12144"
+      "superseded_sha256": "ecdf26430c5a52602231b92486b818fde11663e219f6322517a39ab4b82dee8e"
     },
     {
       "rel": "guards/guard_final_classification.json",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\guard_final_classification.json",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\guards\\guard_final_classification.json",
-      "sha256": "5314608adda44a5e834ec4784cb3d4514a601bc82bc132d9ad7f1e7a72e5d079",
-      "bytes": 1767,
+      "sha256": "d7f611e02874e4799e4eab9cd9ff9771487df9e4120ce34ed91a9f51d6727208",
+      "bytes": 24472,
       "copied_now": true,
-      "superseded_sha256": "6d818ee3b172fd5007ee7e88c4da46cf383007453abc02b0d441983e08c423b3"
+      "superseded_sha256": "5314608adda44a5e834ec4784cb3d4514a601bc82bc132d9ad7f1e7a72e5d079"
     },
     {
       "rel": "REPORT.md",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\report\\REPORT.md",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\REPORT.md",
-      "sha256": "f33ee72aaf39de7718c3dd0673c5b91fa3af6a1e95adbf0c086707b95f6112d8",
-      "bytes": 10001,
+      "sha256": "5aef317c2f69485eee728cff2566e84207f3c94477e3ee22fe4f2e2fc62ea7c2",
+      "bytes": 14181,
       "copied_now": false
     },
     {
       "rel": "MATRIX.md",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\report\\MATRIX.md",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\MATRIX.md",
-      "sha256": "668b3307237df57022b4b691507bfdbf1d441ca24621663c56bb3f41693f24df",
-      "bytes": 12569,
+      "sha256": "fb5640970be5bc16ad544b9d6c9a9741f3f8d8ff08365362760d2eb5836b765f",
+      "bytes": 11333,
       "copied_now": false
     },
     {
       "rel": "NEXT_REVIEW_PACKET.md",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\report\\NEXT_REVIEW_PACKET.md",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\NEXT_REVIEW_PACKET.md",
-      "sha256": "dd7c9ddc828a1d4a2b000d6716986082780102ad5ed2e55736461c90652373d1",
-      "bytes": 5993,
+      "sha256": "874747a90808696dc7940a6e7634201efd178a798c8c50c44ecede27811b4c86",
+      "bytes": 7533,
       "copied_now": false
     },
     {
       "rel": "README.md",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\report\\README.md",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\README.md",
-      "sha256": "4311e2483f19cb4561d55f8ddf7c88ef6844a52d1e67d0a3974efa5885db0ec6",
-      "bytes": 3468,
+      "sha256": "ca54d6f548dade9a15b83b4639e3312905656ecb342a5e3507ec5ec3eac6f421",
+      "bytes": 5190,
       "copied_now": false
     }
   ]

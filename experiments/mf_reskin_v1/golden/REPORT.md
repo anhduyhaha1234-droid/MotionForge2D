@@ -1,152 +1,225 @@
-# REPORT — MF-V1-GOLDEN (round 2, continuation of session `20260917_180945_1e9357`)
+# REPORT — MF-V1-GOLDEN (continuation 02 / round 3 — cutout-crop fix)
 
 Task ID: **MF-V1-GOLDEN** · Branch `codex/mf-reskin-v1-golden` · Base SHA
 `2594de06cd5b2355e7e874ae4d6deb8a7b5b1b64` (re-asserted, unchanged)
-Worker: Hermes worker session `20260917_180945_1e9357` (same owner as round 1)
-Model route: exact `ocg/deepseek-v4.1-flash`, fallback OFF (unchanged)
-Round-2 window (local +07): 2026-09-17 18:50 → 19:05
+Worker session: `20260917_184835_1e70db` (the continuation-02 packet's own pin;
+the round-1/round-2 documents under this same Task ID record
+`20260917_180945_1e9357` — both are quoted verbatim rather than reconciled)
+Model route: exact `ocg/deepseek-v4.1-flash`, thinking ON, effort N/A, fallback OFF
+Round-3 window (local +07): 2026-09-17 19:31 → 19:5x (single bounded correction)
 
 ## 0. Verdict in one line
 
-**TASK_SUBMITTED** — all five outstanding steps I.1–I.5 are done and landed;
-G-A1..G-A7, G-A9..G-A12 are green; **G-A8 is satisfied as outcome (b)** (keyframe
-spec + exact unmet dependency), because no image/generative engine is callable
-from this task's runtime. Nothing was pushed, merged, or self-approved.
+**TASK_SUBMITTED** — the one authorised correction (your decision #2) is done:
+role reference cutouts are now cropped from the **mask's tight bounding box**, the
+audit reads **88/88 `EXACT` with 0 of 2,089,631 mask pixels outside the crop**, the
+round-2 declared-bbox defect is **still measured and reported unchanged**
+(9,058 px = 0.433474 %), the fixture / keyframes / freeze are **re-asserted
+byte-identical**, the guard is re-run and classified, the docs and manifests are
+refreshed to the corrected values, and the work is in a **local commit** on
+`codex/mf-reskin-v1-golden`. **Nothing was pushed.** No engine→artwork, no vision
+work, no PROPAGATE/BENCH, no fixture/tolerance change.
 
 ## 1. What actually ran this round (real numbers)
 
-| Step | Command (exact, via `tools/run_log.py`) | Result | Duration |
+| Step | Command (exact, via `tools/run_log.py`) | Result | Exit |
 |---|---|---|---|
-| I.2 guard baseline | `python tools/write_set_guard.py baseline` | HEAD `2594de0`, porcelain `0` lines, tracked `1837`; runtime root `176` files, EV `0`, in-repo allowlist `0` | 0.410 s |
-| I.1 references | `python tools/make_references.py` | 7 windows → **56 aligned keyframes**, **88 role reference cutouts**, 7 `references_<tag>.json` + `references_index.json`; exit 0 | 22.442 s |
-| audit (new) | `python tools/measure_cutout_bounds.py` | 88 roles audited: **88 CLIPPED**, **10** role→mask-index ambiguous, mask px outside declared crop **9,058 / 2,089,631 = 0.433474 %**, alpha integrity **88/88 true** | 0.236 s |
-| G-A8b evidence (new) | `python tools/probe_image_engine.py` | `any_engine_reachable = false`; ports 8188/8201/7860/8888/3000 → TCP refused; `diffusers`/`transformers` missing; diffusion weights in this runtime `0` | 22.179 s |
-| I.3 evidence publish | `python tools/publish_evidence.py publish --target ev` | byte-verified copies into `…\GOLDEN` | see §4 |
-| I.4 in-repo | `python tools/publish_evidence.py publish --target repo` | **175** files byte-verified into `experiments/mf_reskin_v1/golden/**` | 0.793 s |
-| I.5 commit | `git commit` on `codex/mf-reskin-v1-golden` | commit **674fc0c** (parent `2594de0`), 176 files changed, 26,642 insertions, porcelain `0` after | — |
-| I.2 guard verify | `python tools/write_set_guard.py verify` (pre-commit) | **VERIFIED**, `problems: []`, added `165`, modified `1`, removed `0` | 0.310 s |
+| pre-image freeze (1st) | `python tools/round3_preimage.py` | patched-tool preimages + 7 frozen artifacts | 0 |
+| pre-image freeze (2nd) | `python tools/round3_preimage.py` | same two preimages plus protected/regenerated tree aggregates | 0 |
+| round-2 byte archive | `python tools/round3_preserve.py` | **9** files copied, all `byte_identical: true` | 0 |
+| bounded patch | `python tools/round3_patch.py` | `measure_cutout_bounds.py` patched (`applied_now`); `make_references.py` re-measured | 0 |
+| references (the fix) | `python tools/make_references.py` | 7 windows → **56 keyframes (skipped, already present)** + **88 role cutouts regenerated** + 7 manifests + index | 0 |
+| audit | `python tools/measure_cutout_bounds.py` | 88 roles: **88 `EXACT`**, mask px outside crop **0 / 2,089,631 = 0.0 %** | 0 |
+| independent check | `python tools/verify_round3.py` | **14/14 checks true**, `failures []` | 0 |
 
-The single `modified` file in the guard verify is `ledger/commands.jsonl` — the
-command ledger itself, which every logged command appends to (inside the
-allowlist). **Zero round-1 runtime bytes were modified** and zero files were
-removed.
+`round3_preimage.py` ran twice. The **first** invocation (19:32:41) recorded a
+7-entry frozen list that included `references_index.json` and
+`cutout_bounds_audit.json`; those two are rebuilt by design in this round, so the
+**second, authoritative** invocation (19:34:12) moved them to the
+`regenerated_artifacts_pre` group and added the protected/regenerated tree
+aggregates. Both raw outputs are kept
+(`ledger/raw/20260917T123241_round3_preimage.txt`,
+`ledger/raw/20260917T123412_round3_preimage.txt`) and the **two runs agree
+byte-for-byte on both patched-tool preimages** (`016f7acd…`, `665cdb34…`). Only the
+second run's `ledger/round3_preimage.json` is used as authority below.
 
-## 2. Manager round-1 verification — carried forward, not re-derived
+## 2. The correction itself — bounded patches, with preimage
 
-The Manager independently recomputed and accepted: fixture SHA
-`7e1627e4…cd0dab`; freeze hash `2c558ce1…fa684`; 7 windows / 28.0 s / 1 holdout /
-≥1 primary; reference film A/B SHA == pin, identical, 39,634 decoded frames;
-scene candidates 208 (>0.45) / 224 (>0.25); real SAM 2.1 inference
-(hiera-large, cuda, 2.184 s, 8 masks, frame 1650); 7/7 windows annotated at
-anchor cadence; demo→film offset `film = demo + 1200` (900 frames, MAE 0.1536 at
-1200 vs 0.445 at ±1, 39.2 at 300). The frame-space resolution (film frames
-1650–1769 = the "book scene", PROTOTYPE_A = diagnostic harness output, never
-source truth) stays as accepted and **was not re-opened**.
+Two tool files moved. Both are **untracked runtime tools**, so Git cannot restore
+them; both were snapshotted byte-for-byte before any write
+(`ledger/raw/round3_preimage/`) and the snapshot hash was verified equal to the
+source hash (`snapshot_is_byte_identical: true`). No file was rewritten whole:
+`whole_file_rewrite: false` for both, and every replacement asserts the old block
+occurs exactly once. Record: `ledger/round3_tool_patch.json`.
 
-## 3. New measured findings this round (kept visible, not softened)
+| Tool | sha256 before → after | bytes | lines | diff |
+|---|---|---|---|---|
+| `make_references.py` | `016f7acd4f17916970a971b5856c5b3760d20ce58d805f159cd9b98616f60580` → `9588e8d9ae749894aeeb4760c0a471c044f26d6fc27e7bd1a25e009a28a67124` | 6,829 → 9,977 | 181 → 232 | +54 / −3 |
+| `measure_cutout_bounds.py` | `665cdb34f35969a4d39203b88d686306e5aba40db2cd3049972f2f25847c0b42` → `4c7a694379f91badf04069c275e67e047840387b0985af9993de6eb3c93bd1d7` | 7,853 → 12,329 | 189 → 258 | +100 / −31 |
 
-1. **Delivered role cutouts are cropped by the annotation's declared bbox, and
-   that bbox under-covers the mask.** `tools/measure_cutout_bounds.py`:
-   88/88 cutouts verdict `CLIPPED`, **9,058 of 2,089,631 mask pixels (0.433474 %)**
-   fall outside the crop; worst single case `CAM_4212 role_25 f4317`
-   = 990 px of 211,809 (0.467 %); the declared bbox is usually the mask's tight
-   bbox minus one pixel on an edge (e.g. `[0,0,173,288]` vs tight `[0,0,174,289]`).
-   Alpha integrity holds exactly for all 88 (alpha pixel count == mask pixels
-   inside the crop), so the cutouts are *correct but slightly clipped*.
-   `tools/make_references.py` was **not** modified: round-1 bytes must stay
-   byte-identical, so the geometry is reported as a measured defect instead of
-   silently rewritten. Fixing it is a one-line change if the Manager authorises it.
-2. **10 of 88 role references come from an anchor where one `role_id` is carried
-   by more than one mask index** (role split across masks), e.g. `CAM_4212
-   role_15 f4272` → indices `[2, 6]`. `make_references.py` keeps the largest-area
-   entry; the audit reproduces that rule and records `candidate_indices`,
-   per-index areas and `index_used_by_make_references_inferred` per role. This is
-   the concrete mechanism behind the round-1 `mask_count != role_count` gap, and
-   it means the reference manifest cannot be read as a unique mask-index
-   provenance record — the audit supplies it.
-3. **Freeze hash is over a canonical form, not over the file bytes.**
-   `freeze.hash_of_fixture_bytes_sha256` is `null` in the frozen fixture. The
-   real fixture file hash is
-   `7e1627e4c8c2421e77758b48f0c003c23d0b8b2f50fc73bc2118bc6b06cd0dab` (matches
-   the Manager's round-1 recomputation `7e1627e4…cd0dab`) — recorded here so both
-   numbers are unambiguous.
-4. **Guard semantics caveat (round-1 tool, unchanged):** the guard's
-   `forbidden_touched` map reports `alembic.ini: true` and `pyproject.toml: true`
-   because those files *exist* in the worktree (the check is
-   `exists and not isdir`), not because they were touched. The enforced
-   protections that actually hold are: `git diff --stat` unchanged,
-   `tracked files newly modified: []`, `removed_count 0`, and every changed path
-   inside the allowlist — all satisfied.
-5. **Incidental, outside my scope:** `git commit` on this worktree reported
-   `fatal: bad object refs/codex/turn-diffs/captures/1787896071503/…/base` and
-   `error: failed to perform geometric repack` from an automatic maintenance
-   task. The commit itself succeeded (`674fc0c`, porcelain `0`). I did not touch
-   or repair that ref — it belongs to another tool's capture store.
-6. **Vision route re-probed this round and still has no vision support:** the
-   image probe on the active route returned the marker
-   `[image omitted: model has no vision support]` (verbatim response in
-   `probe/vision_route_probe.json`). All role labels therefore remain structural
-   or cross-referenced from project records.
+### 2.1 `make_references.py` — crop from the mask's tight bbox
 
-## 4. Deliverables landed
+The crop window is now computed from the mask itself:
 
-**In-repo write set** (commit `674fc0c`): `experiments/mf_reskin_v1/golden/**`
-= `GOLDEN_FIXTURE.json`, `SOURCE_PROBE.json`, `KEYFRAME_SPEC.md`, `README.md`,
-`references/` (8 JSON), `annotations/` (14 JSON), `keyframes/<TAG>/` (56 PNG),
-`roles/<TAG>/` (88 PNG), `ledger/commands.jsonl`, `guards/` (baseline + verify),
-`cutout_bounds_audit.json`, `image_engine_probe.json`, `COPY_MANIFEST.json`.
+```
+ys, xs = np.where(m)
+tx, ty = int(xs.min()), int(ys.min())
+tw, th = int(xs.max() - tx + 1), int(ys.max() - ty + 1)
+cut = rgba[ty:ty + th, tx:tx + tw]
+```
 
-**Evidence root** `…\mf-reskin-v1\20260917T110554Z\GOLDEN\`: the above plus
-`REPORT.md`, `MATRIX.md`, `NEXT_REVIEW_PACKET.md`, `HASH_TABLE.json`,
-`HASH_TABLE.md`, `SOURCE_PROBE.json`, `probe/` companions, `source_probe/` raw
-container probes, `masks/<TAG>/` (56 SAM2 mask-index images), `sam2/`, `sheets/`,
-`tools/` (12 tool sources used), `ledger/commands.jsonl` + `ledger/raw/` (all raw
-command output) + `ledger/guard_baseline.json` + `ledger/guard_verify.json`.
-Every published file was copied byte-for-byte and verified by SHA-256 equality;
-`COPY_MANIFEST.json` records the verification per file.
+An empty mask now aborts (`refusing to write an empty cutout`) instead of writing a
+degenerate PNG. The annotation's declared bbox is **kept verbatim** as `bbox_xywh`
+and aliased as `annotation_declared_bbox_xywh`; the applied window is recorded
+separately as `crop_basis: "mask_tight_bbox"`, `crop_bbox_xywh`, `crop_origin_xy`,
+`crop_size_wh`. Nothing is silently redefined and no annotation byte changed.
 
-## 5. G-A8 — stated explicitly
+Per reference the manifest now also records **which mask index was used**, which
+closes the round-2 gap where that was only inferable from the audit:
+`mask_index`, `role_index_candidates` (every index carrying that `role_id` at the
+anchor), `role_index_candidate_areas_px` and `role_index_ambiguous_at_anchor`, plus
+a `field_notes` map describing each field.
 
-**Outcome (b): keyframe spec + exact unmet dependency.**
-`KEYFRAME_SPEC.md` defines the required artwork set (56 artwork frames +
-per-role artwork cutouts + provenance requirements + the frozen checker
-contract) and names the exact missing piece: a callable image-editing/generative
-engine with hashable weights and parameters. Measured, in this runtime:
-no loopback engine accepts a connection (5 ports), no diffusion library in this
-interpreter, no diffusion weights on disk in this runtime, no vision route that
-accepts an image. The sibling MF-V1-COMFY runtime exists (read-only observation:
-`…\runtime\comfy\models\checkpoints\Juggernaut-XL_v9_RunDiffusionPhoto_v2.safetensors`,
-7,105,348,188 bytes) but is explicitly not mine — nothing was written to it,
-nothing was read from it beyond a directory listing, and this task does not
-depend on it. **No artwork was fabricated, and no palette-only/histogram-only
-artifact is presented as a reskin.**
+### 2.2 `measure_cutout_bounds.py` — measure the crop that was applied
 
-## 6. Gaps carried forward (unchanged, truthful negatives)
+The primary metric is now the crop window the cutout was **actually** taken from,
+instead of the annotation's declared bbox. **The check was not relaxed** — it was
+made stronger, and the old number is still produced:
 
-- hands not separately resolvable as two distinct roles at 640×360
-- structural-only role labels (no vision route available)
-- between-anchor frames not annotated/interpolated (anchor cadence 15 only)
-- occlusion class `PARTIAL — NOT_DEMONSTRATED`; z-order `unresolved`
-- `mask_count != role_count` (now with a measured mechanism, §3.2)
-- flat background regions uncovered by route A; route B colour regions are
-  lower-confidence and are not silently treated as background
-- `camera_motion` rests on a small number of windows (318 / 39,634 frames =
-  0.80 % show >1 px global shift)
-- provisional REF-R02/R05 windows land on static holds and were not used
-- exact-repeat/hold divergence vs locked profile (3224 / 8.135 % and 59 vs
-  2675 / 6.75 % and 57) kept as measured, not reconciled
-- **new:** role cutout crop clipping (§3.1) and per-anchor role→index ambiguity
-  (§3.2)
+* the crop window is taken from the **delivered PNG's own dimensions**, not from a
+  JSON field the same tool wrote;
+* the mask's tight bbox is **recomputed independently** from
+  `maskindex_f<frame>.png`;
+* the alpha channel is now compared to the mask **element-wise**
+  (`(alpha == expected).all()`), not merely by non-zero pixel count;
+* `mask_px_outside_declared_crop` keeps the exact round-2 metric, and
+  `mask_px_outside_crop` is the new one — both are in `totals`, so the two rounds
+  can be compared line by line.
 
-## 7. What I did NOT do
+Field names were disambiguated rather than reused: the round-2 field
+`mask_px_outside_crop` (which meant *declared-bbox*) is now
+`mask_px_outside_declared_crop`, and `mask_px_outside_crop` means the crop that was
+applied. The round-2 audit bytes are preserved unchanged at
+`probe/round2/cutout_bounds_audit.json`
+(`5744ea2d8a2572087d3774cce4dbed45bf540353635f9ad7cba8b100b6c5462a`).
 
-No push. No merge. No `reset/clean/stash/restore/checkout`. No write into
-`runtime\comfy\**`, no sibling worktree, no MAIN, no `app/`, `frontend/`,
-`migrations/`, `docs/`. No round-1 output byte deleted or modified. No
-PROPAGATE/BENCH work. No self-approval. `APPROVED`/`CLOSED` are not mine to write.
+## 3. New measured numbers (both metrics, same run)
+
+| Metric | Round 2 | Round 3 |
+|---|---|---|
+| Verdict histogram | 88 `CLIPPED` | **88 `EXACT`** (0 `CLIPPED`, 0 `OVERSIZED`, 0 `ANOMALY`) |
+| Mask px outside the crop that was applied | 9,058 / 2,089,631 | **0 / 2,089,631 = 0.0 %** |
+| Mask px outside the **declared annotation bbox** | 9,058 = 0.433474 % | **9,058 = 0.433474 % (unchanged — still measured)** |
+| Worst single cutout | 990 px, `CAM_4212 role_25 f4317` | same role, now `declared [0,0,639,359]` vs `tight [0,0,640,360]` → delivered **640×360, 211,809 px, 0 outside** |
+| Alpha integrity | 88/88 count-true | **88/88 element-wise true** (`alpha_elementwise_equals_mask`) |
+| Role→mask-index ambiguity | 10/88, index only inferable | **10/88 still recorded**, and the manifest now states the index |
+| References recording `mask_index` | 0/88 | **88/88** |
+| Manifest index == max-area inference | n/a | **88/88** |
+
+Geometry of the defect, measured: **82 of 88** roles had a declared bbox exactly
+**1 px short on both axes**; the other **6** had a declared bbox that *overshot* one
+axis by 2–180 px while still clipping the other — i.e. the old crop was
+simultaneously clipped and padded. All 88 lost at least 4 px (lowest
+`CUT_660 role_3 f660`: `[0,0,97,66]` vs tight `[0,0,98,67]`).
+
+The 10 ambiguous roles (recorded, not hidden) — every one of them resolves to the
+same index by both the manifest and the max-area rule:
+
+```
+CAM_4212 role_2  f4242  idx 2 candidates [1,2]     CAM_4212 role_15 f4272 idx 6 candidates [2,6]
+CAM_4212 role_5  f4287  idx 7 candidates [3,7]     CAM_4212 role_16 f4272 idx 8 candidates [3,8]
+CAM_4212 role_7  f4242  idx 8 candidates [7,8]     CAM_4212 role_17 f4302 idx 6 candidates [4,6]
+CUT_660  role_19 f750   idx 9 candidates [8,9]     OCC_14768 role_7  f14873 idx 2 candidates [1,2]
+OCC_14768 role_8 f14873 idx 4 candidates [3,4]     OCC_14768 role_10 f14873 idx 8 candidates [6,7,8]
+```
+
+**Second and independent derivation** (`tools/verify_round3.py`, a different code
+path that does not import the audit tool): for each of the 88 delivered PNGs it
+re-reads the mask index image, recomputes the tight bbox with `np.where`, and
+requires `alpha.shape == (th, tw)` **and** element-wise equality with the mask.
+Result: `roles_checked 88`, `roles_exact 88`, `mask_px_all_roles 2,089,631`,
+`mask_px_outside_crop 0`. Two independent implementations agree.
+
+## 4. Frozen bytes re-asserted byte-identical
+
+`tools/verify_round3.py` → `verdict ALL_FROZEN_BYTES_IDENTICAL_AND_CUTOUTS_EXACT`,
+`failures []`, 14/14 checks true (`ledger/round3_after.json`).
+
+| Artifact | sha256 (pre == post) |
+|---|---|
+| `GOLDEN_FIXTURE.json` | `7e1627e4c8c2421e77758b48f0c003c23d0b8b2f50fc73bc2118bc6b06cd0dab` (matches the Manager's recomputation) |
+| fixture freeze hash (canonical JSON minus `freeze`, re-derived from the file) | `2c558ce19e0a9d915d860dc07843bd1412ac4a7801284cca5293ea21cbfba684` |
+| `KEYFRAME_SPEC.md` | `4ed5b7bfec887c121b7a361c0d819302b8f991cd12efd4627ce483beafc940f4` |
+| `SOURCE_PROBE.json` | `d9d3053323dd4dbc15fe9dd9b94d5f83b58f5fa9ba3b64c865156d085470420b` |
+| `image_engine_probe.json` | `6dc834143fc3322ed94f6754c97853e2e87515ba9f4f7ef259b4174cd18e5b62` |
+| `vision_route_probe.json` | `82cdbca8515f7ee32bc5c9dbd59d4f9a086c0361931480ec25d5033f8f48604f` |
+| protected annotation tree (7 annotations + 7 relations + 56 keyframes + 56 mask-index PNGs = **126 files**) | aggregate `fdd4345f6d62660ae18e1c774d5e6caaa983898c0c1bda5c2137c4f93852844b` (**pre == post**) |
+
+Regenerated **by design** this round, 95 files, all 95 rewritten
+(`regenerated_changed 95`): `roles/<TAG>/*.png` (88) + `references_<TAG>.json` (7),
+now 1,907,367 B of role cutouts in total. `probe/references_index.json` was
+rewritten but is **byte-identical** to its round-2 image
+(`a20a370545dc3d0be24d18aa670ee627d5b1df4e4aa6ef5cc4094b5abcb7b727`) because it
+records only counts and paths. `probe/cutout_bounds_audit.json`:
+75,273 → 119,946 B, 2,671 → 3,990 lines,
+`62cd9320426ed6ddb21bbd7cce4bd8ff399038f12d6c2c57fdacabdf3c9980fe`.
+
+## 5. Round-2 bytes preserved, not destroyed
+
+Before the first overwrite, 9 round-2 files were copied to side paths inside the
+same allowlist root and hash-verified equal (`ledger/round3_preserve.json`):
+`ledger/round2/guard_baseline.json`, `ledger/round2/guard_verify.json`,
+`probe/guard_final_classification.round2.json`,
+`probe/round2/cutout_bounds_audit.json`, `probe/round2/references_index.json` and
+`report/round2/{REPORT,MATRIX,NEXT_REVIEW_PACKET,README}.md`. Round-2 bytes are also
+in git history (`674fc0c`, `86e794c`, `278bacf`, `ee7aab4`) — none of it rewritten.
+
+## 6. Gaps I am not hiding (carried from round 2, plus what this round found)
+
+1. **The annotation's declared bbox is still wrong.** It is frozen, and this round
+   did not touch it: **9,058 of 2,089,631 mask pixels (0.433474 %)** still fall
+   outside it, 6 of 88 declared bboxes overshoot an axis, and 82 are 1 px short on
+   both. The cutouts no longer inherit that defect, but **any downstream consumer
+   must read `crop_bbox_xywh` / `crop_basis`, never `bbox_xywh`, to reconstruct the
+   reference geometry** — `bbox_xywh` is documented in `field_notes` as the
+   annotation's own value.
+2. **10 of 88 role references come from an anchor where one `role_id` is carried by
+   more than one mask index** (role split across masks). The ambiguity is real and
+   still recorded; `make_references.py` keeps the largest-area index, the manifest
+   now states it, and the audit independently agrees on all 88. It remains the
+   mechanism behind `mask_count != role_count`.
+3. Carried unchanged: hands not separately resolvable at 640×360 · structural-only
+   labels (no vision route: `[image omitted: model has no vision support]`) ·
+   between-anchor frames not annotated (cadence 15 only) · occlusion
+   `PARTIAL — NOT_DEMONSTRATED`, z-order `unresolved` · `mask_count != role_count` ·
+   route-A background holes not silently backgrounded · `camera_motion` rests on
+   318/39,634 frames (0.80 %) · provisional REF-R02/R05 land on static holds ·
+   exact-repeat/hold divergence vs the locked profile kept as measured.
+4. Measurement note, reported not hidden: the continuation-02 packet quotes
+   `COPY_MANIFEST.json 160,899 B`; the measured EV copy at this round's preflight is
+   **167,197 B** and the in-repo copy **87,064 B** (the EV manifest grows as it
+   records superseded hashes). Both are recorded in `HASH_TABLE.json` this round.
+
+## 7. Write set, guard and scope
+
+Write set used: this task's runtime root
+`C:\Users\Admin\Documents\Codex\work\mfv1\runtime\golden\**`, the in-repo allowlist
+`experiments/mf_reskin_v1/golden/**`, and the evidence root
+`…\outputs\mf-reskin-v1\20260917T110554Z\GOLDEN\**`. Guard: the pre-write baseline
+(`ledger/guard_baseline.json`, HEAD `ee7aab4`, porcelain **0**, 2,017 tracked files,
+runtime 370 / EV 338 / in-repo 180 files) was **not** re-taken; `write_set_guard.py
+verify` was run after the work and the result classified by an additive round-3
+classifier (`tools/classify_guard_result_r3.py`) — the round-2
+`write_set_guard.py` and its round-2 classifier were **not** modified.
+
+**Not done this round:** no engine→artwork (that is MF-V1-COMFY's step against
+`KEYFRAME_SPEC.md`), no viewport/vision work, no PROPAGATE/BENCH, no wave, no new
+window, no fixture or tolerance change, no write under `runtime\comfy`, no sibling
+worktree, no MAIN, no `app/`, `frontend/`, `migrations/`, `docs/`. No push, no
+merge, no `reset/clean/stash/restore`. `APPROVED`/`CLOSED` are not mine to write.
 
 ## 8. Terminal state
 
-`TASK_SUBMITTED` — handed back to the Manager for verification, then Codex
-review. Round-2 artifacts: commit `674fc0c` (artifacts) plus the immediately
-following commit on the same branch (this documentation + SHA record).
+`TASK_SUBMITTED` — one bounded correction delivered: **88/88 `EXACT`, 0 mask px
+outside the applied crop**, freeze re-asserted byte-identical, guard classified,
+local commit on `codex/mf-reskin-v1-golden` only.

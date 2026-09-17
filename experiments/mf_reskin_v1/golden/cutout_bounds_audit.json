@@ -1,25 +1,50 @@
 {
   "artifact": "cutout_bounds_audit",
   "produced_by": "tools/measure_cutout_bounds.py",
+  "round": "MF-V1-GOLDEN continuation-02 (round 3 — crop = mask tight bbox)",
   "scope": "every delivered role reference cutout under probe/annotation/*/roles/",
   "role_count": 88,
   "verdict_histogram": {
-    "CLIPPED": 88
+    "EXACT": 88
   },
   "role_index_ambiguous_count": 10,
+  "index_provenance": {
+    "roles_with_manifest_mask_index": 88,
+    "manifest_index_carries_role": 88,
+    "manifest_index_equals_max_area_inference": 88,
+    "manifest_index_is_smaller_split_part": 0
+  },
   "totals": {
     "mask_px_all_roles": 2089631,
+    "mask_px_outside_crop": 0,
+    "loss_pct_of_mask_px": 0.0,
     "mask_px_outside_declared_crop": 9058,
-    "loss_pct_of_mask_px": 0.433474
+    "loss_pct_of_mask_px_declared": 0.433474
   },
-  "interpretation": "make_references.py crops the RGBA cutout using the annotation's declared bbox. That declared bbox is not always the mask's tight bbox, so a CLIPPED verdict means the delivered cutout is missing edge pixels of the role mask. Alpha integrity (alpha count == mask pixels inside the crop) is the correctness check that DOES hold for every cutout.",
+  "interpretation": "PRIMARY metric (round 3): mask pixels outside the crop the cutout was actually taken from. make_references.py now crops to the mask's tight bounding box, so the expected value is 0 for every role and the verdict is EXACT. The check was NOT relaxed: the crop window is read from the delivered PNG's own dimensions, the mask's tight bbox is recomputed independently from maskindex_<frame>.png, and the alpha channel is compared to the mask element-wise rather than by pixel count. The round-2 declared-bbox metric is still reported (*_declared_crop) so the original annotation defect remains measurable for comparison.",
   "per_role": [
     {
       "tag": "BOOK",
       "role_id": "role_1",
       "source_frame_id": 1680,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\roles\\role_1_f1680.png",
-      "reference_sha256": "f56cd7cb3495430789ad20d35be50270b51069d137a114096fe7e13ba94bf6f2",
+      "reference_sha256": "7f9cf5cb50a8303bbd76ccf2a0a3a1227de139158cf7fcfc30df20078c404fbc",
+      "index_used_by_make_references_inferred": 1,
+      "mask_index_from_manifest": 1,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        0,
+        0,
+        174,
+        289
+      ],
+      "crop_size_on_disk_wh": [
+        174,
+        289
+      ],
       "declared_bbox_xywh": [
         0,
         0,
@@ -32,23 +57,38 @@
         174,
         289
       ],
-      "crop_size_on_disk_wh": [
-        173,
-        288
-      ],
       "mask_area_px": 47285,
-      "mask_px_inside_crop": 47226,
-      "mask_px_outside_crop": 59,
-      "alpha_nonzero_px_in_crop": 47226,
+      "mask_px_inside_crop": 47285,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 47226,
+      "mask_px_outside_declared_crop": 59,
+      "alpha_nonzero_px_in_crop": 47285,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "BOOK",
       "role_id": "role_2",
       "source_frame_id": 1665,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\roles\\role_2_f1665.png",
-      "reference_sha256": "9c89e2344f80cb531771a42658140266a979b8ba14e4332774c9f72e305a5c2d",
+      "reference_sha256": "3e2b04b839e593e5659aba5d72048848b0f45540b64d8415f2b4323c74f4dabe",
+      "index_used_by_make_references_inferred": 2,
+      "mask_index_from_manifest": 2,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        172,
+        0,
+        185,
+        260
+      ],
+      "crop_size_on_disk_wh": [
+        185,
+        260
+      ],
       "declared_bbox_xywh": [
         172,
         0,
@@ -61,23 +101,38 @@
         185,
         260
       ],
-      "crop_size_on_disk_wh": [
-        184,
-        259
-      ],
       "mask_area_px": 26482,
-      "mask_px_inside_crop": 26402,
-      "mask_px_outside_crop": 80,
-      "alpha_nonzero_px_in_crop": 26402,
+      "mask_px_inside_crop": 26482,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 26402,
+      "mask_px_outside_declared_crop": 80,
+      "alpha_nonzero_px_in_crop": 26482,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "BOOK",
       "role_id": "role_3",
       "source_frame_id": 1680,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\roles\\role_3_f1680.png",
-      "reference_sha256": "16e63c15483822fb16ef7bf826ea08f2ffaa45e709da9f5619733301ae3757a0",
+      "reference_sha256": "30ba6f399b3a08256aa5a979c56a93c968a2d9a15f346b039b4e6744c206936c",
+      "index_used_by_make_references_inferred": 3,
+      "mask_index_from_manifest": 3,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        469,
+        1,
+        171,
+        191
+      ],
+      "crop_size_on_disk_wh": [
+        171,
+        191
+      ],
       "declared_bbox_xywh": [
         469,
         1,
@@ -90,23 +145,38 @@
         171,
         191
       ],
-      "crop_size_on_disk_wh": [
-        170,
-        193
-      ],
       "mask_area_px": 23599,
-      "mask_px_inside_crop": 23502,
-      "mask_px_outside_crop": 97,
-      "alpha_nonzero_px_in_crop": 23502,
+      "mask_px_inside_crop": 23599,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 23502,
+      "mask_px_outside_declared_crop": 97,
+      "alpha_nonzero_px_in_crop": 23599,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "BOOK",
       "role_id": "role_4",
       "source_frame_id": 1755,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\roles\\role_4_f1755.png",
-      "reference_sha256": "e5254fa61b2d32c95814a2f40135d39e332975b4f61e0ab15cb207c997c0c5e0",
+      "reference_sha256": "9f033f7b44e71bd90c177ea6ac527007e5f430ecc6ce80fb4dfa562f6661449d",
+      "index_used_by_make_references_inferred": 4,
+      "mask_index_from_manifest": 4,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        357,
+        0,
+        113,
+        210
+      ],
+      "crop_size_on_disk_wh": [
+        113,
+        210
+      ],
       "declared_bbox_xywh": [
         357,
         0,
@@ -119,23 +189,38 @@
         113,
         210
       ],
-      "crop_size_on_disk_wh": [
-        112,
-        209
-      ],
       "mask_area_px": 21647,
-      "mask_px_inside_crop": 21595,
-      "mask_px_outside_crop": 52,
-      "alpha_nonzero_px_in_crop": 21595,
+      "mask_px_inside_crop": 21647,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 21595,
+      "mask_px_outside_declared_crop": 52,
+      "alpha_nonzero_px_in_crop": 21647,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "BOOK",
       "role_id": "role_5",
       "source_frame_id": 1695,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\roles\\role_5_f1695.png",
-      "reference_sha256": "8ef5d9c451283c8d795c1a2e48a9e76f445b8e3ab91d22317ad0dfbc7700bad1",
+      "reference_sha256": "c97781737d333a3fa8c7a0b1e8285990b57fdb9e7050cfcf8ce5504623a1f6b6",
+      "index_used_by_make_references_inferred": 5,
+      "mask_index_from_manifest": 5,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        292,
+        63,
+        69,
+        240
+      ],
+      "crop_size_on_disk_wh": [
+        69,
+        240
+      ],
       "declared_bbox_xywh": [
         292,
         63,
@@ -148,23 +233,38 @@
         69,
         240
       ],
-      "crop_size_on_disk_wh": [
-        68,
-        239
-      ],
       "mask_area_px": 10748,
-      "mask_px_inside_crop": 10739,
-      "mask_px_outside_crop": 9,
-      "alpha_nonzero_px_in_crop": 10739,
+      "mask_px_inside_crop": 10748,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 10739,
+      "mask_px_outside_declared_crop": 9,
+      "alpha_nonzero_px_in_crop": 10748,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "BOOK",
       "role_id": "role_6",
       "source_frame_id": 1755,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\roles\\role_6_f1755.png",
-      "reference_sha256": "9227c03ef040248693b94a809da45ce52290d741ba16a1df7e920f2b1134c938",
+      "reference_sha256": "72d258372cdc46a0b8fe50327fe983365979bcef3219dfba35396b5c0b3aa97f",
+      "index_used_by_make_references_inferred": 6,
+      "mask_index_from_manifest": 6,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        477,
+        257,
+        85,
+        103
+      ],
+      "crop_size_on_disk_wh": [
+        85,
+        103
+      ],
       "declared_bbox_xywh": [
         477,
         257,
@@ -177,23 +277,38 @@
         85,
         103
       ],
-      "crop_size_on_disk_wh": [
-        84,
-        102
-      ],
       "mask_area_px": 6497,
-      "mask_px_inside_crop": 6489,
-      "mask_px_outside_crop": 8,
-      "alpha_nonzero_px_in_crop": 6489,
+      "mask_px_inside_crop": 6497,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 6489,
+      "mask_px_outside_declared_crop": 8,
+      "alpha_nonzero_px_in_crop": 6497,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "BOOK",
       "role_id": "role_7",
       "source_frame_id": 1695,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\roles\\role_7_f1695.png",
-      "reference_sha256": "2bddba0168967f7b06c982a18454a6faa975822ec262441442386a2ab76c1290",
+      "reference_sha256": "9ee9c27060fbb214e7799557c82b77734ddaeeb958692f26d7e221831635712d",
+      "index_used_by_make_references_inferred": 7,
+      "mask_index_from_manifest": 7,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        598,
+        98,
+        42,
+        107
+      ],
+      "crop_size_on_disk_wh": [
+        42,
+        107
+      ],
       "declared_bbox_xywh": [
         598,
         98,
@@ -206,23 +321,38 @@
         42,
         107
       ],
-      "crop_size_on_disk_wh": [
-        41,
-        106
-      ],
       "mask_area_px": 3016,
-      "mask_px_inside_crop": 2906,
-      "mask_px_outside_crop": 110,
-      "alpha_nonzero_px_in_crop": 2906,
+      "mask_px_inside_crop": 3016,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 2906,
+      "mask_px_outside_declared_crop": 110,
+      "alpha_nonzero_px_in_crop": 3016,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "BOOK",
       "role_id": "role_8",
       "source_frame_id": 1725,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\roles\\role_8_f1725.png",
-      "reference_sha256": "fc54d4905db239260ce4ec7b8ee3bda16163b12c210eb63d7f9463b8ae5751f5",
+      "reference_sha256": "b531be25d3f652795eefa6bf21124a91ee30ae0690244f9352340e4fc22ae89b",
+      "index_used_by_make_references_inferred": 8,
+      "mask_index_from_manifest": 8,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        9,
+        304,
+        67,
+        46
+      ],
+      "crop_size_on_disk_wh": [
+        67,
+        46
+      ],
       "declared_bbox_xywh": [
         9,
         304,
@@ -235,23 +365,38 @@
         67,
         46
       ],
-      "crop_size_on_disk_wh": [
-        66,
-        45
-      ],
       "mask_area_px": 2937,
-      "mask_px_inside_crop": 2868,
-      "mask_px_outside_crop": 69,
-      "alpha_nonzero_px_in_crop": 2868,
+      "mask_px_inside_crop": 2937,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 2868,
+      "mask_px_outside_declared_crop": 69,
+      "alpha_nonzero_px_in_crop": 2937,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CAM_4212",
       "role_id": "role_1",
       "source_frame_id": 4212,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_1_f4212.png",
-      "reference_sha256": "ca61bf1fd24a2fc6c5be9706cc86bc788cf4dc46c6525f82a729b4c31f946589",
+      "reference_sha256": "e8adbd0ccfe7aae80fcdcbed154dbbd9b0e5e61e757f4af1ba41527bdeb4f9bf",
+      "index_used_by_make_references_inferred": 1,
+      "mask_index_from_manifest": 1,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        0,
+        0,
+        640,
+        360
+      ],
+      "crop_size_on_disk_wh": [
+        640,
+        360
+      ],
       "declared_bbox_xywh": [
         0,
         0,
@@ -264,23 +409,38 @@
         640,
         360
       ],
-      "crop_size_on_disk_wh": [
-        639,
-        359
-      ],
       "mask_area_px": 230186,
-      "mask_px_inside_crop": 229270,
-      "mask_px_outside_crop": 916,
-      "alpha_nonzero_px_in_crop": 229270,
+      "mask_px_inside_crop": 230186,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 229270,
+      "mask_px_outside_declared_crop": 916,
+      "alpha_nonzero_px_in_crop": 230186,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CAM_4212",
       "role_id": "role_10",
       "source_frame_id": 4242,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_10_f4242.png",
-      "reference_sha256": "2ac76ffb7144f4860c7b1fa2fdbfb488f04acf67cc6b10570f93e7de2b3392a4",
+      "reference_sha256": "a105fcd694fa9a8a1de3d3a6c59940dec8b2259e9e97d08ba48aa66853a7a332",
+      "index_used_by_make_references_inferred": 12,
+      "mask_index_from_manifest": 12,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        218,
+        215,
+        71,
+        22
+      ],
+      "crop_size_on_disk_wh": [
+        71,
+        22
+      ],
       "declared_bbox_xywh": [
         218,
         215,
@@ -293,23 +453,38 @@
         71,
         22
       ],
-      "crop_size_on_disk_wh": [
-        70,
-        21
-      ],
       "mask_area_px": 1432,
-      "mask_px_inside_crop": 1404,
-      "mask_px_outside_crop": 28,
-      "alpha_nonzero_px_in_crop": 1404,
+      "mask_px_inside_crop": 1432,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 1404,
+      "mask_px_outside_declared_crop": 28,
+      "alpha_nonzero_px_in_crop": 1432,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CAM_4212",
       "role_id": "role_11",
       "source_frame_id": 4257,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_11_f4257.png",
-      "reference_sha256": "f01dd115b28250ea8418f2bb0d7141560f97203e34b9ae56f02c9ae33297bbf2",
+      "reference_sha256": "bcdc81e4b1d83f629fce6c0731dd8af3ef2875dc681d534cab28f6d60e59ac26",
+      "index_used_by_make_references_inferred": 1,
+      "mask_index_from_manifest": 1,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        203,
+        40,
+        104,
+        135
+      ],
+      "crop_size_on_disk_wh": [
+        104,
+        135
+      ],
       "declared_bbox_xywh": [
         203,
         40,
@@ -322,23 +497,38 @@
         104,
         135
       ],
-      "crop_size_on_disk_wh": [
-        103,
-        134
-      ],
       "mask_area_px": 13786,
-      "mask_px_inside_crop": 13672,
-      "mask_px_outside_crop": 114,
-      "alpha_nonzero_px_in_crop": 13672,
+      "mask_px_inside_crop": 13786,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 13672,
+      "mask_px_outside_declared_crop": 114,
+      "alpha_nonzero_px_in_crop": 13786,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CAM_4212",
       "role_id": "role_12",
       "source_frame_id": 4257,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_12_f4257.png",
-      "reference_sha256": "60d96fe0f5e16c56b47cf85897992493bda2f214217051ed371a1edcaca22c60",
+      "reference_sha256": "681e298e4c1fb0577ac52bd5dfd114783e8dc48349702b2d61c2d3fa34db73fb",
+      "index_used_by_make_references_inferred": 6,
+      "mask_index_from_manifest": 6,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        203,
+        189,
+        104,
+        135
+      ],
+      "crop_size_on_disk_wh": [
+        104,
+        135
+      ],
       "declared_bbox_xywh": [
         203,
         189,
@@ -351,23 +541,38 @@
         104,
         135
       ],
-      "crop_size_on_disk_wh": [
-        103,
-        134
-      ],
       "mask_area_px": 13697,
-      "mask_px_inside_crop": 13677,
-      "mask_px_outside_crop": 20,
-      "alpha_nonzero_px_in_crop": 13677,
+      "mask_px_inside_crop": 13697,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 13677,
+      "mask_px_outside_declared_crop": 20,
+      "alpha_nonzero_px_in_crop": 13697,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CAM_4212",
       "role_id": "role_13",
       "source_frame_id": 4257,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_13_f4257.png",
-      "reference_sha256": "2eb3c6d438966e1d955c7767eaf818beccc1c4953eee2e52d5996c4a271b19ea",
+      "reference_sha256": "b112d38c9eedf8f54e78e6020a9df776d8fce0b44dc5b5ebecb11f008c78b3cd",
+      "index_used_by_make_references_inferred": 7,
+      "mask_index_from_manifest": 7,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        72,
+        227,
+        97,
+        29
+      ],
+      "crop_size_on_disk_wh": [
+        97,
+        29
+      ],
       "declared_bbox_xywh": [
         72,
         227,
@@ -380,23 +585,38 @@
         97,
         29
       ],
-      "crop_size_on_disk_wh": [
-        96,
-        28
-      ],
       "mask_area_px": 2608,
-      "mask_px_inside_crop": 2536,
-      "mask_px_outside_crop": 72,
-      "alpha_nonzero_px_in_crop": 2536,
+      "mask_px_inside_crop": 2608,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 2536,
+      "mask_px_outside_declared_crop": 72,
+      "alpha_nonzero_px_in_crop": 2608,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CAM_4212",
       "role_id": "role_14",
       "source_frame_id": 4257,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_14_f4257.png",
-      "reference_sha256": "a92d3cdda0eae055eb373c21430134b5b4e86e5d9d9de296e96ff9a2766efb91",
+      "reference_sha256": "49e74fd0ebd695d7bd38c526369b289c61de64fd20634543ffff7dae39a2925e",
+      "index_used_by_make_references_inferred": 8,
+      "mask_index_from_manifest": 8,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        0,
+        223,
+        63,
+        35
+      ],
+      "crop_size_on_disk_wh": [
+        63,
+        35
+      ],
       "declared_bbox_xywh": [
         0,
         223,
@@ -409,23 +629,22 @@
         63,
         35
       ],
-      "crop_size_on_disk_wh": [
-        62,
-        34
-      ],
       "mask_area_px": 2039,
-      "mask_px_inside_crop": 1978,
-      "mask_px_outside_crop": 61,
-      "alpha_nonzero_px_in_crop": 1978,
+      "mask_px_inside_crop": 2039,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 1978,
+      "mask_px_outside_declared_crop": 61,
+      "alpha_nonzero_px_in_crop": 2039,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CAM_4212",
       "role_id": "role_15",
       "source_frame_id": 4272,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_15_f4272.png",
-      "reference_sha256": "d43f81d9b3e07be9f582964a666c39786ff1a2e660b46351290928535c219570",
+      "reference_sha256": "042f8ccd0aaf00d0c28c5321f1d070a43fff586e8d50643c063bfba1356dbf77",
       "role_index_ambiguous_at_anchor": true,
       "candidate_indices": [
         2,
@@ -436,6 +655,21 @@
         "6": 20004
       },
       "index_used_by_make_references_inferred": 6,
+      "mask_index_from_manifest": 6,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        101,
+        8,
+        128,
+        165
+      ],
+      "crop_size_on_disk_wh": [
+        128,
+        165
+      ],
       "declared_bbox_xywh": [
         101,
         8,
@@ -448,23 +682,22 @@
         128,
         165
       ],
-      "crop_size_on_disk_wh": [
-        127,
-        345
-      ],
       "mask_area_px": 20004,
-      "mask_px_inside_crop": 19863,
-      "mask_px_outside_crop": 141,
-      "alpha_nonzero_px_in_crop": 19863,
+      "mask_px_inside_crop": 20004,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 19863,
+      "mask_px_outside_declared_crop": 141,
+      "alpha_nonzero_px_in_crop": 20004,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CAM_4212",
       "role_id": "role_16",
       "source_frame_id": 4272,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_16_f4272.png",
-      "reference_sha256": "dd592108b00a3fe147a9a158f1cba7386790de6c705b811bd544abb0e5c15bf0",
+      "reference_sha256": "ae472ad306b947cfdf8c0db9086687a6ef3e5b1fb179e34248a22a2a2847912a",
       "role_index_ambiguous_at_anchor": true,
       "candidate_indices": [
         3,
@@ -475,6 +708,21 @@
         "8": 19998
       },
       "index_used_by_make_references_inferred": 8,
+      "mask_index_from_manifest": 8,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        101,
+        191,
+        128,
+        166
+      ],
+      "crop_size_on_disk_wh": [
+        128,
+        166
+      ],
       "declared_bbox_xywh": [
         101,
         191,
@@ -487,23 +735,22 @@
         128,
         166
       ],
-      "crop_size_on_disk_wh": [
-        127,
-        165
-      ],
       "mask_area_px": 19998,
-      "mask_px_inside_crop": 19883,
-      "mask_px_outside_crop": 115,
-      "alpha_nonzero_px_in_crop": 19883,
+      "mask_px_inside_crop": 19998,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 19883,
+      "mask_px_outside_declared_crop": 115,
+      "alpha_nonzero_px_in_crop": 19998,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CAM_4212",
       "role_id": "role_17",
       "source_frame_id": 4302,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_17_f4302.png",
-      "reference_sha256": "a417b52f33548fd37220cd3afa6542e44b4ece9dacc98a0b3c1aeff2e38e5c57",
+      "reference_sha256": "f11ba2d06c35927483718f544babb24ec8f26fa1208344fb8fe90e5db59ebf13",
       "role_index_ambiguous_at_anchor": true,
       "candidate_indices": [
         4,
@@ -514,6 +761,21 @@
         "6": 20032
       },
       "index_used_by_make_references_inferred": 6,
+      "mask_index_from_manifest": 6,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        257,
+        8,
+        127,
+        165
+      ],
+      "crop_size_on_disk_wh": [
+        127,
+        165
+      ],
       "declared_bbox_xywh": [
         257,
         8,
@@ -526,23 +788,38 @@
         127,
         165
       ],
-      "crop_size_on_disk_wh": [
-        126,
-        164
-      ],
       "mask_area_px": 20032,
-      "mask_px_inside_crop": 19790,
-      "mask_px_outside_crop": 242,
-      "alpha_nonzero_px_in_crop": 19790,
+      "mask_px_inside_crop": 20032,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 19790,
+      "mask_px_outside_declared_crop": 242,
+      "alpha_nonzero_px_in_crop": 20032,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CAM_4212",
       "role_id": "role_18",
       "source_frame_id": 4287,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_18_f4287.png",
-      "reference_sha256": "30c4002eb21e7c68f46a86ad433e9f700ba4191a1c6df1958ce88a631a6a5698",
+      "reference_sha256": "2c7f5ebed23dcd760396371074a6c9048ed78061dce3b502b3231e1194b194b2",
+      "index_used_by_make_references_inferred": 9,
+      "mask_index_from_manifest": 9,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        257,
+        191,
+        127,
+        166
+      ],
+      "crop_size_on_disk_wh": [
+        127,
+        166
+      ],
       "declared_bbox_xywh": [
         257,
         191,
@@ -555,23 +832,38 @@
         127,
         166
       ],
-      "crop_size_on_disk_wh": [
-        126,
-        165
-      ],
       "mask_area_px": 19995,
-      "mask_px_inside_crop": 19883,
-      "mask_px_outside_crop": 112,
-      "alpha_nonzero_px_in_crop": 19883,
+      "mask_px_inside_crop": 19995,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 19883,
+      "mask_px_outside_declared_crop": 112,
+      "alpha_nonzero_px_in_crop": 19995,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CAM_4212",
       "role_id": "role_19",
       "source_frame_id": 4272,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_19_f4272.png",
-      "reference_sha256": "3019013407eb352aaf81baa51a9717e5539a38fc3bbecbfc30e02aed244f9d99",
+      "reference_sha256": "7b940a794b00fe5a0b0c707196070f2d8287bbffea9f64e535961dd4aa0fe7c4",
+      "index_used_by_make_references_inferred": 12,
+      "mask_index_from_manifest": 12,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        125,
+        215,
+        32,
+        31
+      ],
+      "crop_size_on_disk_wh": [
+        32,
+        31
+      ],
       "declared_bbox_xywh": [
         125,
         215,
@@ -584,23 +876,22 @@
         32,
         31
       ],
-      "crop_size_on_disk_wh": [
-        31,
-        30
-      ],
       "mask_area_px": 789,
-      "mask_px_inside_crop": 771,
-      "mask_px_outside_crop": 18,
-      "alpha_nonzero_px_in_crop": 771,
+      "mask_px_inside_crop": 789,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 771,
+      "mask_px_outside_declared_crop": 18,
+      "alpha_nonzero_px_in_crop": 789,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CAM_4212",
       "role_id": "role_2",
       "source_frame_id": 4242,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_2_f4242.png",
-      "reference_sha256": "5a595f144e8bdb8eb243a3126495a1a473630725befb7c8ead93be4036bce4df",
+      "reference_sha256": "5d8b0481948d2bf238b5b8437990ceeafb48e9f67d444559be4608e05f6e5299",
       "role_index_ambiguous_at_anchor": true,
       "candidate_indices": [
         1,
@@ -611,6 +902,21 @@
         "2": 7632
       },
       "index_used_by_make_references_inferred": 2,
+      "mask_index_from_manifest": 2,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        409,
+        76,
+        77,
+        100
+      ],
+      "crop_size_on_disk_wh": [
+        77,
+        100
+      ],
       "declared_bbox_xywh": [
         409,
         76,
@@ -623,23 +929,38 @@
         77,
         100
       ],
-      "crop_size_on_disk_wh": [
-        76,
-        99
-      ],
       "mask_area_px": 7632,
-      "mask_px_inside_crop": 7481,
-      "mask_px_outside_crop": 151,
-      "alpha_nonzero_px_in_crop": 7481,
+      "mask_px_inside_crop": 7632,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 7481,
+      "mask_px_outside_declared_crop": 151,
+      "alpha_nonzero_px_in_crop": 7632,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CAM_4212",
       "role_id": "role_20",
       "source_frame_id": 4287,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_20_f4287.png",
-      "reference_sha256": "a97593207974e2e4d7f5590fb6d443463f783352fb2ec7653f28915049a582e2",
+      "reference_sha256": "1e09898302ac92081fd091f6aa70ceaef40878d2e1d966ea520102f675a0ee2a",
+      "index_used_by_make_references_inferred": 13,
+      "mask_index_from_manifest": 13,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        281,
+        215,
+        31,
+        31
+      ],
+      "crop_size_on_disk_wh": [
+        31,
+        31
+      ],
       "declared_bbox_xywh": [
         281,
         215,
@@ -652,23 +973,38 @@
         31,
         31
       ],
-      "crop_size_on_disk_wh": [
-        30,
-        30
-      ],
       "mask_area_px": 785,
-      "mask_px_inside_crop": 763,
-      "mask_px_outside_crop": 22,
-      "alpha_nonzero_px_in_crop": 763,
+      "mask_px_inside_crop": 785,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 763,
+      "mask_px_outside_declared_crop": 22,
+      "alpha_nonzero_px_in_crop": 785,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CAM_4212",
       "role_id": "role_21",
       "source_frame_id": 4272,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_21_f4272.png",
-      "reference_sha256": "129cbf4e8f73a6443db051b2c3f90beb71ddf217625c4a65fe2b9b50755ed7c9",
+      "reference_sha256": "f60e599a3584375df2727eba44e83f9060766860d22c31517d6938e669d120f3",
+      "index_used_by_make_references_inferred": 14,
+      "mask_index_from_manifest": 14,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        125,
+        31,
+        32,
+        32
+      ],
+      "crop_size_on_disk_wh": [
+        32,
+        32
+      ],
       "declared_bbox_xywh": [
         125,
         31,
@@ -681,23 +1017,38 @@
         32,
         32
       ],
-      "crop_size_on_disk_wh": [
-        31,
-        31
-      ],
       "mask_area_px": 781,
-      "mask_px_inside_crop": 769,
-      "mask_px_outside_crop": 12,
-      "alpha_nonzero_px_in_crop": 769,
+      "mask_px_inside_crop": 781,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 769,
+      "mask_px_outside_declared_crop": 12,
+      "alpha_nonzero_px_in_crop": 781,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CAM_4212",
       "role_id": "role_22",
       "source_frame_id": 4272,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_22_f4272.png",
-      "reference_sha256": "823ad91bce3f3a9979157771f7a3d0f38891e1ede6685b686fb58280ee602b09",
+      "reference_sha256": "4436738972f64b26275ff96cf27c6a3a3e49998c14125b935e2935980688dc29",
+      "index_used_by_make_references_inferred": 15,
+      "mask_index_from_manifest": 15,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        436,
+        31,
+        31,
+        32
+      ],
+      "crop_size_on_disk_wh": [
+        31,
+        32
+      ],
       "declared_bbox_xywh": [
         436,
         31,
@@ -710,23 +1061,38 @@
         31,
         32
       ],
-      "crop_size_on_disk_wh": [
-        30,
-        31
-      ],
       "mask_area_px": 778,
-      "mask_px_inside_crop": 764,
-      "mask_px_outside_crop": 14,
-      "alpha_nonzero_px_in_crop": 764,
+      "mask_px_inside_crop": 778,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 764,
+      "mask_px_outside_declared_crop": 14,
+      "alpha_nonzero_px_in_crop": 778,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CAM_4212",
       "role_id": "role_23",
       "source_frame_id": 4272,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_23_f4272.png",
-      "reference_sha256": "a5ed6dd62a34f1d25733e07e3c74e5789e693726af22bce23fca2f2747f0bd60",
+      "reference_sha256": "c4373fe1d5330f0fbeeda15511b35dde226ea96b0ef385b1a178f992fee5d7a7",
+      "index_used_by_make_references_inferred": 16,
+      "mask_index_from_manifest": 16,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        281,
+        31,
+        31,
+        32
+      ],
+      "crop_size_on_disk_wh": [
+        31,
+        32
+      ],
       "declared_bbox_xywh": [
         281,
         31,
@@ -739,23 +1105,38 @@
         31,
         32
       ],
-      "crop_size_on_disk_wh": [
-        30,
-        31
-      ],
       "mask_area_px": 773,
-      "mask_px_inside_crop": 760,
-      "mask_px_outside_crop": 13,
-      "alpha_nonzero_px_in_crop": 760,
+      "mask_px_inside_crop": 773,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 760,
+      "mask_px_outside_declared_crop": 13,
+      "alpha_nonzero_px_in_crop": 773,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CAM_4212",
       "role_id": "role_24",
       "source_frame_id": 4287,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_24_f4287.png",
-      "reference_sha256": "77416b631505f195bf2363ed25e3d88f5822523af5cbc5299de6c300deb77c39",
+      "reference_sha256": "23daa51816197e03af572aa83cecbaa9fd5edf3f56cbde14dd029aaa9d3f4c58",
+      "index_used_by_make_references_inferred": 17,
+      "mask_index_from_manifest": 17,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        437,
+        220,
+        28,
+        24
+      ],
+      "crop_size_on_disk_wh": [
+        28,
+        24
+      ],
       "declared_bbox_xywh": [
         437,
         220,
@@ -768,23 +1149,38 @@
         28,
         24
       ],
-      "crop_size_on_disk_wh": [
-        27,
-        23
-      ],
       "mask_area_px": 461,
-      "mask_px_inside_crop": 454,
-      "mask_px_outside_crop": 7,
-      "alpha_nonzero_px_in_crop": 454,
+      "mask_px_inside_crop": 461,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 454,
+      "mask_px_outside_declared_crop": 7,
+      "alpha_nonzero_px_in_crop": 461,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CAM_4212",
       "role_id": "role_25",
       "source_frame_id": 4317,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_25_f4317.png",
-      "reference_sha256": "035aed83f3616f7c2843d2390e03c102ceb5bb092dc79d00a0507fe6d6e6f769",
+      "reference_sha256": "c4f142181ac713de9b3d0984f2e3328ccfac2b7b637826e036635fc862d04cb3",
+      "index_used_by_make_references_inferred": 1,
+      "mask_index_from_manifest": 1,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        0,
+        0,
+        640,
+        360
+      ],
+      "crop_size_on_disk_wh": [
+        640,
+        360
+      ],
       "declared_bbox_xywh": [
         0,
         0,
@@ -797,23 +1193,38 @@
         640,
         360
       ],
-      "crop_size_on_disk_wh": [
-        639,
-        359
-      ],
       "mask_area_px": 211809,
-      "mask_px_inside_crop": 210819,
-      "mask_px_outside_crop": 990,
-      "alpha_nonzero_px_in_crop": 210819,
+      "mask_px_inside_crop": 211809,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 210819,
+      "mask_px_outside_declared_crop": 990,
+      "alpha_nonzero_px_in_crop": 211809,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CAM_4212",
       "role_id": "role_3",
       "source_frame_id": 4257,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_3_f4257.png",
-      "reference_sha256": "caf235f610d4af67ceb8306c0f3cd937c368e1bdb148b45ff363e250efcb4cc2",
+      "reference_sha256": "9673b552fd81c2b8b7b64ef3a4366f94908eb0b65a57752ad81ac4956e6f3eb9",
+      "index_used_by_make_references_inferred": 3,
+      "mask_index_from_manifest": 3,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        329,
+        40,
+        104,
+        135
+      ],
+      "crop_size_on_disk_wh": [
+        104,
+        135
+      ],
       "declared_bbox_xywh": [
         329,
         40,
@@ -826,23 +1237,38 @@
         104,
         135
       ],
-      "crop_size_on_disk_wh": [
-        103,
-        134
-      ],
       "mask_area_px": 13774,
-      "mask_px_inside_crop": 13689,
-      "mask_px_outside_crop": 85,
-      "alpha_nonzero_px_in_crop": 13689,
+      "mask_px_inside_crop": 13774,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 13689,
+      "mask_px_outside_declared_crop": 85,
+      "alpha_nonzero_px_in_crop": 13774,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CAM_4212",
       "role_id": "role_4",
       "source_frame_id": 4272,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_4_f4272.png",
-      "reference_sha256": "0c2375a4a713a06f67b729f751090b9662482ddd7dd2740e76b57e9ee990080e",
+      "reference_sha256": "2b9e53c7e8d6a1ec25be3daa8c9456f6bfce68c37f53d7f8267c2c008ec34101",
+      "index_used_by_make_references_inferred": 1,
+      "mask_index_from_manifest": 1,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        412,
+        191,
+        127,
+        166
+      ],
+      "crop_size_on_disk_wh": [
+        127,
+        166
+      ],
       "declared_bbox_xywh": [
         412,
         191,
@@ -855,23 +1281,22 @@
         127,
         166
       ],
-      "crop_size_on_disk_wh": [
-        126,
-        165
-      ],
       "mask_area_px": 20866,
-      "mask_px_inside_crop": 20628,
-      "mask_px_outside_crop": 238,
-      "alpha_nonzero_px_in_crop": 20628,
+      "mask_px_inside_crop": 20866,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 20628,
+      "mask_px_outside_declared_crop": 238,
+      "alpha_nonzero_px_in_crop": 20866,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CAM_4212",
       "role_id": "role_5",
       "source_frame_id": 4287,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_5_f4287.png",
-      "reference_sha256": "afb2a832a4ce87a233a2536cbacb4d29d66f4b6832bdf0b5d408577dd18be288",
+      "reference_sha256": "397a02aee6c45559b681c4a8f74d6cf28a4a43cf05ec2bb519a59c642899dfd0",
       "role_index_ambiguous_at_anchor": true,
       "candidate_indices": [
         3,
@@ -882,6 +1307,21 @@
         "7": 20025
       },
       "index_used_by_make_references_inferred": 7,
+      "mask_index_from_manifest": 7,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        412,
+        8,
+        127,
+        166
+      ],
+      "crop_size_on_disk_wh": [
+        127,
+        166
+      ],
       "declared_bbox_xywh": [
         412,
         8,
@@ -894,23 +1334,38 @@
         127,
         166
       ],
-      "crop_size_on_disk_wh": [
-        126,
-        165
-      ],
       "mask_area_px": 20025,
-      "mask_px_inside_crop": 19879,
-      "mask_px_outside_crop": 146,
-      "alpha_nonzero_px_in_crop": 19879,
+      "mask_px_inside_crop": 20025,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 19879,
+      "mask_px_outside_declared_crop": 146,
+      "alpha_nonzero_px_in_crop": 20025,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CAM_4212",
       "role_id": "role_6",
       "source_frame_id": 4257,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_6_f4257.png",
-      "reference_sha256": "b0bd345ce7b4c352d8d0ae0fb827b2617859ac55f6816e9b2431aa1b32de978f",
+      "reference_sha256": "a511459ed8c4446cec57a500a5f10cf16fe838da466eaf1bc69a21ff3c913aaa",
+      "index_used_by_make_references_inferred": 4,
+      "mask_index_from_manifest": 4,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        329,
+        189,
+        103,
+        135
+      ],
+      "crop_size_on_disk_wh": [
+        103,
+        135
+      ],
       "declared_bbox_xywh": [
         329,
         189,
@@ -923,23 +1378,22 @@
         103,
         135
       ],
-      "crop_size_on_disk_wh": [
-        102,
-        134
-      ],
       "mask_area_px": 13717,
-      "mask_px_inside_crop": 13576,
-      "mask_px_outside_crop": 141,
-      "alpha_nonzero_px_in_crop": 13576,
+      "mask_px_inside_crop": 13717,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 13576,
+      "mask_px_outside_declared_crop": 141,
+      "alpha_nonzero_px_in_crop": 13717,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CAM_4212",
       "role_id": "role_7",
       "source_frame_id": 4242,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_7_f4242.png",
-      "reference_sha256": "b80320657299c5c684b22f3b02636ecf0de06ba7e9c56ee59e2107d26e821e97",
+      "reference_sha256": "07e00bd5f206076a03e4754d294da4c1b2c1ec2e571b83646c10bc6b6446eddc",
       "role_index_ambiguous_at_anchor": true,
       "candidate_indices": [
         7,
@@ -950,6 +1404,21 @@
         "8": 7601
       },
       "index_used_by_make_references_inferred": 8,
+      "mask_index_from_manifest": 8,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        409,
+        187,
+        77,
+        100
+      ],
+      "crop_size_on_disk_wh": [
+        77,
+        100
+      ],
       "declared_bbox_xywh": [
         409,
         187,
@@ -962,23 +1431,38 @@
         77,
         100
       ],
-      "crop_size_on_disk_wh": [
-        76,
-        99
-      ],
       "mask_area_px": 7601,
-      "mask_px_inside_crop": 7480,
-      "mask_px_outside_crop": 121,
-      "alpha_nonzero_px_in_crop": 7480,
+      "mask_px_inside_crop": 7601,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 7480,
+      "mask_px_outside_declared_crop": 121,
+      "alpha_nonzero_px_in_crop": 7601,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CAM_4212",
       "role_id": "role_8",
       "source_frame_id": 4242,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_8_f4242.png",
-      "reference_sha256": "6b27a71b5a7249475e1f2a997f9854401b34cf42ebd6d1676d452b3b6c0b7089",
+      "reference_sha256": "4579d758de29e17bd5d669247b78884513f6ba018863e74ea94a8104b030a19d",
+      "index_used_by_make_references_inferred": 10,
+      "mask_index_from_manifest": 10,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        0,
+        51,
+        25,
+        309
+      ],
+      "crop_size_on_disk_wh": [
+        25,
+        309
+      ],
       "declared_bbox_xywh": [
         0,
         51,
@@ -991,23 +1475,38 @@
         25,
         309
       ],
-      "crop_size_on_disk_wh": [
-        24,
-        308
-      ],
       "mask_area_px": 6915,
-      "mask_px_inside_crop": 6889,
-      "mask_px_outside_crop": 26,
-      "alpha_nonzero_px_in_crop": 6889,
+      "mask_px_inside_crop": 6915,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 6889,
+      "mask_px_outside_declared_crop": 26,
+      "alpha_nonzero_px_in_crop": 6915,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CAM_4212",
       "role_id": "role_9",
       "source_frame_id": 4242,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_9_f4242.png",
-      "reference_sha256": "3b941a6049a04497b0f38d2d15a37d900dd5609cc18c9cd440da032a1ba43134",
+      "reference_sha256": "ea75e7080dc213b34ec8773ad6321030acd09da8cde7e26d25be182ccb3d890a",
+      "index_used_by_make_references_inferred": 11,
+      "mask_index_from_manifest": 11,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        42,
+        212,
+        169,
+        26
+      ],
+      "crop_size_on_disk_wh": [
+        169,
+        26
+      ],
       "declared_bbox_xywh": [
         42,
         212,
@@ -1020,23 +1519,38 @@
         169,
         26
       ],
-      "crop_size_on_disk_wh": [
-        168,
-        25
-      ],
       "mask_area_px": 4103,
-      "mask_px_inside_crop": 3945,
-      "mask_px_outside_crop": 158,
-      "alpha_nonzero_px_in_crop": 3945,
+      "mask_px_inside_crop": 4103,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 3945,
+      "mask_px_outside_declared_crop": 158,
+      "alpha_nonzero_px_in_crop": 4103,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CUT_660",
       "role_id": "role_1",
       "source_frame_id": 660,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_1_f660.png",
-      "reference_sha256": "381c52f7530ef3b61e89d07f45519d8f4f641092c1125e204f5e4bc7c4504b6f",
+      "reference_sha256": "e433a8241217423081c507e7d676665cf2653e7108161d87b3a4e5d9baa63d57",
+      "index_used_by_make_references_inferred": 1,
+      "mask_index_from_manifest": 1,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        484,
+        70,
+        90,
+        170
+      ],
+      "crop_size_on_disk_wh": [
+        90,
+        170
+      ],
       "declared_bbox_xywh": [
         484,
         70,
@@ -1049,23 +1563,38 @@
         90,
         170
       ],
-      "crop_size_on_disk_wh": [
-        89,
-        169
-      ],
       "mask_area_px": 9570,
-      "mask_px_inside_crop": 9553,
-      "mask_px_outside_crop": 17,
-      "alpha_nonzero_px_in_crop": 9553,
+      "mask_px_inside_crop": 9570,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 9553,
+      "mask_px_outside_declared_crop": 17,
+      "alpha_nonzero_px_in_crop": 9570,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CUT_660",
       "role_id": "role_10",
       "source_frame_id": 720,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_10_f720.png",
-      "reference_sha256": "1bcd65e707263eeb2ba059de89d231517341dbb428f4d5448103099be08a27b6",
+      "reference_sha256": "6a38ef32022ba1511236ea26784912115fd1215d4947705fd6e73e934b3a9b7f",
+      "index_used_by_make_references_inferred": 1,
+      "mask_index_from_manifest": 1,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        0,
+        0,
+        640,
+        360
+      ],
+      "crop_size_on_disk_wh": [
+        640,
+        360
+      ],
       "declared_bbox_xywh": [
         0,
         0,
@@ -1078,23 +1607,38 @@
         640,
         360
       ],
-      "crop_size_on_disk_wh": [
-        639,
-        359
-      ],
       "mask_area_px": 140389,
-      "mask_px_inside_crop": 139925,
-      "mask_px_outside_crop": 464,
-      "alpha_nonzero_px_in_crop": 139925,
+      "mask_px_inside_crop": 140389,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 139925,
+      "mask_px_outside_declared_crop": 464,
+      "alpha_nonzero_px_in_crop": 140389,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CUT_660",
       "role_id": "role_11",
       "source_frame_id": 735,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_11_f735.png",
-      "reference_sha256": "6dd0e1c70e6d7074bc20b8f09f0a5a0dbef48340d62d88f4f548e87cb35fba74",
+      "reference_sha256": "e75ee61e8d3cb7e4134dec1e9a647cca8a201c1634335105352c75e486962984",
+      "index_used_by_make_references_inferred": 2,
+      "mask_index_from_manifest": 2,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        206,
+        11,
+        250,
+        345
+      ],
+      "crop_size_on_disk_wh": [
+        250,
+        345
+      ],
       "declared_bbox_xywh": [
         206,
         11,
@@ -1107,23 +1651,38 @@
         250,
         345
       ],
-      "crop_size_on_disk_wh": [
-        249,
-        344
-      ],
       "mask_area_px": 83071,
-      "mask_px_inside_crop": 82924,
-      "mask_px_outside_crop": 147,
-      "alpha_nonzero_px_in_crop": 82924,
+      "mask_px_inside_crop": 83071,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 82924,
+      "mask_px_outside_declared_crop": 147,
+      "alpha_nonzero_px_in_crop": 83071,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CUT_660",
       "role_id": "role_12",
       "source_frame_id": 750,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_12_f750.png",
-      "reference_sha256": "5f554fff6edfc6332a3ef3dcbdf9bbdaa5ed7f5c8440b23e96cfc594cd58c787",
+      "reference_sha256": "5e25c65c7a2adb12785368bddf2deecf1d993feb4a546fe8155108459c4ede89",
+      "index_used_by_make_references_inferred": 1,
+      "mask_index_from_manifest": 1,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        503,
+        104,
+        137,
+        206
+      ],
+      "crop_size_on_disk_wh": [
+        137,
+        206
+      ],
       "declared_bbox_xywh": [
         503,
         104,
@@ -1136,23 +1695,38 @@
         137,
         206
       ],
-      "crop_size_on_disk_wh": [
-        136,
-        205
-      ],
       "mask_area_px": 18295,
-      "mask_px_inside_crop": 18158,
-      "mask_px_outside_crop": 137,
-      "alpha_nonzero_px_in_crop": 18158,
+      "mask_px_inside_crop": 18295,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 18158,
+      "mask_px_outside_declared_crop": 137,
+      "alpha_nonzero_px_in_crop": 18295,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CUT_660",
       "role_id": "role_13",
       "source_frame_id": 750,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_13_f750.png",
-      "reference_sha256": "3a52fabe85610300e8803050ac203d6fa36a0779b6990cbcf5eda7bcd9a702a2",
+      "reference_sha256": "6b8dfb95533c12ae29a73eb7e292fe32a9233960110cb2d1e067a07a0948b932",
+      "index_used_by_make_references_inferred": 2,
+      "mask_index_from_manifest": 2,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        44,
+        0,
+        235,
+        73
+      ],
+      "crop_size_on_disk_wh": [
+        235,
+        73
+      ],
       "declared_bbox_xywh": [
         44,
         0,
@@ -1165,23 +1739,38 @@
         235,
         73
       ],
-      "crop_size_on_disk_wh": [
-        234,
-        72
-      ],
       "mask_area_px": 15357,
-      "mask_px_inside_crop": 15351,
-      "mask_px_outside_crop": 6,
-      "alpha_nonzero_px_in_crop": 15351,
+      "mask_px_inside_crop": 15357,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 15351,
+      "mask_px_outside_declared_crop": 6,
+      "alpha_nonzero_px_in_crop": 15357,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CUT_660",
       "role_id": "role_14",
       "source_frame_id": 765,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_14_f765.png",
-      "reference_sha256": "fd165de2b7acc97f8523ac05abacb6c734d4162567884a768261e738ae5fb0cd",
+      "reference_sha256": "924ad790f8c1b002174d03b9a49b0daa7a2c7f4557007b59d0d8e758314e3f89",
+      "index_used_by_make_references_inferred": 3,
+      "mask_index_from_manifest": 3,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        284,
+        0,
+        94,
+        72
+      ],
+      "crop_size_on_disk_wh": [
+        94,
+        72
+      ],
       "declared_bbox_xywh": [
         284,
         0,
@@ -1194,23 +1783,38 @@
         94,
         72
       ],
-      "crop_size_on_disk_wh": [
-        93,
-        71
-      ],
       "mask_area_px": 5434,
-      "mask_px_inside_crop": 5383,
-      "mask_px_outside_crop": 51,
-      "alpha_nonzero_px_in_crop": 5383,
+      "mask_px_inside_crop": 5434,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 5383,
+      "mask_px_outside_declared_crop": 51,
+      "alpha_nonzero_px_in_crop": 5434,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CUT_660",
       "role_id": "role_15",
       "source_frame_id": 750,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_15_f750.png",
-      "reference_sha256": "2029c05bea362ebeefe08fa9aa9b129a0d8cceb15175766d182f12f07a070122",
+      "reference_sha256": "7bedd369f9993798c52fb0adbbd3b7fff3e228fc94982d424074cb2c4ca5df92",
+      "index_used_by_make_references_inferred": 4,
+      "mask_index_from_manifest": 4,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        479,
+        18,
+        103,
+        88
+      ],
+      "crop_size_on_disk_wh": [
+        103,
+        88
+      ],
       "declared_bbox_xywh": [
         479,
         18,
@@ -1223,23 +1827,38 @@
         103,
         88
       ],
-      "crop_size_on_disk_wh": [
-        102,
-        87
-      ],
       "mask_area_px": 5386,
-      "mask_px_inside_crop": 5358,
-      "mask_px_outside_crop": 28,
-      "alpha_nonzero_px_in_crop": 5358,
+      "mask_px_inside_crop": 5386,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 5358,
+      "mask_px_outside_declared_crop": 28,
+      "alpha_nonzero_px_in_crop": 5386,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CUT_660",
       "role_id": "role_16",
       "source_frame_id": 750,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_16_f750.png",
-      "reference_sha256": "c8596d3da6a0cd4f566f7c1276f2e440a162123945fd4a3686ce3693c718346f",
+      "reference_sha256": "a15b17a70e8689a82d32a4ed6ae534a2e7499faa49ea8522104b9ed16cd20301",
+      "index_used_by_make_references_inferred": 5,
+      "mask_index_from_manifest": 5,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        496,
+        0,
+        144,
+        95
+      ],
+      "crop_size_on_disk_wh": [
+        144,
+        95
+      ],
       "declared_bbox_xywh": [
         496,
         0,
@@ -1252,23 +1871,38 @@
         144,
         95
       ],
-      "crop_size_on_disk_wh": [
-        143,
-        94
-      ],
       "mask_area_px": 4971,
-      "mask_px_inside_crop": 4875,
-      "mask_px_outside_crop": 96,
-      "alpha_nonzero_px_in_crop": 4875,
+      "mask_px_inside_crop": 4971,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 4875,
+      "mask_px_outside_declared_crop": 96,
+      "alpha_nonzero_px_in_crop": 4971,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CUT_660",
       "role_id": "role_17",
       "source_frame_id": 750,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_17_f750.png",
-      "reference_sha256": "8274d9fdef5bd47de55ae927348c0902f39e4ddb5d3919127e256fd3407e3a6e",
+      "reference_sha256": "ecdd6ef49092fba851113f73f624596fb84fe2a2c7545da95535596eb493d2c8",
+      "index_used_by_make_references_inferred": 6,
+      "mask_index_from_manifest": 6,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        0,
+        0,
+        48,
+        88
+      ],
+      "crop_size_on_disk_wh": [
+        48,
+        88
+      ],
       "declared_bbox_xywh": [
         0,
         0,
@@ -1281,23 +1915,38 @@
         48,
         88
       ],
-      "crop_size_on_disk_wh": [
-        47,
-        87
-      ],
       "mask_area_px": 3686,
-      "mask_px_inside_crop": 3657,
-      "mask_px_outside_crop": 29,
-      "alpha_nonzero_px_in_crop": 3657,
+      "mask_px_inside_crop": 3686,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 3657,
+      "mask_px_outside_declared_crop": 29,
+      "alpha_nonzero_px_in_crop": 3686,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CUT_660",
       "role_id": "role_18",
       "source_frame_id": 750,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_18_f750.png",
-      "reference_sha256": "53abf5af64f5f80f62dad53001ea6796b8df7a9764d25fd638df913294332b8e",
+      "reference_sha256": "032cac05e5d31d2f8e4ac84043eeeac3aa055ca0123772c58d8bdc3127bfb3a6",
+      "index_used_by_make_references_inferred": 7,
+      "mask_index_from_manifest": 7,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        146,
+        166,
+        58,
+        88
+      ],
+      "crop_size_on_disk_wh": [
+        58,
+        88
+      ],
       "declared_bbox_xywh": [
         146,
         166,
@@ -1310,23 +1959,22 @@
         58,
         88
       ],
-      "crop_size_on_disk_wh": [
-        57,
-        87
-      ],
       "mask_area_px": 3429,
-      "mask_px_inside_crop": 3402,
-      "mask_px_outside_crop": 27,
-      "alpha_nonzero_px_in_crop": 3402,
+      "mask_px_inside_crop": 3429,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 3402,
+      "mask_px_outside_declared_crop": 27,
+      "alpha_nonzero_px_in_crop": 3429,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CUT_660",
       "role_id": "role_19",
       "source_frame_id": 750,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_19_f750.png",
-      "reference_sha256": "3f785b06d78808768577a3762ab95d4fa7609f9c799d169ab2740609727f3ea3",
+      "reference_sha256": "ca541a3c5ef32b0844900845816898c1098475493e7b83818cbb4c4cbce1bcdb",
       "role_index_ambiguous_at_anchor": true,
       "candidate_indices": [
         8,
@@ -1337,6 +1985,21 @@
         "9": 3363
       },
       "index_used_by_make_references_inferred": 9,
+      "mask_index_from_manifest": 9,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        0,
+        87,
+        43,
+        117
+      ],
+      "crop_size_on_disk_wh": [
+        43,
+        117
+      ],
       "declared_bbox_xywh": [
         0,
         87,
@@ -1349,23 +2012,38 @@
         43,
         117
       ],
-      "crop_size_on_disk_wh": [
-        42,
-        116
-      ],
       "mask_area_px": 3363,
-      "mask_px_inside_crop": 3341,
-      "mask_px_outside_crop": 22,
-      "alpha_nonzero_px_in_crop": 3341,
+      "mask_px_inside_crop": 3363,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 3341,
+      "mask_px_outside_declared_crop": 22,
+      "alpha_nonzero_px_in_crop": 3363,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CUT_660",
       "role_id": "role_2",
       "source_frame_id": 660,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_2_f660.png",
-      "reference_sha256": "c3ed45018892c8e749f3bf752afe3b6c241cfbde6f7ccf0defc48710555e076b",
+      "reference_sha256": "e5d0729ef4abfdba30bf3ea4e0d94bbe76991a8433090120f6b7f9195c15d513",
+      "index_used_by_make_references_inferred": 2,
+      "mask_index_from_manifest": 2,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        373,
+        27,
+        115,
+        55
+      ],
+      "crop_size_on_disk_wh": [
+        115,
+        55
+      ],
       "declared_bbox_xywh": [
         373,
         27,
@@ -1378,23 +2056,38 @@
         115,
         55
       ],
-      "crop_size_on_disk_wh": [
-        114,
-        54
-      ],
       "mask_area_px": 4852,
-      "mask_px_inside_crop": 4811,
-      "mask_px_outside_crop": 41,
-      "alpha_nonzero_px_in_crop": 4811,
+      "mask_px_inside_crop": 4852,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 4811,
+      "mask_px_outside_declared_crop": 41,
+      "alpha_nonzero_px_in_crop": 4852,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CUT_660",
       "role_id": "role_20",
       "source_frame_id": 750,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_20_f750.png",
-      "reference_sha256": "d6f0444c10c57e5e84017582d8632792b1bc7acc92ec2c479aec5317446f679a",
+      "reference_sha256": "8568183628a188270bcecca26fec57343b4d33f4d05445d212c8ca097a0a877a",
+      "index_used_by_make_references_inferred": 11,
+      "mask_index_from_manifest": 11,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        295,
+        336,
+        146,
+        24
+      ],
+      "crop_size_on_disk_wh": [
+        146,
+        24
+      ],
       "declared_bbox_xywh": [
         295,
         336,
@@ -1407,23 +2100,38 @@
         146,
         24
       ],
-      "crop_size_on_disk_wh": [
-        145,
-        23
-      ],
       "mask_area_px": 2354,
-      "mask_px_inside_crop": 2208,
-      "mask_px_outside_crop": 146,
-      "alpha_nonzero_px_in_crop": 2208,
+      "mask_px_inside_crop": 2354,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 2208,
+      "mask_px_outside_declared_crop": 146,
+      "alpha_nonzero_px_in_crop": 2354,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CUT_660",
       "role_id": "role_3",
       "source_frame_id": 660,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_3_f660.png",
-      "reference_sha256": "03318522dbcbf424928d974c18741e32aff9994c155a23efef96877b934bb24d",
+      "reference_sha256": "5e1280e3db8d4b2d147b2d05587c3b873ea5341b54a20235fba457d7503b1f6c",
+      "index_used_by_make_references_inferred": 3,
+      "mask_index_from_manifest": 3,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        0,
+        0,
+        98,
+        67
+      ],
+      "crop_size_on_disk_wh": [
+        98,
+        67
+      ],
       "declared_bbox_xywh": [
         0,
         0,
@@ -1436,23 +2144,38 @@
         98,
         67
       ],
-      "crop_size_on_disk_wh": [
-        97,
-        66
-      ],
       "mask_area_px": 3173,
-      "mask_px_inside_crop": 3169,
-      "mask_px_outside_crop": 4,
-      "alpha_nonzero_px_in_crop": 3169,
+      "mask_px_inside_crop": 3173,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 3169,
+      "mask_px_outside_declared_crop": 4,
+      "alpha_nonzero_px_in_crop": 3173,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CUT_660",
       "role_id": "role_4",
       "source_frame_id": 720,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_4_f720.png",
-      "reference_sha256": "27ca21c6a37ec195eddc9be70659a2842498297a02089731927bb510f19c0937",
+      "reference_sha256": "8a3e3188a6e8a69600c8acc5c803f2576c660a125d7cab1eb9ae24a689fc903d",
+      "index_used_by_make_references_inferred": 3,
+      "mask_index_from_manifest": 3,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        9,
+        304,
+        67,
+        46
+      ],
+      "crop_size_on_disk_wh": [
+        67,
+        46
+      ],
       "declared_bbox_xywh": [
         9,
         304,
@@ -1465,23 +2188,38 @@
         67,
         46
       ],
-      "crop_size_on_disk_wh": [
-        66,
-        45
-      ],
       "mask_area_px": 2935,
-      "mask_px_inside_crop": 2865,
-      "mask_px_outside_crop": 70,
-      "alpha_nonzero_px_in_crop": 2865,
+      "mask_px_inside_crop": 2935,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 2865,
+      "mask_px_outside_declared_crop": 70,
+      "alpha_nonzero_px_in_crop": 2935,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CUT_660",
       "role_id": "role_5",
       "source_frame_id": 675,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_5_f675.png",
-      "reference_sha256": "30b3ab13098c4b61db83444d1f4716c69ad1b45a3e0e862c37a2536cd2766686",
+      "reference_sha256": "b8037858a215daef04f0653b7396092c56ae9d266f218b0a07c2d705e234b21a",
+      "index_used_by_make_references_inferred": 4,
+      "mask_index_from_manifest": 4,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        569,
+        23,
+        71,
+        71
+      ],
+      "crop_size_on_disk_wh": [
+        71,
+        71
+      ],
       "declared_bbox_xywh": [
         569,
         23,
@@ -1494,23 +2232,38 @@
         71,
         71
       ],
-      "crop_size_on_disk_wh": [
-        70,
-        70
-      ],
       "mask_area_px": 2644,
-      "mask_px_inside_crop": 2570,
-      "mask_px_outside_crop": 74,
-      "alpha_nonzero_px_in_crop": 2570,
+      "mask_px_inside_crop": 2644,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 2570,
+      "mask_px_outside_declared_crop": 74,
+      "alpha_nonzero_px_in_crop": 2644,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CUT_660",
       "role_id": "role_6",
       "source_frame_id": 660,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_6_f660.png",
-      "reference_sha256": "237640f691032b27c5993a68eb912ebee573e239436eb919344dc09556e9c833",
+      "reference_sha256": "1048c3cee2fc6ed679de106f6805d7e0e35af7093138afc2f257df7f5a6efd23",
+      "index_used_by_make_references_inferred": 6,
+      "mask_index_from_manifest": 6,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        590,
+        299,
+        50,
+        61
+      ],
+      "crop_size_on_disk_wh": [
+        50,
+        61
+      ],
       "declared_bbox_xywh": [
         590,
         299,
@@ -1523,23 +2276,38 @@
         50,
         61
       ],
-      "crop_size_on_disk_wh": [
-        49,
-        60
-      ],
       "mask_area_px": 1427,
-      "mask_px_inside_crop": 1360,
-      "mask_px_outside_crop": 67,
-      "alpha_nonzero_px_in_crop": 1360,
+      "mask_px_inside_crop": 1427,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 1360,
+      "mask_px_outside_declared_crop": 67,
+      "alpha_nonzero_px_in_crop": 1427,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CUT_660",
       "role_id": "role_7",
       "source_frame_id": 660,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_7_f660.png",
-      "reference_sha256": "0631d705e5ed3fe13b88562a6f5d01ab90e40e291bc62dd54780a7ce6f4347ea",
+      "reference_sha256": "02853a80ad50b3b1ee63adeb62a1a9ddaed6d0314c5c18cb0e29e123f2ad118a",
+      "index_used_by_make_references_inferred": 7,
+      "mask_index_from_manifest": 7,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        0,
+        116,
+        24,
+        80
+      ],
+      "crop_size_on_disk_wh": [
+        24,
+        80
+      ],
       "declared_bbox_xywh": [
         0,
         116,
@@ -1552,23 +2320,38 @@
         24,
         80
       ],
-      "crop_size_on_disk_wh": [
-        23,
-        79
-      ],
       "mask_area_px": 1266,
-      "mask_px_inside_crop": 1256,
-      "mask_px_outside_crop": 10,
-      "alpha_nonzero_px_in_crop": 1256,
+      "mask_px_inside_crop": 1266,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 1256,
+      "mask_px_outside_declared_crop": 10,
+      "alpha_nonzero_px_in_crop": 1266,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CUT_660",
       "role_id": "role_8",
       "source_frame_id": 660,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_8_f660.png",
-      "reference_sha256": "d0b29a090b13f3b32903a31113581bef71ef462c508f5ed7835eb9e5da273078",
+      "reference_sha256": "a9d31ea6f0db33f408d5ab32d5bdb54dec4ada3433d368e0f64a7a99723b088d",
+      "index_used_by_make_references_inferred": 8,
+      "mask_index_from_manifest": 8,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        489,
+        40,
+        36,
+        40
+      ],
+      "crop_size_on_disk_wh": [
+        36,
+        40
+      ],
       "declared_bbox_xywh": [
         489,
         40,
@@ -1581,23 +2364,38 @@
         36,
         40
       ],
-      "crop_size_on_disk_wh": [
-        35,
-        39
-      ],
       "mask_area_px": 1016,
-      "mask_px_inside_crop": 1005,
-      "mask_px_outside_crop": 11,
-      "alpha_nonzero_px_in_crop": 1005,
+      "mask_px_inside_crop": 1016,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 1005,
+      "mask_px_outside_declared_crop": 11,
+      "alpha_nonzero_px_in_crop": 1016,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "CUT_660",
       "role_id": "role_9",
       "source_frame_id": 675,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_9_f675.png",
-      "reference_sha256": "a4f179a4a911a346513dcf305d31d6e264942f74ad4c37daf5a3402c395b7195",
+      "reference_sha256": "0d0d76570604896692ff443e01d1a80826331b40b1b111aba294c18824b1ffe0",
+      "index_used_by_make_references_inferred": 7,
+      "mask_index_from_manifest": 7,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        496,
+        139,
+        22,
+        33
+      ],
+      "crop_size_on_disk_wh": [
+        22,
+        33
+      ],
       "declared_bbox_xywh": [
         496,
         139,
@@ -1610,23 +2408,38 @@
         22,
         33
       ],
-      "crop_size_on_disk_wh": [
-        21,
-        32
-      ],
       "mask_area_px": 687,
-      "mask_px_inside_crop": 663,
-      "mask_px_outside_crop": 24,
-      "alpha_nonzero_px_in_crop": 663,
+      "mask_px_inside_crop": 687,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 663,
+      "mask_px_outside_declared_crop": 24,
+      "alpha_nonzero_px_in_crop": 687,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "HOLDOUT_16231",
       "role_id": "role_1",
       "source_frame_id": 16276,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_1_f16276.png",
-      "reference_sha256": "19a9a0e5bbba8ab03a118ad033a6ffae50e9cd23ac428011dd602ef17c489e8b",
+      "reference_sha256": "195a0eab77f4f15fcf7714b526d23001d12d17b6b5c29607d8162c475269130e",
+      "index_used_by_make_references_inferred": 1,
+      "mask_index_from_manifest": 1,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        306,
+        1,
+        334,
+        296
+      ],
+      "crop_size_on_disk_wh": [
+        334,
+        296
+      ],
       "declared_bbox_xywh": [
         181,
         1,
@@ -1639,23 +2452,38 @@
         334,
         296
       ],
-      "crop_size_on_disk_wh": [
-        458,
-        295
-      ],
       "mask_area_px": 46091,
-      "mask_px_inside_crop": 45848,
-      "mask_px_outside_crop": 243,
-      "alpha_nonzero_px_in_crop": 45848,
+      "mask_px_inside_crop": 46091,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 45848,
+      "mask_px_outside_declared_crop": 243,
+      "alpha_nonzero_px_in_crop": 46091,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "HOLDOUT_16231",
       "role_id": "role_10",
       "source_frame_id": 16231,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_10_f16231.png",
-      "reference_sha256": "df6df37fd2bde583159ce208a8a4c19cc11eaaf04a8bd3f26cd5be3f7e0d1cba",
+      "reference_sha256": "a36525f6f55c59c7a6e20d3c3bc49cb3c9f4a584c2744fdc43f46bcb78391458",
+      "index_used_by_make_references_inferred": 10,
+      "mask_index_from_manifest": 10,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        395,
+        174,
+        47,
+        45
+      ],
+      "crop_size_on_disk_wh": [
+        47,
+        45
+      ],
       "declared_bbox_xywh": [
         395,
         174,
@@ -1668,23 +2496,38 @@
         47,
         45
       ],
-      "crop_size_on_disk_wh": [
-        46,
-        44
-      ],
       "mask_area_px": 1803,
-      "mask_px_inside_crop": 1765,
-      "mask_px_outside_crop": 38,
-      "alpha_nonzero_px_in_crop": 1765,
+      "mask_px_inside_crop": 1803,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 1765,
+      "mask_px_outside_declared_crop": 38,
+      "alpha_nonzero_px_in_crop": 1803,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "HOLDOUT_16231",
       "role_id": "role_11",
       "source_frame_id": 16231,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_11_f16231.png",
-      "reference_sha256": "dafd399a20ffb7494ac61c3a92184c01e2300766bbd016416e1cb5f1f173aeae",
+      "reference_sha256": "72600ec9336c91c2144d5611f2375b42a43130cbc9beb2ed0a97bdeb8b999cbf",
+      "index_used_by_make_references_inferred": 11,
+      "mask_index_from_manifest": 11,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        210,
+        328,
+        17,
+        32
+      ],
+      "crop_size_on_disk_wh": [
+        17,
+        32
+      ],
       "declared_bbox_xywh": [
         210,
         328,
@@ -1697,23 +2540,38 @@
         17,
         32
       ],
-      "crop_size_on_disk_wh": [
-        16,
-        31
-      ],
       "mask_area_px": 528,
-      "mask_px_inside_crop": 481,
-      "mask_px_outside_crop": 47,
-      "alpha_nonzero_px_in_crop": 481,
+      "mask_px_inside_crop": 528,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 481,
+      "mask_px_outside_declared_crop": 47,
+      "alpha_nonzero_px_in_crop": 528,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "HOLDOUT_16231",
       "role_id": "role_12",
       "source_frame_id": 16261,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_12_f16261.png",
-      "reference_sha256": "3e161a14a3a26febe127f239ec892cf34d5e211f80f97c7bc38d8abc0af93b9d",
+      "reference_sha256": "9cee6e7df1a8dafd228a840e6fa8244cb8b7c6476ced15f7ee01325b7e0b95f0",
+      "index_used_by_make_references_inferred": 10,
+      "mask_index_from_manifest": 10,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        9,
+        304,
+        68,
+        47
+      ],
+      "crop_size_on_disk_wh": [
+        68,
+        47
+      ],
       "declared_bbox_xywh": [
         9,
         304,
@@ -1726,23 +2584,38 @@
         68,
         47
       ],
-      "crop_size_on_disk_wh": [
-        67,
-        46
-      ],
       "mask_area_px": 2922,
-      "mask_px_inside_crop": 2908,
-      "mask_px_outside_crop": 14,
-      "alpha_nonzero_px_in_crop": 2908,
+      "mask_px_inside_crop": 2922,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 2908,
+      "mask_px_outside_declared_crop": 14,
+      "alpha_nonzero_px_in_crop": 2922,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "HOLDOUT_16231",
       "role_id": "role_13",
       "source_frame_id": 16336,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_13_f16336.png",
-      "reference_sha256": "bc5fce222a17d28873dd149415199f351a17d73181ddea3fbaa57b8b02f8d12e",
+      "reference_sha256": "77a89bb74dd9740be4d21375d852b9a10e96fb46333bd336911a8a7a28bdabdf",
+      "index_used_by_make_references_inferred": 10,
+      "mask_index_from_manifest": 10,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        9,
+        304,
+        68,
+        47
+      ],
+      "crop_size_on_disk_wh": [
+        68,
+        47
+      ],
       "declared_bbox_xywh": [
         9,
         304,
@@ -1755,23 +2628,38 @@
         68,
         47
       ],
-      "crop_size_on_disk_wh": [
-        67,
-        46
-      ],
       "mask_area_px": 2920,
-      "mask_px_inside_crop": 2905,
-      "mask_px_outside_crop": 15,
-      "alpha_nonzero_px_in_crop": 2905,
+      "mask_px_inside_crop": 2920,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 2905,
+      "mask_px_outside_declared_crop": 15,
+      "alpha_nonzero_px_in_crop": 2920,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "HOLDOUT_16231",
       "role_id": "role_2",
       "source_frame_id": 16306,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_2_f16306.png",
-      "reference_sha256": "913ceb1c7f39f4f63993f5a6d04d5953f6286b123532948c9d6f32dec3ea942f",
+      "reference_sha256": "59168cd2aa4067954c295682940cf9c19d511317cd841c914bf2d970f30c8341",
+      "index_used_by_make_references_inferred": 2,
+      "mask_index_from_manifest": 2,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        0,
+        0,
+        259,
+        222
+      ],
+      "crop_size_on_disk_wh": [
+        259,
+        222
+      ],
       "declared_bbox_xywh": [
         0,
         0,
@@ -1784,23 +2672,38 @@
         259,
         222
       ],
-      "crop_size_on_disk_wh": [
-        258,
-        221
-      ],
       "mask_area_px": 39178,
-      "mask_px_inside_crop": 39127,
-      "mask_px_outside_crop": 51,
-      "alpha_nonzero_px_in_crop": 39127,
+      "mask_px_inside_crop": 39178,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 39127,
+      "mask_px_outside_declared_crop": 51,
+      "alpha_nonzero_px_in_crop": 39178,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "HOLDOUT_16231",
       "role_id": "role_3",
       "source_frame_id": 16321,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_3_f16321.png",
-      "reference_sha256": "c8fd0c13bcdb8a4c6623be2612b4d5fee303b0342427aa7c6b2efb91d87a4150",
+      "reference_sha256": "00537c290a627808a0a23d7c82862906ad52c50c7b3788a6a109e14a5faf0f3a",
+      "index_used_by_make_references_inferred": 3,
+      "mask_index_from_manifest": 3,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        168,
+        231,
+        313,
+        129
+      ],
+      "crop_size_on_disk_wh": [
+        313,
+        129
+      ],
       "declared_bbox_xywh": [
         168,
         231,
@@ -1813,23 +2716,38 @@
         313,
         129
       ],
-      "crop_size_on_disk_wh": [
-        312,
-        128
-      ],
       "mask_area_px": 26715,
-      "mask_px_inside_crop": 26649,
-      "mask_px_outside_crop": 66,
-      "alpha_nonzero_px_in_crop": 26649,
+      "mask_px_inside_crop": 26715,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 26649,
+      "mask_px_outside_declared_crop": 66,
+      "alpha_nonzero_px_in_crop": 26715,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "HOLDOUT_16231",
       "role_id": "role_4",
       "source_frame_id": 16321,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_4_f16321.png",
-      "reference_sha256": "624d4a3f2e3e5d6116e076ad927f47e5a625507be3573d87adba1395ad6c35db",
+      "reference_sha256": "41ac6b995f6211666072674016a5a5be3d8ffa2f2fcb9ed0433b2259a92af927",
+      "index_used_by_make_references_inferred": 4,
+      "mask_index_from_manifest": 4,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        474,
+        82,
+        113,
+        240
+      ],
+      "crop_size_on_disk_wh": [
+        113,
+        240
+      ],
       "declared_bbox_xywh": [
         474,
         82,
@@ -1842,23 +2760,38 @@
         113,
         240
       ],
-      "crop_size_on_disk_wh": [
-        112,
-        239
-      ],
       "mask_area_px": 22020,
-      "mask_px_inside_crop": 21918,
-      "mask_px_outside_crop": 102,
-      "alpha_nonzero_px_in_crop": 21918,
+      "mask_px_inside_crop": 22020,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 21918,
+      "mask_px_outside_declared_crop": 102,
+      "alpha_nonzero_px_in_crop": 22020,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "HOLDOUT_16231",
       "role_id": "role_5",
       "source_frame_id": 16231,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_5_f16231.png",
-      "reference_sha256": "4965462bd6b3c3a8d37ca305d32d0c6f6b2fb4e382046ce336037a6ee873cfae",
+      "reference_sha256": "f5acd3a5416ae7c0d54af09edeaca9565601b7066c7f589722d24afa89d8539b",
+      "index_used_by_make_references_inferred": 5,
+      "mask_index_from_manifest": 5,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        32,
+        76,
+        109,
+        252
+      ],
+      "crop_size_on_disk_wh": [
+        109,
+        252
+      ],
       "declared_bbox_xywh": [
         32,
         76,
@@ -1871,23 +2804,38 @@
         109,
         252
       ],
-      "crop_size_on_disk_wh": [
-        108,
-        251
-      ],
       "mask_area_px": 20969,
-      "mask_px_inside_crop": 20919,
-      "mask_px_outside_crop": 50,
-      "alpha_nonzero_px_in_crop": 20919,
+      "mask_px_inside_crop": 20969,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 20919,
+      "mask_px_outside_declared_crop": 50,
+      "alpha_nonzero_px_in_crop": 20969,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "HOLDOUT_16231",
       "role_id": "role_6",
       "source_frame_id": 16231,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_6_f16231.png",
-      "reference_sha256": "907acb6546aa48f01ab700059ee8edfbd78ff96c1b1facbfd049738e3566f358",
+      "reference_sha256": "589cf1c38183035027a2007f1f8709b08b44a75c0be30b4dfa6d797925e27aa8",
+      "index_used_by_make_references_inferred": 6,
+      "mask_index_from_manifest": 6,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        321,
+        55,
+        84,
+        176
+      ],
+      "crop_size_on_disk_wh": [
+        84,
+        176
+      ],
       "declared_bbox_xywh": [
         321,
         55,
@@ -1900,23 +2848,38 @@
         84,
         176
       ],
-      "crop_size_on_disk_wh": [
-        83,
-        175
-      ],
       "mask_area_px": 11105,
-      "mask_px_inside_crop": 11042,
-      "mask_px_outside_crop": 63,
-      "alpha_nonzero_px_in_crop": 11042,
+      "mask_px_inside_crop": 11105,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 11042,
+      "mask_px_outside_declared_crop": 63,
+      "alpha_nonzero_px_in_crop": 11105,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "HOLDOUT_16231",
       "role_id": "role_7",
       "source_frame_id": 16321,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_7_f16321.png",
-      "reference_sha256": "bcd2e0277bd991e1a646260d50dba588ae62f2f21e3c1c54fabdaae04472a7e8",
+      "reference_sha256": "f8188d975d7e308745a277593f944376641443bebcd80eb2d44b5e38f3de4d2c",
+      "index_used_by_make_references_inferred": 7,
+      "mask_index_from_manifest": 7,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        165,
+        174,
+        92,
+        77
+      ],
+      "crop_size_on_disk_wh": [
+        92,
+        77
+      ],
       "declared_bbox_xywh": [
         165,
         174,
@@ -1929,23 +2892,38 @@
         92,
         77
       ],
-      "crop_size_on_disk_wh": [
-        91,
-        76
-      ],
       "mask_area_px": 5724,
-      "mask_px_inside_crop": 5648,
-      "mask_px_outside_crop": 76,
-      "alpha_nonzero_px_in_crop": 5648,
+      "mask_px_inside_crop": 5724,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 5648,
+      "mask_px_outside_declared_crop": 76,
+      "alpha_nonzero_px_in_crop": 5724,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "HOLDOUT_16231",
       "role_id": "role_8",
       "source_frame_id": 16231,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_8_f16231.png",
-      "reference_sha256": "194d4d383826d9fda589fdc256cd81fce1501d1ad39766bb3fe29decd944a47d",
+      "reference_sha256": "f37a5263b06ec0386623cedb1d1a23bec0a1128c57472b95f43300f9f832c448",
+      "index_used_by_make_references_inferred": 8,
+      "mask_index_from_manifest": 8,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        258,
+        175,
+        76,
+        56
+      ],
+      "crop_size_on_disk_wh": [
+        76,
+        56
+      ],
       "declared_bbox_xywh": [
         258,
         175,
@@ -1958,23 +2936,38 @@
         76,
         56
       ],
-      "crop_size_on_disk_wh": [
-        75,
-        55
-      ],
       "mask_area_px": 3969,
-      "mask_px_inside_crop": 3904,
-      "mask_px_outside_crop": 65,
-      "alpha_nonzero_px_in_crop": 3904,
+      "mask_px_inside_crop": 3969,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 3904,
+      "mask_px_outside_declared_crop": 65,
+      "alpha_nonzero_px_in_crop": 3969,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "HOLDOUT_16231",
       "role_id": "role_9",
       "source_frame_id": 16261,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_9_f16261.png",
-      "reference_sha256": "4bc39c469eb302a5d21ddc645c7ea1358690d4d9dd240c370d5cc058177e1956",
+      "reference_sha256": "3eec1a070db6a82e17990a0719f5e0aea8535fddaacec269fff4246a450c6573",
+      "index_used_by_make_references_inferred": 9,
+      "mask_index_from_manifest": 9,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        574,
+        301,
+        66,
+        59
+      ],
+      "crop_size_on_disk_wh": [
+        66,
+        59
+      ],
       "declared_bbox_xywh": [
         574,
         301,
@@ -1987,23 +2980,38 @@
         66,
         59
       ],
-      "crop_size_on_disk_wh": [
-        65,
-        58
-      ],
       "mask_area_px": 3050,
-      "mask_px_inside_crop": 2990,
-      "mask_px_outside_crop": 60,
-      "alpha_nonzero_px_in_crop": 2990,
+      "mask_px_inside_crop": 3050,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 2990,
+      "mask_px_outside_declared_crop": 60,
+      "alpha_nonzero_px_in_crop": 3050,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "OCC_14768",
       "role_id": "role_1",
       "source_frame_id": 14843,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_1_f14843.png",
-      "reference_sha256": "dee070fe54fea06960a4f5383d1f84c05e458968bcf594a4aed58013a30e75f7",
+      "reference_sha256": "074ea3c529a3e2d3f9c2f150687bbe6db7fb663be452a4cb7185d7bbcad7b320",
+      "index_used_by_make_references_inferred": 1,
+      "mask_index_from_manifest": 1,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        93,
+        0,
+        115,
+        341
+      ],
+      "crop_size_on_disk_wh": [
+        115,
+        341
+      ],
       "declared_bbox_xywh": [
         93,
         0,
@@ -2016,23 +3024,22 @@
         115,
         341
       ],
-      "crop_size_on_disk_wh": [
-        114,
-        340
-      ],
       "mask_area_px": 33018,
-      "mask_px_inside_crop": 32892,
-      "mask_px_outside_crop": 126,
-      "alpha_nonzero_px_in_crop": 32892,
+      "mask_px_inside_crop": 33018,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 32892,
+      "mask_px_outside_declared_crop": 126,
+      "alpha_nonzero_px_in_crop": 33018,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "OCC_14768",
       "role_id": "role_10",
       "source_frame_id": 14873,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_10_f14873.png",
-      "reference_sha256": "85323d710be5c2f01fb34a9a0213981eef5d2f06d383ea86bfece63de020632e",
+      "reference_sha256": "722c94bc797c13db90fbd9abd1a8f01e405a06ceb6ff99154917fada4b52eb83",
       "role_index_ambiguous_at_anchor": true,
       "candidate_indices": [
         6,
@@ -2045,6 +3052,21 @@
         "8": 9352
       },
       "index_used_by_make_references_inferred": 8,
+      "mask_index_from_manifest": 8,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        464,
+        304,
+        176,
+        56
+      ],
+      "crop_size_on_disk_wh": [
+        176,
+        56
+      ],
       "declared_bbox_xywh": [
         464,
         304,
@@ -2057,23 +3079,38 @@
         176,
         56
       ],
-      "crop_size_on_disk_wh": [
-        175,
-        55
-      ],
       "mask_area_px": 9352,
-      "mask_px_inside_crop": 9298,
-      "mask_px_outside_crop": 54,
-      "alpha_nonzero_px_in_crop": 9298,
+      "mask_px_inside_crop": 9352,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 9298,
+      "mask_px_outside_declared_crop": 54,
+      "alpha_nonzero_px_in_crop": 9352,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "OCC_14768",
       "role_id": "role_11",
       "source_frame_id": 14873,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_11_f14873.png",
-      "reference_sha256": "fd59c6cf390f8b13a819db545ffb845f5d73f42ddf0a6178c73e78ac0f88359f",
+      "reference_sha256": "93f1d41e49167c745dd91f87411e24162fe3ff648e2e933e78cd7d04825b4d10",
+      "index_used_by_make_references_inferred": 9,
+      "mask_index_from_manifest": 9,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        326,
+        202,
+        64,
+        106
+      ],
+      "crop_size_on_disk_wh": [
+        64,
+        106
+      ],
       "declared_bbox_xywh": [
         326,
         202,
@@ -2086,23 +3123,38 @@
         64,
         106
       ],
-      "crop_size_on_disk_wh": [
-        63,
-        105
-      ],
       "mask_area_px": 5258,
-      "mask_px_inside_crop": 5226,
-      "mask_px_outside_crop": 32,
-      "alpha_nonzero_px_in_crop": 5226,
+      "mask_px_inside_crop": 5258,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 5226,
+      "mask_px_outside_declared_crop": 32,
+      "alpha_nonzero_px_in_crop": 5258,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "OCC_14768",
       "role_id": "role_2",
       "source_frame_id": 14768,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_2_f14768.png",
-      "reference_sha256": "2e930a9570940a48fd33bbc76567192d4124d6ee60d9ce3cf88d1a412af236a7",
+      "reference_sha256": "03479f2587c1ed2f93af78fa288cd7ded52e9a36f52babdef4ec8a68d7eeb921",
+      "index_used_by_make_references_inferred": 2,
+      "mask_index_from_manifest": 2,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        193,
+        1,
+        447,
+        358
+      ],
+      "crop_size_on_disk_wh": [
+        447,
+        358
+      ],
       "declared_bbox_xywh": [
         193,
         1,
@@ -2115,23 +3167,38 @@
         447,
         358
       ],
-      "crop_size_on_disk_wh": [
-        446,
-        357
-      ],
       "mask_area_px": 30672,
-      "mask_px_inside_crop": 30312,
-      "mask_px_outside_crop": 360,
-      "alpha_nonzero_px_in_crop": 30312,
+      "mask_px_inside_crop": 30672,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 30312,
+      "mask_px_outside_declared_crop": 360,
+      "alpha_nonzero_px_in_crop": 30672,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "OCC_14768",
       "role_id": "role_3",
       "source_frame_id": 14873,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_3_f14873.png",
-      "reference_sha256": "e7c2e7bd3cc2b9a69e4d2a2d413546e00b61fc11a89e9c701ca8e1dc7f868807",
+      "reference_sha256": "6ece111783c1534cf3bc9a4c5152a14f5a0915276789bc72a1609fd412888a6e",
+      "index_used_by_make_references_inferred": 10,
+      "mask_index_from_manifest": 10,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        9,
+        304,
+        67,
+        46
+      ],
+      "crop_size_on_disk_wh": [
+        67,
+        46
+      ],
       "declared_bbox_xywh": [
         9,
         304,
@@ -2144,23 +3211,38 @@
         67,
         46
       ],
-      "crop_size_on_disk_wh": [
-        66,
-        45
-      ],
       "mask_area_px": 2931,
-      "mask_px_inside_crop": 2863,
-      "mask_px_outside_crop": 68,
-      "alpha_nonzero_px_in_crop": 2863,
+      "mask_px_inside_crop": 2931,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 2863,
+      "mask_px_outside_declared_crop": 68,
+      "alpha_nonzero_px_in_crop": 2931,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "OCC_14768",
       "role_id": "role_4",
       "source_frame_id": 14813,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_4_f14813.png",
-      "reference_sha256": "f1ff255f6cdd54a9cbd3688b2ae02d1b9a8c824e7dfecf88d05acd3d583f0266",
+      "reference_sha256": "5b177d9124f1d24ceeaf1282c8ea71cb925d5b938ed82fc3b2527b7919df3db1",
+      "index_used_by_make_references_inferred": 4,
+      "mask_index_from_manifest": 4,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        329,
+        114,
+        53,
+        13
+      ],
+      "crop_size_on_disk_wh": [
+        53,
+        13
+      ],
       "declared_bbox_xywh": [
         329,
         114,
@@ -2173,23 +3255,38 @@
         53,
         13
       ],
-      "crop_size_on_disk_wh": [
-        52,
-        12
-      ],
       "mask_area_px": 646,
-      "mask_px_inside_crop": 586,
-      "mask_px_outside_crop": 60,
-      "alpha_nonzero_px_in_crop": 586,
+      "mask_px_inside_crop": 646,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 586,
+      "mask_px_outside_declared_crop": 60,
+      "alpha_nonzero_px_in_crop": 646,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "OCC_14768",
       "role_id": "role_5",
       "source_frame_id": 14798,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_5_f14798.png",
-      "reference_sha256": "38a9ae1146b3cd5bb66fdd24258b7579ec01c54e6676a85628d7afe8b58e1979",
+      "reference_sha256": "6e9bd78de52a318e985b5b7d582ee896d294d4ee367facf22cbe022206ddbba9",
+      "index_used_by_make_references_inferred": 5,
+      "mask_index_from_manifest": 5,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        436,
+        113,
+        38,
+        14
+      ],
+      "crop_size_on_disk_wh": [
+        38,
+        14
+      ],
       "declared_bbox_xywh": [
         436,
         113,
@@ -2202,23 +3299,38 @@
         38,
         14
       ],
-      "crop_size_on_disk_wh": [
-        37,
-        13
-      ],
       "mask_area_px": 461,
-      "mask_px_inside_crop": 420,
-      "mask_px_outside_crop": 41,
-      "alpha_nonzero_px_in_crop": 420,
+      "mask_px_inside_crop": 461,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 420,
+      "mask_px_outside_declared_crop": 41,
+      "alpha_nonzero_px_in_crop": 461,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "OCC_14768",
       "role_id": "role_6",
       "source_frame_id": 14858,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_6_f14858.png",
-      "reference_sha256": "38a9ae1146b3cd5bb66fdd24258b7579ec01c54e6676a85628d7afe8b58e1979",
+      "reference_sha256": "6927d38b835ee59067e2d48132a4b87095cfb4796348057617ffda6bc5105cc3",
+      "index_used_by_make_references_inferred": 4,
+      "mask_index_from_manifest": 4,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        436,
+        113,
+        38,
+        14
+      ],
+      "crop_size_on_disk_wh": [
+        38,
+        14
+      ],
       "declared_bbox_xywh": [
         436,
         113,
@@ -2231,23 +3343,22 @@
         38,
         14
       ],
-      "crop_size_on_disk_wh": [
-        37,
-        13
-      ],
       "mask_area_px": 461,
-      "mask_px_inside_crop": 420,
-      "mask_px_outside_crop": 41,
-      "alpha_nonzero_px_in_crop": 420,
+      "mask_px_inside_crop": 461,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 420,
+      "mask_px_outside_declared_crop": 41,
+      "alpha_nonzero_px_in_crop": 461,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "OCC_14768",
       "role_id": "role_7",
       "source_frame_id": 14873,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_7_f14873.png",
-      "reference_sha256": "38c105ac1301f7db9367c5bdef684a21ed5dc1c65c0209ee6ebb053a43e236aa",
+      "reference_sha256": "8bd5e15d5994336deaaf902bff5f2c39439ccb8742f09e5f134e330a96005d58",
       "role_index_ambiguous_at_anchor": true,
       "candidate_indices": [
         1,
@@ -2258,6 +3369,21 @@
         "2": 66944
       },
       "index_used_by_make_references_inferred": 2,
+      "mask_index_from_manifest": 2,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        0,
+        1,
+        640,
+        128
+      ],
+      "crop_size_on_disk_wh": [
+        640,
+        128
+      ],
       "declared_bbox_xywh": [
         0,
         1,
@@ -2270,23 +3396,22 @@
         640,
         128
       ],
-      "crop_size_on_disk_wh": [
-        639,
-        231
-      ],
       "mask_area_px": 66944,
-      "mask_px_inside_crop": 66830,
-      "mask_px_outside_crop": 114,
-      "alpha_nonzero_px_in_crop": 66830,
+      "mask_px_inside_crop": 66944,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 66830,
+      "mask_px_outside_declared_crop": 114,
+      "alpha_nonzero_px_in_crop": 66944,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "OCC_14768",
       "role_id": "role_8",
       "source_frame_id": 14873,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_8_f14873.png",
-      "reference_sha256": "856d9f241e341791316f8c308e514b7f51aa877200f85ac2483732723824c69d",
+      "reference_sha256": "b2adacfa312c89e4c1d0517eabd5a0aee0de93dd05d993cf71c88807e8c675cf",
       "role_index_ambiguous_at_anchor": true,
       "candidate_indices": [
         3,
@@ -2297,6 +3422,21 @@
         "4": 56164
       },
       "index_used_by_make_references_inferred": 4,
+      "mask_index_from_manifest": 4,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        0,
+        71,
+        640,
+        234
+      ],
+      "crop_size_on_disk_wh": [
+        640,
+        234
+      ],
       "declared_bbox_xywh": [
         0,
         71,
@@ -2309,23 +3449,38 @@
         640,
         234
       ],
-      "crop_size_on_disk_wh": [
-        639,
-        266
-      ],
       "mask_area_px": 56164,
-      "mask_px_inside_crop": 55989,
-      "mask_px_outside_crop": 175,
-      "alpha_nonzero_px_in_crop": 55989,
+      "mask_px_inside_crop": 56164,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 55989,
+      "mask_px_outside_declared_crop": 175,
+      "alpha_nonzero_px_in_crop": 56164,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "OCC_14768",
       "role_id": "role_9",
       "source_frame_id": 14873,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_9_f14873.png",
-      "reference_sha256": "e972cb0adac731658714797e1d86516f27fa1c87953ca1ef6b4c81a180bf13bd",
+      "reference_sha256": "5502c58b8c008cf595cea8becc491b4eee28de41b07ddf13a7c0a01de34a638e",
+      "index_used_by_make_references_inferred": 5,
+      "mask_index_from_manifest": 5,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        0,
+        181,
+        248,
+        75
+      ],
+      "crop_size_on_disk_wh": [
+        248,
+        75
+      ],
       "declared_bbox_xywh": [
         0,
         181,
@@ -2338,23 +3493,38 @@
         248,
         75
       ],
-      "crop_size_on_disk_wh": [
-        247,
-        74
-      ],
       "mask_area_px": 15135,
-      "mask_px_inside_crop": 15127,
-      "mask_px_outside_crop": 8,
-      "alpha_nonzero_px_in_crop": 15127,
+      "mask_px_inside_crop": 15135,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 15127,
+      "mask_px_outside_declared_crop": 8,
+      "alpha_nonzero_px_in_crop": 15135,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "TURN_795",
       "role_id": "role_1",
       "source_frame_id": 795,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\roles\\role_1_f795.png",
-      "reference_sha256": "1ccd5edc5ce2187e442ec32573ddf825babef367339ee4cc2a57fd176fd72f7a",
+      "reference_sha256": "d5b3ea8ab5ec92eed000de7f4ec78fd00e50b4b26cae9a0df14d60114efdb16b",
+      "index_used_by_make_references_inferred": 1,
+      "mask_index_from_manifest": 1,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        0,
+        0,
+        640,
+        359
+      ],
+      "crop_size_on_disk_wh": [
+        640,
+        359
+      ],
       "declared_bbox_xywh": [
         0,
         0,
@@ -2367,23 +3537,38 @@
         640,
         359
       ],
-      "crop_size_on_disk_wh": [
-        639,
-        358
-      ],
       "mask_area_px": 136002,
-      "mask_px_inside_crop": 135644,
-      "mask_px_outside_crop": 358,
-      "alpha_nonzero_px_in_crop": 135644,
+      "mask_px_inside_crop": 136002,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 135644,
+      "mask_px_outside_declared_crop": 358,
+      "alpha_nonzero_px_in_crop": 136002,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "TURN_795",
       "role_id": "role_2",
       "source_frame_id": 900,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\roles\\role_2_f900.png",
-      "reference_sha256": "e541076819e8a86634a0d6df0f6d13e39b16825d3632ccc08c39c4e8761e24e1",
+      "reference_sha256": "0e70f09fe7caae4c923bd079ac8fce3226cce70a220d9ebddd022c0959c1295b",
+      "index_used_by_make_references_inferred": 1,
+      "mask_index_from_manifest": 1,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        7,
+        0,
+        503,
+        349
+      ],
+      "crop_size_on_disk_wh": [
+        503,
+        349
+      ],
       "declared_bbox_xywh": [
         7,
         0,
@@ -2396,23 +3581,38 @@
         503,
         349
       ],
-      "crop_size_on_disk_wh": [
-        502,
-        348
-      ],
       "mask_area_px": 127889,
-      "mask_px_inside_crop": 127596,
-      "mask_px_outside_crop": 293,
-      "alpha_nonzero_px_in_crop": 127596,
+      "mask_px_inside_crop": 127889,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 127596,
+      "mask_px_outside_declared_crop": 293,
+      "alpha_nonzero_px_in_crop": 127889,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "TURN_795",
       "role_id": "role_3",
       "source_frame_id": 795,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\roles\\role_3_f795.png",
-      "reference_sha256": "e36e75058591861c96aeb0c940b11b408a9a083364a43357e1216921b421bd4a",
+      "reference_sha256": "5a1787464b7ca5b243d39a2d24da2a3233999b07281d3a6c652013682ecb969a",
+      "index_used_by_make_references_inferred": 3,
+      "mask_index_from_manifest": 3,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        116,
+        16,
+        95,
+        299
+      ],
+      "crop_size_on_disk_wh": [
+        95,
+        299
+      ],
       "declared_bbox_xywh": [
         116,
         16,
@@ -2425,23 +3625,38 @@
         95,
         299
       ],
-      "crop_size_on_disk_wh": [
-        94,
-        298
-      ],
       "mask_area_px": 22286,
-      "mask_px_inside_crop": 22274,
-      "mask_px_outside_crop": 12,
-      "alpha_nonzero_px_in_crop": 22274,
+      "mask_px_inside_crop": 22286,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 22274,
+      "mask_px_outside_declared_crop": 12,
+      "alpha_nonzero_px_in_crop": 22286,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "TURN_795",
       "role_id": "role_4",
       "source_frame_id": 810,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\roles\\role_4_f810.png",
-      "reference_sha256": "9c9cca6a928ac40048fbd2e322021ef48a77f7871e3f2d471f2a3749de9a00d5",
+      "reference_sha256": "4c67dfb7feed4f0c267fc3a90c60b9f56ed30d5939a3ee149eaec8aeb1963683",
+      "index_used_by_make_references_inferred": 3,
+      "mask_index_from_manifest": 3,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        9,
+        304,
+        67,
+        46
+      ],
+      "crop_size_on_disk_wh": [
+        67,
+        46
+      ],
       "declared_bbox_xywh": [
         9,
         304,
@@ -2454,23 +3669,38 @@
         67,
         46
       ],
-      "crop_size_on_disk_wh": [
-        66,
-        45
-      ],
       "mask_area_px": 2932,
-      "mask_px_inside_crop": 2861,
-      "mask_px_outside_crop": 71,
-      "alpha_nonzero_px_in_crop": 2861,
+      "mask_px_inside_crop": 2932,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 2861,
+      "mask_px_outside_declared_crop": 71,
+      "alpha_nonzero_px_in_crop": 2932,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "TURN_795",
       "role_id": "role_5",
       "source_frame_id": 840,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\roles\\role_5_f840.png",
-      "reference_sha256": "37ac372401df03e00c09111e3f1169fa77ca594f4b3749253268783247da37cd",
+      "reference_sha256": "b3b2dbe8cd1e7e67914ba8c1ff4bae288a59c660060c7ec858a568ae067322af",
+      "index_used_by_make_references_inferred": 4,
+      "mask_index_from_manifest": 4,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        292,
+        210,
+        89,
+        12
+      ],
+      "crop_size_on_disk_wh": [
+        89,
+        12
+      ],
       "declared_bbox_xywh": [
         292,
         210,
@@ -2483,23 +3713,38 @@
         89,
         12
       ],
-      "crop_size_on_disk_wh": [
-        88,
-        11
-      ],
       "mask_area_px": 910,
-      "mask_px_inside_crop": 848,
-      "mask_px_outside_crop": 62,
-      "alpha_nonzero_px_in_crop": 848,
+      "mask_px_inside_crop": 910,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 848,
+      "mask_px_outside_declared_crop": 62,
+      "alpha_nonzero_px_in_crop": 910,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "TURN_795",
       "role_id": "role_6",
       "source_frame_id": 900,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\roles\\role_6_f900.png",
-      "reference_sha256": "c9c34476247eb1c54e4755704917a290b1ad83b3581fad308ca6cbb4c422f764",
+      "reference_sha256": "a3e3f425ad0f69448f3aca06bef69773df23d60651bf92663ba298a2870d3f1a",
+      "index_used_by_make_references_inferred": 2,
+      "mask_index_from_manifest": 2,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        11,
+        0,
+        138,
+        320
+      ],
+      "crop_size_on_disk_wh": [
+        138,
+        320
+      ],
       "declared_bbox_xywh": [
         11,
         0,
@@ -2512,23 +3757,38 @@
         138,
         320
       ],
-      "crop_size_on_disk_wh": [
-        137,
-        319
-      ],
       "mask_area_px": 36566,
-      "mask_px_inside_crop": 36548,
-      "mask_px_outside_crop": 18,
-      "alpha_nonzero_px_in_crop": 36548,
+      "mask_px_inside_crop": 36566,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 36548,
+      "mask_px_outside_declared_crop": 18,
+      "alpha_nonzero_px_in_crop": 36566,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "WALK_7927",
       "role_id": "role_1",
       "source_frame_id": 7972,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\roles\\role_1_f7972.png",
-      "reference_sha256": "48f7e0ca48f37aecf1b51ba033d7ee8f5041bba399edec8ed83599cfb89134e2",
+      "reference_sha256": "28cccb9ef696fa5cf94a3b6a35ce632124068c0d33cc12157d37f85a14a1bac9",
+      "index_used_by_make_references_inferred": 1,
+      "mask_index_from_manifest": 1,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        62,
+        0,
+        436,
+        360
+      ],
+      "crop_size_on_disk_wh": [
+        436,
+        360
+      ],
       "declared_bbox_xywh": [
         48,
         0,
@@ -2541,23 +3801,38 @@
         436,
         360
       ],
-      "crop_size_on_disk_wh": [
-        449,
-        359
-      ],
       "mask_area_px": 106117,
-      "mask_px_inside_crop": 106080,
-      "mask_px_outside_crop": 37,
-      "alpha_nonzero_px_in_crop": 106080,
+      "mask_px_inside_crop": 106117,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 106080,
+      "mask_px_outside_declared_crop": 37,
+      "alpha_nonzero_px_in_crop": 106117,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "WALK_7927",
       "role_id": "role_2",
       "source_frame_id": 8002,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\roles\\role_2_f8002.png",
-      "reference_sha256": "1c3e447b1834dd20e396984b858af45486614b19847469ec6bafd37a07c29a6b",
+      "reference_sha256": "ef6216cc318efbdf83626a88d0991d5e5aedddf96441aa75ee85c8a3238d49e7",
+      "index_used_by_make_references_inferred": 1,
+      "mask_index_from_manifest": 1,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        71,
+        0,
+        107,
+        323
+      ],
+      "crop_size_on_disk_wh": [
+        107,
+        323
+      ],
       "declared_bbox_xywh": [
         71,
         0,
@@ -2570,23 +3845,38 @@
         107,
         323
       ],
-      "crop_size_on_disk_wh": [
-        106,
-        322
-      ],
       "mask_area_px": 29765,
-      "mask_px_inside_crop": 29610,
-      "mask_px_outside_crop": 155,
-      "alpha_nonzero_px_in_crop": 29610,
+      "mask_px_inside_crop": 29765,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 29610,
+      "mask_px_outside_declared_crop": 155,
+      "alpha_nonzero_px_in_crop": 29765,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "WALK_7927",
       "role_id": "role_3",
       "source_frame_id": 7942,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\roles\\role_3_f7942.png",
-      "reference_sha256": "dbdce179117fde0a3459db2e7c722207d1ae8428e59ea671db6086a6b89334ff",
+      "reference_sha256": "2e27fecb59f0eaa145df389c44f8d66e183b8be5a188c08ae95558fb98a3792a",
+      "index_used_by_make_references_inferred": 3,
+      "mask_index_from_manifest": 3,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        9,
+        304,
+        67,
+        46
+      ],
+      "crop_size_on_disk_wh": [
+        67,
+        46
+      ],
       "declared_bbox_xywh": [
         9,
         304,
@@ -2599,23 +3889,38 @@
         67,
         46
       ],
-      "crop_size_on_disk_wh": [
-        66,
-        45
-      ],
       "mask_area_px": 2852,
-      "mask_px_inside_crop": 2785,
-      "mask_px_outside_crop": 67,
-      "alpha_nonzero_px_in_crop": 2785,
+      "mask_px_inside_crop": 2852,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 2785,
+      "mask_px_outside_declared_crop": 67,
+      "alpha_nonzero_px_in_crop": 2852,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "WALK_7927",
       "role_id": "role_4",
       "source_frame_id": 7942,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\roles\\role_4_f7942.png",
-      "reference_sha256": "5410bcc6ddc49613faab546e23a28a4b26591f8fc1924bb2ba99f8b8a482474c",
+      "reference_sha256": "35326a70bb380b7fa9c3889485380ddffa3577b7c5dab2a49f32abb8fa4a8c48",
+      "index_used_by_make_references_inferred": 4,
+      "mask_index_from_manifest": 4,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        378,
+        243,
+        24,
+        25
+      ],
+      "crop_size_on_disk_wh": [
+        24,
+        25
+      ],
       "declared_bbox_xywh": [
         378,
         243,
@@ -2628,23 +3933,38 @@
         24,
         25
       ],
-      "crop_size_on_disk_wh": [
-        23,
-        24
-      ],
       "mask_area_px": 501,
-      "mask_px_inside_crop": 481,
-      "mask_px_outside_crop": 20,
-      "alpha_nonzero_px_in_crop": 481,
+      "mask_px_inside_crop": 501,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 481,
+      "mask_px_outside_declared_crop": 20,
+      "alpha_nonzero_px_in_crop": 501,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     },
     {
       "tag": "WALK_7927",
       "role_id": "role_5",
       "source_frame_id": 8032,
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\roles\\role_5_f8032.png",
-      "reference_sha256": "e09bf5c23772984185ed15a1759b1f803e4f29f324d2dc298a71b89edb80656c",
+      "reference_sha256": "e5d7a13d552be175a785b054787aaece11c6d5d3359529a774fdabcd1a6aee63",
+      "index_used_by_make_references_inferred": 1,
+      "mask_index_from_manifest": 1,
+      "manifest_index_carries_role": true,
+      "manifest_index_equals_inference": true,
+      "manifest_index_is_smaller_split_part": false,
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh_applied": [
+        62,
+        0,
+        437,
+        350
+      ],
+      "crop_size_on_disk_wh": [
+        437,
+        350
+      ],
       "declared_bbox_xywh": [
         62,
         0,
@@ -2657,16 +3977,15 @@
         437,
         350
       ],
-      "crop_size_on_disk_wh": [
-        436,
-        349
-      ],
       "mask_area_px": 105673,
-      "mask_px_inside_crop": 105595,
-      "mask_px_outside_crop": 78,
-      "alpha_nonzero_px_in_crop": 105595,
+      "mask_px_inside_crop": 105673,
+      "mask_px_outside_crop": 0,
+      "mask_px_inside_declared_crop": 105595,
+      "mask_px_outside_declared_crop": 78,
+      "alpha_nonzero_px_in_crop": 105673,
       "alpha_matches_mask_inside_crop": true,
-      "verdict": "CLIPPED"
+      "alpha_elementwise_equals_mask": true,
+      "verdict": "EXACT"
     }
   ]
 }

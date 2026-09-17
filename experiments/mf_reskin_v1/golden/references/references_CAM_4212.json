@@ -64,7 +64,7 @@
     {
       "role_id": "role_1",
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_1_f4212.png",
-      "reference_sha256": "ca61bf1fd24a2fc6c5be9706cc86bc788cf4dc46c6525f82a729b4c31f946589",
+      "reference_sha256": "e8adbd0ccfe7aae80fcdcbed154dbbd9b0e5e61e757f4af1ba41527bdeb4f9bf",
       "source_frame_id": 4212,
       "source_pts": 2156544,
       "source_pts_time": 140.4,
@@ -76,16 +76,45 @@
         639,
         359
       ],
+      "annotation_declared_bbox_xywh": [
+        0,
+        0,
+        639,
+        359
+      ],
+      "mask_index": 1,
+      "role_index_ambiguous_at_anchor": false,
+      "role_index_candidates": [
+        1
+      ],
+      "role_index_candidate_areas_px": {
+        "1": 230186
+      },
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh": [
+        0,
+        0,
+        640,
+        360
+      ],
+      "crop_origin_xy": [
+        0,
+        0
+      ],
+      "crop_size_wh": [
+        640,
+        360
+      ],
       "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4212.png",
       "provenance": {
         "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
-        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index, cropped to that mask's tight bounding box (round-3 fix)"
       }
     },
     {
       "role_id": "role_10",
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_10_f4242.png",
-      "reference_sha256": "2ac76ffb7144f4860c7b1fa2fdbfb488f04acf67cc6b10570f93e7de2b3392a4",
+      "reference_sha256": "a105fcd694fa9a8a1de3d3a6c59940dec8b2259e9e97d08ba48aa66853a7a332",
       "source_frame_id": 4242,
       "source_pts": 2171904,
       "source_pts_time": 141.4,
@@ -97,16 +126,45 @@
         70,
         21
       ],
+      "annotation_declared_bbox_xywh": [
+        218,
+        215,
+        70,
+        21
+      ],
+      "mask_index": 12,
+      "role_index_ambiguous_at_anchor": false,
+      "role_index_candidates": [
+        12
+      ],
+      "role_index_candidate_areas_px": {
+        "12": 1432
+      },
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh": [
+        218,
+        215,
+        71,
+        22
+      ],
+      "crop_origin_xy": [
+        218,
+        215
+      ],
+      "crop_size_wh": [
+        71,
+        22
+      ],
       "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4242.png",
       "provenance": {
         "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
-        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index, cropped to that mask's tight bounding box (round-3 fix)"
       }
     },
     {
       "role_id": "role_11",
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_11_f4257.png",
-      "reference_sha256": "f01dd115b28250ea8418f2bb0d7141560f97203e34b9ae56f02c9ae33297bbf2",
+      "reference_sha256": "bcdc81e4b1d83f629fce6c0731dd8af3ef2875dc681d534cab28f6d60e59ac26",
       "source_frame_id": 4257,
       "source_pts": 2179584,
       "source_pts_time": 141.9,
@@ -118,16 +176,45 @@
         103,
         134
       ],
+      "annotation_declared_bbox_xywh": [
+        203,
+        40,
+        103,
+        134
+      ],
+      "mask_index": 1,
+      "role_index_ambiguous_at_anchor": false,
+      "role_index_candidates": [
+        1
+      ],
+      "role_index_candidate_areas_px": {
+        "1": 13786
+      },
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh": [
+        203,
+        40,
+        104,
+        135
+      ],
+      "crop_origin_xy": [
+        203,
+        40
+      ],
+      "crop_size_wh": [
+        104,
+        135
+      ],
       "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4257.png",
       "provenance": {
         "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
-        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index, cropped to that mask's tight bounding box (round-3 fix)"
       }
     },
     {
       "role_id": "role_12",
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_12_f4257.png",
-      "reference_sha256": "60d96fe0f5e16c56b47cf85897992493bda2f214217051ed371a1edcaca22c60",
+      "reference_sha256": "681e298e4c1fb0577ac52bd5dfd114783e8dc48349702b2d61c2d3fa34db73fb",
       "source_frame_id": 4257,
       "source_pts": 2179584,
       "source_pts_time": 141.9,
@@ -139,16 +226,45 @@
         103,
         134
       ],
+      "annotation_declared_bbox_xywh": [
+        203,
+        189,
+        103,
+        134
+      ],
+      "mask_index": 6,
+      "role_index_ambiguous_at_anchor": false,
+      "role_index_candidates": [
+        6
+      ],
+      "role_index_candidate_areas_px": {
+        "6": 13697
+      },
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh": [
+        203,
+        189,
+        104,
+        135
+      ],
+      "crop_origin_xy": [
+        203,
+        189
+      ],
+      "crop_size_wh": [
+        104,
+        135
+      ],
       "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4257.png",
       "provenance": {
         "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
-        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index, cropped to that mask's tight bounding box (round-3 fix)"
       }
     },
     {
       "role_id": "role_13",
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_13_f4257.png",
-      "reference_sha256": "2eb3c6d438966e1d955c7767eaf818beccc1c4953eee2e52d5996c4a271b19ea",
+      "reference_sha256": "b112d38c9eedf8f54e78e6020a9df776d8fce0b44dc5b5ebecb11f008c78b3cd",
       "source_frame_id": 4257,
       "source_pts": 2179584,
       "source_pts_time": 141.9,
@@ -160,16 +276,45 @@
         96,
         28
       ],
+      "annotation_declared_bbox_xywh": [
+        72,
+        227,
+        96,
+        28
+      ],
+      "mask_index": 7,
+      "role_index_ambiguous_at_anchor": false,
+      "role_index_candidates": [
+        7
+      ],
+      "role_index_candidate_areas_px": {
+        "7": 2608
+      },
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh": [
+        72,
+        227,
+        97,
+        29
+      ],
+      "crop_origin_xy": [
+        72,
+        227
+      ],
+      "crop_size_wh": [
+        97,
+        29
+      ],
       "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4257.png",
       "provenance": {
         "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
-        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index, cropped to that mask's tight bounding box (round-3 fix)"
       }
     },
     {
       "role_id": "role_14",
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_14_f4257.png",
-      "reference_sha256": "a92d3cdda0eae055eb373c21430134b5b4e86e5d9d9de296e96ff9a2766efb91",
+      "reference_sha256": "49e74fd0ebd695d7bd38c526369b289c61de64fd20634543ffff7dae39a2925e",
       "source_frame_id": 4257,
       "source_pts": 2179584,
       "source_pts_time": 141.9,
@@ -181,16 +326,45 @@
         62,
         34
       ],
+      "annotation_declared_bbox_xywh": [
+        0,
+        223,
+        62,
+        34
+      ],
+      "mask_index": 8,
+      "role_index_ambiguous_at_anchor": false,
+      "role_index_candidates": [
+        8
+      ],
+      "role_index_candidate_areas_px": {
+        "8": 2039
+      },
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh": [
+        0,
+        223,
+        63,
+        35
+      ],
+      "crop_origin_xy": [
+        0,
+        223
+      ],
+      "crop_size_wh": [
+        63,
+        35
+      ],
       "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4257.png",
       "provenance": {
         "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
-        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index, cropped to that mask's tight bounding box (round-3 fix)"
       }
     },
     {
       "role_id": "role_15",
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_15_f4272.png",
-      "reference_sha256": "d43f81d9b3e07be9f582964a666c39786ff1a2e660b46351290928535c219570",
+      "reference_sha256": "042f8ccd0aaf00d0c28c5321f1d070a43fff586e8d50643c063bfba1356dbf77",
       "source_frame_id": 4272,
       "source_pts": 2187264,
       "source_pts_time": 142.4,
@@ -202,16 +376,47 @@
         127,
         345
       ],
+      "annotation_declared_bbox_xywh": [
+        101,
+        8,
+        127,
+        345
+      ],
+      "mask_index": 6,
+      "role_index_ambiguous_at_anchor": true,
+      "role_index_candidates": [
+        2,
+        6
+      ],
+      "role_index_candidate_areas_px": {
+        "2": 120,
+        "6": 20004
+      },
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh": [
+        101,
+        8,
+        128,
+        165
+      ],
+      "crop_origin_xy": [
+        101,
+        8
+      ],
+      "crop_size_wh": [
+        128,
+        165
+      ],
       "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4272.png",
       "provenance": {
         "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
-        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index, cropped to that mask's tight bounding box (round-3 fix)"
       }
     },
     {
       "role_id": "role_16",
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_16_f4272.png",
-      "reference_sha256": "dd592108b00a3fe147a9a158f1cba7386790de6c705b811bd544abb0e5c15bf0",
+      "reference_sha256": "ae472ad306b947cfdf8c0db9086687a6ef3e5b1fb179e34248a22a2a2847912a",
       "source_frame_id": 4272,
       "source_pts": 2187264,
       "source_pts_time": 142.4,
@@ -223,16 +428,47 @@
         127,
         165
       ],
+      "annotation_declared_bbox_xywh": [
+        101,
+        191,
+        127,
+        165
+      ],
+      "mask_index": 8,
+      "role_index_ambiguous_at_anchor": true,
+      "role_index_candidates": [
+        3,
+        8
+      ],
+      "role_index_candidate_areas_px": {
+        "3": 106,
+        "8": 19998
+      },
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh": [
+        101,
+        191,
+        128,
+        166
+      ],
+      "crop_origin_xy": [
+        101,
+        191
+      ],
+      "crop_size_wh": [
+        128,
+        166
+      ],
       "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4272.png",
       "provenance": {
         "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
-        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index, cropped to that mask's tight bounding box (round-3 fix)"
       }
     },
     {
       "role_id": "role_17",
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_17_f4302.png",
-      "reference_sha256": "a417b52f33548fd37220cd3afa6542e44b4ece9dacc98a0b3c1aeff2e38e5c57",
+      "reference_sha256": "f11ba2d06c35927483718f544babb24ec8f26fa1208344fb8fe90e5db59ebf13",
       "source_frame_id": 4302,
       "source_pts": 2202624,
       "source_pts_time": 143.4,
@@ -244,16 +480,47 @@
         126,
         164
       ],
+      "annotation_declared_bbox_xywh": [
+        257,
+        8,
+        126,
+        164
+      ],
+      "mask_index": 6,
+      "role_index_ambiguous_at_anchor": true,
+      "role_index_candidates": [
+        4,
+        6
+      ],
+      "role_index_candidate_areas_px": {
+        "4": 12,
+        "6": 20032
+      },
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh": [
+        257,
+        8,
+        127,
+        165
+      ],
+      "crop_origin_xy": [
+        257,
+        8
+      ],
+      "crop_size_wh": [
+        127,
+        165
+      ],
       "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4302.png",
       "provenance": {
         "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
-        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index, cropped to that mask's tight bounding box (round-3 fix)"
       }
     },
     {
       "role_id": "role_18",
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_18_f4287.png",
-      "reference_sha256": "30c4002eb21e7c68f46a86ad433e9f700ba4191a1c6df1958ce88a631a6a5698",
+      "reference_sha256": "2c7f5ebed23dcd760396371074a6c9048ed78061dce3b502b3231e1194b194b2",
       "source_frame_id": 4287,
       "source_pts": 2194944,
       "source_pts_time": 142.9,
@@ -265,16 +532,45 @@
         126,
         165
       ],
+      "annotation_declared_bbox_xywh": [
+        257,
+        191,
+        126,
+        165
+      ],
+      "mask_index": 9,
+      "role_index_ambiguous_at_anchor": false,
+      "role_index_candidates": [
+        9
+      ],
+      "role_index_candidate_areas_px": {
+        "9": 19995
+      },
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh": [
+        257,
+        191,
+        127,
+        166
+      ],
+      "crop_origin_xy": [
+        257,
+        191
+      ],
+      "crop_size_wh": [
+        127,
+        166
+      ],
       "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4287.png",
       "provenance": {
         "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
-        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index, cropped to that mask's tight bounding box (round-3 fix)"
       }
     },
     {
       "role_id": "role_19",
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_19_f4272.png",
-      "reference_sha256": "3019013407eb352aaf81baa51a9717e5539a38fc3bbecbfc30e02aed244f9d99",
+      "reference_sha256": "7b940a794b00fe5a0b0c707196070f2d8287bbffea9f64e535961dd4aa0fe7c4",
       "source_frame_id": 4272,
       "source_pts": 2187264,
       "source_pts_time": 142.4,
@@ -286,16 +582,45 @@
         31,
         30
       ],
+      "annotation_declared_bbox_xywh": [
+        125,
+        215,
+        31,
+        30
+      ],
+      "mask_index": 12,
+      "role_index_ambiguous_at_anchor": false,
+      "role_index_candidates": [
+        12
+      ],
+      "role_index_candidate_areas_px": {
+        "12": 789
+      },
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh": [
+        125,
+        215,
+        32,
+        31
+      ],
+      "crop_origin_xy": [
+        125,
+        215
+      ],
+      "crop_size_wh": [
+        32,
+        31
+      ],
       "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4272.png",
       "provenance": {
         "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
-        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index, cropped to that mask's tight bounding box (round-3 fix)"
       }
     },
     {
       "role_id": "role_2",
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_2_f4242.png",
-      "reference_sha256": "5a595f144e8bdb8eb243a3126495a1a473630725befb7c8ead93be4036bce4df",
+      "reference_sha256": "5d8b0481948d2bf238b5b8437990ceeafb48e9f67d444559be4608e05f6e5299",
       "source_frame_id": 4242,
       "source_pts": 2171904,
       "source_pts_time": 141.4,
@@ -307,16 +632,47 @@
         76,
         99
       ],
+      "annotation_declared_bbox_xywh": [
+        409,
+        76,
+        76,
+        99
+      ],
+      "mask_index": 2,
+      "role_index_ambiguous_at_anchor": true,
+      "role_index_candidates": [
+        1,
+        2
+      ],
+      "role_index_candidate_areas_px": {
+        "1": 6,
+        "2": 7632
+      },
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh": [
+        409,
+        76,
+        77,
+        100
+      ],
+      "crop_origin_xy": [
+        409,
+        76
+      ],
+      "crop_size_wh": [
+        77,
+        100
+      ],
       "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4242.png",
       "provenance": {
         "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
-        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index, cropped to that mask's tight bounding box (round-3 fix)"
       }
     },
     {
       "role_id": "role_20",
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_20_f4287.png",
-      "reference_sha256": "a97593207974e2e4d7f5590fb6d443463f783352fb2ec7653f28915049a582e2",
+      "reference_sha256": "1e09898302ac92081fd091f6aa70ceaef40878d2e1d966ea520102f675a0ee2a",
       "source_frame_id": 4287,
       "source_pts": 2194944,
       "source_pts_time": 142.9,
@@ -328,16 +684,45 @@
         30,
         30
       ],
+      "annotation_declared_bbox_xywh": [
+        281,
+        215,
+        30,
+        30
+      ],
+      "mask_index": 13,
+      "role_index_ambiguous_at_anchor": false,
+      "role_index_candidates": [
+        13
+      ],
+      "role_index_candidate_areas_px": {
+        "13": 785
+      },
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh": [
+        281,
+        215,
+        31,
+        31
+      ],
+      "crop_origin_xy": [
+        281,
+        215
+      ],
+      "crop_size_wh": [
+        31,
+        31
+      ],
       "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4287.png",
       "provenance": {
         "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
-        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index, cropped to that mask's tight bounding box (round-3 fix)"
       }
     },
     {
       "role_id": "role_21",
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_21_f4272.png",
-      "reference_sha256": "129cbf4e8f73a6443db051b2c3f90beb71ddf217625c4a65fe2b9b50755ed7c9",
+      "reference_sha256": "f60e599a3584375df2727eba44e83f9060766860d22c31517d6938e669d120f3",
       "source_frame_id": 4272,
       "source_pts": 2187264,
       "source_pts_time": 142.4,
@@ -349,16 +734,45 @@
         31,
         31
       ],
+      "annotation_declared_bbox_xywh": [
+        125,
+        31,
+        31,
+        31
+      ],
+      "mask_index": 14,
+      "role_index_ambiguous_at_anchor": false,
+      "role_index_candidates": [
+        14
+      ],
+      "role_index_candidate_areas_px": {
+        "14": 781
+      },
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh": [
+        125,
+        31,
+        32,
+        32
+      ],
+      "crop_origin_xy": [
+        125,
+        31
+      ],
+      "crop_size_wh": [
+        32,
+        32
+      ],
       "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4272.png",
       "provenance": {
         "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
-        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index, cropped to that mask's tight bounding box (round-3 fix)"
       }
     },
     {
       "role_id": "role_22",
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_22_f4272.png",
-      "reference_sha256": "823ad91bce3f3a9979157771f7a3d0f38891e1ede6685b686fb58280ee602b09",
+      "reference_sha256": "4436738972f64b26275ff96cf27c6a3a3e49998c14125b935e2935980688dc29",
       "source_frame_id": 4272,
       "source_pts": 2187264,
       "source_pts_time": 142.4,
@@ -370,16 +784,45 @@
         30,
         31
       ],
+      "annotation_declared_bbox_xywh": [
+        436,
+        31,
+        30,
+        31
+      ],
+      "mask_index": 15,
+      "role_index_ambiguous_at_anchor": false,
+      "role_index_candidates": [
+        15
+      ],
+      "role_index_candidate_areas_px": {
+        "15": 778
+      },
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh": [
+        436,
+        31,
+        31,
+        32
+      ],
+      "crop_origin_xy": [
+        436,
+        31
+      ],
+      "crop_size_wh": [
+        31,
+        32
+      ],
       "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4272.png",
       "provenance": {
         "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
-        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index, cropped to that mask's tight bounding box (round-3 fix)"
       }
     },
     {
       "role_id": "role_23",
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_23_f4272.png",
-      "reference_sha256": "a5ed6dd62a34f1d25733e07e3c74e5789e693726af22bce23fca2f2747f0bd60",
+      "reference_sha256": "c4373fe1d5330f0fbeeda15511b35dde226ea96b0ef385b1a178f992fee5d7a7",
       "source_frame_id": 4272,
       "source_pts": 2187264,
       "source_pts_time": 142.4,
@@ -391,16 +834,45 @@
         30,
         31
       ],
+      "annotation_declared_bbox_xywh": [
+        281,
+        31,
+        30,
+        31
+      ],
+      "mask_index": 16,
+      "role_index_ambiguous_at_anchor": false,
+      "role_index_candidates": [
+        16
+      ],
+      "role_index_candidate_areas_px": {
+        "16": 773
+      },
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh": [
+        281,
+        31,
+        31,
+        32
+      ],
+      "crop_origin_xy": [
+        281,
+        31
+      ],
+      "crop_size_wh": [
+        31,
+        32
+      ],
       "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4272.png",
       "provenance": {
         "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
-        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index, cropped to that mask's tight bounding box (round-3 fix)"
       }
     },
     {
       "role_id": "role_24",
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_24_f4287.png",
-      "reference_sha256": "77416b631505f195bf2363ed25e3d88f5822523af5cbc5299de6c300deb77c39",
+      "reference_sha256": "23daa51816197e03af572aa83cecbaa9fd5edf3f56cbde14dd029aaa9d3f4c58",
       "source_frame_id": 4287,
       "source_pts": 2194944,
       "source_pts_time": 142.9,
@@ -412,16 +884,45 @@
         27,
         23
       ],
+      "annotation_declared_bbox_xywh": [
+        437,
+        220,
+        27,
+        23
+      ],
+      "mask_index": 17,
+      "role_index_ambiguous_at_anchor": false,
+      "role_index_candidates": [
+        17
+      ],
+      "role_index_candidate_areas_px": {
+        "17": 461
+      },
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh": [
+        437,
+        220,
+        28,
+        24
+      ],
+      "crop_origin_xy": [
+        437,
+        220
+      ],
+      "crop_size_wh": [
+        28,
+        24
+      ],
       "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4287.png",
       "provenance": {
         "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
-        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index, cropped to that mask's tight bounding box (round-3 fix)"
       }
     },
     {
       "role_id": "role_25",
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_25_f4317.png",
-      "reference_sha256": "035aed83f3616f7c2843d2390e03c102ceb5bb092dc79d00a0507fe6d6e6f769",
+      "reference_sha256": "c4f142181ac713de9b3d0984f2e3328ccfac2b7b637826e036635fc862d04cb3",
       "source_frame_id": 4317,
       "source_pts": 2210304,
       "source_pts_time": 143.9,
@@ -433,16 +934,45 @@
         639,
         359
       ],
+      "annotation_declared_bbox_xywh": [
+        0,
+        0,
+        639,
+        359
+      ],
+      "mask_index": 1,
+      "role_index_ambiguous_at_anchor": false,
+      "role_index_candidates": [
+        1
+      ],
+      "role_index_candidate_areas_px": {
+        "1": 211809
+      },
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh": [
+        0,
+        0,
+        640,
+        360
+      ],
+      "crop_origin_xy": [
+        0,
+        0
+      ],
+      "crop_size_wh": [
+        640,
+        360
+      ],
       "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4317.png",
       "provenance": {
         "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
-        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index, cropped to that mask's tight bounding box (round-3 fix)"
       }
     },
     {
       "role_id": "role_3",
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_3_f4257.png",
-      "reference_sha256": "caf235f610d4af67ceb8306c0f3cd937c368e1bdb148b45ff363e250efcb4cc2",
+      "reference_sha256": "9673b552fd81c2b8b7b64ef3a4366f94908eb0b65a57752ad81ac4956e6f3eb9",
       "source_frame_id": 4257,
       "source_pts": 2179584,
       "source_pts_time": 141.9,
@@ -454,16 +984,45 @@
         103,
         134
       ],
+      "annotation_declared_bbox_xywh": [
+        329,
+        40,
+        103,
+        134
+      ],
+      "mask_index": 3,
+      "role_index_ambiguous_at_anchor": false,
+      "role_index_candidates": [
+        3
+      ],
+      "role_index_candidate_areas_px": {
+        "3": 13774
+      },
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh": [
+        329,
+        40,
+        104,
+        135
+      ],
+      "crop_origin_xy": [
+        329,
+        40
+      ],
+      "crop_size_wh": [
+        104,
+        135
+      ],
       "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4257.png",
       "provenance": {
         "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
-        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index, cropped to that mask's tight bounding box (round-3 fix)"
       }
     },
     {
       "role_id": "role_4",
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_4_f4272.png",
-      "reference_sha256": "0c2375a4a713a06f67b729f751090b9662482ddd7dd2740e76b57e9ee990080e",
+      "reference_sha256": "2b9e53c7e8d6a1ec25be3daa8c9456f6bfce68c37f53d7f8267c2c008ec34101",
       "source_frame_id": 4272,
       "source_pts": 2187264,
       "source_pts_time": 142.4,
@@ -475,16 +1034,45 @@
         126,
         165
       ],
+      "annotation_declared_bbox_xywh": [
+        412,
+        191,
+        126,
+        165
+      ],
+      "mask_index": 1,
+      "role_index_ambiguous_at_anchor": false,
+      "role_index_candidates": [
+        1
+      ],
+      "role_index_candidate_areas_px": {
+        "1": 20866
+      },
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh": [
+        412,
+        191,
+        127,
+        166
+      ],
+      "crop_origin_xy": [
+        412,
+        191
+      ],
+      "crop_size_wh": [
+        127,
+        166
+      ],
       "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4272.png",
       "provenance": {
         "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
-        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index, cropped to that mask's tight bounding box (round-3 fix)"
       }
     },
     {
       "role_id": "role_5",
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_5_f4287.png",
-      "reference_sha256": "afb2a832a4ce87a233a2536cbacb4d29d66f4b6832bdf0b5d408577dd18be288",
+      "reference_sha256": "397a02aee6c45559b681c4a8f74d6cf28a4a43cf05ec2bb519a59c642899dfd0",
       "source_frame_id": 4287,
       "source_pts": 2194944,
       "source_pts_time": 142.9,
@@ -496,16 +1084,47 @@
         126,
         165
       ],
+      "annotation_declared_bbox_xywh": [
+        412,
+        8,
+        126,
+        165
+      ],
+      "mask_index": 7,
+      "role_index_ambiguous_at_anchor": true,
+      "role_index_candidates": [
+        3,
+        7
+      ],
+      "role_index_candidate_areas_px": {
+        "3": 61,
+        "7": 20025
+      },
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh": [
+        412,
+        8,
+        127,
+        166
+      ],
+      "crop_origin_xy": [
+        412,
+        8
+      ],
+      "crop_size_wh": [
+        127,
+        166
+      ],
       "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4287.png",
       "provenance": {
         "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
-        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index, cropped to that mask's tight bounding box (round-3 fix)"
       }
     },
     {
       "role_id": "role_6",
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_6_f4257.png",
-      "reference_sha256": "b0bd345ce7b4c352d8d0ae0fb827b2617859ac55f6816e9b2431aa1b32de978f",
+      "reference_sha256": "a511459ed8c4446cec57a500a5f10cf16fe838da466eaf1bc69a21ff3c913aaa",
       "source_frame_id": 4257,
       "source_pts": 2179584,
       "source_pts_time": 141.9,
@@ -517,16 +1136,45 @@
         102,
         134
       ],
+      "annotation_declared_bbox_xywh": [
+        329,
+        189,
+        102,
+        134
+      ],
+      "mask_index": 4,
+      "role_index_ambiguous_at_anchor": false,
+      "role_index_candidates": [
+        4
+      ],
+      "role_index_candidate_areas_px": {
+        "4": 13717
+      },
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh": [
+        329,
+        189,
+        103,
+        135
+      ],
+      "crop_origin_xy": [
+        329,
+        189
+      ],
+      "crop_size_wh": [
+        103,
+        135
+      ],
       "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4257.png",
       "provenance": {
         "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
-        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index, cropped to that mask's tight bounding box (round-3 fix)"
       }
     },
     {
       "role_id": "role_7",
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_7_f4242.png",
-      "reference_sha256": "b80320657299c5c684b22f3b02636ecf0de06ba7e9c56ee59e2107d26e821e97",
+      "reference_sha256": "07e00bd5f206076a03e4754d294da4c1b2c1ec2e571b83646c10bc6b6446eddc",
       "source_frame_id": 4242,
       "source_pts": 2171904,
       "source_pts_time": 141.4,
@@ -538,16 +1186,47 @@
         76,
         99
       ],
+      "annotation_declared_bbox_xywh": [
+        409,
+        187,
+        76,
+        99
+      ],
+      "mask_index": 8,
+      "role_index_ambiguous_at_anchor": true,
+      "role_index_candidates": [
+        7,
+        8
+      ],
+      "role_index_candidate_areas_px": {
+        "7": 8,
+        "8": 7601
+      },
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh": [
+        409,
+        187,
+        77,
+        100
+      ],
+      "crop_origin_xy": [
+        409,
+        187
+      ],
+      "crop_size_wh": [
+        77,
+        100
+      ],
       "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4242.png",
       "provenance": {
         "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
-        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index, cropped to that mask's tight bounding box (round-3 fix)"
       }
     },
     {
       "role_id": "role_8",
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_8_f4242.png",
-      "reference_sha256": "6b27a71b5a7249475e1f2a997f9854401b34cf42ebd6d1676d452b3b6c0b7089",
+      "reference_sha256": "4579d758de29e17bd5d669247b78884513f6ba018863e74ea94a8104b030a19d",
       "source_frame_id": 4242,
       "source_pts": 2171904,
       "source_pts_time": 141.4,
@@ -559,16 +1238,45 @@
         24,
         308
       ],
+      "annotation_declared_bbox_xywh": [
+        0,
+        51,
+        24,
+        308
+      ],
+      "mask_index": 10,
+      "role_index_ambiguous_at_anchor": false,
+      "role_index_candidates": [
+        10
+      ],
+      "role_index_candidate_areas_px": {
+        "10": 6915
+      },
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh": [
+        0,
+        51,
+        25,
+        309
+      ],
+      "crop_origin_xy": [
+        0,
+        51
+      ],
+      "crop_size_wh": [
+        25,
+        309
+      ],
       "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4242.png",
       "provenance": {
         "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
-        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index, cropped to that mask's tight bounding box (round-3 fix)"
       }
     },
     {
       "role_id": "role_9",
       "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_9_f4242.png",
-      "reference_sha256": "3b941a6049a04497b0f38d2d15a37d900dd5609cc18c9cd440da032a1ba43134",
+      "reference_sha256": "ea75e7080dc213b34ec8773ad6321030acd09da8cde7e26d25be182ccb3d890a",
       "source_frame_id": 4242,
       "source_pts": 2171904,
       "source_pts_time": 141.4,
@@ -580,13 +1288,48 @@
         168,
         25
       ],
+      "annotation_declared_bbox_xywh": [
+        42,
+        212,
+        168,
+        25
+      ],
+      "mask_index": 11,
+      "role_index_ambiguous_at_anchor": false,
+      "role_index_candidates": [
+        11
+      ],
+      "role_index_candidate_areas_px": {
+        "11": 4103
+      },
+      "crop_basis": "mask_tight_bbox",
+      "crop_bbox_xywh": [
+        42,
+        212,
+        169,
+        26
+      ],
+      "crop_origin_xy": [
+        42,
+        212
+      ],
+      "crop_size_wh": [
+        169,
+        26
+      ],
       "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4242.png",
       "provenance": {
         "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
-        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index, cropped to that mask's tight bounding box (round-3 fix)"
       }
     }
   ],
   "role_count": 25,
+  "field_notes": {
+    "bbox_xywh": "annotation-declared bbox, recorded verbatim; NOT the crop window (round-3 rename alias: annotation_declared_bbox_xywh)",
+    "crop_bbox_xywh": "crop window actually applied, = the mask's tight bounding box; see crop_basis",
+    "mask_index": "mask label value in maskindex_f<frame>.png whose pixels were used for this reference",
+    "role_index_candidates": "every mask index carrying this role_id at this anchor; length > 1 means the role is split across masks"
+  },
   "note": "These are SOURCE-derived alignment references, not reskin artwork. They exist so a downstream candidate can be compared against the source silhouette/appearance per role. No new identity is created here."
 }
