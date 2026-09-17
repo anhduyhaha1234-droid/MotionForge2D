@@ -1,0 +1,2887 @@
+{
+  "fixture_id": "MF-V1-GOLDEN",
+  "fixture_version": "1",
+  "task_id": "MF-V1-GOLDEN",
+  "wave_base": "2594de06cd5b2355e7e874ae4d6deb8a7b5b1b64",
+  "generated_by": "tools/build_fixture.py",
+  "generated_at_utc": "2026-09-17T11:43:36Z",
+  "source_lock": {
+    "reference_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
+    "copies": [
+      {
+        "path": "C:\\Users\\Admin\\MotionForge2D\\projects\\2dc14177a212\\Tại_sao_thật_tệ_khi_ĐỨNG_TÊN_HỘ_công_ty_.mp4",
+        "sha256": "5a175454c2c2965bac5013a53926e210a9f70a185d802d0f2e0083a6fb399fa2",
+        "bytes": 36971916
+      },
+      {
+        "path": "C:\\Users\\Admin\\MotionForge2D\\projects\\4503582811e8\\Tại_sao_thật_tệ_khi_ĐỨNG_TÊN_HỘ_công_ty_.mp4",
+        "sha256": "5a175454c2c2965bac5013a53926e210a9f70a185d802d0f2e0083a6fb399fa2",
+        "bytes": 36971916
+      }
+    ],
+    "container_duration_s": 1321.21542,
+    "video": {
+      "codec": "h264",
+      "profile": "Main",
+      "width": 640,
+      "height": 360,
+      "sar": "1:1",
+      "dar": "16:9",
+      "pix_fmt": "yuv420p",
+      "r_frame_rate": "30/1",
+      "avg_frame_rate": "30/1",
+      "time_base": "1/15360",
+      "ticks_per_frame": 512,
+      "nb_frames_declared": 39634,
+      "nb_read_frames_verified": 39634,
+      "color_space": "bt709",
+      "field_order": "progressive"
+    },
+    "audio": {
+      "codec": "aac",
+      "profile": "LC",
+      "sample_rate": 44100,
+      "channels": 2,
+      "channel_layout": "stereo",
+      "bit_rate": 95999,
+      "duration_s": 1321.21542
+    },
+    "video_duration_s_from_rational": "1321.133333",
+    "timeline_definition": {
+      "frame_id_to_time": "t = frame_id / 30 exactly",
+      "frame_id_to_pts": "pts = frame_id * 512 exactly (timebase 1/15360)"
+    }
+  },
+  "media_objects": {
+    "REFERENCE_FILM": {
+      "sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
+      "bytes": 36971916,
+      "duration_s": 1321.21542,
+      "frames": 39634,
+      "note": "locked reference film; NOT the demo and NOT the 4 s clip"
+    },
+    "DEMO_30S": {
+      "sha256": "22e7577d78f38355ffe133b3ea292e0b9c0bfa628bbcf24d37b6e9a64ca9ce1a",
+      "bytes": 877221,
+      "duration_s": 30.0,
+      "frames": 900,
+      "video": "h264 High 640x360 30/1",
+      "copies": [
+        "C:/Users/Admin/Documents/Codex/2026-09-05/files-pasted-by-the-user-codex/outputs/motionforge-real-pilot-20260907/source-0040-0110.mp4",
+        "C:/Users/Admin/Documents/Codex/2026-09-05/files-pasted-by-the-user-codex/outputs/demo-luna-c7-review-20260910/fixture/source.mp4",
+        "C:/Users/Admin/Documents/Codex/mf-c11/20260912T152347Z/projects/projects/4091af4c7374/source_42052c37861342d082d40404d3187698.mp4"
+      ],
+      "provenance_corroboration": "declared source_audio_video (sha 22e7577d…, 877221 bytes) in hand-prototype/20260913T102850Z/prototype-a/diagnostic-clip-results.json"
+    },
+    "CLIP_4S_PROTOTYPE_A": {
+      "sha256": "dee47afcb5e12aff48076df6b59d84f527af4a0d9be9403550ae99a9e71755fb",
+      "bytes": 133761,
+      "duration_s": 4.0,
+      "frames": 120,
+      "video": "h264 High 640x360 30/1",
+      "note": "PROTOTYPE_A diagnostic 4 s clip; a diagnostic harness output, NOT customer proof and NOT public product behaviour"
+    }
+  },
+  "index_space_mapping": {
+    "demo_to_film": {
+      "formula": "film_frame = demo_frame + 1200",
+      "offset": 1200,
+      "proven": true,
+      "evidence_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\demo_offset_verification.json",
+      "frames_compared": 900,
+      "mae_mean": 0.153557,
+      "mae_max": 0.244861,
+      "offset_contrast": [
+        {
+          "offset": -6,
+          "samples": 228,
+          "mae_mean": 2.103116,
+          "mae_min": 0.097014
+        },
+        {
+          "offset": -3,
+          "samples": 228,
+          "mae_mean": 1.053481,
+          "mae_min": 0.097708
+        },
+        {
+          "offset": -1,
+          "samples": 228,
+          "mae_mean": 0.445176,
+          "mae_min": 0.092639
+        },
+        {
+          "offset": 0,
+          "samples": 228,
+          "mae_mean": 0.153443,
+          "mae_min": 0.092431
+        },
+        {
+          "offset": 1,
+          "samples": 228,
+          "mae_mean": 0.672435,
+          "mae_min": 0.092708
+        },
+        {
+          "offset": 3,
+          "samples": 228,
+          "mae_mean": 1.283525,
+          "mae_min": 0.096181
+        },
+        {
+          "offset": 6,
+          "samples": 228,
+          "mae_mean": 2.388705,
+          "mae_min": 0.109097
+        },
+        {
+          "offset": 300,
+          "samples": 152,
+          "mae_mean": 39.214675,
+          "mae_min": 1.543403
+        },
+        {
+          "offset": -300,
+          "samples": 228,
+          "mae_mean": 50.861139,
+          "mae_min": 1.511667
+        }
+      ]
+    },
+    "book_window_reconciliation": {
+      "packet_statement": "book scene frames 450-569",
+      "tested_literally_in_film_space": "FILM frames 450-569 were tested against the 13/09 prototype stills and against the prototype's own base video: no match found",
+      "resolved_mapping": "the 450-569 numbering belongs to the C11/demo source index space; in reference-film canonical space the book window is frames 1650-1769",
+      "evidence_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\locate_PROTOTYPE_A_frame-450.json",
+      "special_case": "the PROTOTYPE_A stills match NEITHER the film nor the demo-30s at any offset (best 160x90 MAE 8.04 / 8.04, i.e. no match): they are outputs of the arm-rig diagnostic harness, not raw source frames, so they are imported as a limited diagnostic reference and never treated as source truth"
+    }
+  },
+  "windows": [
+    {
+      "window_id": "W01_BOOK",
+      "role_in_set": "primary",
+      "name": "book scene (seated man, two hands, open book)",
+      "start_frame": 1650,
+      "end_frame_exclusive": 1770,
+      "source_index_space": "reference film",
+      "classes": [
+        "prop_interaction",
+        "contact",
+        "hold"
+      ],
+      "holdout": false,
+      "annotation_tag": "BOOK",
+      "class_evidence": {
+        "prop_interaction": "annotation contacts between role_3/role_6/role_7/role_2 at anchors 1650-1755; book state change corroborated by prototype-a diagnostic record (state seated_book_closed -> seated_book_open at C11 source frame 522 = film frame 1722)"
+      },
+      "pts_start": 844800,
+      "pts_end_exclusive": 906240,
+      "start_time_s": 55.0,
+      "end_time_s_exclusive": 59.0,
+      "frame_count": 120,
+      "duration_s": 4.0,
+      "annotation_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\annotation_BOOK.json",
+      "anchors": [
+        1650,
+        1665,
+        1680,
+        1695,
+        1710,
+        1725,
+        1740,
+        1755
+      ],
+      "anchor_cadence_frames": 15,
+      "roles": [
+        {
+          "role_id": "role_1",
+          "kind_structural": "background",
+          "median_area_pct": 20.469,
+          "first_frame_id": 1650,
+          "last_frame_id": 1755,
+          "mean_predicted_iou": 0.974653,
+          "state_counts": {
+            "visible": 8,
+            "invisible": 0,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_2",
+          "kind_structural": "character",
+          "median_area_pct": 11.465,
+          "first_frame_id": 1650,
+          "last_frame_id": 1755,
+          "mean_predicted_iou": 0.967971,
+          "state_counts": {
+            "visible": 8,
+            "invisible": 0,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_3",
+          "kind_structural": "background",
+          "median_area_pct": 10.2205,
+          "first_frame_id": 1650,
+          "last_frame_id": 1755,
+          "mean_predicted_iou": 0.988411,
+          "state_counts": {
+            "visible": 8,
+            "invisible": 0,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_4",
+          "kind_structural": "character",
+          "median_area_pct": 9.337,
+          "first_frame_id": 1650,
+          "last_frame_id": 1755,
+          "mean_predicted_iou": 0.986163,
+          "state_counts": {
+            "visible": 8,
+            "invisible": 0,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_5",
+          "kind_structural": "character",
+          "median_area_pct": 4.6615,
+          "first_frame_id": 1650,
+          "last_frame_id": 1755,
+          "mean_predicted_iou": 0.936235,
+          "state_counts": {
+            "visible": 0,
+            "invisible": 0,
+            "unknown": 8
+          }
+        },
+        {
+          "role_id": "role_6",
+          "kind_structural": "character",
+          "median_area_pct": 2.816,
+          "first_frame_id": 1650,
+          "last_frame_id": 1755,
+          "mean_predicted_iou": 0.967568,
+          "state_counts": {
+            "visible": 8,
+            "invisible": 0,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_7",
+          "kind_structural": "character",
+          "median_area_pct": 1.309,
+          "first_frame_id": 1650,
+          "last_frame_id": 1755,
+          "mean_predicted_iou": 0.966015,
+          "state_counts": {
+            "visible": 8,
+            "invisible": 0,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_8",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 1.2743,
+          "first_frame_id": 1650,
+          "last_frame_id": 1755,
+          "mean_predicted_iou": 0.978588,
+          "state_counts": {
+            "visible": 8,
+            "invisible": 0,
+            "unknown": 0
+          }
+        }
+      ],
+      "contacts": [
+        {
+          "role_a": "role_1",
+          "role_b": "role_2",
+          "anchor_frames": [
+            1650,
+            1665,
+            1680,
+            1695,
+            1710,
+            1725,
+            1740,
+            1755
+          ],
+          "anchor_count": 8
+        },
+        {
+          "role_a": "role_2",
+          "role_b": "role_4",
+          "anchor_frames": [
+            1650,
+            1665,
+            1680,
+            1695,
+            1710,
+            1725,
+            1740,
+            1755
+          ],
+          "anchor_count": 8
+        },
+        {
+          "role_a": "role_2",
+          "role_b": "role_5",
+          "anchor_frames": [
+            1650,
+            1665,
+            1680,
+            1695,
+            1710,
+            1725,
+            1740,
+            1755
+          ],
+          "anchor_count": 8
+        },
+        {
+          "role_a": "role_3",
+          "role_b": "role_4",
+          "anchor_frames": [
+            1650,
+            1665,
+            1680,
+            1695,
+            1710,
+            1725,
+            1740,
+            1755
+          ],
+          "anchor_count": 8
+        },
+        {
+          "role_a": "role_3",
+          "role_b": "role_7",
+          "anchor_frames": [
+            1650,
+            1665,
+            1680,
+            1695,
+            1710,
+            1725,
+            1740,
+            1755
+          ],
+          "anchor_count": 8
+        }
+      ],
+      "cuts_inside_window": [],
+      "occlusion_events": [],
+      "exception_count": 16,
+      "exception_kinds": [
+        "route_a_route_b_disagreement",
+        "uncovered_region"
+      ],
+      "uncovered_by_route_a_pct": [
+        38.3989,
+        38.401,
+        38.3637,
+        38.4549,
+        38.4549,
+        38.6545,
+        38.648,
+        38.5078
+      ]
+    },
+    {
+      "window_id": "W02_CUT",
+      "role_in_set": "additional",
+      "name": "REF-R01-derived window containing hard cuts",
+      "start_frame": 660,
+      "end_frame_exclusive": 780,
+      "source_index_space": "reference film",
+      "classes": [
+        "hard_cut"
+      ],
+      "holdout": false,
+      "annotation_tag": "CUT_660",
+      "class_evidence": {
+        "hard_cut": "2 detected cut boundaries inside the window at film frames 681 (score 0.423976) and 748 (score 0.399514), from probe/scenes_candidates.json"
+      },
+      "pts_start": 337920,
+      "pts_end_exclusive": 399360,
+      "start_time_s": 22.0,
+      "end_time_s_exclusive": 26.0,
+      "frame_count": 120,
+      "duration_s": 4.0,
+      "annotation_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\annotation_CUT_660.json",
+      "anchors": [
+        660,
+        675,
+        690,
+        705,
+        720,
+        735,
+        750,
+        765
+      ],
+      "anchor_cadence_frames": 15,
+      "roles": [
+        {
+          "role_id": "role_1",
+          "kind_structural": "character",
+          "median_area_pct": 4.1536,
+          "first_frame_id": 660,
+          "last_frame_id": 660,
+          "mean_predicted_iou": 0.907975,
+          "state_counts": {
+            "visible": 0,
+            "invisible": 7,
+            "unknown": 1
+          }
+        },
+        {
+          "role_id": "role_2",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 2.1057,
+          "first_frame_id": 660,
+          "last_frame_id": 675,
+          "mean_predicted_iou": 0.941013,
+          "state_counts": {
+            "visible": 2,
+            "invisible": 6,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_3",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 1.3769,
+          "first_frame_id": 660,
+          "last_frame_id": 675,
+          "mean_predicted_iou": 0.947426,
+          "state_counts": {
+            "visible": 2,
+            "invisible": 6,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_4",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 1.2704,
+          "first_frame_id": 660,
+          "last_frame_id": 765,
+          "mean_predicted_iou": 0.975605,
+          "state_counts": {
+            "visible": 8,
+            "invisible": 0,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_5",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 1.1473,
+          "first_frame_id": 660,
+          "last_frame_id": 675,
+          "mean_predicted_iou": 0.971125,
+          "state_counts": {
+            "visible": 2,
+            "invisible": 6,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_6",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 0.6191,
+          "first_frame_id": 660,
+          "last_frame_id": 675,
+          "mean_predicted_iou": 0.945414,
+          "state_counts": {
+            "visible": 2,
+            "invisible": 6,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_7",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 0.5495,
+          "first_frame_id": 660,
+          "last_frame_id": 675,
+          "mean_predicted_iou": 0.932605,
+          "state_counts": {
+            "visible": 2,
+            "invisible": 6,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_8",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 0.441,
+          "first_frame_id": 660,
+          "last_frame_id": 660,
+          "mean_predicted_iou": 0.885378,
+          "state_counts": {
+            "visible": 1,
+            "invisible": 7,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_9",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 0.2982,
+          "first_frame_id": 675,
+          "last_frame_id": 675,
+          "mean_predicted_iou": 0.917003,
+          "state_counts": {
+            "visible": 1,
+            "invisible": 7,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_10",
+          "kind_structural": "background",
+          "median_area_pct": 60.8442,
+          "first_frame_id": 690,
+          "last_frame_id": 735,
+          "mean_predicted_iou": 0.992308,
+          "state_counts": {
+            "visible": 4,
+            "invisible": 4,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_11",
+          "kind_structural": "unclassified",
+          "median_area_pct": 36.0449,
+          "first_frame_id": 690,
+          "last_frame_id": 735,
+          "mean_predicted_iou": 0.985888,
+          "state_counts": {
+            "visible": 4,
+            "invisible": 4,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_12",
+          "kind_structural": "character",
+          "median_area_pct": 7.9398,
+          "first_frame_id": 750,
+          "last_frame_id": 765,
+          "mean_predicted_iou": 0.942854,
+          "state_counts": {
+            "visible": 2,
+            "invisible": 6,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_13",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 6.6652,
+          "first_frame_id": 750,
+          "last_frame_id": 765,
+          "mean_predicted_iou": 0.984394,
+          "state_counts": {
+            "visible": 2,
+            "invisible": 6,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_14",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 2.3583,
+          "first_frame_id": 750,
+          "last_frame_id": 765,
+          "mean_predicted_iou": 0.977482,
+          "state_counts": {
+            "visible": 2,
+            "invisible": 6,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_15",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 2.3368,
+          "first_frame_id": 750,
+          "last_frame_id": 765,
+          "mean_predicted_iou": 0.949487,
+          "state_counts": {
+            "visible": 2,
+            "invisible": 6,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_16",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 2.1571,
+          "first_frame_id": 750,
+          "last_frame_id": 765,
+          "mean_predicted_iou": 0.979521,
+          "state_counts": {
+            "visible": 2,
+            "invisible": 6,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_17",
+          "kind_structural": "character",
+          "median_area_pct": 1.5996,
+          "first_frame_id": 750,
+          "last_frame_id": 765,
+          "mean_predicted_iou": 0.973584,
+          "state_counts": {
+            "visible": 2,
+            "invisible": 6,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_18",
+          "kind_structural": "character",
+          "median_area_pct": 1.4883,
+          "first_frame_id": 750,
+          "last_frame_id": 765,
+          "mean_predicted_iou": 0.92176,
+          "state_counts": {
+            "visible": 2,
+            "invisible": 6,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_19",
+          "kind_structural": "character",
+          "median_area_pct": 1.4628,
+          "first_frame_id": 750,
+          "last_frame_id": 765,
+          "mean_predicted_iou": 0.906723,
+          "state_counts": {
+            "visible": 2,
+            "invisible": 6,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_20",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 1.0217,
+          "first_frame_id": 750,
+          "last_frame_id": 765,
+          "mean_predicted_iou": 0.885732,
+          "state_counts": {
+            "visible": 2,
+            "invisible": 6,
+            "unknown": 0
+          }
+        }
+      ],
+      "contacts": [
+        {
+          "role_a": "role_1",
+          "role_b": "role_8",
+          "anchor_frames": [
+            660
+          ],
+          "anchor_count": 1
+        },
+        {
+          "role_a": "role_10",
+          "role_b": "role_11",
+          "anchor_frames": [
+            690,
+            705,
+            720,
+            735
+          ],
+          "anchor_count": 4
+        },
+        {
+          "role_a": "role_10",
+          "role_b": "role_4",
+          "anchor_frames": [
+            690,
+            705,
+            720,
+            735
+          ],
+          "anchor_count": 4
+        },
+        {
+          "role_a": "role_13",
+          "role_b": "role_17",
+          "anchor_frames": [
+            750,
+            765
+          ],
+          "anchor_count": 2
+        },
+        {
+          "role_a": "role_15",
+          "role_b": "role_16",
+          "anchor_frames": [
+            750,
+            765
+          ],
+          "anchor_count": 2
+        }
+      ],
+      "cuts_inside_window": [
+        {
+          "frame_id": 681,
+          "pts": 348672,
+          "pts_time": 22.7,
+          "scene_score": 0.423976,
+          "offset_in_window": 21
+        },
+        {
+          "frame_id": 748,
+          "pts": 382976,
+          "pts_time": 24.933333,
+          "scene_score": 0.399514,
+          "offset_in_window": 88
+        }
+      ],
+      "occlusion_events": [],
+      "exception_count": 9,
+      "exception_kinds": [
+        "route_a_route_b_disagreement",
+        "uncovered_region"
+      ],
+      "uncovered_by_route_a_pct": [
+        88.3381,
+        92.6354,
+        1.9375,
+        1.9418,
+        1.747,
+        1.7448,
+        71.7092,
+        71.717
+      ]
+    },
+    {
+      "window_id": "W03_WALK",
+      "role_in_set": "additional",
+      "name": "figure translating under a static camera",
+      "start_frame": 7927,
+      "end_frame_exclusive": 8047,
+      "source_index_space": "reference film",
+      "classes": [
+        "walking"
+      ],
+      "holdout": false,
+      "annotation_tag": "WALK_7927",
+      "class_evidence": {
+        "walking": "classify_S48_7927: quadrant_min_shift_mean 0.0002 px and quadrant agreement 0.006 (camera static) while centroid path is 0.265 frame-widths with direction consistency 0.742 (a single object translating coherently)"
+      },
+      "pts_start": 4058624,
+      "pts_end_exclusive": 4120064,
+      "start_time_s": 264.233333,
+      "end_time_s_exclusive": 268.233333,
+      "frame_count": 120,
+      "duration_s": 4.0,
+      "annotation_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\annotation_WALK_7927.json",
+      "anchors": [
+        7927,
+        7942,
+        7957,
+        7972,
+        7987,
+        8002,
+        8017,
+        8032
+      ],
+      "anchor_cadence_frames": 15,
+      "roles": [
+        {
+          "role_id": "role_1",
+          "kind_structural": "foreground",
+          "median_area_pct": 58.7891,
+          "first_frame_id": 7927,
+          "last_frame_id": 7987,
+          "mean_predicted_iou": 0.942526,
+          "state_counts": {
+            "visible": 3,
+            "invisible": 3,
+            "unknown": 2
+          }
+        },
+        {
+          "role_id": "role_2",
+          "kind_structural": "foreground",
+          "median_area_pct": 12.8991,
+          "first_frame_id": 7927,
+          "last_frame_id": 8032,
+          "mean_predicted_iou": 0.964283,
+          "state_counts": {
+            "visible": 8,
+            "invisible": 0,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_3",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 1.2368,
+          "first_frame_id": 7927,
+          "last_frame_id": 8032,
+          "mean_predicted_iou": 0.97616,
+          "state_counts": {
+            "visible": 8,
+            "invisible": 0,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_4",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 0.2174,
+          "first_frame_id": 7927,
+          "last_frame_id": 7957,
+          "mean_predicted_iou": 0.806137,
+          "state_counts": {
+            "visible": 0,
+            "invisible": 5,
+            "unknown": 3
+          }
+        },
+        {
+          "role_id": "role_5",
+          "kind_structural": "foreground",
+          "median_area_pct": 58.7643,
+          "first_frame_id": 8032,
+          "last_frame_id": 8032,
+          "mean_predicted_iou": 0.954693,
+          "state_counts": {
+            "visible": 1,
+            "invisible": 7,
+            "unknown": 0
+          }
+        }
+      ],
+      "contacts": [
+        {
+          "role_a": "role_1",
+          "role_b": "role_2",
+          "anchor_frames": [
+            7927,
+            7942,
+            7957,
+            7972,
+            7987
+          ],
+          "anchor_count": 5
+        },
+        {
+          "role_a": "role_1",
+          "role_b": "role_3",
+          "anchor_frames": [
+            7927,
+            7942,
+            7957,
+            7972
+          ],
+          "anchor_count": 4
+        },
+        {
+          "role_a": "role_1",
+          "role_b": "role_4",
+          "anchor_frames": [
+            7927,
+            7942,
+            7957
+          ],
+          "anchor_count": 3
+        },
+        {
+          "role_a": "role_2",
+          "role_b": "role_5",
+          "anchor_frames": [
+            8032
+          ],
+          "anchor_count": 1
+        }
+      ],
+      "cuts_inside_window": [
+        {
+          "frame_id": 7927,
+          "pts": 4058624,
+          "pts_time": 264.233333,
+          "scene_score": 0.780147,
+          "offset_in_window": 0
+        }
+      ],
+      "occlusion_events": [],
+      "exception_count": 16,
+      "exception_kinds": [
+        "low_confidence_mask",
+        "route_a_route_b_disagreement",
+        "uncovered_region"
+      ],
+      "uncovered_by_route_a_pct": [
+        39.974,
+        39.9805,
+        39.9787,
+        39.8056,
+        39.8641,
+        85.8446,
+        85.8655,
+        40.0122
+      ]
+    },
+    {
+      "window_id": "W04_TURN",
+      "role_in_set": "additional",
+      "name": "large silhouette/shape change under a static camera",
+      "start_frame": 795,
+      "end_frame_exclusive": 915,
+      "source_index_space": "reference film",
+      "classes": [
+        "turn_or_shape_change"
+      ],
+      "holdout": false,
+      "annotation_tag": "TURN_795",
+      "class_evidence": {
+        "turn_or_shape_change": "classify_S8B_795: aspect_relative_change 11.2819 with quadrant_min_shift_mean 0.151 px (camera essentially static) and only 1.68% held frames (continuous animation)"
+      },
+      "pts_start": 407040,
+      "pts_end_exclusive": 468480,
+      "start_time_s": 26.5,
+      "end_time_s_exclusive": 30.5,
+      "frame_count": 120,
+      "duration_s": 4.0,
+      "annotation_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\annotation_TURN_795.json",
+      "anchors": [
+        795,
+        810,
+        825,
+        840,
+        855,
+        870,
+        885,
+        900
+      ],
+      "anchor_cadence_frames": 15,
+      "roles": [
+        {
+          "role_id": "role_1",
+          "kind_structural": "background",
+          "median_area_pct": 42.5703,
+          "first_frame_id": 795,
+          "last_frame_id": 885,
+          "mean_predicted_iou": 0.986558,
+          "state_counts": {
+            "visible": 7,
+            "invisible": 1,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_2",
+          "kind_structural": "unclassified",
+          "median_area_pct": 53.6888,
+          "first_frame_id": 795,
+          "last_frame_id": 900,
+          "mean_predicted_iou": 0.98339,
+          "state_counts": {
+            "visible": 7,
+            "invisible": 1,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_3",
+          "kind_structural": "character",
+          "median_area_pct": 9.6727,
+          "first_frame_id": 795,
+          "last_frame_id": 795,
+          "mean_predicted_iou": 0.964477,
+          "state_counts": {
+            "visible": 1,
+            "invisible": 7,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_4",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 1.27,
+          "first_frame_id": 795,
+          "last_frame_id": 900,
+          "mean_predicted_iou": 0.979986,
+          "state_counts": {
+            "visible": 8,
+            "invisible": 0,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_5",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 0.395,
+          "first_frame_id": 840,
+          "last_frame_id": 840,
+          "mean_predicted_iou": 0.896244,
+          "state_counts": {
+            "visible": 0,
+            "invisible": 7,
+            "unknown": 1
+          }
+        },
+        {
+          "role_id": "role_6",
+          "kind_structural": "foreground",
+          "median_area_pct": 14.7543,
+          "first_frame_id": 855,
+          "last_frame_id": 900,
+          "mean_predicted_iou": 0.960989,
+          "state_counts": {
+            "visible": 3,
+            "invisible": 5,
+            "unknown": 0
+          }
+        }
+      ],
+      "contacts": [
+        {
+          "role_a": "role_1",
+          "role_b": "role_2",
+          "anchor_frames": [
+            795,
+            810,
+            825,
+            840,
+            855,
+            870
+          ],
+          "anchor_count": 6
+        },
+        {
+          "role_a": "role_1",
+          "role_b": "role_3",
+          "anchor_frames": [
+            795
+          ],
+          "anchor_count": 1
+        },
+        {
+          "role_a": "role_1",
+          "role_b": "role_4",
+          "anchor_frames": [
+            795,
+            810,
+            825,
+            840,
+            855,
+            870,
+            870,
+            885
+          ],
+          "anchor_count": 8
+        },
+        {
+          "role_a": "role_2",
+          "role_b": "role_3",
+          "anchor_frames": [
+            795
+          ],
+          "anchor_count": 1
+        },
+        {
+          "role_a": "role_2",
+          "role_b": "role_5",
+          "anchor_frames": [
+            840
+          ],
+          "anchor_count": 1
+        },
+        {
+          "role_a": "role_2",
+          "role_b": "role_6",
+          "anchor_frames": [
+            855,
+            870,
+            900
+          ],
+          "anchor_count": 3
+        },
+        {
+          "role_a": "role_2",
+          "role_b": "role_4",
+          "anchor_frames": [
+            870
+          ],
+          "anchor_count": 1
+        },
+        {
+          "role_a": "role_1",
+          "role_b": "role_6",
+          "anchor_frames": [
+            870
+          ],
+          "anchor_count": 1
+        }
+      ],
+      "cuts_inside_window": [
+        {
+          "frame_id": 795,
+          "pts": 407040,
+          "pts_time": 26.5,
+          "scene_score": 0.465638,
+          "offset_in_window": 0
+        }
+      ],
+      "occlusion_events": [],
+      "exception_count": 9,
+      "exception_kinds": [
+        "route_a_route_b_disagreement",
+        "uncovered_region"
+      ],
+      "uncovered_by_route_a_pct": [
+        3.0577,
+        2.5608,
+        2.8294,
+        2.4709,
+        2.3837,
+        2.1558,
+        69.3633,
+        27.3581
+      ]
+    },
+    {
+      "window_id": "W05_CAMERA",
+      "role_in_set": "additional",
+      "name": "whole-scene / camera motion",
+      "start_frame": 4212,
+      "end_frame_exclusive": 4332,
+      "source_index_space": "reference film",
+      "classes": [
+        "camera_motion"
+      ],
+      "holdout": false,
+      "annotation_tag": "CAM_4212",
+      "class_evidence": {
+        "camera_motion": "classify_S31_4212: quadrant_min_shift_mean 2.2837 px - every quadrant moves, which a single moving object cannot produce - with gmag_p90 7.466 on non-held frames"
+      },
+      "pts_start": 2156544,
+      "pts_end_exclusive": 2217984,
+      "start_time_s": 140.4,
+      "end_time_s_exclusive": 144.4,
+      "frame_count": 120,
+      "duration_s": 4.0,
+      "annotation_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\annotation_CAM_4212.json",
+      "anchors": [
+        4212,
+        4227,
+        4242,
+        4257,
+        4272,
+        4287,
+        4302,
+        4317
+      ],
+      "anchor_cadence_frames": 15,
+      "roles": [
+        {
+          "role_id": "role_1",
+          "kind_structural": "background",
+          "median_area_pct": 99.9071,
+          "first_frame_id": 4212,
+          "last_frame_id": 4227,
+          "mean_predicted_iou": 0.997321,
+          "state_counts": {
+            "visible": 2,
+            "invisible": 6,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_2",
+          "kind_structural": "character",
+          "median_area_pct": 3.3155,
+          "first_frame_id": 4242,
+          "last_frame_id": 4242,
+          "mean_predicted_iou": 0.979078,
+          "state_counts": {
+            "visible": 0,
+            "invisible": 7,
+            "unknown": 1
+          }
+        },
+        {
+          "role_id": "role_3",
+          "kind_structural": "character",
+          "median_area_pct": 3.3099,
+          "first_frame_id": 4242,
+          "last_frame_id": 4257,
+          "mean_predicted_iou": 0.977021,
+          "state_counts": {
+            "visible": 1,
+            "invisible": 6,
+            "unknown": 1
+          }
+        },
+        {
+          "role_id": "role_4",
+          "kind_structural": "character",
+          "median_area_pct": 9.0747,
+          "first_frame_id": 4242,
+          "last_frame_id": 4302,
+          "mean_predicted_iou": 0.987513,
+          "state_counts": {
+            "visible": 1,
+            "invisible": 3,
+            "unknown": 4
+          }
+        },
+        {
+          "role_id": "role_5",
+          "kind_structural": "character",
+          "median_area_pct": 9.0291,
+          "first_frame_id": 4242,
+          "last_frame_id": 4302,
+          "mean_predicted_iou": 0.988211,
+          "state_counts": {
+            "visible": 1,
+            "invisible": 3,
+            "unknown": 4
+          }
+        },
+        {
+          "role_id": "role_6",
+          "kind_structural": "character",
+          "median_area_pct": 4.6298,
+          "first_frame_id": 4242,
+          "last_frame_id": 4257,
+          "mean_predicted_iou": 0.984371,
+          "state_counts": {
+            "visible": 1,
+            "invisible": 6,
+            "unknown": 1
+          }
+        },
+        {
+          "role_id": "role_7",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 3.3005,
+          "first_frame_id": 4242,
+          "last_frame_id": 4242,
+          "mean_predicted_iou": 0.980497,
+          "state_counts": {
+            "visible": 0,
+            "invisible": 7,
+            "unknown": 1
+          }
+        },
+        {
+          "role_id": "role_8",
+          "kind_structural": "character",
+          "median_area_pct": 3.0013,
+          "first_frame_id": 4242,
+          "last_frame_id": 4242,
+          "mean_predicted_iou": 0.951864,
+          "state_counts": {
+            "visible": 1,
+            "invisible": 7,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_9",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 1.7808,
+          "first_frame_id": 4242,
+          "last_frame_id": 4242,
+          "mean_predicted_iou": 0.971591,
+          "state_counts": {
+            "visible": 0,
+            "invisible": 7,
+            "unknown": 1
+          }
+        },
+        {
+          "role_id": "role_10",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 0.6215,
+          "first_frame_id": 4242,
+          "last_frame_id": 4242,
+          "mean_predicted_iou": 0.959362,
+          "state_counts": {
+            "visible": 1,
+            "invisible": 7,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_11",
+          "kind_structural": "character",
+          "median_area_pct": 5.9835,
+          "first_frame_id": 4257,
+          "last_frame_id": 4257,
+          "mean_predicted_iou": 0.985918,
+          "state_counts": {
+            "visible": 1,
+            "invisible": 7,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_12",
+          "kind_structural": "character",
+          "median_area_pct": 5.9449,
+          "first_frame_id": 4257,
+          "last_frame_id": 4257,
+          "mean_predicted_iou": 0.991717,
+          "state_counts": {
+            "visible": 0,
+            "invisible": 7,
+            "unknown": 1
+          }
+        },
+        {
+          "role_id": "role_13",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 1.1319,
+          "first_frame_id": 4257,
+          "last_frame_id": 4257,
+          "mean_predicted_iou": 0.971826,
+          "state_counts": {
+            "visible": 1,
+            "invisible": 7,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_14",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 0.8316,
+          "first_frame_id": 4257,
+          "last_frame_id": 4302,
+          "mean_predicted_iou": 0.973568,
+          "state_counts": {
+            "visible": 4,
+            "invisible": 4,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_15",
+          "kind_structural": "character",
+          "median_area_pct": 9.0314,
+          "first_frame_id": 4272,
+          "last_frame_id": 4302,
+          "mean_predicted_iou": 0.981012,
+          "state_counts": {
+            "visible": 0,
+            "invisible": 5,
+            "unknown": 3
+          }
+        },
+        {
+          "role_id": "role_16",
+          "kind_structural": "unclassified",
+          "median_area_pct": 9.043,
+          "first_frame_id": 4272,
+          "last_frame_id": 4302,
+          "mean_predicted_iou": 0.959447,
+          "state_counts": {
+            "visible": 0,
+            "invisible": 5,
+            "unknown": 3
+          }
+        },
+        {
+          "role_id": "role_17",
+          "kind_structural": "character",
+          "median_area_pct": 9.0329,
+          "first_frame_id": 4272,
+          "last_frame_id": 4302,
+          "mean_predicted_iou": 0.986953,
+          "state_counts": {
+            "visible": 0,
+            "invisible": 5,
+            "unknown": 3
+          }
+        },
+        {
+          "role_id": "role_18",
+          "kind_structural": "character",
+          "median_area_pct": 9.0161,
+          "first_frame_id": 4272,
+          "last_frame_id": 4317,
+          "mean_predicted_iou": 0.984684,
+          "state_counts": {
+            "visible": 0,
+            "invisible": 4,
+            "unknown": 4
+          }
+        },
+        {
+          "role_id": "role_19",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 0.3424,
+          "first_frame_id": 4272,
+          "last_frame_id": 4302,
+          "mean_predicted_iou": 0.929582,
+          "state_counts": {
+            "visible": 3,
+            "invisible": 5,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_20",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 0.3407,
+          "first_frame_id": 4272,
+          "last_frame_id": 4302,
+          "mean_predicted_iou": 0.934738,
+          "state_counts": {
+            "visible": 3,
+            "invisible": 5,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_21",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 0.339,
+          "first_frame_id": 4272,
+          "last_frame_id": 4302,
+          "mean_predicted_iou": 0.935712,
+          "state_counts": {
+            "visible": 3,
+            "invisible": 5,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_22",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 0.3377,
+          "first_frame_id": 4272,
+          "last_frame_id": 4302,
+          "mean_predicted_iou": 0.941029,
+          "state_counts": {
+            "visible": 3,
+            "invisible": 5,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_23",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 0.3355,
+          "first_frame_id": 4272,
+          "last_frame_id": 4302,
+          "mean_predicted_iou": 0.938339,
+          "state_counts": {
+            "visible": 3,
+            "invisible": 5,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_24",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 0.2001,
+          "first_frame_id": 4287,
+          "last_frame_id": 4302,
+          "mean_predicted_iou": 0.88436,
+          "state_counts": {
+            "visible": 2,
+            "invisible": 6,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_25",
+          "kind_structural": "background",
+          "median_area_pct": 91.931,
+          "first_frame_id": 4317,
+          "last_frame_id": 4317,
+          "mean_predicted_iou": 0.965225,
+          "state_counts": {
+            "visible": 1,
+            "invisible": 7,
+            "unknown": 0
+          }
+        }
+      ],
+      "contacts": [
+        {
+          "role_a": "role_2",
+          "role_b": "role_7",
+          "anchor_frames": [
+            4242,
+            4242
+          ],
+          "anchor_count": 2
+        },
+        {
+          "role_a": "role_3",
+          "role_b": "role_6",
+          "anchor_frames": [
+            4242
+          ],
+          "anchor_count": 1
+        },
+        {
+          "role_a": "role_6",
+          "role_b": "role_7",
+          "anchor_frames": [
+            4242
+          ],
+          "anchor_count": 1
+        },
+        {
+          "role_a": "role_4",
+          "role_b": "role_5",
+          "anchor_frames": [
+            4272,
+            4287,
+            4302
+          ],
+          "anchor_count": 3
+        },
+        {
+          "role_a": "role_15",
+          "role_b": "role_21",
+          "anchor_frames": [
+            4272,
+            4272,
+            4287,
+            4287,
+            4302,
+            4302
+          ],
+          "anchor_count": 6
+        },
+        {
+          "role_a": "role_15",
+          "role_b": "role_16",
+          "anchor_frames": [
+            4272,
+            4272,
+            4287,
+            4287,
+            4302,
+            4302
+          ],
+          "anchor_count": 6
+        },
+        {
+          "role_a": "role_16",
+          "role_b": "role_18",
+          "anchor_frames": [
+            4272,
+            4287,
+            4302
+          ],
+          "anchor_count": 3
+        },
+        {
+          "role_a": "role_16",
+          "role_b": "role_19",
+          "anchor_frames": [
+            4272,
+            4272,
+            4287,
+            4287,
+            4302,
+            4302
+          ],
+          "anchor_count": 6
+        },
+        {
+          "role_a": "role_22",
+          "role_b": "role_5",
+          "anchor_frames": [
+            4272,
+            4272,
+            4287,
+            4287,
+            4302,
+            4302
+          ],
+          "anchor_count": 6
+        },
+        {
+          "role_a": "role_17",
+          "role_b": "role_18",
+          "anchor_frames": [
+            4272,
+            4287,
+            4302
+          ],
+          "anchor_count": 3
+        },
+        {
+          "role_a": "role_17",
+          "role_b": "role_23",
+          "anchor_frames": [
+            4272,
+            4272,
+            4287,
+            4287,
+            4302,
+            4302
+          ],
+          "anchor_count": 6
+        },
+        {
+          "role_a": "role_18",
+          "role_b": "role_20",
+          "anchor_frames": [
+            4272,
+            4287,
+            4302
+          ],
+          "anchor_count": 3
+        },
+        {
+          "role_a": "role_24",
+          "role_b": "role_4",
+          "anchor_frames": [
+            4287,
+            4302
+          ],
+          "anchor_count": 2
+        },
+        {
+          "role_a": "role_18",
+          "role_b": "role_25",
+          "anchor_frames": [
+            4317
+          ],
+          "anchor_count": 1
+        }
+      ],
+      "cuts_inside_window": [
+        {
+          "frame_id": 4212,
+          "pts": 2156544,
+          "pts_time": 140.4,
+          "scene_score": 1.0,
+          "offset_in_window": 0
+        }
+      ],
+      "occlusion_events": [],
+      "exception_count": 50,
+      "exception_kinds": [
+        "route_a_route_b_disagreement",
+        "uncovered_region"
+      ],
+      "uncovered_by_route_a_pct": [
+        0.0929,
+        0.0929,
+        74.7604,
+        62.1936,
+        44.8646,
+        44.8615,
+        44.8646,
+        2.8155
+      ]
+    },
+    {
+      "window_id": "W06_OVERLAP",
+      "role_in_set": "additional",
+      "name": "overlap / occlusion candidate",
+      "start_frame": 14768,
+      "end_frame_exclusive": 14888,
+      "source_index_space": "reference film",
+      "classes": [
+        "overlap_or_occlusion"
+      ],
+      "holdout": false,
+      "annotation_tag": "OCC_14768",
+      "class_evidence": {
+        "overlap_or_occlusion": "NOT DEMONSTRATED by this fixture. The window was selected because it has the largest single diff-region coverage (75.59% of frame) with a static camera, and it contains 2 cut boundaries; but the annotation measured 0 occlusion events and the containment test returned only mask nesting. The class is carried at coverage_status=NOT_DEMONSTRATED and listed in gaps."
+      },
+      "coverage_status": "NOT_DEMONSTRATED",
+      "pts_start": 7561216,
+      "pts_end_exclusive": 7622656,
+      "start_time_s": 492.266667,
+      "end_time_s_exclusive": 496.266667,
+      "frame_count": 120,
+      "duration_s": 4.0,
+      "annotation_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\annotation_OCC_14768.json",
+      "anchors": [
+        14768,
+        14783,
+        14798,
+        14813,
+        14828,
+        14843,
+        14858,
+        14873
+      ],
+      "anchor_cadence_frames": 15,
+      "roles": [
+        {
+          "role_id": "role_1",
+          "kind_structural": "foreground",
+          "median_area_pct": 14.3247,
+          "first_frame_id": 14768,
+          "last_frame_id": 14858,
+          "mean_predicted_iou": 0.975198,
+          "state_counts": {
+            "visible": 7,
+            "invisible": 1,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_2",
+          "kind_structural": "background",
+          "median_area_pct": 13.3056,
+          "first_frame_id": 14768,
+          "last_frame_id": 14843,
+          "mean_predicted_iou": 0.85397,
+          "state_counts": {
+            "visible": 4,
+            "invisible": 3,
+            "unknown": 1
+          }
+        },
+        {
+          "role_id": "role_3",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 1.2307,
+          "first_frame_id": 14768,
+          "last_frame_id": 14873,
+          "mean_predicted_iou": 0.974996,
+          "state_counts": {
+            "visible": 8,
+            "invisible": 0,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_4",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 0.2799,
+          "first_frame_id": 14768,
+          "last_frame_id": 14858,
+          "mean_predicted_iou": 0.898951,
+          "state_counts": {
+            "visible": 0,
+            "invisible": 1,
+            "unknown": 7
+          }
+        },
+        {
+          "role_id": "role_5",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 0.2001,
+          "first_frame_id": 14798,
+          "last_frame_id": 14798,
+          "mean_predicted_iou": 0.870845,
+          "state_counts": {
+            "visible": 0,
+            "invisible": 7,
+            "unknown": 1
+          }
+        },
+        {
+          "role_id": "role_6",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 0.2001,
+          "first_frame_id": 14858,
+          "last_frame_id": 14858,
+          "mean_predicted_iou": 0.871569,
+          "state_counts": {
+            "visible": 0,
+            "invisible": 7,
+            "unknown": 1
+          }
+        },
+        {
+          "role_id": "role_7",
+          "kind_structural": "background",
+          "median_area_pct": 29.0808,
+          "first_frame_id": 14873,
+          "last_frame_id": 14873,
+          "mean_predicted_iou": 0.989833,
+          "state_counts": {
+            "visible": 1,
+            "invisible": 7,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_8",
+          "kind_structural": "background",
+          "median_area_pct": 24.3954,
+          "first_frame_id": 14873,
+          "last_frame_id": 14873,
+          "mean_predicted_iou": 0.956672,
+          "state_counts": {
+            "visible": 1,
+            "invisible": 7,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_9",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 6.569,
+          "first_frame_id": 14873,
+          "last_frame_id": 14873,
+          "mean_predicted_iou": 0.938475,
+          "state_counts": {
+            "visible": 1,
+            "invisible": 7,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_10",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 4.9023,
+          "first_frame_id": 14873,
+          "last_frame_id": 14873,
+          "mean_predicted_iou": 0.890729,
+          "state_counts": {
+            "visible": 1,
+            "invisible": 7,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_11",
+          "kind_structural": "character",
+          "median_area_pct": 2.2821,
+          "first_frame_id": 14873,
+          "last_frame_id": 14873,
+          "mean_predicted_iou": 0.946849,
+          "state_counts": {
+            "visible": 1,
+            "invisible": 7,
+            "unknown": 0
+          }
+        }
+      ],
+      "contacts": [
+        {
+          "role_a": "role_7",
+          "role_b": "role_8",
+          "anchor_frames": [
+            14873,
+            14873,
+            14873
+          ],
+          "anchor_count": 3
+        },
+        {
+          "role_a": "role_8",
+          "role_b": "role_9",
+          "anchor_frames": [
+            14873,
+            14873
+          ],
+          "anchor_count": 2
+        },
+        {
+          "role_a": "role_10",
+          "role_b": "role_8",
+          "anchor_frames": [
+            14873,
+            14873,
+            14873,
+            14873,
+            14873,
+            14873
+          ],
+          "anchor_count": 6
+        }
+      ],
+      "cuts_inside_window": [
+        {
+          "frame_id": 14768,
+          "pts": 7561216,
+          "pts_time": 492.266667,
+          "scene_score": 0.929572,
+          "offset_in_window": 0
+        },
+        {
+          "frame_id": 14870,
+          "pts": 7613440,
+          "pts_time": 495.666667,
+          "scene_score": 0.936177,
+          "offset_in_window": 102
+        }
+      ],
+      "occlusion_events": [],
+      "exception_count": 19,
+      "exception_kinds": [
+        "low_confidence_mask",
+        "route_a_route_b_disagreement",
+        "uncovered_region"
+      ],
+      "uncovered_by_route_a_pct": [
+        70.8633,
+        70.8672,
+        70.658,
+        70.8581,
+        84.1645,
+        70.8529,
+        83.9744,
+        31.3468
+      ]
+    },
+    {
+      "window_id": "W07_HOLDOUT",
+      "role_in_set": "additional_holdout",
+      "name": "holdout segment (never used for tuning)",
+      "start_frame": 16231,
+      "end_frame_exclusive": 16351,
+      "source_index_space": "reference film",
+      "classes": [
+        "unlabelled_holdout"
+      ],
+      "holdout": true,
+      "annotation_tag": "HOLDOUT_16231",
+      "class_evidence": {
+        "holdout": "no threshold, criterion or calibration in this fixture was derived from this window; all thresholds were fixed before any window was measured"
+      },
+      "pts_start": 8310272,
+      "pts_end_exclusive": 8371712,
+      "start_time_s": 541.033333,
+      "end_time_s_exclusive": 545.033333,
+      "frame_count": 120,
+      "duration_s": 4.0,
+      "annotation_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\annotation_HOLDOUT_16231.json",
+      "anchors": [
+        16231,
+        16246,
+        16261,
+        16276,
+        16291,
+        16306,
+        16321,
+        16336
+      ],
+      "anchor_cadence_frames": 15,
+      "roles": [
+        {
+          "role_id": "role_1",
+          "kind_structural": "background",
+          "median_area_pct": 20.0104,
+          "first_frame_id": 16231,
+          "last_frame_id": 16336,
+          "mean_predicted_iou": 0.971803,
+          "state_counts": {
+            "visible": 8,
+            "invisible": 0,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_2",
+          "kind_structural": "background",
+          "median_area_pct": 17.0007,
+          "first_frame_id": 16231,
+          "last_frame_id": 16336,
+          "mean_predicted_iou": 0.980545,
+          "state_counts": {
+            "visible": 8,
+            "invisible": 0,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_3",
+          "kind_structural": "unclassified",
+          "median_area_pct": 11.8147,
+          "first_frame_id": 16231,
+          "last_frame_id": 16336,
+          "mean_predicted_iou": 0.969033,
+          "state_counts": {
+            "visible": 6,
+            "invisible": 0,
+            "unknown": 2
+          }
+        },
+        {
+          "role_id": "role_4",
+          "kind_structural": "character",
+          "median_area_pct": 9.5503,
+          "first_frame_id": 16231,
+          "last_frame_id": 16321,
+          "mean_predicted_iou": 0.94943,
+          "state_counts": {
+            "visible": 0,
+            "invisible": 1,
+            "unknown": 7
+          }
+        },
+        {
+          "role_id": "role_5",
+          "kind_structural": "character",
+          "median_area_pct": 9.0951,
+          "first_frame_id": 16231,
+          "last_frame_id": 16336,
+          "mean_predicted_iou": 0.957557,
+          "state_counts": {
+            "visible": 0,
+            "invisible": 0,
+            "unknown": 8
+          }
+        },
+        {
+          "role_id": "role_6",
+          "kind_structural": "character",
+          "median_area_pct": 4.8229,
+          "first_frame_id": 16231,
+          "last_frame_id": 16336,
+          "mean_predicted_iou": 0.954068,
+          "state_counts": {
+            "visible": 0,
+            "invisible": 0,
+            "unknown": 8
+          }
+        },
+        {
+          "role_id": "role_7",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 2.4692,
+          "first_frame_id": 16231,
+          "last_frame_id": 16336,
+          "mean_predicted_iou": 0.967517,
+          "state_counts": {
+            "visible": 8,
+            "invisible": 0,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_8",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 1.7227,
+          "first_frame_id": 16231,
+          "last_frame_id": 16336,
+          "mean_predicted_iou": 0.965327,
+          "state_counts": {
+            "visible": 8,
+            "invisible": 0,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_9",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 1.3229,
+          "first_frame_id": 16231,
+          "last_frame_id": 16336,
+          "mean_predicted_iou": 0.934912,
+          "state_counts": {
+            "visible": 8,
+            "invisible": 0,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_10",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 0.7823,
+          "first_frame_id": 16231,
+          "last_frame_id": 16336,
+          "mean_predicted_iou": 0.939156,
+          "state_counts": {
+            "visible": 8,
+            "invisible": 0,
+            "unknown": 0
+          }
+        },
+        {
+          "role_id": "role_11",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 0.2292,
+          "first_frame_id": 16231,
+          "last_frame_id": 16336,
+          "mean_predicted_iou": 0.853119,
+          "state_counts": {
+            "visible": 7,
+            "invisible": 0,
+            "unknown": 1
+          }
+        },
+        {
+          "role_id": "role_12",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 1.2682,
+          "first_frame_id": 16261,
+          "last_frame_id": 16261,
+          "mean_predicted_iou": 0.80362,
+          "state_counts": {
+            "visible": 0,
+            "invisible": 7,
+            "unknown": 1
+          }
+        },
+        {
+          "role_id": "role_13",
+          "kind_structural": "prop_or_detail",
+          "median_area_pct": 1.2668,
+          "first_frame_id": 16321,
+          "last_frame_id": 16336,
+          "mean_predicted_iou": 0.811323,
+          "state_counts": {
+            "visible": 0,
+            "invisible": 6,
+            "unknown": 2
+          }
+        }
+      ],
+      "contacts": [
+        {
+          "role_a": "role_1",
+          "role_b": "role_2",
+          "anchor_frames": [
+            16231,
+            16246,
+            16261,
+            16276,
+            16291,
+            16306,
+            16321,
+            16336
+          ],
+          "anchor_count": 8
+        },
+        {
+          "role_a": "role_1",
+          "role_b": "role_4",
+          "anchor_frames": [
+            16231,
+            16246,
+            16261,
+            16276,
+            16291,
+            16291,
+            16306,
+            16321
+          ],
+          "anchor_count": 8
+        },
+        {
+          "role_a": "role_1",
+          "role_b": "role_6",
+          "anchor_frames": [
+            16231,
+            16246,
+            16261,
+            16276,
+            16291,
+            16291,
+            16306,
+            16321,
+            16336
+          ],
+          "anchor_count": 9
+        },
+        {
+          "role_a": "role_1",
+          "role_b": "role_10",
+          "anchor_frames": [
+            16231,
+            16246,
+            16261,
+            16276,
+            16291,
+            16291,
+            16306,
+            16321,
+            16336
+          ],
+          "anchor_count": 9
+        },
+        {
+          "role_a": "role_2",
+          "role_b": "role_5",
+          "anchor_frames": [
+            16231,
+            16246,
+            16261,
+            16276,
+            16291,
+            16306,
+            16321,
+            16336
+          ],
+          "anchor_count": 8
+        },
+        {
+          "role_a": "role_2",
+          "role_b": "role_7",
+          "anchor_frames": [
+            16231,
+            16246,
+            16261,
+            16276,
+            16291,
+            16306,
+            16321,
+            16336
+          ],
+          "anchor_count": 8
+        },
+        {
+          "role_a": "role_3",
+          "role_b": "role_4",
+          "anchor_frames": [
+            16231,
+            16246,
+            16261,
+            16276,
+            16291,
+            16306,
+            16321
+          ],
+          "anchor_count": 7
+        },
+        {
+          "role_a": "role_3",
+          "role_b": "role_6",
+          "anchor_frames": [
+            16231,
+            16246,
+            16261,
+            16276,
+            16291,
+            16306,
+            16321,
+            16336,
+            16336
+          ],
+          "anchor_count": 9
+        },
+        {
+          "role_a": "role_3",
+          "role_b": "role_7",
+          "anchor_frames": [
+            16231,
+            16246,
+            16261,
+            16276,
+            16291,
+            16306,
+            16321,
+            16336,
+            16336
+          ],
+          "anchor_count": 9
+        },
+        {
+          "role_a": "role_3",
+          "role_b": "role_8",
+          "anchor_frames": [
+            16231,
+            16246,
+            16261,
+            16276,
+            16291,
+            16306,
+            16321,
+            16336,
+            16336
+          ],
+          "anchor_count": 9
+        },
+        {
+          "role_a": "role_11",
+          "role_b": "role_3",
+          "anchor_frames": [
+            16231,
+            16246,
+            16261,
+            16276,
+            16291,
+            16306,
+            16321,
+            16336,
+            16336
+          ],
+          "anchor_count": 9
+        },
+        {
+          "role_a": "role_4",
+          "role_b": "role_9",
+          "anchor_frames": [
+            16231,
+            16246,
+            16261,
+            16276,
+            16291,
+            16306,
+            16321
+          ],
+          "anchor_count": 7
+        },
+        {
+          "role_a": "role_6",
+          "role_b": "role_8",
+          "anchor_frames": [
+            16231,
+            16246,
+            16261,
+            16276,
+            16291,
+            16306,
+            16321,
+            16336
+          ],
+          "anchor_count": 8
+        },
+        {
+          "role_a": "role_10",
+          "role_b": "role_6",
+          "anchor_frames": [
+            16231,
+            16246,
+            16261,
+            16276,
+            16291,
+            16306,
+            16321,
+            16336
+          ],
+          "anchor_count": 8
+        },
+        {
+          "role_a": "role_7",
+          "role_b": "role_8",
+          "anchor_frames": [
+            16231,
+            16246,
+            16261,
+            16276,
+            16291,
+            16306,
+            16321,
+            16336
+          ],
+          "anchor_count": 8
+        },
+        {
+          "role_a": "role_12",
+          "role_b": "role_5",
+          "anchor_frames": [
+            16261
+          ],
+          "anchor_count": 1
+        },
+        {
+          "role_a": "role_1",
+          "role_b": "role_8",
+          "anchor_frames": [
+            16291
+          ],
+          "anchor_count": 1
+        },
+        {
+          "role_a": "role_13",
+          "role_b": "role_5",
+          "anchor_frames": [
+            16321,
+            16336
+          ],
+          "anchor_count": 2
+        }
+      ],
+      "cuts_inside_window": [
+        {
+          "frame_id": 16231,
+          "pts": 8310272,
+          "pts_time": 541.033333,
+          "scene_score": 0.495542,
+          "offset_in_window": 0
+        }
+      ],
+      "occlusion_events": [],
+      "exception_count": 37,
+      "exception_kinds": [
+        "low_confidence_mask",
+        "route_a_route_b_disagreement",
+        "uncovered_region"
+      ],
+      "uncovered_by_route_a_pct": [
+        21.4032,
+        21.4062,
+        20.1506,
+        21.4175,
+        21.1667,
+        21.4136,
+        20.1345,
+        29.6623
+      ]
+    }
+  ],
+  "window_set_summary": {
+    "primary_count": 1,
+    "additional_count": 6,
+    "total_duration_s": 28.0,
+    "within_20_30s": true,
+    "holdout_windows": [
+      "W07_HOLDOUT"
+    ],
+    "classes_covered": [
+      "camera_motion",
+      "contact",
+      "hard_cut",
+      "hold",
+      "overlap_or_occlusion",
+      "prop_interaction",
+      "turn_or_shape_change",
+      "unlabelled_holdout",
+      "walking"
+    ]
+  },
+  "role_inventory": {
+    "method": "per-window SAM 2.1 automatic masks tracked across anchors by IoU; structural kinds from explicit geometry rules. Semantic names are NOT asserted by this fixture for any window except where a cross-referenced project record documents them.",
+    "structural_kind_histogram": {
+      "background": 11,
+      "character": 26,
+      "prop_or_detail": 42,
+      "unclassified": 4,
+      "foreground": 5
+    },
+    "per_window": {
+      "W01_BOOK": [
+        "role_1",
+        "role_2",
+        "role_3",
+        "role_4",
+        "role_5",
+        "role_6",
+        "role_7",
+        "role_8"
+      ],
+      "W02_CUT": [
+        "role_1",
+        "role_2",
+        "role_3",
+        "role_4",
+        "role_5",
+        "role_6",
+        "role_7",
+        "role_8",
+        "role_9",
+        "role_10",
+        "role_11",
+        "role_12",
+        "role_13",
+        "role_14",
+        "role_15",
+        "role_16",
+        "role_17",
+        "role_18",
+        "role_19",
+        "role_20"
+      ],
+      "W03_WALK": [
+        "role_1",
+        "role_2",
+        "role_3",
+        "role_4",
+        "role_5"
+      ],
+      "W04_TURN": [
+        "role_1",
+        "role_2",
+        "role_3",
+        "role_4",
+        "role_5",
+        "role_6"
+      ],
+      "W05_CAMERA": [
+        "role_1",
+        "role_2",
+        "role_3",
+        "role_4",
+        "role_5",
+        "role_6",
+        "role_7",
+        "role_8",
+        "role_9",
+        "role_10",
+        "role_11",
+        "role_12",
+        "role_13",
+        "role_14",
+        "role_15",
+        "role_16",
+        "role_17",
+        "role_18",
+        "role_19",
+        "role_20",
+        "role_21",
+        "role_22",
+        "role_23",
+        "role_24",
+        "role_25"
+      ],
+      "W06_OVERLAP": [
+        "role_1",
+        "role_2",
+        "role_3",
+        "role_4",
+        "role_5",
+        "role_6",
+        "role_7",
+        "role_8",
+        "role_9",
+        "role_10",
+        "role_11"
+      ],
+      "W07_HOLDOUT": [
+        "role_1",
+        "role_2",
+        "role_3",
+        "role_4",
+        "role_5",
+        "role_6",
+        "role_7",
+        "role_8",
+        "role_9",
+        "role_10",
+        "role_11",
+        "role_12",
+        "role_13"
+      ]
+    },
+    "semantic_identification": {
+      "status": "LIMITED",
+      "documented_only_for": "W01_BOOK",
+      "documented_roles": {
+        "man": "supported by the C11 prototype record window/state labels (seated, book)",
+        "book": "supported by the C11 prototype record (seated_book_closed/open)",
+        "two_hands": "REQUIRED by the packet but NOT independently separable in this fixture: see gaps"
+      },
+      "vision_availability": "no vision model was available in this session (native and auxiliary both unavailable), so no semantic label in this fixture is asserted from image inspection"
+    }
+  },
+  "interaction_group": {
+    "id": "G_BOOK_MAN_HANDS",
+    "window": "W01_BOOK",
+    "members_required": [
+      "man",
+      "left_hand",
+      "right_hand",
+      "book"
+    ],
+    "constraint": "while the book is held/open these members are one constrained group: they may not be generated or transformed independently",
+    "structure": "grouped_by_annotation_component: role_3 + role_6 + role_7 + role_2 are linked by measured contact at every anchor 1650..1755 and are treated as one group with a shared transform constraint",
+    "contact_evidence": "annotation_BOOK.json contacts[]",
+    "separation_status": "hands are NOT separately resolved as distinct roles in this fixture; see gaps.hands_not_separable"
+  },
+  "measurements": {
+    "source_statistics_independent_recheck": {
+      "scene_candidates_gt_0.45": 208,
+      "scene_candidates_gt_0.25": 224,
+      "spacing_p50_gt_0.45": 4.1667,
+      "spacing_p90_gt_0.45": 12.8067,
+      "exact_repeat_frames_measured": 3224,
+      "exact_repeat_pct_measured": 8.135,
+      "longest_exact_hold_frames_measured": 59,
+      "locked_profile_expectations": {
+        "score_gt_0.45_expected": 208,
+        "score_gt_0.25_expected": 224,
+        "p50_gt_0.45_expected_s": 4.2,
+        "p90_gt_0.45_expected_s": 12.73,
+        "p50_gt_0.25_expected_s": 4.1,
+        "p90_gt_0.25_expected_s": 11.97
+      },
+      "divergence_note": "candidate counts and spacing reproduce the locked profile; the exact-repeat count (3224 / 8.135%) and longest hold (59) differ from the profile's 2675 / 6.75% and 57. Both numbers are kept; tolerances in this fixture are calibrated on the values MEASURED by this task, and the divergence is recorded rather than hidden."
+    },
+    "per_window_classification": {
+      "BOOK_1650": {
+        "tag": "BOOK_1650",
+        "start_frame": 1650,
+        "end_frame_exclusive": 1770,
+        "frames": 120,
+        "duration_s": 4.0,
+        "held_pct": 97.479,
+        "mad_mean": 0.034486,
+        "mad_max": 1.352361,
+        "gmag_mean_nonheld": 0.052845,
+        "gmag_p90_nonheld": 0.084623,
+        "frac_nonheld_frames_gmag_gt1": 0.0,
+        "centroid_path_px": 18.09,
+        "centroid_path_frac_of_width": 0.0565,
+        "direction_consistency": null,
+        "blob_area_max_px": 667,
+        "blob_area_frac_of_frame": 0.0116,
+        "occlusion_dip_ratio": 1.0,
+        "asymmetric_blob_count_max": 2,
+        "aspect_relative_change": 0.75
+      },
+      "S8B_795": {
+        "tag": "S8B_795",
+        "start_frame": 795,
+        "end_frame_exclusive": 915,
+        "frames": 120,
+        "duration_s": 4.0,
+        "held_pct": 1.681,
+        "mad_mean": 3.053817,
+        "mad_max": 4.683854,
+        "gmag_mean_nonheld": 0.157695,
+        "gmag_p90_nonheld": 0.273308,
+        "frac_nonheld_frames_gmag_gt1": 0.0,
+        "centroid_path_px": 6918.679,
+        "centroid_path_frac_of_width": 21.6209,
+        "direction_consistency": 0.0838,
+        "blob_area_max_px": 1714,
+        "blob_area_frac_of_frame": 0.0298,
+        "occlusion_dip_ratio": 0.9026,
+        "asymmetric_blob_count_max": 27,
+        "aspect_relative_change": 11.2819,
+        "quadrant_agreement_mean": 0.3294,
+        "quadrant_min_shift_mean": 0.151
+      },
+      "S48_7927": {
+        "tag": "S48_7927",
+        "start_frame": 7927,
+        "end_frame_exclusive": 8047,
+        "frames": 120,
+        "duration_s": 4.0,
+        "held_pct": 81.513,
+        "mad_mean": 0.609489,
+        "mad_max": 11.949514,
+        "gmag_mean_nonheld": 0.072417,
+        "gmag_p90_nonheld": 0.106542,
+        "frac_nonheld_frames_gmag_gt1": 0.0,
+        "centroid_path_px": 84.821,
+        "centroid_path_frac_of_width": 0.2651,
+        "direction_consistency": 0.7421,
+        "blob_area_max_px": 2077,
+        "blob_area_frac_of_frame": 0.0361,
+        "occlusion_dip_ratio": 1.0,
+        "asymmetric_blob_count_max": 3,
+        "aspect_relative_change": 0.8151,
+        "quadrant_agreement_mean": 0.006,
+        "quadrant_min_shift_mean": 0.0002
+      },
+      "S31_4212": {
+        "tag": "S31_4212",
+        "start_frame": 4212,
+        "end_frame_exclusive": 4332,
+        "frames": 120,
+        "duration_s": 4.0,
+        "held_pct": 74.79,
+        "mad_mean": 2.324867,
+        "mad_max": 21.145503,
+        "gmag_mean_nonheld": 10.916416,
+        "gmag_p90_nonheld": 7.465974,
+        "frac_nonheld_frames_gmag_gt1": 0.7667,
+        "centroid_path_px": 988.801,
+        "centroid_path_frac_of_width": 3.09,
+        "direction_consistency": 0.491,
+        "blob_area_max_px": 5805,
+        "blob_area_frac_of_frame": 0.1008,
+        "occlusion_dip_ratio": 1.0,
+        "asymmetric_blob_count_max": 48,
+        "aspect_relative_change": 4.5931,
+        "quadrant_agreement_mean": 0.3105,
+        "quadrant_min_shift_mean": 2.2837
+      },
+      "S90_14768": {
+        "tag": "S90_14768",
+        "start_frame": 14768,
+        "end_frame_exclusive": 14888,
+        "frames": 120,
+        "duration_s": 4.0,
+        "held_pct": 77.311,
+        "mad_mean": 1.546967,
+        "mad_max": 106.815781,
+        "gmag_mean_nonheld": 2.445939,
+        "gmag_p90_nonheld": 0.264242,
+        "frac_nonheld_frames_gmag_gt1": 0.037,
+        "centroid_path_px": 326.107,
+        "centroid_path_frac_of_width": 1.0191,
+        "direction_consistency": 0.2402,
+        "blob_area_max_px": 43538,
+        "blob_area_frac_of_frame": 0.7559,
+        "occlusion_dip_ratio": 1.0,
+        "asymmetric_blob_count_max": 6,
+        "aspect_relative_change": 1.3077,
+        "quadrant_agreement_mean": 0.0179,
+        "quadrant_min_shift_mean": 0.6467
+      },
+      "S206_34985": {
+        "tag": "S206_34985",
+        "start_frame": 34985,
+        "end_frame_exclusive": 35105,
+        "frames": 120,
+        "duration_s": 4.0,
+        "held_pct": 94.118,
+        "mad_mean": 0.043976,
+        "mad_max": 0.645226,
+        "gmag_mean_nonheld": 0.016362,
+        "gmag_p90_nonheld": 0.017907,
+        "frac_nonheld_frames_gmag_gt1": 0.0,
+        "centroid_path_px": 0.341,
+        "centroid_path_frac_of_width": 0.0011,
+        "direction_consistency": null,
+        "blob_area_max_px": 188,
+        "blob_area_frac_of_frame": 0.0033,
+        "occlusion_dip_ratio": 1.0,
+        "asymmetric_blob_count_max": 4,
+        "aspect_relative_change": 0.0,
+        "quadrant_agreement_mean": 0.002,
+        "quadrant_min_shift_mean": 0.0001
+      },
+      "R05_32314": {
+        "tag": "R05_32314",
+        "start_frame": 32314,
+        "end_frame_exclusive": 32434,
+        "frames": 120,
+        "duration_s": 4.0,
+        "held_pct": 100.0,
+        "mad_mean": 0.012246,
+        "mad_max": 0.134219,
+        "gmag_mean_nonheld": null,
+        "gmag_p90_nonheld": null,
+        "frac_nonheld_frames_gmag_gt1": null,
+        "centroid_path_px": 0.23,
+        "centroid_path_frac_of_width": 0.0007,
+        "direction_consistency": null,
+        "blob_area_max_px": 64,
+        "blob_area_frac_of_frame": 0.0011,
+        "occlusion_dip_ratio": 1.0,
+        "asymmetric_blob_count_max": 1,
+        "aspect_relative_change": 0.0,
+        "quadrant_agreement_mean": null,
+        "quadrant_min_shift_mean": null
+      },
+      "R02_2916": {
+        "tag": "R02_2916",
+        "start_frame": 2916,
+        "end_frame_exclusive": 3036,
+        "frames": 120,
+        "duration_s": 4.0,
+        "held_pct": 99.16,
+        "mad_mean": 0.44594,
+        "mad_max": 52.566771,
+        "gmag_mean_nonheld": 61.296068,
+        "gmag_p90_nonheld": 61.296068,
+        "frac_nonheld_frames_gmag_gt1": 1.0,
+        "centroid_path_px": 0.0,
+        "centroid_path_frac_of_width": 0.0,
+        "direction_consistency": null,
+        "blob_area_max_px": 29786,
+        "blob_area_frac_of_frame": 0.5171,
+        "occlusion_dip_ratio": 1.0,
+        "asymmetric_blob_count_max": 1,
+        "aspect_relative_change": 0.0,
+        "quadrant_agreement_mean": 0.0033,
+        "quadrant_min_shift_mean": 0.246
+      }
+    }
+  },
+  "style_contract": {
+    "may_change": [
+      "character identity",
+      "face",
+      "hair",
+      "clothing",
+      "materials",
+      "palette",
+      "background design",
+      "prop design"
+    ],
+    "must_not_change": [
+      "scale",
+      "layout / framing",
+      "silhouette envelope",
+      "grip / touch contact geometry",
+      "shot order and cut frames",
+      "frame count, timing and original audio",
+      "z-order and visibility intervals"
+    ],
+    "hard_constraints": [
+      "no renderer may redefine what 'correct' means",
+      "a palette-only or histogram-only change is NOT a reskin and may not be presented as one",
+      "source watermark/logo pixels are source-only and must not be reproduced"
+    ],
+    "provenance": "derived from docs/pm/TARGET_PROFILE_2D_SOURCE_LOCKED.md sections 2 and 5, and the locked reference profile on this machine"
+  },
+  "keyframes": {
+    "spec_artifact": "KEYFRAME_SPEC.md",
+    "aligned_source_keyframes": "per-window anchor PNGs under probe/annotation/<tag>/ and sheets under probe/sheets/",
+    "role_references": "per-role masked cutouts derived from the source at the anchor where the role is largest",
+    "imported_existing_reference": {
+      "artifact": "PROTOTYPE_A stills + PROTOTYPE_A_diagnostic_4s_source-audio.mp4",
+      "sha256": "dee47afcb5e12aff48076df6b59d84f527af4a0d9be9403550ae99a9e71755fb",
+      "scope": "hand-only overlay diagnostic aligned to the SAME window (C11 frame N = film frame N+1200); useful as an alignment reference only, never as reskin artwork"
+    },
+    "new_identity_artwork": {
+      "status": "NOT PRODUCED",
+      "reason": "UNMET DEPENDENCY: no image-editing or generative provider is callable and verifiable on this machine in this session",
+      "evidence": "ComfyUI is not running (127.0.0.1:8188 closed); no diffusion checkpoint files (.ckpt/.safetensors) found on disk; no vision model available"
+    }
+  },
+  "gaps": {
+    "hands_not_separable": "the packet requires man + TWO hands + book as one group, and per-role masks for all roles present. At 640x360 in this flat-colour source the two hands are not resolved as two distinct roles by either route; they appear inside the character/held-object group. Recorded as an unmet role-resolution dependency, not silently merged.",
+    "vision_unavailable": "no semantic inspection of any frame was possible; all labels are structural or come from cross-referenced project records",
+    "between_anchor_frames_not_annotated": "annotation exists at the declared anchor cadence only; frames between anchors are an explicit gap, not interpolated",
+    "uncovered_by_route_a": "SAM 2.1 automatic masks leave flat background regions uncovered (per-anchor uncovered_pct recorded); route B colour regions cover those pixels at lower confidence - they are NOT silently treated as background",
+    "overlap_occlusion_class": "PARTIAL - NOT DEMONSTRATED. The source is documented (locked profile) to contain occlusion (props in front of the torso, characters crossing/grouping), and W01_BOOK is a real prop-held-in-front-of-body scene. But this fixture did NOT measure an occlusion event: the annotated windows produced 0 occlusion events, and the containment test returns only SAM2 mask nesting (whole-object plus part masks), which occurs with no occlusion present. Z-order is therefore recorded as unresolved rather than guessed.",
+    "mask_count_is_not_role_count": "MEASURED: SAM 2.1 automatic mask generation returns nested masks, so on this source mask_count (3..25 across anchors) is NOT the role count. Any downstream task comparing role counts to mask counts will be wrong; see relations_<tag>.json measured_nesting.",
+    "camera_motion_class_basis": "camera_motion is asserted ONLY where every quadrant shifts together (quadrant_min_shift_mean > 1 px). On this film that is rare: only 318 of 39634 frames (0.80%) show >1 px global shift on non-held frames, so the class rests on a small number of windows and this scarcity is a property of the film, not of the fixture.",
+    "provisional_risk_loops_unreliable": "The locked profile's provisional REF-R02/R04/R05 windows are marked 'to be snapped to canonical frame IDs'. Measured here: the R05 window (film 32314-32434) is 100.0% low-change and R02 (film 2916-3036) is 99.16% low-change - i.e. they land on static holds, not on the motion the profile intends to cover. They were therefore NOT used as benchmark windows.",
+    "low_change_metric_definition": "'held_pct' in this fixture means mad <= 0.5 on a 320x180 grayscale difference, i.e. near-static, NOT bit-identical. Bit-identical repeat frames are reported separately as exact_repeat_frames_measured."
+  },
+  "assertions": [
+    {
+      "name": "ref_film_A_sha_matches_pin",
+      "passed": true
+    },
+    {
+      "name": "ref_film_B_sha_matches_pin",
+      "passed": true
+    },
+    {
+      "name": "ref_film_A_and_B_identical",
+      "passed": true
+    },
+    {
+      "name": "ref_decoded_frames_39634",
+      "passed": true
+    },
+    {
+      "name": "demo_offset_proven",
+      "passed": true
+    },
+    {
+      "name": "scene_candidates_208_gt045",
+      "passed": true
+    },
+    {
+      "name": "scene_candidates_224_gt025",
+      "passed": true
+    }
+  ],
+  "freeze": {
+    "frozen": true,
+    "freeze_hash_sha256": "2c558ce19e0a9d915d860dc07843bd1412ac4a7801284cca5293ea21cbfba684",
+    "hash_scope": "canonical JSON of this object with the 'freeze' key removed",
+    "canonicalization": "json.dumps(sort_keys=True, separators=(',',':'), ensure_ascii=False)",
+    "frozen_at_utc": "2026-09-17T11:43:36Z",
+    "frozen_before": "any candidate render for the MF-RESKIN-V1 wave",
+    "hash_of_fixture_bytes_sha256": null
+  }
+}

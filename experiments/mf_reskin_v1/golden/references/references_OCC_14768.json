@@ -1,0 +1,298 @@
+{
+  "tag": "OCC_14768",
+  "source_film": "C:\\Users\\Admin\\MotionForge2D\\projects\\2dc14177a212\\Tại_sao_thật_tệ_khi_ĐỨNG_TÊN_HỘ_công_ty_.mp4",
+  "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
+  "keyframes": [
+    {
+      "frame_id": 14768,
+      "keyframe_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\keyframes\\keyframe_f14768.png",
+      "keyframe_sha256": "1f9f9d40750e8e2dc2e4e7a93b4aae6e21379ed2d749416b0397109dfe17cb89",
+      "mask_index_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\maskindex_f14768.png",
+      "mask_index_sha256": "bc3d170278d0151100136bfe9e8a35f1ec01ba493bfad4a4b52d3c2808e698d0"
+    },
+    {
+      "frame_id": 14783,
+      "keyframe_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\keyframes\\keyframe_f14783.png",
+      "keyframe_sha256": "c5b54a4e20a30501c3f76f8817251ae42b59984d82fbdb3790789b4989de4418",
+      "mask_index_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\maskindex_f14783.png",
+      "mask_index_sha256": "fd1636667c480ddc506fded9aa3c2a760c92772ba5e7c849f60747497d3d2fd9"
+    },
+    {
+      "frame_id": 14798,
+      "keyframe_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\keyframes\\keyframe_f14798.png",
+      "keyframe_sha256": "d170ef76f4599d0b6b4332777153f1c860558b69411402682d37a6df87498443",
+      "mask_index_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\maskindex_f14798.png",
+      "mask_index_sha256": "6e6f2b5742c7c5319752f1250747dd905dc0abae0177a0bca660786744cc299f"
+    },
+    {
+      "frame_id": 14813,
+      "keyframe_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\keyframes\\keyframe_f14813.png",
+      "keyframe_sha256": "a4ff2ce25bfdddf67d2f848195a742d2eb5963334d4f000e69baa8d5a6bf5b3b",
+      "mask_index_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\maskindex_f14813.png",
+      "mask_index_sha256": "600c94021a941141d022ae1170a51101ec931898a3e5e189a1fae288b85b75fb"
+    },
+    {
+      "frame_id": 14828,
+      "keyframe_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\keyframes\\keyframe_f14828.png",
+      "keyframe_sha256": "7e2968740fa4546383f36cf1abd6855520fdfee9e2f0c2cde1f9e43c19aefbef",
+      "mask_index_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\maskindex_f14828.png",
+      "mask_index_sha256": "633bc44fefa4e6add5c574dddd15ede7882beb306a99b5d2683dd388b30f3a63"
+    },
+    {
+      "frame_id": 14843,
+      "keyframe_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\keyframes\\keyframe_f14843.png",
+      "keyframe_sha256": "7b1d43258840d509cbdf936353287dabc5362a14c995fedf73662a33ef7a7876",
+      "mask_index_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\maskindex_f14843.png",
+      "mask_index_sha256": "6207937ac16c13c7ce5407a055de0817c7ad3f4efba193519162db3ff7776a04"
+    },
+    {
+      "frame_id": 14858,
+      "keyframe_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\keyframes\\keyframe_f14858.png",
+      "keyframe_sha256": "e6cc324a93d573f0c5bc9f8e53868cc3fb28e40308eb1788d5a4b5297e668b07",
+      "mask_index_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\maskindex_f14858.png",
+      "mask_index_sha256": "e3366ddacd15fcd1a551a9d64d8a5393d0be64e27861ae3da7a52d394caced0e"
+    },
+    {
+      "frame_id": 14873,
+      "keyframe_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\keyframes\\keyframe_f14873.png",
+      "keyframe_sha256": "cbdf37225dd92a3142e9bd068f103b8a83fc6e61ce660c04e01af92d9e4dda60",
+      "mask_index_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\maskindex_f14873.png",
+      "mask_index_sha256": "45bb7211236d07a758175e5750762a1d34b72ea7823b27b4f190c3f37cfe2256"
+    }
+  ],
+  "role_references": [
+    {
+      "role_id": "role_1",
+      "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_1_f14843.png",
+      "reference_sha256": "dee070fe54fea06960a4f5383d1f84c05e458968bcf594a4aed58013a30e75f7",
+      "source_frame_id": 14843,
+      "source_pts": 7599616,
+      "source_pts_time": 494.766667,
+      "mask_area_px": 33018,
+      "area_pct": 14.3307,
+      "bbox_xywh": [
+        93,
+        0,
+        114,
+        340
+      ],
+      "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\maskindex_f14843.png",
+      "provenance": {
+        "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+      }
+    },
+    {
+      "role_id": "role_10",
+      "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_10_f14873.png",
+      "reference_sha256": "85323d710be5c2f01fb34a9a0213981eef5d2f06d383ea86bfece63de020632e",
+      "source_frame_id": 14873,
+      "source_pts": 7614976,
+      "source_pts_time": 495.766667,
+      "mask_area_px": 9352,
+      "area_pct": 4.059,
+      "bbox_xywh": [
+        464,
+        304,
+        175,
+        55
+      ],
+      "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\maskindex_f14873.png",
+      "provenance": {
+        "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+      }
+    },
+    {
+      "role_id": "role_11",
+      "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_11_f14873.png",
+      "reference_sha256": "fd59c6cf390f8b13a819db545ffb845f5d73f42ddf0a6178c73e78ac0f88359f",
+      "source_frame_id": 14873,
+      "source_pts": 7614976,
+      "source_pts_time": 495.766667,
+      "mask_area_px": 5258,
+      "area_pct": 2.2821,
+      "bbox_xywh": [
+        326,
+        202,
+        63,
+        105
+      ],
+      "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\maskindex_f14873.png",
+      "provenance": {
+        "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+      }
+    },
+    {
+      "role_id": "role_2",
+      "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_2_f14768.png",
+      "reference_sha256": "2e930a9570940a48fd33bbc76567192d4124d6ee60d9ce3cf88d1a412af236a7",
+      "source_frame_id": 14768,
+      "source_pts": 7561216,
+      "source_pts_time": 492.266667,
+      "mask_area_px": 30672,
+      "area_pct": 13.3125,
+      "bbox_xywh": [
+        193,
+        1,
+        446,
+        357
+      ],
+      "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\maskindex_f14768.png",
+      "provenance": {
+        "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+      }
+    },
+    {
+      "role_id": "role_3",
+      "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_3_f14873.png",
+      "reference_sha256": "e7c2e7bd3cc2b9a69e4d2a2d413546e00b61fc11a89e9c701ca8e1dc7f868807",
+      "source_frame_id": 14873,
+      "source_pts": 7614976,
+      "source_pts_time": 495.766667,
+      "mask_area_px": 2931,
+      "area_pct": 1.2721,
+      "bbox_xywh": [
+        9,
+        304,
+        66,
+        45
+      ],
+      "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\maskindex_f14873.png",
+      "provenance": {
+        "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+      }
+    },
+    {
+      "role_id": "role_4",
+      "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_4_f14813.png",
+      "reference_sha256": "f1ff255f6cdd54a9cbd3688b2ae02d1b9a8c824e7dfecf88d05acd3d583f0266",
+      "source_frame_id": 14813,
+      "source_pts": 7584256,
+      "source_pts_time": 493.766667,
+      "mask_area_px": 646,
+      "area_pct": 0.2804,
+      "bbox_xywh": [
+        329,
+        114,
+        52,
+        12
+      ],
+      "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\maskindex_f14813.png",
+      "provenance": {
+        "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+      }
+    },
+    {
+      "role_id": "role_5",
+      "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_5_f14798.png",
+      "reference_sha256": "38a9ae1146b3cd5bb66fdd24258b7579ec01c54e6676a85628d7afe8b58e1979",
+      "source_frame_id": 14798,
+      "source_pts": 7576576,
+      "source_pts_time": 493.266667,
+      "mask_area_px": 461,
+      "area_pct": 0.2001,
+      "bbox_xywh": [
+        436,
+        113,
+        37,
+        13
+      ],
+      "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\maskindex_f14798.png",
+      "provenance": {
+        "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+      }
+    },
+    {
+      "role_id": "role_6",
+      "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_6_f14858.png",
+      "reference_sha256": "38a9ae1146b3cd5bb66fdd24258b7579ec01c54e6676a85628d7afe8b58e1979",
+      "source_frame_id": 14858,
+      "source_pts": 7607296,
+      "source_pts_time": 495.266667,
+      "mask_area_px": 461,
+      "area_pct": 0.2001,
+      "bbox_xywh": [
+        436,
+        113,
+        37,
+        13
+      ],
+      "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\maskindex_f14858.png",
+      "provenance": {
+        "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+      }
+    },
+    {
+      "role_id": "role_7",
+      "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_7_f14873.png",
+      "reference_sha256": "38c105ac1301f7db9367c5bdef684a21ed5dc1c65c0209ee6ebb053a43e236aa",
+      "source_frame_id": 14873,
+      "source_pts": 7614976,
+      "source_pts_time": 495.766667,
+      "mask_area_px": 66944,
+      "area_pct": 29.0608,
+      "bbox_xywh": [
+        0,
+        1,
+        639,
+        231
+      ],
+      "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\maskindex_f14873.png",
+      "provenance": {
+        "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+      }
+    },
+    {
+      "role_id": "role_8",
+      "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_8_f14873.png",
+      "reference_sha256": "856d9f241e341791316f8c308e514b7f51aa877200f85ac2483732723824c69d",
+      "source_frame_id": 14873,
+      "source_pts": 7614976,
+      "source_pts_time": 495.766667,
+      "mask_area_px": 56164,
+      "area_pct": 24.3806,
+      "bbox_xywh": [
+        0,
+        71,
+        639,
+        266
+      ],
+      "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\maskindex_f14873.png",
+      "provenance": {
+        "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+      }
+    },
+    {
+      "role_id": "role_9",
+      "reference_png": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_9_f14873.png",
+      "reference_sha256": "e972cb0adac731658714797e1d86516f27fa1c87953ca1ef6b4c81a180bf13bd",
+      "source_frame_id": 14873,
+      "source_pts": 7614976,
+      "source_pts_time": 495.766667,
+      "mask_area_px": 15135,
+      "area_pct": 6.569,
+      "bbox_xywh": [
+        0,
+        181,
+        247,
+        74
+      ],
+      "derived_from_mask_artifact": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\maskindex_f14873.png",
+      "provenance": {
+        "source_film_sha256": "5A175454C2C2965BAC5013A53926E210A9F70A185D802D0F2E0083A6FB399FA2",
+        "derivation": "exact source frame decoded by frame number; RGBA cutout = frame pixels where the SAM2 mask index equals this role's index"
+      }
+    }
+  ],
+  "role_count": 11,
+  "note": "These are SOURCE-derived alignment references, not reskin artwork. They exist so a downstream candidate can be compared against the source silhouette/appearance per role. No new identity is created here."
+}

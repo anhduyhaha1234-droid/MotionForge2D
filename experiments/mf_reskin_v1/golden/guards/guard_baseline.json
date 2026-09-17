@@ -1,0 +1,1442 @@
+{
+  "taken_at_utc": "2026-09-17T11:50:40Z",
+  "git": {
+    "head": "2594de06cd5b2355e7e874ae4d6deb8a7b5b1b64",
+    "branch": "codex/mf-reskin-v1-golden",
+    "porcelain": "",
+    "porcelain_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "porcelain_line_count": 0,
+    "tracked_file_count": 1837,
+    "diff_stat": "",
+    "diff_cached_stat": ""
+  },
+  "roots": {
+    "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden": [
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\commands.jsonl",
+        "rel": "ledger/commands.jsonl",
+        "size": 36988,
+        "mtime": 1789645416,
+        "sha256": "4bc13417c63c342bcedae38356aa13d7584603ae4d85d0b006ea93f321d3b106",
+        "lines": 59
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T111637_probe_clip4_container.txt",
+        "rel": "ledger/raw/20260917T111637_probe_clip4_container.txt",
+        "size": 4984,
+        "mtime": 1789643797,
+        "sha256": "9020c72a72a2e5ef18332a423161605e555ddc9d05634a34bd36e2fc3007c549",
+        "lines": 142
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T111637_probe_demo_container.txt",
+        "rel": "ledger/raw/20260917T111637_probe_demo_container.txt",
+        "size": 5209,
+        "mtime": 1789643797,
+        "sha256": "2a959009609b16e4db1f264be5a3d297df783f6f9c174a558a83b649163d686a",
+        "lines": 148
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T111637_probe_refB_container.txt",
+        "rel": "ledger/raw/20260917T111637_probe_refB_container.txt",
+        "size": 5156,
+        "mtime": 1789643797,
+        "sha256": "a3d3cdcad0437b871818b88c170486b68a528d82663b43853784b9ec3ddeb3df",
+        "lines": 147
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T111637_probe_ref_container.txt",
+        "rel": "ledger/raw/20260917T111637_probe_ref_container.txt",
+        "size": 5156,
+        "mtime": 1789643797,
+        "sha256": "404f28e6fe660854293f5a3bb94684d19c48ba675a42ecd4f5b92029d9c72d60",
+        "lines": 147
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T111659_probe_ref_count_frames.txt",
+        "rel": "ledger/raw/20260917T111659_probe_ref_count_frames.txt",
+        "size": 1302,
+        "mtime": 1789643824,
+        "sha256": "32480192e60d6718989d88b76b085996af953ed3abc40fa61e60ea6e4cb2b5be",
+        "lines": 35
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T111700_detect_scene_changes_raw.txt",
+        "rel": "ledger/raw/20260917T111700_detect_scene_changes_raw.txt",
+        "size": 2351,
+        "mtime": 1789643822,
+        "sha256": "b6bf521f48e50661c2b0f539cc57b81f7e453eecca592f2ac45cbdfb37c3fe07",
+        "lines": 35
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T112647_verify_book_window_stills.txt",
+        "rel": "ledger/raw/20260917T112647_verify_book_window_stills.txt",
+        "size": 720,
+        "mtime": 1789644408,
+        "sha256": "1fb4570958c183246d1210f34bd246edf95a9bd4e723524e75e57ca2bf350aab",
+        "lines": 14
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T112707_locate_still_frame450.txt",
+        "rel": "ledger/raw/20260917T112707_locate_still_frame450.txt",
+        "size": 1485,
+        "mtime": 1789644445,
+        "sha256": "aee05a798a74bb8c8a865a5dd56c5fff82a5b92fdf1d5a0b33ace8ce7fc7603e",
+        "lines": 49
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T112738_locate_prototypeA450_in_demo30s.txt",
+        "rel": "ledger/raw/20260917T112738_locate_prototypeA450_in_demo30s.txt",
+        "size": 1343,
+        "mtime": 1789644459,
+        "sha256": "898c41bfd9ae352f459c9f89b26632f83c950fbfcec75f8338ca89be172224fc",
+        "lines": 41
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T112739_locate_demo_f0_in_ref.txt",
+        "rel": "ledger/raw/20260917T112739_locate_demo_f0_in_ref.txt",
+        "size": 1118,
+        "mtime": 1789644478,
+        "sha256": "b6cbcbb8ef680f794beb39646507d71b6736213a918222603a5d65d5e0a8e28a",
+        "lines": 41
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T112917_verify_demo_offset.txt",
+        "rel": "ledger/raw/20260917T112917_verify_demo_offset.txt",
+        "size": 652,
+        "mtime": 1789644558,
+        "sha256": "747d6ca446ba10acac027f7f7da29307518d60f6669de580df73580b5a62f73a",
+        "lines": 16
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T112919_sam2_probe_frame1650.txt",
+        "rel": "ledger/raw/20260917T112919_sam2_probe_frame1650.txt",
+        "size": 939,
+        "mtime": 1789644564,
+        "sha256": "09827b15c6f5d854c06e775ab0c75183f4eece96ff0d30e24c0e7e752af99d90",
+        "lines": 19
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T113034_verify_demo_offset.txt",
+        "rel": "ledger/raw/20260917T113034_verify_demo_offset.txt",
+        "size": 592,
+        "mtime": 1789644636,
+        "sha256": "40bb919005cca33fa896bb89f5929849a66fb59de2b04ca243cd32703439a646",
+        "lines": 14
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T113057_verify_demo_offset.txt",
+        "rel": "ledger/raw/20260917T113057_verify_demo_offset.txt",
+        "size": 768,
+        "mtime": 1789644659,
+        "sha256": "31c893179ed261c9985d24aecd2c0e3291a7c29af26bf6158d1ba34a490f5bac",
+        "lines": 15
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T113123_verify_demo_offset.txt",
+        "rel": "ledger/raw/20260917T113123_verify_demo_offset.txt",
+        "size": 1012,
+        "mtime": 1789644685,
+        "sha256": "481aaa5541f6f399600417db3bc30274341931f8830a041a81f2feab373eed37",
+        "lines": 22
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T113145_verify_demo_offset.txt",
+        "rel": "ledger/raw/20260917T113145_verify_demo_offset.txt",
+        "size": 1011,
+        "mtime": 1789644707,
+        "sha256": "7e998787095a31fc6504a4e1869f82e0b5ccb84f723ec7e17829318292b1a321",
+        "lines": 22
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T113233_sam2_probe_frame1650.txt",
+        "rel": "ledger/raw/20260917T113233_sam2_probe_frame1650.txt",
+        "size": 2946,
+        "mtime": 1789644760,
+        "sha256": "3df9824d8d81ead5e3c8f82fb41fc82d11adaefe4083a112e0f63b1230287b14",
+        "lines": 137
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T113418_series_BOOKWIN_film1650_1770.txt",
+        "rel": "ledger/raw/20260917T113418_series_BOOKWIN_film1650_1770.txt",
+        "size": 582,
+        "mtime": 1789644858,
+        "sha256": "dee74e58e400fa003e929ee308930d48d07fab20c3327f69c30494db00c02e7e",
+        "lines": 10
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T113448_series_WHOLEFILM.txt",
+        "rel": "ledger/raw/20260917T113448_series_WHOLEFILM.txt",
+        "size": 591,
+        "mtime": 1789644922,
+        "sha256": "61204b54f74df19c5d3332bcf56b6bf7dbb9fb8bedc5fc537e979559fd50a382",
+        "lines": 10
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T113619_analyze_shot_metrics.txt",
+        "rel": "ledger/raw/20260917T113619_analyze_shot_metrics.txt",
+        "size": 2173,
+        "mtime": 1789644979,
+        "sha256": "04f65df885c412db558b122561230206fece2fb421291b103aae581d48098c7d",
+        "lines": 31
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T113707_classify_candidates.txt",
+        "rel": "ledger/raw/20260917T113707_classify_candidates.txt",
+        "size": 879,
+        "mtime": 1789645028,
+        "sha256": "3b0d427432a812a88fc0cc2cd90ad31906ff21fb1322e8017cb9e6b4eeb700e8",
+        "lines": 10
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T113708_classify_candidates.txt",
+        "rel": "ledger/raw/20260917T113708_classify_candidates.txt",
+        "size": 869,
+        "mtime": 1789645028,
+        "sha256": "8e83aade19581f83c14f6e5a73244c036ce14815d3dfc3f7ef18b5694e66ec46",
+        "lines": 10
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T113757_classify_candidates.txt",
+        "rel": "ledger/raw/20260917T113757_classify_candidates.txt",
+        "size": 950,
+        "mtime": 1789645078,
+        "sha256": "6579baeaa5887e89b52c7a8d43033732ff657a01f6693bff2605f2cc457edbfe",
+        "lines": 10
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T113758_classify_candidates.txt",
+        "rel": "ledger/raw/20260917T113758_classify_candidates.txt",
+        "size": 957,
+        "mtime": 1789645079,
+        "sha256": "bd3bfb6a2f2fdacc661fddb07e7ad779b413bb9c0f9dcb45348f5dcc626adc07",
+        "lines": 10
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T113759_classify_candidates.txt",
+        "rel": "ledger/raw/20260917T113759_classify_candidates.txt",
+        "size": 950,
+        "mtime": 1789645080,
+        "sha256": "2fbcef04dfd17317e5cd91bcc1d36bcc4d3e4c06fcffde8740fadc2e03700632",
+        "lines": 10
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T113800_classify_candidates.txt",
+        "rel": "ledger/raw/20260917T113800_classify_candidates.txt",
+        "size": 942,
+        "mtime": 1789645080,
+        "sha256": "a60bcea05e02dd7e3ca96cb64d66530029d7f23e177bd7d56c1f7762850fff3d",
+        "lines": 10
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T113801_classify_candidates.txt",
+        "rel": "ledger/raw/20260917T113801_classify_candidates.txt",
+        "size": 955,
+        "mtime": 1789645081,
+        "sha256": "a6e250378a84faa4bd33ca8fde3cc45f17a6c23cc2238e763b53962913d1a79c",
+        "lines": 10
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T113850_classify_candidates.txt",
+        "rel": "ledger/raw/20260917T113850_classify_candidates.txt",
+        "size": 963,
+        "mtime": 1789645131,
+        "sha256": "4b8fd0344ea640f380375f006a22759f77268050bb2958e820db249f23b197e2",
+        "lines": 10
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T113851_classify_candidates.txt",
+        "rel": "ledger/raw/20260917T113851_classify_candidates.txt",
+        "size": 966,
+        "mtime": 1789645132,
+        "sha256": "e2829a4e8c545c264d0a46a242835967ccd239dc9fa901a7a2045898e0bf74ba",
+        "lines": 10
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T113852_classify_candidates.txt",
+        "rel": "ledger/raw/20260917T113852_classify_candidates.txt",
+        "size": 939,
+        "mtime": 1789645133,
+        "sha256": "2d43c6382a76d28bf7dc0bc7f63673bb1357441f98d25f1b45752e3720cea0a4",
+        "lines": 10
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T113853_classify_candidates.txt",
+        "rel": "ledger/raw/20260917T113853_classify_candidates.txt",
+        "size": 955,
+        "mtime": 1789645133,
+        "sha256": "a6e250378a84faa4bd33ca8fde3cc45f17a6c23cc2238e763b53962913d1a79c",
+        "lines": 10
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T113956_annotate_BOOK.txt",
+        "rel": "ledger/raw/20260917T113956_annotate_BOOK.txt",
+        "size": 832,
+        "mtime": 1789645207,
+        "sha256": "909a07bfa99c6ba968f1f43129ccd336a6a0f739b436118677df36bea4d9a9c0",
+        "lines": 18
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T114059_annotate_window.txt",
+        "rel": "ledger/raw/20260917T114059_annotate_window.txt",
+        "size": 832,
+        "mtime": 1789645270,
+        "sha256": "0c6c59e476d1498b6f29921e75895ee7b7d5f3ae6c26580f02d1472777ce500d",
+        "lines": 18
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T114110_annotate_window.txt",
+        "rel": "ledger/raw/20260917T114110_annotate_window.txt",
+        "size": 851,
+        "mtime": 1789645280,
+        "sha256": "cc4ef0187b58382fdeca1e065314b385f0ae6255c8644f4a765d16effffabedb",
+        "lines": 18
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T114120_annotate_window.txt",
+        "rel": "ledger/raw/20260917T114120_annotate_window.txt",
+        "size": 831,
+        "mtime": 1789645291,
+        "sha256": "420b49d8e0887645a01d635a49714fca6a76997c7c417ce33f84cd298bea4785",
+        "lines": 18
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T114131_annotate_window.txt",
+        "rel": "ledger/raw/20260917T114131_annotate_window.txt",
+        "size": 850,
+        "mtime": 1789645302,
+        "sha256": "3e7c1f156609edc987a6b435a683fcfe904d791d33aab2ffa388da08ec1d287d",
+        "lines": 18
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T114142_annotate_window.txt",
+        "rel": "ledger/raw/20260917T114142_annotate_window.txt",
+        "size": 864,
+        "mtime": 1789645312,
+        "sha256": "5e95f258ca36e12725040e458d60a168fb7170e681f10b73e22e6c8a6325c39f",
+        "lines": 18
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T114152_annotate_window.txt",
+        "rel": "ledger/raw/20260917T114152_annotate_window.txt",
+        "size": 888,
+        "mtime": 1789645322,
+        "sha256": "a2c7e641e2f2214802408dcffed35fc69bf338adfb53fcfd7b8f67300e9ed497",
+        "lines": 18
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T114240_measure_role_relations.txt",
+        "rel": "ledger/raw/20260917T114240_measure_role_relations.txt",
+        "size": 9815,
+        "mtime": 1789645361,
+        "sha256": "8c17d52aea75ea2534fe09acb453b833b59355f3d1c3d7a586001150e6ac6b5b",
+        "lines": 230
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T114336_build_fixture.txt",
+        "rel": "ledger/raw/20260917T114336_build_fixture.txt",
+        "size": 811,
+        "mtime": 1789645416,
+        "sha256": "fc1611e71bfdb394902408ccfa059322b63c5813f68f19ba5b1dccb882644478",
+        "lines": 28
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T114336_measure_role_relations.txt",
+        "rel": "ledger/raw/20260917T114336_measure_role_relations.txt",
+        "size": 9815,
+        "mtime": 1789645416,
+        "sha256": "8c17d52aea75ea2534fe09acb453b833b59355f3d1c3d7a586001150e6ac6b5b",
+        "lines": 230
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\GOLDEN_FIXTURE.json",
+        "rel": "probe/GOLDEN_FIXTURE.json",
+        "size": 83675,
+        "mtime": 1789645416,
+        "sha256": "7e1627e4c8c2421e77758b48f0c003c23d0b8b2f50fc73bc2118bc6b06cd0dab",
+        "lines": 2886
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\SOURCE_PROBE.json",
+        "rel": "probe/SOURCE_PROBE.json",
+        "size": 31048,
+        "mtime": 1789643975,
+        "sha256": "d9d3053323dd4dbc15fe9dd9b94d5f83b58f5fa9ba3b64c865156d085470420b",
+        "lines": 895
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\annotation_BOOK.json",
+        "rel": "probe/annotation/BOOK/annotation_BOOK.json",
+        "size": 34725,
+        "mtime": 1789645206,
+        "sha256": "053906b047193744f04d738515a9813555bbfd2be8860e75296d24a3db9ccd17",
+        "lines": 1542
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\maskindex_f1650.png",
+        "rel": "probe/annotation/BOOK/maskindex_f1650.png",
+        "size": 6468,
+        "mtime": 1789645206,
+        "sha256": "598f89af0ec19cf16412e709d41fbd83552e8743a6250944f12f3363cecc5a2a",
+        "lines": 48
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\maskindex_f1665.png",
+        "rel": "probe/annotation/BOOK/maskindex_f1665.png",
+        "size": 6474,
+        "mtime": 1789645206,
+        "sha256": "1ff25696f0dcee75b05b4920fb67a0d962f2465dce0940d82c5aeb6af5e040aa",
+        "lines": 46
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\maskindex_f1680.png",
+        "rel": "probe/annotation/BOOK/maskindex_f1680.png",
+        "size": 6437,
+        "mtime": 1789645206,
+        "sha256": "fdab1680ffc05cd1c37d1db191c347f2a3ebc89e00a9f7679490fbf237d72f2e",
+        "lines": 33
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\maskindex_f1695.png",
+        "rel": "probe/annotation/BOOK/maskindex_f1695.png",
+        "size": 6478,
+        "mtime": 1789645206,
+        "sha256": "e5ab1a364af52ecc71f640d4e2801e8aa371d15e388fc34beb94d3648ac0d954",
+        "lines": 30
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\maskindex_f1710.png",
+        "rel": "probe/annotation/BOOK/maskindex_f1710.png",
+        "size": 6473,
+        "mtime": 1789645206,
+        "sha256": "e02892c49ebc021ec19f1fb217a67be24ff12df45adf2cf95018299b9734c2b8",
+        "lines": 28
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\maskindex_f1725.png",
+        "rel": "probe/annotation/BOOK/maskindex_f1725.png",
+        "size": 6394,
+        "mtime": 1789645206,
+        "sha256": "5aff5a99492fa14bc52856c6a87ccd8277b0a0cb3fe4071406228ce8fbb580ea",
+        "lines": 52
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\maskindex_f1740.png",
+        "rel": "probe/annotation/BOOK/maskindex_f1740.png",
+        "size": 6388,
+        "mtime": 1789645206,
+        "sha256": "cc44e02eae312479634cccdeb8cde8a7767ad56030e935f99911b08939a36ede",
+        "lines": 35
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\maskindex_f1755.png",
+        "rel": "probe/annotation/BOOK/maskindex_f1755.png",
+        "size": 6386,
+        "mtime": 1789645206,
+        "sha256": "3e538e3a7494358282856d0fae2675f7b5784557d98035dc4a21058815e6647e",
+        "lines": 32
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\relations_BOOK.json",
+        "rel": "probe/annotation/BOOK/relations_BOOK.json",
+        "size": 5144,
+        "mtime": 1789645416,
+        "sha256": "5383a3169c7ccb171cad2dadbc01478362016a2ce25c122b9deb5a62994092da",
+        "lines": 176
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\annotation_CAM_4212.json",
+        "rel": "probe/annotation/CAM_4212/annotation_CAM_4212.json",
+        "size": 77169,
+        "mtime": 1789645301,
+        "sha256": "b4ef3571f9b4c667af6c03f85517ca45f79e2307512a1753d7bcaf06ae06e782",
+        "lines": 3060
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4212.png",
+        "rel": "probe/annotation/CAM_4212/maskindex_f4212.png",
+        "size": 1086,
+        "mtime": 1789645301,
+        "sha256": "b11de7e82bcdf94bdb9b3d89e11fb89502683f0e44b8cc0e75b8d5b24584da6e",
+        "lines": 2
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4227.png",
+        "rel": "probe/annotation/CAM_4212/maskindex_f4227.png",
+        "size": 1086,
+        "mtime": 1789645301,
+        "sha256": "b11de7e82bcdf94bdb9b3d89e11fb89502683f0e44b8cc0e75b8d5b24584da6e",
+        "lines": 2
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4242.png",
+        "rel": "probe/annotation/CAM_4212/maskindex_f4242.png",
+        "size": 4590,
+        "mtime": 1789645301,
+        "sha256": "9c3a9f02738f47aec837776fdcabd20badf675b3cdda75b4de599fbfc6946dd9",
+        "lines": 3
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4257.png",
+        "rel": "probe/annotation/CAM_4212/maskindex_f4257.png",
+        "size": 4410,
+        "mtime": 1789645301,
+        "sha256": "7c56b78c39cb29c992c5e2668e88b58e75124dcb94c6af843407e86464fcac04",
+        "lines": 51
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4272.png",
+        "rel": "probe/annotation/CAM_4212/maskindex_f4272.png",
+        "size": 5954,
+        "mtime": 1789645301,
+        "sha256": "130515f77b4f4c762bf13c96aa771c44aacfad1965023a3acbce5b1379a44cc6",
+        "lines": 25
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4287.png",
+        "rel": "probe/annotation/CAM_4212/maskindex_f4287.png",
+        "size": 5881,
+        "mtime": 1789645301,
+        "sha256": "da2da4e70006f8f57cfe4d3bd37e7a397d2c34037238ef9af72ea9746e10cc50",
+        "lines": 25
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4302.png",
+        "rel": "probe/annotation/CAM_4212/maskindex_f4302.png",
+        "size": 5888,
+        "mtime": 1789645301,
+        "sha256": "1b53d41bfa5a6e84ebaea7ba4a640cb3a58807638d64cc65cd260b097167e0f2",
+        "lines": 27
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\maskindex_f4317.png",
+        "rel": "probe/annotation/CAM_4212/maskindex_f4317.png",
+        "size": 3312,
+        "mtime": 1789645301,
+        "sha256": "69873e11963ea5df7f8eb85b8e30ac16dc7df208968a1fddb5238978cf036f49",
+        "lines": 25
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\relations_CAM_4212.json",
+        "rel": "probe/annotation/CAM_4212/relations_CAM_4212.json",
+        "size": 8211,
+        "mtime": 1789645416,
+        "sha256": "d57fcc4ebb61c1a97cc9c7b61cfc0a8be34d39f1cf10cf0d9409caf8eddf7c93",
+        "lines": 261
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\annotation_CUT_660.json",
+        "rel": "probe/annotation/CUT_660/annotation_CUT_660.json",
+        "size": 49834,
+        "mtime": 1789645269,
+        "sha256": "ea58e0eb0d34c90c1b902778df302cc7dfbb0c47d8da4b4472a03e6605f3df5f",
+        "lines": 2034
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\maskindex_f660.png",
+        "rel": "probe/annotation/CUT_660/maskindex_f660.png",
+        "size": 3100,
+        "mtime": 1789645269,
+        "sha256": "6187fcde049889b219dd3b33edd1749d329ec197601d4857fc45a3dfd50fa8f6",
+        "lines": 17
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\maskindex_f675.png",
+        "rel": "probe/annotation/CUT_660/maskindex_f675.png",
+        "size": 2386,
+        "mtime": 1789645269,
+        "sha256": "40eac42d45b762348f2b51b0e26b391108246fc63f4145b36cd9a71cc2762320",
+        "lines": 9
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\maskindex_f690.png",
+        "rel": "probe/annotation/CUT_660/maskindex_f690.png",
+        "size": 3310,
+        "mtime": 1789645269,
+        "sha256": "edbe0c710433d53115267ee49b65fc9edc0f033266c3916eaffbd5f1dd3c81f2",
+        "lines": 10
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\maskindex_f705.png",
+        "rel": "probe/annotation/CUT_660/maskindex_f705.png",
+        "size": 3311,
+        "mtime": 1789645269,
+        "sha256": "d987b743737dc142fcb3b84c06697339f861de6e970567d790b24d7645563f5a",
+        "lines": 8
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\maskindex_f720.png",
+        "rel": "probe/annotation/CUT_660/maskindex_f720.png",
+        "size": 3218,
+        "mtime": 1789645269,
+        "sha256": "6bbb38ae44591cb51126ed3a224a9ac4f0c6744c1980bd795a9fdee8c9c0d262",
+        "lines": 11
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\maskindex_f735.png",
+        "rel": "probe/annotation/CUT_660/maskindex_f735.png",
+        "size": 3213,
+        "mtime": 1789645269,
+        "sha256": "9f3e060525627af970f4d61f5e3326a46ba0cf39264e768828be4ac0ca162828",
+        "lines": 17
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\maskindex_f750.png",
+        "rel": "probe/annotation/CUT_660/maskindex_f750.png",
+        "size": 4274,
+        "mtime": 1789645269,
+        "sha256": "c4f8ff0f8863165978f77d96e2126c9193ef2fe8c42f025e45ba01038f7cec35",
+        "lines": 29
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\maskindex_f765.png",
+        "rel": "probe/annotation/CUT_660/maskindex_f765.png",
+        "size": 4276,
+        "mtime": 1789645269,
+        "sha256": "6a628769fb586921ce12cd42a018f4cc80b01e03cd39338e1502ae80843ded02",
+        "lines": 34
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\relations_CUT_660.json",
+        "rel": "probe/annotation/CUT_660/relations_CUT_660.json",
+        "size": 3190,
+        "mtime": 1789645416,
+        "sha256": "ea9eaaa4d89d1e19ac0907f95ad8b3e49c14cf68daeadaf9aa5e7aa0846f97c1",
+        "lines": 91
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\annotation_HOLDOUT_16231.json",
+        "rel": "probe/annotation/HOLDOUT_16231/annotation_HOLDOUT_16231.json",
+        "size": 58535,
+        "mtime": 1789645322,
+        "sha256": "5c9f0464ed53f8f074f7fb631d084b12f4c24fc22dbe3de1a4699aa3ad92b981",
+        "lines": 2531
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\maskindex_f16231.png",
+        "rel": "probe/annotation/HOLDOUT_16231/maskindex_f16231.png",
+        "size": 7465,
+        "mtime": 1789645322,
+        "sha256": "152be11dd03265fc6c3256250de20b474fd11270577a6c4a886e5fcda9390abe",
+        "lines": 26
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\maskindex_f16246.png",
+        "rel": "probe/annotation/HOLDOUT_16231/maskindex_f16246.png",
+        "size": 7464,
+        "mtime": 1789645322,
+        "sha256": "b3e124be38167a60bac1065f562e91743aa93e205cc7059b5f89cb30d0c6f4a0",
+        "lines": 34
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\maskindex_f16261.png",
+        "rel": "probe/annotation/HOLDOUT_16231/maskindex_f16261.png",
+        "size": 7655,
+        "mtime": 1789645322,
+        "sha256": "5116d5de35ec2cfbda42a5792690b45cabcbf19e1a01c45b7e18e09ffc9fdff7",
+        "lines": 32
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\maskindex_f16276.png",
+        "rel": "probe/annotation/HOLDOUT_16231/maskindex_f16276.png",
+        "size": 7452,
+        "mtime": 1789645322,
+        "sha256": "411ce84255c25b0b70f2b75b7ae38605563462ba54ce72d2cfad7f877cbd7be9",
+        "lines": 29
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\maskindex_f16291.png",
+        "rel": "probe/annotation/HOLDOUT_16231/maskindex_f16291.png",
+        "size": 7828,
+        "mtime": 1789645322,
+        "sha256": "4d903eb8995af87ca7d4663dfbb86bf5bc2b236e17d2fa1e89797dd7a0f487fd",
+        "lines": 34
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\maskindex_f16306.png",
+        "rel": "probe/annotation/HOLDOUT_16231/maskindex_f16306.png",
+        "size": 7451,
+        "mtime": 1789645322,
+        "sha256": "b5f484d705e918c9b94f07372beffefe2176425a2b385ca33195b5a42b7846a4",
+        "lines": 23
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\maskindex_f16321.png",
+        "rel": "probe/annotation/HOLDOUT_16231/maskindex_f16321.png",
+        "size": 7669,
+        "mtime": 1789645322,
+        "sha256": "cfe868762d7602cea03d8e7d27b2b48e91ed8a5d8be0a73ea85c8ef0f5e14888",
+        "lines": 36
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\maskindex_f16336.png",
+        "rel": "probe/annotation/HOLDOUT_16231/maskindex_f16336.png",
+        "size": 7124,
+        "mtime": 1789645322,
+        "sha256": "ea1b188297b407fa9cd0fbdc71ef3428fe8aa8b50ea641e54be51f99e95f404c",
+        "lines": 33
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\relations_HOLDOUT_16231.json",
+        "rel": "probe/annotation/HOLDOUT_16231/relations_HOLDOUT_16231.json",
+        "size": 13122,
+        "mtime": 1789645416,
+        "sha256": "21b8b6e86c7a4022ea478fd5bc0218de3144cf70ff999c19818636aa280cb914",
+        "lines": 481
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\annotation_OCC_14768.json",
+        "rel": "probe/annotation/OCC_14768/annotation_OCC_14768.json",
+        "size": 35823,
+        "mtime": 1789645311,
+        "sha256": "2e0f7b9b05f17a9e4e509e2f01fe67f32428a50b6e947380cc14ad230e60484a",
+        "lines": 1437
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\maskindex_f14768.png",
+        "rel": "probe/annotation/OCC_14768/maskindex_f14768.png",
+        "size": 3179,
+        "mtime": 1789645311,
+        "sha256": "bc3d170278d0151100136bfe9e8a35f1ec01ba493bfad4a4b52d3c2808e698d0",
+        "lines": 3
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\maskindex_f14783.png",
+        "rel": "probe/annotation/OCC_14768/maskindex_f14783.png",
+        "size": 3186,
+        "mtime": 1789645311,
+        "sha256": "fd1636667c480ddc506fded9aa3c2a760c92772ba5e7c849f60747497d3d2fd9",
+        "lines": 47
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\maskindex_f14798.png",
+        "rel": "probe/annotation/OCC_14768/maskindex_f14798.png",
+        "size": 3264,
+        "mtime": 1789645311,
+        "sha256": "6e6f2b5742c7c5319752f1250747dd905dc0abae0177a0bca660786744cc299f",
+        "lines": 9
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\maskindex_f14813.png",
+        "rel": "probe/annotation/OCC_14768/maskindex_f14813.png",
+        "size": 3180,
+        "mtime": 1789645311,
+        "sha256": "600c94021a941141d022ae1170a51101ec931898a3e5e189a1fae288b85b75fb",
+        "lines": 2
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\maskindex_f14828.png",
+        "rel": "probe/annotation/OCC_14768/maskindex_f14828.png",
+        "size": 2503,
+        "mtime": 1789645311,
+        "sha256": "633bc44fefa4e6add5c574dddd15ede7882beb306a99b5d2683dd388b30f3a63",
+        "lines": 2
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\maskindex_f14843.png",
+        "rel": "probe/annotation/OCC_14768/maskindex_f14843.png",
+        "size": 3172,
+        "mtime": 1789645311,
+        "sha256": "6207937ac16c13c7ce5407a055de0817c7ad3f4efba193519162db3ff7776a04",
+        "lines": 54
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\maskindex_f14858.png",
+        "rel": "probe/annotation/OCC_14768/maskindex_f14858.png",
+        "size": 2578,
+        "mtime": 1789645311,
+        "sha256": "e3366ddacd15fcd1a551a9d64d8a5393d0be64e27861ae3da7a52d394caced0e",
+        "lines": 2
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\maskindex_f14873.png",
+        "rel": "probe/annotation/OCC_14768/maskindex_f14873.png",
+        "size": 4380,
+        "mtime": 1789645311,
+        "sha256": "45bb7211236d07a758175e5750762a1d34b72ea7823b27b4f190c3f37cfe2256",
+        "lines": 19
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\relations_OCC_14768.json",
+        "rel": "probe/annotation/OCC_14768/relations_OCC_14768.json",
+        "size": 2517,
+        "mtime": 1789645416,
+        "sha256": "993c54534d7bed3e8286fe0cf005e7a0072c1e43267cbf3f35167a9a7fbae19a",
+        "lines": 63
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\annotation_TURN_795.json",
+        "rel": "probe/annotation/TURN_795/annotation_TURN_795.json",
+        "size": 22518,
+        "mtime": 1789645290,
+        "sha256": "c3458aa58a4bb8f9a94b08a19c6986e77ca91f457822deb0684ff438d651e787",
+        "lines": 972
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\maskindex_f795.png",
+        "rel": "probe/annotation/TURN_795/maskindex_f795.png",
+        "size": 4131,
+        "mtime": 1789645290,
+        "sha256": "68723182673d0863bb3762303388f8f1ee8d37c6164b1fd51f3cdc183e6fa2ef",
+        "lines": 41
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\maskindex_f810.png",
+        "rel": "probe/annotation/TURN_795/maskindex_f810.png",
+        "size": 3799,
+        "mtime": 1789645290,
+        "sha256": "36ef58dc2011402cc9b8de834ca11628b51f0ca3216555b373de8cd5c470e87a",
+        "lines": 26
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\maskindex_f825.png",
+        "rel": "probe/annotation/TURN_795/maskindex_f825.png",
+        "size": 3879,
+        "mtime": 1789645290,
+        "sha256": "37424871a13eb9d56304427d16b835b6641310b7a67673d4cf8f7202f0150d7f",
+        "lines": 2
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\maskindex_f840.png",
+        "rel": "probe/annotation/TURN_795/maskindex_f840.png",
+        "size": 3903,
+        "mtime": 1789645290,
+        "sha256": "f5ec05a4bccbfc4c49d8b2e3be7d4c5e51d278ad2e231cc8d2381bc2d6f7ead9",
+        "lines": 6
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\maskindex_f855.png",
+        "rel": "probe/annotation/TURN_795/maskindex_f855.png",
+        "size": 4479,
+        "mtime": 1789645290,
+        "sha256": "ec4d058132052c4d282463cca8db3d091b6e7d630e9c17e56320c79e91f51b61",
+        "lines": 17
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\maskindex_f870.png",
+        "rel": "probe/annotation/TURN_795/maskindex_f870.png",
+        "size": 4557,
+        "mtime": 1789645290,
+        "sha256": "9e82c5ba289a30e21af1289ac24b53373f71961861f5550deab5ea423d8be3d0",
+        "lines": 84
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\maskindex_f885.png",
+        "rel": "probe/annotation/TURN_795/maskindex_f885.png",
+        "size": 2704,
+        "mtime": 1789645290,
+        "sha256": "4589e1b057b889cfc204cfeb8d649f0a632b54150009cb816e2c8ef1f7ac6db1",
+        "lines": 16
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\maskindex_f900.png",
+        "rel": "probe/annotation/TURN_795/maskindex_f900.png",
+        "size": 3205,
+        "mtime": 1789645290,
+        "sha256": "8e421bb78cb2d6b6ff0db7d484649b8b1b85087d90938a22a8a08453f3810005",
+        "lines": 23
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\relations_TURN_795.json",
+        "rel": "probe/annotation/TURN_795/relations_TURN_795.json",
+        "size": 7613,
+        "mtime": 1789645416,
+        "sha256": "4fb3c95929531c58242ec659e5cf2f778283ded0e44de1f4a7ade1cef67d0324",
+        "lines": 244
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\annotation_WALK_7927.json",
+        "rel": "probe/annotation/WALK_7927/annotation_WALK_7927.json",
+        "size": 21665,
+        "mtime": 1789645279,
+        "sha256": "4e3d75e8f09fdd88397efbfa9521a57347c56274d1908f560eb7e3cadc984aca",
+        "lines": 901
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\maskindex_f7927.png",
+        "rel": "probe/annotation/WALK_7927/maskindex_f7927.png",
+        "size": 3691,
+        "mtime": 1789645279,
+        "sha256": "78db56e4ce52ae85974d4356843f357aa5e38c789c71d35015984e08d9302de3",
+        "lines": 17
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\maskindex_f7942.png",
+        "rel": "probe/annotation/WALK_7927/maskindex_f7942.png",
+        "size": 3694,
+        "mtime": 1789645279,
+        "sha256": "916f780d4b9c2d6f72f46d0e9dc3f53b63a7cd9911729c4c3f8de673ed82eb28",
+        "lines": 22
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\maskindex_f7957.png",
+        "rel": "probe/annotation/WALK_7927/maskindex_f7957.png",
+        "size": 3694,
+        "mtime": 1789645279,
+        "sha256": "65996c1704ade3211be3a8e584a28a01884b1771b0d0c208761b62ea3efff180",
+        "lines": 21
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\maskindex_f7972.png",
+        "rel": "probe/annotation/WALK_7927/maskindex_f7972.png",
+        "size": 3629,
+        "mtime": 1789645279,
+        "sha256": "80c541bd295a33e512e3ef7bf2ff77c4a31ec93359c503b6d903c0c0ef9c1c0c",
+        "lines": 22
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\maskindex_f7987.png",
+        "rel": "probe/annotation/WALK_7927/maskindex_f7987.png",
+        "size": 3814,
+        "mtime": 1789645279,
+        "sha256": "c149634fa622247e46b8f993a95757c5294f9058a97c092fae254b9d0d6db2cb",
+        "lines": 19
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\maskindex_f8002.png",
+        "rel": "probe/annotation/WALK_7927/maskindex_f8002.png",
+        "size": 2357,
+        "mtime": 1789645279,
+        "sha256": "ed8c479232ec5bfcaeb1216ccf61b4428ebd491f8c1e2b118c6c775cb81b379d",
+        "lines": 3
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\maskindex_f8017.png",
+        "rel": "probe/annotation/WALK_7927/maskindex_f8017.png",
+        "size": 2357,
+        "mtime": 1789645279,
+        "sha256": "4f9ad94bce721ccb6f9143db8c90d4dc32a59470f3665f0b95444b469b39d3b7",
+        "lines": 2
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\maskindex_f8032.png",
+        "rel": "probe/annotation/WALK_7927/maskindex_f8032.png",
+        "size": 3605,
+        "mtime": 1789645279,
+        "sha256": "e5509d1046ea1cc2b790bf609741485f3e03341142cea8a5281b24315a3878fe",
+        "lines": 25
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\relations_WALK_7927.json",
+        "rel": "probe/annotation/WALK_7927/relations_WALK_7927.json",
+        "size": 4158,
+        "mtime": 1789645416,
+        "sha256": "9cca3366d5ceb32362ee7f350bbcd2a7a8aac709c75eee4ec95b5b9c7491f286",
+        "lines": 123
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\book_window_verification.json",
+        "rel": "probe/book_window_verification.json",
+        "size": 3336,
+        "mtime": 1789644408,
+        "sha256": "717a98b148aa647b373bc55834e284eb7088b394994ace1a4e5ebbfd34cfec6b",
+        "lines": 97
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\classify_BOOK_1650.json",
+        "rel": "probe/classify_BOOK_1650.json",
+        "size": 25828,
+        "mtime": 1789645027,
+        "sha256": "d75a0f5629bcfc023de97ac5f7534b5d3124b087774217232d08758f40728ad3",
+        "lines": 1344
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\classify_R02_2916.json",
+        "rel": "probe/classify_R02_2916.json",
+        "size": 28488,
+        "mtime": 1789645133,
+        "sha256": "a2b95a16db38e1c3269775de7dbac261bdd5853a3b1706d152e8cada6bf1476d",
+        "lines": 1474
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\classify_R05_32314.json",
+        "rel": "probe/classify_R05_32314.json",
+        "size": 28423,
+        "mtime": 1789645133,
+        "sha256": "ae46db11725df850f05eb4ede83e4b3947220a42597a9f58e397520f39249d33",
+        "lines": 1465
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\classify_S136B_23650.json",
+        "rel": "probe/classify_S136B_23650.json",
+        "size": 12309,
+        "mtime": 1789645094,
+        "sha256": "890990b6a3884cdfd4d0b0ff6d097a07cf241f885f3caf5f0b3195bbd213d6b6",
+        "lines": 607
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\classify_S136_23650.json",
+        "rel": "probe/classify_S136_23650.json",
+        "size": 8834,
+        "mtime": 1789645027,
+        "sha256": "f4f2201bb27a5e7e729e75ec1cbc1ebeeec47d1c09e9ee5dfd5c84e16a3c3be1",
+        "lines": 442
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\classify_S142_24573.json",
+        "rel": "probe/classify_S142_24573.json",
+        "size": 30016,
+        "mtime": 1789645131,
+        "sha256": "85df3fe7c18cd6e720930603c6429f59c798229337395f54b485a2ff2daf522b",
+        "lines": 1537
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\classify_S162_27896.json",
+        "rel": "probe/classify_S162_27896.json",
+        "size": 28647,
+        "mtime": 1789645132,
+        "sha256": "b35417653887fb4fdef069d59768598d5c0adf586d35c0cb0dd2d661eb856e09",
+        "lines": 1474
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\classify_S16_2237.json",
+        "rel": "probe/classify_S16_2237.json",
+        "size": 47716,
+        "mtime": 1789645131,
+        "sha256": "ed4e830eaa4817a81bc113b84987443bfab15fda6efe0f29b3c85e733bbbd154",
+        "lines": 2356
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\classify_S206_34985.json",
+        "rel": "probe/classify_S206_34985.json",
+        "size": 29774,
+        "mtime": 1789645132,
+        "sha256": "74e622307abe8092e90727fa3f65acac141b5eab923d7d6de544e71c9f1de07f",
+        "lines": 1528
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\classify_S31_4212.json",
+        "rel": "probe/classify_S31_4212.json",
+        "size": 33881,
+        "mtime": 1789645133,
+        "sha256": "8868a81e3c9efda2131255e1f123729dd2f050f692f47f93d00a8c31002ddac2",
+        "lines": 1726
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\classify_S47_7893.json",
+        "rel": "probe/classify_S47_7893.json",
+        "size": 7758,
+        "mtime": 1789645028,
+        "sha256": "da5c4ce0915f5553736aded574883a567d942bc1c142e6094f2b889e832602e5",
+        "lines": 398
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\classify_S48_7927.json",
+        "rel": "probe/classify_S48_7927.json",
+        "size": 32346,
+        "mtime": 1789645131,
+        "sha256": "f7d47ad1771d89d0473e637caa22bc6c8de21f17336a610591d61739ea78884f",
+        "lines": 1663
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\classify_S53_8776.json",
+        "rel": "probe/classify_S53_8776.json",
+        "size": 11495,
+        "mtime": 1789645028,
+        "sha256": "70191bbd18f8a3c624d4dfc4a81fab48450a83637e9f61e5b8fd7396d0c3dc38",
+        "lines": 585
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\classify_S54_8827.json",
+        "rel": "probe/classify_S54_8827.json",
+        "size": 28707,
+        "mtime": 1789645132,
+        "sha256": "0510fd347144779be569d9afec394d193fcf5207456a7ff645ca7400d8ec1523",
+        "lines": 1483
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\classify_S75_12108.json",
+        "rel": "probe/classify_S75_12108.json",
+        "size": 12199,
+        "mtime": 1789645028,
+        "sha256": "c47ff8b5cee74b9bd5bf6ca5747cd0cc819d7dff21ca36efb9d0634ea7fc24cc",
+        "lines": 640
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\classify_S8B_795.json",
+        "rel": "probe/classify_S8B_795.json",
+        "size": 51113,
+        "mtime": 1789645130,
+        "sha256": "68fe440d8c4a7e556a448e487da61bc1dc1469e68a0d2961997b1167c58e1bef",
+        "lines": 2518
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\classify_S8_795.json",
+        "rel": "probe/classify_S8_795.json",
+        "size": 39740,
+        "mtime": 1789645027,
+        "sha256": "cec56e4a23967da9e003c4bfb854b37e64afcdc97263a9fc11a9655ae1a3c6ca",
+        "lines": 2004
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\classify_S90_14768.json",
+        "rel": "probe/classify_S90_14768.json",
+        "size": 33664,
+        "mtime": 1789645132,
+        "sha256": "dfe2fe204f3f561bd5c2ef5b24de17b6c1d5aa3e873cd7c07b3d1111d8fb9b2e",
+        "lines": 1708
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\clip4_container.json",
+        "rel": "probe/clip4_container.json",
+        "size": 4641,
+        "mtime": 1789643797,
+        "sha256": "ebffaeaeecbdca5e0104baf7dacc126952032152f58d14250121542b70c482b2",
+        "lines": 134
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\clip4_path.txt",
+        "rel": "probe/clip4_path.txt",
+        "size": 144,
+        "mtime": 1789643568,
+        "sha256": "0f4027e89c9c602c5830fcee1f9c8a51c67efa174e0592937b37e0f74074a20d",
+        "lines": 1
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\demo_container.json",
+        "rel": "probe/demo_container.json",
+        "size": 4882,
+        "mtime": 1789643797,
+        "sha256": "07faf1ef030c222dda89a714e3e1844038d4c203d52fae31a5277b8248bf726a",
+        "lines": 140
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\demo_offset_verification.json",
+        "rel": "probe/demo_offset_verification.json",
+        "size": 1818,
+        "mtime": 1789644707,
+        "sha256": "435da202eedeb35cce4dfc6ef57e2ec62045192bf787a54b18741d9656901177",
+        "lines": 70
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\demo_path.txt",
+        "rel": "probe/demo_path.txt",
+        "size": 134,
+        "mtime": 1789643568,
+        "sha256": "f4105ff7b48d18854dba2bf46de6185a3aa27bd6753ae3b05c0d9e755540155a",
+        "lines": 1
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\locate_PROTOTYPE_A_frame-450.json",
+        "rel": "probe/locate_PROTOTYPE_A_frame-450.json",
+        "size": 863,
+        "mtime": 1789644459,
+        "sha256": "9a2b89edceeddf425689b10ce5d8c5e705dc1fd37da5ae229f35d34c87e4b8f7",
+        "lines": 31
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\locate_demo_f000.json",
+        "rel": "probe/locate_demo_f000.json",
+        "size": 746,
+        "mtime": 1789644478,
+        "sha256": "7e67e0ae5a6f92d953252c77847462452e73cf4cd749feb720676b0a73a8281e",
+        "lines": 31
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\refB_container.json",
+        "rel": "probe/refB_container.json",
+        "size": 4853,
+        "mtime": 1789643797,
+        "sha256": "eefb7cfcbe556a1ce614eb31f8eb16f69a75a4cb862060c5db26ad73c385f2a6",
+        "lines": 139
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\refB_path.txt",
+        "rel": "probe/refB_path.txt",
+        "size": 109,
+        "mtime": 1789643568,
+        "sha256": "2a1db6cc89a8060aaa8dd1136b76bfbbf6ebc0a3257596e4d6a884ae68229492",
+        "lines": 1
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\ref_container.err",
+        "rel": "probe/ref_container.err",
+        "size": 1036,
+        "mtime": 1789643569,
+        "sha256": "38acb4389dcf108c1c07067d20b77fc89452605a61936ad147bfbe93f437cd25",
+        "lines": 16
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\ref_container.json",
+        "rel": "probe/ref_container.json",
+        "size": 4853,
+        "mtime": 1789643797,
+        "sha256": "12178052be4f9175647553bb8ba4ce4e301cbed82954418e1ae062da20604c04",
+        "lines": 139
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\ref_count_frames.json",
+        "rel": "probe/ref_count_frames.json",
+        "size": 688,
+        "mtime": 1789643824,
+        "sha256": "4dd8664dca0ed2bdf7b72b64252b2870f87e8aeb44c6613dc8e452858f28807e",
+        "lines": 27
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\ref_path.txt",
+        "rel": "probe/ref_path.txt",
+        "size": 109,
+        "mtime": 1789643568,
+        "sha256": "6cbbeafe1a6cbbc01dd6a62b9495a02fcee6f53d9dfc81b99abe97b798fbf10f",
+        "lines": 1
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\sam2\\frame_1650.png",
+        "rel": "probe/sam2/frame_1650.png",
+        "size": 177993,
+        "mtime": 1789644559,
+        "sha256": "6989822f7c4d3eb34e4ee3cc4224b745a758396cd8512b8229a4b2532740b893",
+        "lines": 550
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\sam2\\masks_1650.npy",
+        "rel": "probe/sam2/masks_1650.npy",
+        "size": 1843328,
+        "mtime": 1789644760,
+        "sha256": "dcef7bc6dcc05d8c231113df2c35b5a6ceefc33303d051b88c46857276c0251a",
+        "lines": 1
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\sam2\\overlay_1650.png",
+        "rel": "probe/sam2/overlay_1650.png",
+        "size": 172407,
+        "mtime": 1789644760,
+        "sha256": "72ff720b363a5ebd8b098bc19b475b3584b5e88cc08d3430c96ad3605d4034b4",
+        "lines": 557
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\sam2\\sam2_probe_1650.json",
+        "rel": "probe/sam2/sam2_probe_1650.json",
+        "size": 2816,
+        "mtime": 1789644760,
+        "sha256": "79a4b7bb67946a5d87a3ddb030baf7ae4db1255e0ba641ee3c67496dcfa24ef7",
+        "lines": 127
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\scdet_stderr.txt",
+        "rel": "probe/scdet_stderr.txt",
+        "size": 1875,
+        "mtime": 1789643822,
+        "sha256": "486a520c473c2a72d243f9b7814fcb53667a59642509ddb30299997950ffd032",
+        "lines": 27
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\scenes_candidates.json",
+        "rel": "probe/scenes_candidates.json",
+        "size": 39970,
+        "mtime": 1789643975,
+        "sha256": "225c6d3bdcc414be5fd9de469b9ddd05318b6c8c344314d17dd896b15e9b9c1b",
+        "lines": 1649
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\scenes_raw.txt",
+        "rel": "probe/scenes_raw.txt",
+        "size": 15853,
+        "mtime": 1789643822,
+        "sha256": "f55f212446529c5289d218438248f49d785c40aa2e58bf0985b6fb443b8bcac6",
+        "lines": 460
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\series_BOOKWIN.json",
+        "rel": "probe/series_BOOKWIN.json",
+        "size": 24473,
+        "mtime": 1789644858,
+        "sha256": "17720cfd810db1b46924208a2785692bdb5c704d0e052ccb6c6c7aa97f147d2e",
+        "lines": 1221
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\series_WHOLEFILM.json",
+        "rel": "probe/series_WHOLEFILM.json",
+        "size": 8073840,
+        "mtime": 1789644922,
+        "sha256": "1b2bb45c5c870e755c21e59437c1b51004c9e01728a3482a8473989a94573fc1",
+        "lines": null
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\sheets\\A_book_and_riskloops.png",
+        "rel": "probe/sheets/A_book_and_riskloops.png",
+        "size": 1160565,
+        "mtime": 1789644017,
+        "sha256": "c910dadeca318fa2fad1c3f79a8801432e8454521b4583c2c97cc159213bd511",
+        "lines": 4048
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\shot_metrics.json",
+        "rel": "probe/shot_metrics.json",
+        "size": 96613,
+        "mtime": 1789644979,
+        "sha256": "7542f2b30f65add6f130dc60dbc19f533c9002fced8640eeab5e578005dc65a0",
+        "lines": 3820
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\shots.json",
+        "rel": "probe/shots.json",
+        "size": 68543,
+        "mtime": 1789643975,
+        "sha256": "f98b150fe9e9fdee8a41219f1c16a90b525c6bc9b588edfd045ffeb5d4c96051",
+        "lines": 2490
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\tools\\analyze_series.py",
+        "rel": "tools/analyze_series.py",
+        "size": 4764,
+        "mtime": 1789644972,
+        "sha256": "6c0d315e2f13f670fe44743f24d4bd7d8888ea9eb426f50b00fbe0ad67fe9261",
+        "lines": 127
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\tools\\annotate_window.py",
+        "rel": "tools/annotate_window.py",
+        "size": 20607,
+        "mtime": 1789645171,
+        "sha256": "7e02117a7003daefaca0391cf8bab38a435ae3a637bec29aae9580b3131d6d48",
+        "lines": 503
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\tools\\build_fixture.py",
+        "rel": "tools/build_fixture.py",
+        "size": 26606,
+        "mtime": 1789645406,
+        "sha256": "9194ae1eafe32951b133dec8f2ca6095625635876290709d9ccb2495969a29e7",
+        "lines": 534
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\tools\\build_source_probe.py",
+        "rel": "tools/build_source_probe.py",
+        "size": 8057,
+        "mtime": 1789643970,
+        "sha256": "e825e94984de60c19e480a6726446aa7fbedcdcbed37a72b7a80b9f603733810",
+        "lines": 198
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\tools\\classify_window.py",
+        "rel": "tools/classify_window.py",
+        "size": 9197,
+        "mtime": 1789645066,
+        "sha256": "047dd247bc21b6cd88af4a11660a8fc10c2a09c5af0bbe10ce3dd62c6a5c8cf2",
+        "lines": 224
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\tools\\env_probe.py",
+        "rel": "tools/env_probe.py",
+        "size": 2990,
+        "mtime": 1789643478,
+        "sha256": "6ca5b47847096607873f9dc000d00208a4efc2c407307eecdcdb6102325e91be",
+        "lines": 85
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\tools\\locate_still.py",
+        "rel": "tools/locate_still.py",
+        "size": 4926,
+        "mtime": 1789644454,
+        "sha256": "9607503da2292c0cf62ef7e99e6b1aee5438a362626e0de9113b3a768305e7e7",
+        "lines": 143
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\tools\\make_references.py",
+        "rel": "tools/make_references.py",
+        "size": 6829,
+        "mtime": 1789645439,
+        "sha256": "016f7acd4f17916970a971b5856c5b3760d20ce58d805f159cd9b98616f60580",
+        "lines": 181
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\tools\\make_sheet.py",
+        "rel": "tools/make_sheet.py",
+        "size": 3015,
+        "mtime": 1789644008,
+        "sha256": "9a46a9ac2faf0dc60b676e8ce897c8f2464d702e1bf1e455dccb45230dd6a9a6",
+        "lines": 97
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\tools\\measure_relations.py",
+        "rel": "tools/measure_relations.py",
+        "size": 8924,
+        "mtime": 1789645371,
+        "sha256": "833697df1fc88209b39ba52fc4523cc1e340f928681915c6a398419e68fa31eb",
+        "lines": 198
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\tools\\parse_scenes.py",
+        "rel": "tools/parse_scenes.py",
+        "size": 5125,
+        "mtime": 1789643970,
+        "sha256": "196d963baa90795af055d7905f132dd42a1d072331dc06666b72070792bd6625",
+        "lines": 150
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\tools\\run_log.py",
+        "rel": "tools/run_log.py",
+        "size": 3776,
+        "mtime": 1789643779,
+        "sha256": "4f63b85cf2d5b8fdba7ed499304e9e1a8b735c9c131f5b9de8b8c7f1a89383d6",
+        "lines": 114
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\tools\\sam2_probe.py",
+        "rel": "tools/sam2_probe.py",
+        "size": 5207,
+        "mtime": 1789644738,
+        "sha256": "e37dd9195a8178805064d9cec906ca072b2dd1424df3e01209fc95e3dd5f9b9f",
+        "lines": 144
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\tools\\shot_table.py",
+        "rel": "tools/shot_table.py",
+        "size": 3139,
+        "mtime": 1789643930,
+        "sha256": "1a8e5edb85ede66fd01e6bf88621c670f0ca75224ab8a3c767eb1b0dc6706639",
+        "lines": 88
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\tools\\verify_demo_offset.py",
+        "rel": "tools/verify_demo_offset.py",
+        "size": 6479,
+        "mtime": 1789644695,
+        "sha256": "c900710b90263e4fcefa126521ccf676b8dc2ec9992993de98bcfe32c7260958",
+        "lines": 165
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\tools\\verify_stills.py",
+        "rel": "tools/verify_stills.py",
+        "size": 3308,
+        "mtime": 1789644403,
+        "sha256": "0137091e6967c3483d7da4f5ee5759a26fb5aafd044a934c057d133ff287bf4a",
+        "lines": 88
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\tools\\window_series.py",
+        "rel": "tools/window_series.py",
+        "size": 4378,
+        "mtime": 1789644858,
+        "sha256": "89ef33f435967e203033ce2d277bd821f0a5887854d60e63f050ccf1a782d0dd",
+        "lines": 119
+      },
+      {
+        "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\tools\\write_set_guard.py",
+        "rel": "tools/write_set_guard.py",
+        "size": 8030,
+        "mtime": 1789645439,
+        "sha256": "8656e3383283d9a8a51a440332c1099d0b32dffacb4033861cde7029508ac372",
+        "lines": 224
+      }
+    ],
+    "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN": [],
+    "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden": []
+  },
+  "root_counts": {
+    "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden": 176,
+    "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN": 0,
+    "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden": 0
+  },
+  "forbidden_touched": {
+    "app": false,
+    "frontend": false,
+    "migrations": false,
+    "docs": false,
+    "tests": false,
+    "scripts": false,
+    "alembic.ini": true,
+    "pyproject.toml": true
+  }
+}

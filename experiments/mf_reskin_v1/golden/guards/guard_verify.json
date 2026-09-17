@@ -1,0 +1,693 @@
+{
+  "mode": "verify",
+  "taken_at_utc": "2026-09-17T11:59:35Z",
+  "verdict": "VERIFIED",
+  "problems": [],
+  "added_count": 165,
+  "modified_count": 1,
+  "removed_count": 0,
+  "tracked_modified_delta": [],
+  "head": "2594de06cd5b2355e7e874ae4d6deb8a7b5b1b64",
+  "branch": "codex/mf-reskin-v1-golden",
+  "root_counts": {
+    "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden": 341,
+    "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN": 0,
+    "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden": 0
+  },
+  "changed_files": [
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\commands.jsonl",
+      "change": "modified"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\guard_baseline.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T115040_guard_baseline_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T115133_make_references_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T115321_measure_cutout_bounds_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T115435_measure_cutout_bounds_r2_v2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T115544_probe_image_engine_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\KEYFRAME_SPEC.md",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\keyframes\\keyframe_f1650.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\keyframes\\keyframe_f1665.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\keyframes\\keyframe_f1680.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\keyframes\\keyframe_f1695.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\keyframes\\keyframe_f1710.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\keyframes\\keyframe_f1725.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\keyframes\\keyframe_f1740.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\keyframes\\keyframe_f1755.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\references_BOOK.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\roles\\role_1_f1680.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\roles\\role_2_f1665.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\roles\\role_3_f1680.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\roles\\role_4_f1755.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\roles\\role_5_f1695.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\roles\\role_6_f1755.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\roles\\role_7_f1695.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\roles\\role_8_f1725.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\keyframes\\keyframe_f4212.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\keyframes\\keyframe_f4227.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\keyframes\\keyframe_f4242.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\keyframes\\keyframe_f4257.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\keyframes\\keyframe_f4272.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\keyframes\\keyframe_f4287.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\keyframes\\keyframe_f4302.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\keyframes\\keyframe_f4317.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\references_CAM_4212.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_10_f4242.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_11_f4257.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_12_f4257.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_13_f4257.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_14_f4257.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_15_f4272.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_16_f4272.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_17_f4302.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_18_f4287.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_19_f4272.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_1_f4212.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_20_f4287.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_21_f4272.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_22_f4272.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_23_f4272.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_24_f4287.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_25_f4317.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_2_f4242.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_3_f4257.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_4_f4272.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_5_f4287.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_6_f4257.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_7_f4242.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_8_f4242.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\roles\\role_9_f4242.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\keyframes\\keyframe_f660.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\keyframes\\keyframe_f675.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\keyframes\\keyframe_f690.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\keyframes\\keyframe_f705.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\keyframes\\keyframe_f720.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\keyframes\\keyframe_f735.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\keyframes\\keyframe_f750.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\keyframes\\keyframe_f765.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\references_CUT_660.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_10_f720.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_11_f735.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_12_f750.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_13_f750.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_14_f765.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_15_f750.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_16_f750.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_17_f750.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_18_f750.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_19_f750.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_1_f660.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_20_f750.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_2_f660.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_3_f660.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_4_f720.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_5_f675.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_6_f660.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_7_f660.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_8_f660.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\roles\\role_9_f675.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\keyframes\\keyframe_f16231.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\keyframes\\keyframe_f16246.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\keyframes\\keyframe_f16261.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\keyframes\\keyframe_f16276.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\keyframes\\keyframe_f16291.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\keyframes\\keyframe_f16306.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\keyframes\\keyframe_f16321.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\keyframes\\keyframe_f16336.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\references_HOLDOUT_16231.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_10_f16231.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_11_f16231.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_12_f16261.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_13_f16336.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_1_f16276.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_2_f16306.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_3_f16321.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_4_f16321.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_5_f16231.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_6_f16231.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_7_f16321.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_8_f16231.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\roles\\role_9_f16261.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\keyframes\\keyframe_f14768.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\keyframes\\keyframe_f14783.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\keyframes\\keyframe_f14798.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\keyframes\\keyframe_f14813.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\keyframes\\keyframe_f14828.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\keyframes\\keyframe_f14843.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\keyframes\\keyframe_f14858.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\keyframes\\keyframe_f14873.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\references_OCC_14768.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_10_f14873.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_11_f14873.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_1_f14843.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_2_f14768.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_3_f14873.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_4_f14813.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_5_f14798.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_6_f14858.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_7_f14873.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_8_f14873.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\roles\\role_9_f14873.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\keyframes\\keyframe_f795.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\keyframes\\keyframe_f810.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\keyframes\\keyframe_f825.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\keyframes\\keyframe_f840.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\keyframes\\keyframe_f855.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\keyframes\\keyframe_f870.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\keyframes\\keyframe_f885.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\keyframes\\keyframe_f900.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\references_TURN_795.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\roles\\role_1_f795.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\roles\\role_2_f900.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\roles\\role_3_f795.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\roles\\role_4_f810.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\roles\\role_5_f840.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\roles\\role_6_f900.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\keyframes\\keyframe_f7927.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\keyframes\\keyframe_f7942.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\keyframes\\keyframe_f7957.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\keyframes\\keyframe_f7972.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\keyframes\\keyframe_f7987.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\keyframes\\keyframe_f8002.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\keyframes\\keyframe_f8017.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\keyframes\\keyframe_f8032.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\references_WALK_7927.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\roles\\role_1_f7972.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\roles\\role_2_f8002.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\roles\\role_3_f7942.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\roles\\role_4_f7942.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\roles\\role_5_f8032.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\cutout_bounds_audit.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\image_engine_probe.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\references_index.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\vision_route_probe.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\tools\\measure_cutout_bounds.py",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\tools\\probe_image_engine.py",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\tools\\publish_evidence.py",
+      "change": "added"
+    }
+  ],
+  "forbidden_touched": {
+    "app": false,
+    "frontend": false,
+    "migrations": false,
+    "docs": false,
+    "tests": false,
+    "scripts": false,
+    "alembic.ini": true,
+    "pyproject.toml": true
+  }
+}

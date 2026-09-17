@@ -1,0 +1,110 @@
+{
+  "artifact": "image_engine_probe",
+  "produced_by": "tools/probe_image_engine.py",
+  "runtime_root": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden",
+  "loopback_http_probes": [
+    {
+      "port": 8188,
+      "tcp_connect": false,
+      "http_get_system_stats": null,
+      "http_status": null,
+      "error": "ConnectionRefusedError: [WinError 10061] No connection could be made because the target machine actively refused it"
+    },
+    {
+      "port": 8201,
+      "tcp_connect": false,
+      "http_get_system_stats": null,
+      "http_status": null,
+      "error": "ConnectionRefusedError: [WinError 10061] No connection could be made because the target machine actively refused it"
+    },
+    {
+      "port": 7860,
+      "tcp_connect": false,
+      "http_get_system_stats": null,
+      "http_status": null,
+      "error": "ConnectionRefusedError: [WinError 10061] No connection could be made because the target machine actively refused it"
+    },
+    {
+      "port": 8888,
+      "tcp_connect": false,
+      "http_get_system_stats": null,
+      "http_status": null,
+      "error": "ConnectionRefusedError: [WinError 10061] No connection could be made because the target machine actively refused it"
+    },
+    {
+      "port": 3000,
+      "tcp_connect": false,
+      "http_get_system_stats": null,
+      "http_status": null,
+      "error": "ConnectionRefusedError: [WinError 10061] No connection could be made because the target machine actively refused it"
+    }
+  ],
+  "any_engine_reachable": false,
+  "python_libraries_in_this_interpreter": {
+    "torch": {
+      "available": true,
+      "version": "2.11.0+cu128"
+    },
+    "diffusers": {
+      "available": false,
+      "error": "ModuleNotFoundError"
+    },
+    "transformers": {
+      "available": false,
+      "error": "ModuleNotFoundError"
+    },
+    "PIL": {
+      "available": true,
+      "version": "12.2.0"
+    },
+    "onnxruntime": {
+      "available": true,
+      "version": "1.27.0"
+    },
+    "sam2": {
+      "available": true,
+      "version": "unknown"
+    },
+    "cv2": {
+      "available": true,
+      "version": "5.0.0"
+    },
+    "numpy": {
+      "available": true,
+      "version": "2.4.3"
+    }
+  },
+  "diffusion_weights_in_this_runtime": {
+    "**/*.safetensors": {
+      "count": 0,
+      "files": []
+    },
+    "**/*.ckpt": {
+      "count": 0,
+      "files": []
+    },
+    "**/*.gguf": {
+      "count": 0,
+      "files": []
+    },
+    "**/*.pth": {
+      "count": 0,
+      "files": []
+    }
+  },
+  "total_diffusion_weights_in_this_runtime": 0,
+  "sibling_comfy_model_store_observation": {
+    "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\comfy\\models\\checkpoints",
+    "observed_read_only": true,
+    "usable_by_this_task": false,
+    "reason": "MF-V1-COMFY runtime; Manager round-2 packet forbids writing, depending on or mutating it",
+    "exists": true,
+    "files": [
+      {
+        "name": "Juggernaut-XL_v9_RunDiffusionPhoto_v2.safetensors",
+        "bytes": 7105348188
+      }
+    ]
+  },
+  "conclusion": "No image-editing/generative engine is callable from this task's runtime: no loopback engine accepts a connection, no diffusion library is installed in this interpreter, and this runtime holds no diffusion weights. The sibling MF-V1-COMFY store exists but is out of this task's authority."
+}

@@ -1,0 +1,37 @@
+{
+  "BOOK": {
+    "keyframes": 8,
+    "role_references": 8,
+    "manifest": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\BOOK\\references_BOOK.json"
+  },
+  "CAM_4212": {
+    "keyframes": 8,
+    "role_references": 25,
+    "manifest": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CAM_4212\\references_CAM_4212.json"
+  },
+  "CUT_660": {
+    "keyframes": 8,
+    "role_references": 20,
+    "manifest": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\CUT_660\\references_CUT_660.json"
+  },
+  "HOLDOUT_16231": {
+    "keyframes": 8,
+    "role_references": 13,
+    "manifest": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\HOLDOUT_16231\\references_HOLDOUT_16231.json"
+  },
+  "OCC_14768": {
+    "keyframes": 8,
+    "role_references": 11,
+    "manifest": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\OCC_14768\\references_OCC_14768.json"
+  },
+  "TURN_795": {
+    "keyframes": 8,
+    "role_references": 6,
+    "manifest": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\TURN_795\\references_TURN_795.json"
+  },
+  "WALK_7927": {
+    "keyframes": 8,
+    "role_references": 5,
+    "manifest": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\annotation\\WALK_7927\\references_WALK_7927.json"
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "tag": "OCC_14768",
+  "threshold_contained_high": 0.6,
+  "relations": [
+    {
+      "role_a": "role_8",
+      "role_b": "role_9",
+      "anchors": [
+        14873
+      ],
+      "anchor_count": 1,
+      "max_containment_a_in_b_box": 0.008,
+      "max_containment_b_in_a_box": 1.0,
+      "relation": "smaller_role_lies_inside_larger_role_region",
+      "contained_role": "role_9",
+      "containing_role": "role_8",
+      "containment_ratio": 1.0,
+      "mask_cross_overlap_px": 0,
+      "z_order": "unresolved_from_disjoint_masks"
+    },
+    {
+      "role_a": "role_7",
+      "role_b": "role_8",
+      "anchors": [
+        14873
+      ],
+      "anchor_count": 1,
+      "max_containment_a_in_b_box": 0.3527,
+      "max_containment_b_in_a_box": 0.0001,
+      "relation": "adjacent_roles_no_containment",
+      "contained_role": null,
+      "containing_role": null,
+      "containment_ratio": null,
+      "mask_cross_overlap_px": 0,
+      "z_order": "unresolved_from_disjoint_masks"
+    }
+  ],
+  "containment_relations": [
+    {
+      "role_a": "role_8",
+      "role_b": "role_9",
+      "anchors": [
+        14873
+      ],
+      "anchor_count": 1,
+      "max_containment_a_in_b_box": 0.008,
+      "max_containment_b_in_a_box": 1.0,
+      "relation": "smaller_role_lies_inside_larger_role_region",
+      "contained_role": "role_9",
+      "containing_role": "role_8",
+      "containment_ratio": 1.0,
+      "mask_cross_overlap_px": 0,
+      "z_order": "unresolved_from_disjoint_masks"
+    }
+  ],
+  "interpretation": "CAUTION - these containment relations are NOT occlusion and NOT z-order. SAM 2.1 automatic mask generation returns NESTED masks (a whole-object mask plus part and sub-part masks), so a small mask lying inside a large mask's bounding box is the normal nesting case and can be produced with no occlusion present at all. Measured consequence for downstream tasks: mask count must NOT be treated as object/role count on this source.",
+  "measured_nesting": {
+    "adjacent_pairs": 2,
+    "pairs_contained_ratio_ge_0.60": 1,
+    "pairs_exactly_1.0": 1
+  },
+  "occlusion_status": "NOT_DEMONSTRATED: no occlusion event was measured in this window. This is a limitation of mask-geometry evidence on this source, not proof the source contains no occlusion.",
+  "z_order_note": "SAM 2.1 automatic masks are disjoint or nested, so which surface is in FRONT cannot be measured from masks alone; z-order is recorded as unresolved instead of guessed."
+}

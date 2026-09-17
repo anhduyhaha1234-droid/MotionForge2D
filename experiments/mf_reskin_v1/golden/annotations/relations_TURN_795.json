@@ -1,0 +1,245 @@
+{
+  "tag": "TURN_795",
+  "threshold_contained_high": 0.6,
+  "relations": [
+    {
+      "role_a": "role_1",
+      "role_b": "role_3",
+      "anchors": [
+        795
+      ],
+      "anchor_count": 1,
+      "max_containment_a_in_b_box": 0.0265,
+      "max_containment_b_in_a_box": 1.0,
+      "relation": "smaller_role_lies_inside_larger_role_region",
+      "contained_role": "role_3",
+      "containing_role": "role_1",
+      "containment_ratio": 1.0,
+      "mask_cross_overlap_px": 0,
+      "z_order": "unresolved_from_disjoint_masks"
+    },
+    {
+      "role_a": "role_1",
+      "role_b": "role_4",
+      "anchors": [
+        795,
+        810,
+        825,
+        840,
+        855,
+        870,
+        885
+      ],
+      "anchor_count": 7,
+      "max_containment_a_in_b_box": 0.0013,
+      "max_containment_b_in_a_box": 1.0,
+      "relation": "smaller_role_lies_inside_larger_role_region",
+      "contained_role": "role_4",
+      "containing_role": "role_1",
+      "containment_ratio": 1.0,
+      "mask_cross_overlap_px": 0,
+      "z_order": "unresolved_from_disjoint_masks"
+    },
+    {
+      "role_a": "role_2",
+      "role_b": "role_3",
+      "anchors": [
+        795
+      ],
+      "anchor_count": 1,
+      "max_containment_a_in_b_box": 0.0256,
+      "max_containment_b_in_a_box": 1.0,
+      "relation": "smaller_role_lies_inside_larger_role_region",
+      "contained_role": "role_3",
+      "containing_role": "role_2",
+      "containment_ratio": 1.0,
+      "mask_cross_overlap_px": 0,
+      "z_order": "unresolved_from_disjoint_masks"
+    },
+    {
+      "role_a": "role_2",
+      "role_b": "role_5",
+      "anchors": [
+        840
+      ],
+      "anchor_count": 1,
+      "max_containment_a_in_b_box": 0.0013,
+      "max_containment_b_in_a_box": 1.0,
+      "relation": "smaller_role_lies_inside_larger_role_region",
+      "contained_role": "role_5",
+      "containing_role": "role_2",
+      "containment_ratio": 1.0,
+      "mask_cross_overlap_px": 0,
+      "z_order": "unresolved_from_disjoint_masks"
+    },
+    {
+      "role_a": "role_2",
+      "role_b": "role_6",
+      "anchors": [
+        855,
+        870,
+        900
+      ],
+      "anchor_count": 3,
+      "max_containment_a_in_b_box": 0.0347,
+      "max_containment_b_in_a_box": 1.0,
+      "relation": "smaller_role_lies_inside_larger_role_region",
+      "contained_role": "role_6",
+      "containing_role": "role_2",
+      "containment_ratio": 1.0,
+      "mask_cross_overlap_px": 0,
+      "z_order": "unresolved_from_disjoint_masks"
+    },
+    {
+      "role_a": "role_1",
+      "role_b": "role_6",
+      "anchors": [
+        870
+      ],
+      "anchor_count": 1,
+      "max_containment_a_in_b_box": 0.0298,
+      "max_containment_b_in_a_box": 1.0,
+      "relation": "smaller_role_lies_inside_larger_role_region",
+      "contained_role": "role_6",
+      "containing_role": "role_1",
+      "containment_ratio": 1.0,
+      "mask_cross_overlap_px": 0,
+      "z_order": "unresolved_from_disjoint_masks"
+    },
+    {
+      "role_a": "role_1",
+      "role_b": "role_2",
+      "anchors": [
+        795,
+        810,
+        825,
+        840,
+        855,
+        870
+      ],
+      "anchor_count": 6,
+      "max_containment_a_in_b_box": 0.1391,
+      "max_containment_b_in_a_box": 1.0,
+      "relation": "adjacent_roles_no_containment",
+      "contained_role": null,
+      "containing_role": null,
+      "containment_ratio": null,
+      "mask_cross_overlap_px": 0,
+      "z_order": "unresolved_from_disjoint_masks"
+    }
+  ],
+  "containment_relations": [
+    {
+      "role_a": "role_1",
+      "role_b": "role_3",
+      "anchors": [
+        795
+      ],
+      "anchor_count": 1,
+      "max_containment_a_in_b_box": 0.0265,
+      "max_containment_b_in_a_box": 1.0,
+      "relation": "smaller_role_lies_inside_larger_role_region",
+      "contained_role": "role_3",
+      "containing_role": "role_1",
+      "containment_ratio": 1.0,
+      "mask_cross_overlap_px": 0,
+      "z_order": "unresolved_from_disjoint_masks"
+    },
+    {
+      "role_a": "role_1",
+      "role_b": "role_4",
+      "anchors": [
+        795,
+        810,
+        825,
+        840,
+        855,
+        870,
+        885
+      ],
+      "anchor_count": 7,
+      "max_containment_a_in_b_box": 0.0013,
+      "max_containment_b_in_a_box": 1.0,
+      "relation": "smaller_role_lies_inside_larger_role_region",
+      "contained_role": "role_4",
+      "containing_role": "role_1",
+      "containment_ratio": 1.0,
+      "mask_cross_overlap_px": 0,
+      "z_order": "unresolved_from_disjoint_masks"
+    },
+    {
+      "role_a": "role_2",
+      "role_b": "role_3",
+      "anchors": [
+        795
+      ],
+      "anchor_count": 1,
+      "max_containment_a_in_b_box": 0.0256,
+      "max_containment_b_in_a_box": 1.0,
+      "relation": "smaller_role_lies_inside_larger_role_region",
+      "contained_role": "role_3",
+      "containing_role": "role_2",
+      "containment_ratio": 1.0,
+      "mask_cross_overlap_px": 0,
+      "z_order": "unresolved_from_disjoint_masks"
+    },
+    {
+      "role_a": "role_2",
+      "role_b": "role_5",
+      "anchors": [
+        840
+      ],
+      "anchor_count": 1,
+      "max_containment_a_in_b_box": 0.0013,
+      "max_containment_b_in_a_box": 1.0,
+      "relation": "smaller_role_lies_inside_larger_role_region",
+      "contained_role": "role_5",
+      "containing_role": "role_2",
+      "containment_ratio": 1.0,
+      "mask_cross_overlap_px": 0,
+      "z_order": "unresolved_from_disjoint_masks"
+    },
+    {
+      "role_a": "role_2",
+      "role_b": "role_6",
+      "anchors": [
+        855,
+        870,
+        900
+      ],
+      "anchor_count": 3,
+      "max_containment_a_in_b_box": 0.0347,
+      "max_containment_b_in_a_box": 1.0,
+      "relation": "smaller_role_lies_inside_larger_role_region",
+      "contained_role": "role_6",
+      "containing_role": "role_2",
+      "containment_ratio": 1.0,
+      "mask_cross_overlap_px": 0,
+      "z_order": "unresolved_from_disjoint_masks"
+    },
+    {
+      "role_a": "role_1",
+      "role_b": "role_6",
+      "anchors": [
+        870
+      ],
+      "anchor_count": 1,
+      "max_containment_a_in_b_box": 0.0298,
+      "max_containment_b_in_a_box": 1.0,
+      "relation": "smaller_role_lies_inside_larger_role_region",
+      "contained_role": "role_6",
+      "containing_role": "role_1",
+      "containment_ratio": 1.0,
+      "mask_cross_overlap_px": 0,
+      "z_order": "unresolved_from_disjoint_masks"
+    }
+  ],
+  "interpretation": "CAUTION - these containment relations are NOT occlusion and NOT z-order. SAM 2.1 automatic mask generation returns NESTED masks (a whole-object mask plus part and sub-part masks), so a small mask lying inside a large mask's bounding box is the normal nesting case and can be produced with no occlusion present at all. Measured consequence for downstream tasks: mask count must NOT be treated as object/role count on this source.",
+  "measured_nesting": {
+    "adjacent_pairs": 7,
+    "pairs_contained_ratio_ge_0.60": 6,
+    "pairs_exactly_1.0": 6
+  },
+  "occlusion_status": "NOT_DEMONSTRATED: no occlusion event was measured in this window. This is a limitation of mask-geometry evidence on this source, not proof the source contains no occlusion.",
+  "z_order_note": "SAM 2.1 automatic masks are disjoint or nested, so which surface is in FRONT cannot be measured from masks alone; z-order is recorded as unresolved instead of guessed."
+}
