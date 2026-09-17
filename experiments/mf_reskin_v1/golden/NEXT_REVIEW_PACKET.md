@@ -27,12 +27,16 @@ no vision, no PROPAGATE/BENCH, no fixture or tolerance change.
 | `mask_index` per reference | not in the manifest | **recorded, 88/88** |
 | manifest index vs max-area inference | inference only | **agree 88/88** |
 | role→index ambiguity | 10/88 | **10/88, still recorded with candidates** |
+| `publish_evidence.py` (not part of decision #2) | `5399a175…` | `c5e904e9…` (+8/−1) — patched because `publish --target ev` crashed on this round's new `ledger/raw/` snapshot **subdirectory**; failed run kept |
 
-Both tool edits are **bounded patches with preimage**: snapshots taken before any
-write (`ledger/raw/round3_preimage/`, `snapshot_is_byte_identical: true`), every
+All three tool edits are **bounded patches with preimage**: snapshots taken before
+any write (`ledger/raw/round3_preimage/`, `snapshot_is_byte_identical: true`), every
 replacement asserted to occur exactly once, `whole_file_rewrite: false`, and
 before/after sha256 + bytes + line counts recorded in
-`ledger/round3_tool_patch.json`.
+`ledger/round3_tool_patch.json`. The third (`publish_evidence.py`) is a measured
+necessity: the preimage snapshots live in a subdirectory of `ledger/raw/`, which its
+flat listing tried to `sha256` — the first `publish --target ev` died with
+`PermissionError` (row 102, kept), the patch skips non-files, the re-run is row 105.
 
 **The audit check was not redefined to make it pass.** It is now measured against
 the crop actually applied, and it is strictly stronger: the crop window is read

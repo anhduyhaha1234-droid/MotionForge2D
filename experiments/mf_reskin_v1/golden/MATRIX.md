@@ -25,7 +25,7 @@ and after-image hashes for this round: `ledger/round3_preimage.json`,
 | G-A8 | every required role has a reference; artwork exists **or** exact unmet dependency | **PASS as outcome (b)** (unchanged; artwork is a separate authorised step) | 88 role references + `KEYFRAME_SPEC.md` (`4ed5b7bf…`, byte-identical) + `image_engine_probe.json` (`any_engine_reachable false`) · `make_references.py`, `probe_image_engine.py` |
 | G-A9 | provenance recorded for every generated/imported asset | **PASS, extended this round** | per-role `reference_sha256`, `source_frame_id`, `source_pts`, `mask_index` (**new**), `role_index_candidates` (**new**), `crop_basis`/`crop_bbox_xywh`/`crop_origin_xy`/`crop_size_wh` (**new**), `annotation_declared_bbox_xywh` (alias of `bbox_xywh`), `derived_from_mask_artifact`, `provenance.source_film_sha256`; per-file rows in `COPY_MANIFEST.json` + `HASH_TABLE.json` · `make_references.py`, `publish_evidence.py` |
 | G-A10 | fixture frozen before any candidate; freeze hash recorded | **PASS, re-asserted** | `freeze_hash_sha256 2c558ce19e0a9d915d860dc07843bd1412ac4a7801284cca5293ea21cbfba684` **re-derived this round from the file** by `verify_round3.py` (canonical JSON minus `freeze`) and equal to the pin; fixture file sha `7e1627e4…cd0dab` also equal |
-| G-A11 | no file written outside the allowlist; guard VERIFIED | **PASS** | `guards/guard_baseline.json` (pre-write) + `guards/guard_verify.json` (post-work) + `guards/guard_final_classification.json` → round-3 classifier verdict; every changed path inside the allowlist, `removed_count 0`, no destructive shrink; frozen-byte re-assertion in `ledger/round3_after.json` (14/14 checks) · `write_set_guard.py`, `classify_guard_result_r3.py` |
+| G-A11 | no file written outside the allowlist; guard VERIFIED | **PASS** | `guards/guard_baseline.json` (pre-write, HEAD `ee7aab4`, porcelain 0) + `guards/guard_verify.json` + `guards/guard_final_classification.json` → round-3 stage-aware classifier: **precommit `VERIFIED_WITH_EXPECTED_REGENERATION_PRECOMMIT` 12/12** and **postcommit `VERIFIED_WITH_EXPECTED_REGENERATION_AND_COMMIT` 12/12** (the raw guard verdict is `DRIFT` only because `write_set_guard.py` treats any HEAD movement / tracked-file change as a problem, and both are packet-mandated); every changed path inside the allowlist, `removed_count 0`, no destructive shrink; frozen-byte re-assertion 14/14 in `ledger/round3_after.json` · `write_set_guard.py`, `classify_guard_result_r3.py` |
 | G-A12 | report states real pass *and* fail, no fabricated numbers | **PASS** | `REPORT.md` §6 lists the carried gaps, the still-wrong annotation bbox (0.433474 %), the 10/88 ambiguity, the 6/88 overshoot bboxes and the COPY_MANIFEST size discrepancy; `MATRIX.md` §E lists every round-3 command row, including the duplicated pre-image run |
 
 ## B. Window matrix (frozen fixture — unchanged this round)
@@ -80,7 +80,7 @@ Frozen set re-asserted this round (all byte-identical, `ledger/round3_after.json
 | Roles whose declared bbox **overshoots** one axis | not measured | **6/88** (2–180 px) | same |
 | Independent second derivation | n/a | **88/88 exact, 0 px outside, equal totals** | `ledger/round3_after.json.independent_cutout_check` |
 | Frozen-byte re-assertion | n/a | **14/14 checks true, `failures []`** | `ledger/round3_after.json.checks` |
-| Patched tools | 2 tools, no preimage record this granular | `make_references.py` `016f7acd…`→`9588e8d9…`; `measure_cutout_bounds.py` `665cdb34…`→`4c7a6943…` | `ledger/round3_tool_patch.json` |
+| Patched tools | 2 tools touched, no preimage record this granular | `make_references.py` `016f7acd…`→`9588e8d9…` (+54/−3); `measure_cutout_bounds.py` `665cdb34…`→`4c7a6943…` (+100/−31); `publish_evidence.py` `5399a175…`→`c5e904e9…` (+8/−1) for the measured `ledger/raw/` subdirectory crash | `ledger/round3_tool_patch.json` |
 | Engine reachability / diffusion weights / vision | `false` / 0 / no vision | **not re-probed** (out of scope this round; round-2 evidence carried) | `image_engine_probe.json`, `vision_route_probe.json` |
 
 ## E. Command ledger — the round-3 rows
@@ -94,14 +94,37 @@ Frozen set re-asserted this round (all byte-identical, `ledger/round3_after.json
 | 91 | **make_references_r3** | 0 | 0.942 | ledger/raw/20260917T134255_make_references_r3.txt |
 | 92 | **measure_cutout_bounds_r3** | 0 | 0.285 | ledger/raw/20260917T134314_measure_cutout_bounds_r3.txt |
 | 93 | **verify_round3** | 0 | 0.317 | ledger/raw/20260917T134424_verify_round3.txt |
+| 94 | **publish_repo_r3** | 0 | 0.535 | ledger/raw/20260917T135330_publish_repo_r3.txt |
+| 95 | guard_verify_precommit_r3 | **1** | 0.645 | ledger/raw/20260917T135359_guard_verify_precommit_r3.txt (verdict DRIFT = expected regeneration, see §A G-A11) |
+| 96 | classify_guard_result_precommit_r3 (v1) | **1** | 0.050 | ledger/raw/20260917T135410_classify_guard_result_precommit_r3.txt (checker bug: demanded a HEAD advance pre-commit; kept) |
+| 97 | classify_guard_result_precommit_r3_v2 | 0 | 0.055 | ledger/raw/20260917T135453_classify_guard_result_precommit_r3_v2.txt |
+| 98 | publish_repo_guards_r3 | 0 | 0.202 | ledger/raw/20260917T135519_publish_repo_guards_r3.txt |
+| — | **commit #1 `9f1b54c`** (105 files, all inside the write set) | — | — | `git show --stat 9f1b54c` |
+| 99 | guard_verify_postcommit_r3 | **1** | 0.559 | ledger/raw/20260917T135610_guard_verify_postcommit_r3.txt (single problem: HEAD moved) |
+| 100 | classify_guard_result_postcommit_r3 | 0 | 0.058 | ledger/raw/20260917T135611_classify_guard_result_postcommit_r3.txt |
+| 101 | publish_repo_guards_tip_r3 | 0 | 0.210 | ledger/raw/20260917T135623_publish_repo_guards_tip_r3.txt |
+| — | **commit #2 `4768be0`** (guard verdict + tip-timed refresh) | — | — | `git show --stat 4768be0` |
+| 102 | publish_ev_r3 | **1** | 0.680 | ledger/raw/20260917T135757_publish_ev_r3.txt (`PermissionError` on `ledger\raw\round3_preimage`, kept) |
+| 103 | round3_tool_patch_v2 | 0 | 0.045 | ledger/raw/20260917T135854_round3_tool_patch_v2.txt (adds the `publish_evidence.py` bounded patch) |
+| 104 | round3_tool_patch_v3 | 0 | 0.039 | ledger/raw/20260917T135943_round3_tool_patch_v3.txt (idempotent: correct an already-patched label) |
+| 105 | publish_ev_r3_v2 | 0 | 0.388 | ledger/raw/20260917T135943_publish_ev_r3_v2.txt (356 files, 0 problems) |
+| 106 | round3_tool_patch_v4 | 0 | 0.042 | ledger/raw/20260917T140028_round3_tool_patch_v4.txt (idempotent: no bytes move) |
+| 107 | hash_table_r3 | 0 | 1.178 | ledger/raw/20260917T140028_hash_table_r3.txt (5 inputs, 951 output rows) |
 
 Rows 87–88 are the pre-image freeze (the duplicated invocation is disclosed in
-`REPORT.md` §1; both raw outputs kept, the second is authoritative). Rows 89–93 are
-this round's correction. Rows 1–86 are rounds 1–2 and live in the round-2 table of
-the archived `report/round2/MATRIX.md`. `make_references_r3` takes **0.942 s**
-versus round 2's 22.442 s because all 56 keyframes already existed and were
-therefore **not re-decoded** (the fixture was not rebuilt) — proved afterwards by
-`verify_round3.py`: all 56 keyframe PNGs byte-identical.
+`REPORT.md` §1; both raw outputs kept, the second is authoritative). Rows 89–107 are
+this round's work — including its two **non-zero exits**, which are kept as raw
+evidence rather than dropped: row 96 (round-3 classifier v1 was wrong on the
+pre-commit state and was corrected, both runs kept) and row 102 (`publish --target
+ev` hit a real `PermissionError` caused by this round's snapshot subdirectory; fixed
+by a bounded patch to `publish_evidence.py`, re-run as row 105). Rows 1–86 are
+rounds 1–2 and live in the round-2 table of the archived `report/round2/MATRIX.md`.
+`make_references_r3` takes **0.942 s** versus round 2's 22.442 s because all 56
+keyframes already existed and were therefore **not re-decoded** (the fixture was not
+rebuilt) — proved afterwards by `verify_round3.py`: all 56 keyframe PNGs
+byte-identical.
 
 Every row in `ledger/commands.jsonl` carries argv, cwd, UTC+local start/end, exit
-code, duration, raw output path and raw byte size. Rows 87–93 are all exit 0.
+code, duration, raw output path and raw byte size. In the round-3 range 87–107 the
+only non-zero exits are rows 95, 96, 99 and 102 — all four are named above and their
+raw output is kept; every other row is exit 0.

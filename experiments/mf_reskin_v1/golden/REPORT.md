@@ -32,6 +32,19 @@ work, no PROPAGATE/BENCH, no fixture/tolerance change.
 | audit | `python tools/measure_cutout_bounds.py` | 88 roles: **88 `EXACT`**, mask px outside crop **0 / 2,089,631 = 0.0 %** | 0 |
 | independent check | `python tools/verify_round3.py` | **14/14 checks true**, `failures []` | 0 |
 
+Two commands **failed first** and are kept in the ledger as raw evidence (they are
+part of this round's record, not hidden):
+
+* row 96 `classify_guard_result_precommit_r3` → exit 1: the first version of the
+  round-3 classifier demanded a HEAD advance, which a pre-commit state cannot have,
+  so it returned `DRIFT`. It was corrected to be stage-aware
+  (`--stage precommit|postcommit`) and re-run (row 97, exit 0). Both raw outputs are
+  kept; the failed one is **not** deleted.
+* row 102 `publish_ev_r3` → exit 1 `PermissionError`: `publish_evidence.py` listed
+  `ledger/raw/` flatly, and this round put the preimage snapshots in a
+  **subdirectory** there, so the tool tried to `sha256` a directory. Fixed by a
+  bounded patch (see §2.3) and re-run as row 105 (exit 0).
+
 `round3_preimage.py` ran twice. The **first** invocation (19:32:41) recorded a
 7-entry frozen list that included `references_index.json` and
 `cutout_bounds_audit.json`; those two are rebuilt by design in this round, so the
@@ -45,17 +58,19 @@ second run's `ledger/round3_preimage.json` is used as authority below.
 
 ## 2. The correction itself — bounded patches, with preimage
 
-Two tool files moved. Both are **untracked runtime tools**, so Git cannot restore
-them; both were snapshotted byte-for-byte before any write
+Three tool files moved: two carry the correction itself, the third is a measured
+necessity (§2.3). All are **untracked runtime tools**, so Git cannot restore
+them; each was snapshotted byte-for-byte before any write
 (`ledger/raw/round3_preimage/`) and the snapshot hash was verified equal to the
 source hash (`snapshot_is_byte_identical: true`). No file was rewritten whole:
-`whole_file_rewrite: false` for both, and every replacement asserts the old block
-occurs exactly once. Record: `ledger/round3_tool_patch.json`.
+`whole_file_rewrite: false` for all three, and every replacement asserts the old
+block occurs exactly once. Record: `ledger/round3_tool_patch.json`.
 
 | Tool | sha256 before → after | bytes | lines | diff |
 |---|---|---|---|---|
 | `make_references.py` | `016f7acd4f17916970a971b5856c5b3760d20ce58d805f159cd9b98616f60580` → `9588e8d9ae749894aeeb4760c0a471c044f26d6fc27e7bd1a25e009a28a67124` | 6,829 → 9,977 | 181 → 232 | +54 / −3 |
 | `measure_cutout_bounds.py` | `665cdb34f35969a4d39203b88d686306e5aba40db2cd3049972f2f25847c0b42` → `4c7a694379f91badf04069c275e67e047840387b0985af9993de6eb3c93bd1d7` | 7,853 → 12,329 | 189 → 258 | +100 / −31 |
+| `publish_evidence.py` (see §2.3) | `5399a175ea30d585c370c6c5ba519104800ba62c7bfe3567fc6ce48bc4af834d` → `c5e904e980b73280b13b05d756c9d3f58b930bd9db123c611e0104ae43bc56ab` | 15,797 → 16,189 | 321 → 328 | +8 / −1 |
 
 ### 2.1 `make_references.py` — crop from the mask's tight bbox
 
@@ -102,6 +117,21 @@ Field names were disambiguated rather than reused: the round-2 field
 applied. The round-2 audit bytes are preserved unchanged at
 `probe/round2/cutout_bounds_audit.json`
 (`5744ea2d8a2572087d3774cce4dbed45bf540353635f9ad7cba8b100b6c5462a`).
+
+### 2.3 `publish_evidence.py` — a measured necessity, not scope creep
+
+`publish --target ev` died with `PermissionError: [Errno 13]` on
+`ledger\raw\round3_preimage` (ledger row 102, exit 1, raw traceback kept): the tool
+lists `ledger/raw/` flatly for publication, and this round stored its preimage
+snapshots as a **subdirectory** there. The bounded patch skips entries that are not files, so
+the EV publish completes (row 105, exit 0, 356 files, 0 problems). Nothing about the
+publication semantics changed — the same files are copied and hash-verified — and no
+snapshot was moved to dodge the bug. `ledger/round3_preimage.json` had recorded this
+tool under `unpatched_tool_hashes`; that record is superseded here explicitly, and
+the preimage snapshot was taken byte-identical before the patch
+(`5399a175ea30d585c370c6c5ba519104800ba62c7bfe3567fc6ce48bc4af834d`).
+
+
 
 ## 3. New measured numbers (both metrics, same run)
 
@@ -199,6 +229,14 @@ in git history (`674fc0c`, `86e794c`, `278bacf`, `ee7aab4`) — none of it rewri
    `COPY_MANIFEST.json 160,899 B`; the measured EV copy at this round's preflight is
    **167,197 B** and the in-repo copy **87,064 B** (the EV manifest grows as it
    records superseded hashes). Both are recorded in `HASH_TABLE.json` this round.
+5. **A third tool had to be patched for a measured reason** (§2.3): the new preimage
+   snapshot subdirectory under `ledger/raw/` broke `publish_evidence.py`'s flat
+   listing and the first EV publish crashed. The failed command, its traceback and
+   the patch record are all kept. This is disclosed as a scope addition beyond
+   `make_references.py`, with its before/after bytes in the ledger.
+6. **The round-3 guard classifier itself was wrong on its first run** (§1): it
+   demanded a HEAD advance in a pre-commit state. The failed run is kept; the
+   corrected, stage-aware version is the one whose verdict is published.
 
 ## 7. Write set, guard and scope
 
