@@ -46,6 +46,25 @@ $VP tools/serve_comfy.py --port 8199          # loopback only, writes instance_e
 $VP -m pytest tests/ -q                       # real-server tests skip if the server is down
 ```
 
+## Stop (required — the wave allows one heavy GPU stage at a time)
+
+Never leave this server holding VRAM after a proof: the card is 12,227 MiB and an idle
+server still holds ~7.4 GiB. Shutdown is a task-local tool — never `killall`/`pkill`
+(this machine runs Hermes on Python):
+
+```bash
+python EV/COMFY/tools/stop_comfy.py           # identity-checked: epoch pid + matching
+                                              # launcher ancestors, leaf -> root, no /T
+```
+
+It proves the target's identity from `runtime/comfy/instance_epoch.json`, posts ComfyUI's
+own `/free {"unload_models": true, "free_memory": true}`, stops the verified pids one at a
+time, and writes `EV/COMFY/raw/comfy_shutdown.json` with argv, cwd, before/after
+`nvidia-smi` readings and the closed-port proof. A repeat run is harmless
+(`ALREADY_STOPPED`) and never overwrites that evidence. Measured (continuation-01): VRAM
+7,490 → 862 → 623 MiB of 12,227 MiB, port `8199` closed, zero python processes outside
+this task's own chain touched. Full steps: `EV/COMFY/DOWNLOAD_MANIFEST.md` §F.
+
 Adapter states are `submitted → queued → generated → validated`, plus `unresolved` and
 `failed`. `accepted`/`published` belong to MotionForge — the adapter never emits them.
 
