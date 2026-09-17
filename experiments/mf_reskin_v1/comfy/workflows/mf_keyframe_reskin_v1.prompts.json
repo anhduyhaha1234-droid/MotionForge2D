@@ -1,0 +1,43 @@
+{
+  "workflow_id": "mf_keyframe_reskin_v1",
+  "role": "source keyframe + style refs + structure guide -> aligned styled keyframe, including background and selected roles",
+  "route": "A",
+  "route_name": "sdxl-img2img-bounded-denoise",
+  "structure_conditioning": {
+    "mechanism": "img2img: the frozen GOLDEN keyframe at the anchor is the VAE-encoded init latent; the source latents anchor geometry, a strong identity/medium prompt supplies the appearance change",
+    "graph_path": "2 LoadImage -> 3 ImageScale(1024x576 lanczos) -> 6 VAEEncode -> 7 KSampler(denoise<1) -> 8 VAEDecode -> 9 ImageScale(640x360 lanczos) -> 10 SaveImage",
+    "why_not_text_to_image": "KEYFRAME_SPEC.md 1.2 forbids scale/layout/silhouette/contact drift; plain T2I cannot hold geometry, so it is rejected by the graph validator (EmptyLatentImage is refused)",
+    "why_not_sdxl_controlnet": "no SDXL ControlNet checkpoint exists on this machine (measured: models/controlnet holds only flux_controlnet_union_pro_fp8.safetensors); the only ControlNet present is the FLUX union, and FLUX.1-dev is licence-gated"
+  },
+  "params": {
+    "checkpoint": "Juggernaut-XL_v9_RunDiffusionPhoto_v2.safetensors",
+    "init_resolution": [1024, 576],
+    "init_resolution_note": "exactly 16:9 and the same pixel count as the already-proven 768x768 run (peak 8,656 / 12,227 MiB); deliberately not 1280x720 (1.56x pixels)",
+    "deliverable_resolution": [640, 360],
+    "steps": 20,
+    "cfg": 6.0,
+    "sampler_name": "euler",
+    "scheduler": "normal",
+    "seed_policy": "deterministic per anchor: sha256('<TAG>|<frame_id>|20260917') first 4 bytes, masked to 31 bits; no seed reuse across anchors",
+    "denoise": "reported per anchor; calibrated in this round (see raw/210_calibration.json)"
+  },
+  "prompts": {
+    "positive_template": "{hint}; reskinned as a cinematic photoreal 35mm film still of a different character: a grizzled fisherwoman with braided auburn hair, a scarred cheek and a sun-weathered face, wearing a thick charcoal wool coat with brass buttons, a cable-knit scarf and worn leather gloves. Photographic skin pores, individual hair strands, woven fabric fibres, brushed metal and oiled wood surfaces, overcast north-sea daylight, atmospheric haze, shallow depth of field, fine film grain, teal-and-amber grade, high micro-detail",
+    "positive_template_identity_v2": "{hint}; re-rendered from scratch as a photographic 35mm film still of a visibly DIFFERENT person, not a recolour of the drawing: a gaunt sun-weathered fisherwoman in her sixties, deep-set hooded eyes with crow's feet, a crooked broken nose, a scar across the left cheekbone, thin wind-chapped lips, braided iron-grey auburn hair with loose strands, wearing a thick hand-knitted aran jumper under a salt-stained oilskin jacket with tarnished brass toggles and cracked leather gloves, holding the same object in the same grip. Every flat colour region of the original drawing must be replaced by a continuous photographic surface: visible skin pores and wrinkles, individual eyelashes and hair strands, individual wool fibres and pilling, wet oilskin sheen with specular highlights, corroded metal, worn varnished wood grain, no untextured or posterised areas anywhere in the frame. The flat background shapes must become a photographic environment of weathered planks, rusted ironwork and drifting sea fog. Overcast north-atlantic daylight, volumetric haze, shallow depth of field, fine film grain, teal-and-amber grade, high micro-detail",
+    "negative_identity_v2": "flat vector art, flat colour fill, uniform colour regions, untextured surfaces, posterised gradients, cel shading, cartoon, anime, poster, illustration, colour grading only, recolour, recoloured, text, caption, watermark, logo, signature, blurry, low quality, jpeg artifacts, duplicate objects, extra limbs, extra hands, deformed hands, identical face to the source drawing",
+    "identity_v2_rationale": "continuation-03 (MF-V1-COMFY): the continuation-02 template changed the palette and the medium but the measured structure remained explainable as a colour map of the source (the LUT test), i.e. the render was closer to a grade than a reskin. This variant forces an actual identity and surface change (a specific different person, photographic materials, and an explicit demand that no flat or untextured region survive) while leaving the geometry conditioning untouched: the frozen keyframe is still the img2img init at the same denoise.",
+    "negative": "flat vector art, flat colour fill, cel shading, cartoon, anime, poster, illustration, text, caption, watermark, logo, signature, blurry, low quality, jpeg artifacts, duplicate objects, extra limbs, extra hands, deformed hands",
+    "per_window_hint": "the frozen fixture's own window `name` field (read-only input), appended as the scene hint so the model does not fight the anchored layout"
+  },
+  "not_used": {
+    "flux1_dev": {
+      "status": "licence_gated_not_used",
+      "licence": "FLUX.1 [dev] Non-Commercial License",
+      "requirement": "using FLUX.1-dev for deliverable artwork requires explicit end-user licence acceptance; the Manager is not authorised to grant it, so no FLUX output exists in this artwork set",
+      "measured_present_on_disk": [
+        {"file": "flux1-dev-Q4_K_S.gguf", "bytes": 6805988640, "where": "user store models/unet (read-only)"},
+        {"file": "flux_controlnet_union_pro_fp8.safetensors", "bytes": 2140902936, "where": "user store models/controlnet (read-only)"}
+      ]
+    }
+  }
+}
