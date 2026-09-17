@@ -1,123 +1,18 @@
 {
   "mode": "verify",
-  "taken_at_utc": "2026-09-17T13:54:00Z",
+  "taken_at_utc": "2026-09-17T13:56:11Z",
   "verdict": "DRIFT",
   "problems": [
-    "tracked files newly modified: ['experiments/mf_reskin_v1/golden/COPY_MANIFEST.json', 'experiments/mf_reskin_v1/golden/MATRIX.md', 'experiments/mf_reskin_v1/golden/NEXT_REVIEW_PACKET.md', 'experiments/mf_reskin_v1/golden/README.md', 'experiments/mf_reskin_v1/golden/REPORT.md', 'experiments/mf_reskin_v1/golden/cutout_bounds_audit.json', 'experiments/mf_reskin_v1/golden/guards/guard_baseline.json', 'experiments/mf_reskin_v1/golden/ledger/commands.jsonl', 'experiments/mf_reskin_v1/golden/references/references_BOOK.json', 'experiments/mf_reskin_v1/golden/references/references_CAM_4212.json', 'experiments/mf_reskin_v1/golden/references/references_CUT_660.json', 'experiments/mf_reskin_v1/golden/references/references_HOLDOUT_16231.json', 'experiments/mf_reskin_v1/golden/references/references_OCC_14768.json', 'experiments/mf_reskin_v1/golden/references/references_TURN_795.json', 'experiments/mf_reskin_v1/golden/references/references_WALK_7927.json', 'experiments/mf_reskin_v1/golden/roles/BOOK/role_1_f1680.png', 'experiments/mf_reskin_v1/golden/roles/BOOK/role_2_f1665.png', 'experiments/mf_reskin_v1/golden/roles/BOOK/role_3_f1680.png', 'experiments/mf_reskin_v1/golden/roles/BOOK/role_4_f1755.png', 'experiments/mf_reskin_v1/golden/roles/BOOK/role_5_f1695.png', 'experiments/mf_reskin_v1/golden/roles/BOOK/role_6_f1755.png', 'experiments/mf_reskin_v1/golden/roles/BOOK/role_7_f1695.png', 'experiments/mf_reskin_v1/golden/roles/BOOK/role_8_f1725.png', 'experiments/mf_reskin_v1/golden/roles/CAM_4212/role_10_f4242.png', 'experiments/mf_reskin_v1/golden/roles/CAM_4212/role_11_f4257.png', 'experiments/mf_reskin_v1/golden/roles/CAM_4212/role_12_f4257.png', 'experiments/mf_reskin_v1/golden/roles/CAM_4212/role_13_f4257.png', 'experiments/mf_reskin_v1/golden/roles/CAM_4212/role_14_f4257.png', 'experiments/mf_reskin_v1/golden/roles/CAM_4212/role_15_f4272.png', 'experiments/mf_reskin_v1/golden/roles/CAM_4212/role_16_f4272.png', 'experiments/mf_reskin_v1/golden/roles/CAM_4212/role_17_f4302.png', 'experiments/mf_reskin_v1/golden/roles/CAM_4212/role_18_f4287.png', 'experiments/mf_reskin_v1/golden/roles/CAM_4212/role_19_f4272.png', 'experiments/mf_reskin_v1/golden/roles/CAM_4212/role_1_f4212.png', 'experiments/mf_reskin_v1/golden/roles/CAM_4212/role_20_f4287.png', 'experiments/mf_reskin_v1/golden/roles/CAM_4212/role_21_f4272.png', 'experiments/mf_reskin_v1/golden/roles/CAM_4212/role_22_f4272.png', 'experiments/mf_reskin_v1/golden/roles/CAM_4212/role_23_f4272.png', 'experiments/mf_reskin_v1/golden/roles/CAM_4212/role_24_f4287.png', 'experiments/mf_reskin_v1/golden/roles/CAM_4212/role_25_f4317.png', 'experiments/mf_reskin_v1/golden/roles/CAM_4212/role_2_f4242.png', 'experiments/mf_reskin_v1/golden/roles/CAM_4212/role_3_f4257.png', 'experiments/mf_reskin_v1/golden/roles/CAM_4212/role_4_f4272.png', 'experiments/mf_reskin_v1/golden/roles/CAM_4212/role_5_f4287.png', 'experiments/mf_reskin_v1/golden/roles/CAM_4212/role_6_f4257.png', 'experiments/mf_reskin_v1/golden/roles/CAM_4212/role_7_f4242.png', 'experiments/mf_reskin_v1/golden/roles/CAM_4212/role_8_f4242.png', 'experiments/mf_reskin_v1/golden/roles/CAM_4212/role_9_f4242.png', 'experiments/mf_reskin_v1/golden/roles/CUT_660/role_10_f720.png', 'experiments/mf_reskin_v1/golden/roles/CUT_660/role_11_f735.png', 'experiments/mf_reskin_v1/golden/roles/CUT_660/role_12_f750.png', 'experiments/mf_reskin_v1/golden/roles/CUT_660/role_13_f750.png', 'experiments/mf_reskin_v1/golden/roles/CUT_660/role_14_f765.png', 'experiments/mf_reskin_v1/golden/roles/CUT_660/role_15_f750.png', 'experiments/mf_reskin_v1/golden/roles/CUT_660/role_16_f750.png', 'experiments/mf_reskin_v1/golden/roles/CUT_660/role_17_f750.png', 'experiments/mf_reskin_v1/golden/roles/CUT_660/role_18_f750.png', 'experiments/mf_reskin_v1/golden/roles/CUT_660/role_19_f750.png', 'experiments/mf_reskin_v1/golden/roles/CUT_660/role_1_f660.png', 'experiments/mf_reskin_v1/golden/roles/CUT_660/role_20_f750.png', 'experiments/mf_reskin_v1/golden/roles/CUT_660/role_2_f660.png', 'experiments/mf_reskin_v1/golden/roles/CUT_660/role_3_f660.png', 'experiments/mf_reskin_v1/golden/roles/CUT_660/role_4_f720.png', 'experiments/mf_reskin_v1/golden/roles/CUT_660/role_5_f675.png', 'experiments/mf_reskin_v1/golden/roles/CUT_660/role_6_f660.png', 'experiments/mf_reskin_v1/golden/roles/CUT_660/role_7_f660.png', 'experiments/mf_reskin_v1/golden/roles/CUT_660/role_8_f660.png', 'experiments/mf_reskin_v1/golden/roles/CUT_660/role_9_f675.png', 'experiments/mf_reskin_v1/golden/roles/HOLDOUT_16231/role_10_f16231.png', 'experiments/mf_reskin_v1/golden/roles/HOLDOUT_16231/role_11_f16231.png', 'experiments/mf_reskin_v1/golden/roles/HOLDOUT_16231/role_12_f16261.png', 'experiments/mf_reskin_v1/golden/roles/HOLDOUT_16231/role_13_f16336.png', 'experiments/mf_reskin_v1/golden/roles/HOLDOUT_16231/role_1_f16276.png', 'experiments/mf_reskin_v1/golden/roles/HOLDOUT_16231/role_2_f16306.png', 'experiments/mf_reskin_v1/golden/roles/HOLDOUT_16231/role_3_f16321.png', 'experiments/mf_reskin_v1/golden/roles/HOLDOUT_16231/role_4_f16321.png', 'experiments/mf_reskin_v1/golden/roles/HOLDOUT_16231/role_5_f16231.png', 'experiments/mf_reskin_v1/golden/roles/HOLDOUT_16231/role_6_f16231.png', 'experiments/mf_reskin_v1/golden/roles/HOLDOUT_16231/role_7_f16321.png', 'experiments/mf_reskin_v1/golden/roles/HOLDOUT_16231/role_8_f16231.png', 'experiments/mf_reskin_v1/golden/roles/HOLDOUT_16231/role_9_f16261.png', 'experiments/mf_reskin_v1/golden/roles/OCC_14768/role_10_f14873.png', 'experiments/mf_reskin_v1/golden/roles/OCC_14768/role_11_f14873.png', 'experiments/mf_reskin_v1/golden/roles/OCC_14768/role_1_f14843.png', 'experiments/mf_reskin_v1/golden/roles/OCC_14768/role_2_f14768.png', 'experiments/mf_reskin_v1/golden/roles/OCC_14768/role_3_f14873.png', 'experiments/mf_reskin_v1/golden/roles/OCC_14768/role_4_f14813.png', 'experiments/mf_reskin_v1/golden/roles/OCC_14768/role_5_f14798.png', 'experiments/mf_reskin_v1/golden/roles/OCC_14768/role_6_f14858.png', 'experiments/mf_reskin_v1/golden/roles/OCC_14768/role_7_f14873.png', 'experiments/mf_reskin_v1/golden/roles/OCC_14768/role_8_f14873.png', 'experiments/mf_reskin_v1/golden/roles/OCC_14768/role_9_f14873.png', 'experiments/mf_reskin_v1/golden/roles/TURN_795/role_1_f795.png', 'experiments/mf_reskin_v1/golden/roles/TURN_795/role_2_f900.png', 'experiments/mf_reskin_v1/golden/roles/TURN_795/role_3_f795.png', 'experiments/mf_reskin_v1/golden/roles/TURN_795/role_4_f810.png', 'experiments/mf_reskin_v1/golden/roles/TURN_795/role_5_f840.png', 'experiments/mf_reskin_v1/golden/roles/TURN_795/role_6_f900.png', 'experiments/mf_reskin_v1/golden/roles/WALK_7927/role_1_f7972.png', 'experiments/mf_reskin_v1/golden/roles/WALK_7927/role_2_f8002.png', 'experiments/mf_reskin_v1/golden/roles/WALK_7927/role_3_f7942.png', 'experiments/mf_reskin_v1/golden/roles/WALK_7927/role_4_f7942.png', 'experiments/mf_reskin_v1/golden/roles/WALK_7927/role_5_f8032.png']",
-    "git diff --stat changed on tracked files"
+    "HEAD changed: ee7aab4d0d1d08a101fea5d0a8c1d2e61087008d -> 9f1b54c5be22306b78aa03399be31f07b5f84e8b"
   ],
-  "added_count": 30,
-  "modified_count": 207,
+  "added_count": 34,
+  "modified_count": 211,
   "removed_count": 0,
-  "tracked_modified_delta": [
-    "experiments/mf_reskin_v1/golden/COPY_MANIFEST.json",
-    "experiments/mf_reskin_v1/golden/MATRIX.md",
-    "experiments/mf_reskin_v1/golden/NEXT_REVIEW_PACKET.md",
-    "experiments/mf_reskin_v1/golden/README.md",
-    "experiments/mf_reskin_v1/golden/REPORT.md",
-    "experiments/mf_reskin_v1/golden/cutout_bounds_audit.json",
-    "experiments/mf_reskin_v1/golden/guards/guard_baseline.json",
-    "experiments/mf_reskin_v1/golden/ledger/commands.jsonl",
-    "experiments/mf_reskin_v1/golden/references/references_BOOK.json",
-    "experiments/mf_reskin_v1/golden/references/references_CAM_4212.json",
-    "experiments/mf_reskin_v1/golden/references/references_CUT_660.json",
-    "experiments/mf_reskin_v1/golden/references/references_HOLDOUT_16231.json",
-    "experiments/mf_reskin_v1/golden/references/references_OCC_14768.json",
-    "experiments/mf_reskin_v1/golden/references/references_TURN_795.json",
-    "experiments/mf_reskin_v1/golden/references/references_WALK_7927.json",
-    "experiments/mf_reskin_v1/golden/roles/BOOK/role_1_f1680.png",
-    "experiments/mf_reskin_v1/golden/roles/BOOK/role_2_f1665.png",
-    "experiments/mf_reskin_v1/golden/roles/BOOK/role_3_f1680.png",
-    "experiments/mf_reskin_v1/golden/roles/BOOK/role_4_f1755.png",
-    "experiments/mf_reskin_v1/golden/roles/BOOK/role_5_f1695.png",
-    "experiments/mf_reskin_v1/golden/roles/BOOK/role_6_f1755.png",
-    "experiments/mf_reskin_v1/golden/roles/BOOK/role_7_f1695.png",
-    "experiments/mf_reskin_v1/golden/roles/BOOK/role_8_f1725.png",
-    "experiments/mf_reskin_v1/golden/roles/CAM_4212/role_10_f4242.png",
-    "experiments/mf_reskin_v1/golden/roles/CAM_4212/role_11_f4257.png",
-    "experiments/mf_reskin_v1/golden/roles/CAM_4212/role_12_f4257.png",
-    "experiments/mf_reskin_v1/golden/roles/CAM_4212/role_13_f4257.png",
-    "experiments/mf_reskin_v1/golden/roles/CAM_4212/role_14_f4257.png",
-    "experiments/mf_reskin_v1/golden/roles/CAM_4212/role_15_f4272.png",
-    "experiments/mf_reskin_v1/golden/roles/CAM_4212/role_16_f4272.png",
-    "experiments/mf_reskin_v1/golden/roles/CAM_4212/role_17_f4302.png",
-    "experiments/mf_reskin_v1/golden/roles/CAM_4212/role_18_f4287.png",
-    "experiments/mf_reskin_v1/golden/roles/CAM_4212/role_19_f4272.png",
-    "experiments/mf_reskin_v1/golden/roles/CAM_4212/role_1_f4212.png",
-    "experiments/mf_reskin_v1/golden/roles/CAM_4212/role_20_f4287.png",
-    "experiments/mf_reskin_v1/golden/roles/CAM_4212/role_21_f4272.png",
-    "experiments/mf_reskin_v1/golden/roles/CAM_4212/role_22_f4272.png",
-    "experiments/mf_reskin_v1/golden/roles/CAM_4212/role_23_f4272.png",
-    "experiments/mf_reskin_v1/golden/roles/CAM_4212/role_24_f4287.png",
-    "experiments/mf_reskin_v1/golden/roles/CAM_4212/role_25_f4317.png",
-    "experiments/mf_reskin_v1/golden/roles/CAM_4212/role_2_f4242.png",
-    "experiments/mf_reskin_v1/golden/roles/CAM_4212/role_3_f4257.png",
-    "experiments/mf_reskin_v1/golden/roles/CAM_4212/role_4_f4272.png",
-    "experiments/mf_reskin_v1/golden/roles/CAM_4212/role_5_f4287.png",
-    "experiments/mf_reskin_v1/golden/roles/CAM_4212/role_6_f4257.png",
-    "experiments/mf_reskin_v1/golden/roles/CAM_4212/role_7_f4242.png",
-    "experiments/mf_reskin_v1/golden/roles/CAM_4212/role_8_f4242.png",
-    "experiments/mf_reskin_v1/golden/roles/CAM_4212/role_9_f4242.png",
-    "experiments/mf_reskin_v1/golden/roles/CUT_660/role_10_f720.png",
-    "experiments/mf_reskin_v1/golden/roles/CUT_660/role_11_f735.png",
-    "experiments/mf_reskin_v1/golden/roles/CUT_660/role_12_f750.png",
-    "experiments/mf_reskin_v1/golden/roles/CUT_660/role_13_f750.png",
-    "experiments/mf_reskin_v1/golden/roles/CUT_660/role_14_f765.png",
-    "experiments/mf_reskin_v1/golden/roles/CUT_660/role_15_f750.png",
-    "experiments/mf_reskin_v1/golden/roles/CUT_660/role_16_f750.png",
-    "experiments/mf_reskin_v1/golden/roles/CUT_660/role_17_f750.png",
-    "experiments/mf_reskin_v1/golden/roles/CUT_660/role_18_f750.png",
-    "experiments/mf_reskin_v1/golden/roles/CUT_660/role_19_f750.png",
-    "experiments/mf_reskin_v1/golden/roles/CUT_660/role_1_f660.png",
-    "experiments/mf_reskin_v1/golden/roles/CUT_660/role_20_f750.png",
-    "experiments/mf_reskin_v1/golden/roles/CUT_660/role_2_f660.png",
-    "experiments/mf_reskin_v1/golden/roles/CUT_660/role_3_f660.png",
-    "experiments/mf_reskin_v1/golden/roles/CUT_660/role_4_f720.png",
-    "experiments/mf_reskin_v1/golden/roles/CUT_660/role_5_f675.png",
-    "experiments/mf_reskin_v1/golden/roles/CUT_660/role_6_f660.png",
-    "experiments/mf_reskin_v1/golden/roles/CUT_660/role_7_f660.png",
-    "experiments/mf_reskin_v1/golden/roles/CUT_660/role_8_f660.png",
-    "experiments/mf_reskin_v1/golden/roles/CUT_660/role_9_f675.png",
-    "experiments/mf_reskin_v1/golden/roles/HOLDOUT_16231/role_10_f16231.png",
-    "experiments/mf_reskin_v1/golden/roles/HOLDOUT_16231/role_11_f16231.png",
-    "experiments/mf_reskin_v1/golden/roles/HOLDOUT_16231/role_12_f16261.png",
-    "experiments/mf_reskin_v1/golden/roles/HOLDOUT_16231/role_13_f16336.png",
-    "experiments/mf_reskin_v1/golden/roles/HOLDOUT_16231/role_1_f16276.png",
-    "experiments/mf_reskin_v1/golden/roles/HOLDOUT_16231/role_2_f16306.png",
-    "experiments/mf_reskin_v1/golden/roles/HOLDOUT_16231/role_3_f16321.png",
-    "experiments/mf_reskin_v1/golden/roles/HOLDOUT_16231/role_4_f16321.png",
-    "experiments/mf_reskin_v1/golden/roles/HOLDOUT_16231/role_5_f16231.png",
-    "experiments/mf_reskin_v1/golden/roles/HOLDOUT_16231/role_6_f16231.png",
-    "experiments/mf_reskin_v1/golden/roles/HOLDOUT_16231/role_7_f16321.png",
-    "experiments/mf_reskin_v1/golden/roles/HOLDOUT_16231/role_8_f16231.png",
-    "experiments/mf_reskin_v1/golden/roles/HOLDOUT_16231/role_9_f16261.png",
-    "experiments/mf_reskin_v1/golden/roles/OCC_14768/role_10_f14873.png",
-    "experiments/mf_reskin_v1/golden/roles/OCC_14768/role_11_f14873.png",
-    "experiments/mf_reskin_v1/golden/roles/OCC_14768/role_1_f14843.png",
-    "experiments/mf_reskin_v1/golden/roles/OCC_14768/role_2_f14768.png",
-    "experiments/mf_reskin_v1/golden/roles/OCC_14768/role_3_f14873.png",
-    "experiments/mf_reskin_v1/golden/roles/OCC_14768/role_4_f14813.png",
-    "experiments/mf_reskin_v1/golden/roles/OCC_14768/role_5_f14798.png",
-    "experiments/mf_reskin_v1/golden/roles/OCC_14768/role_6_f14858.png",
-    "experiments/mf_reskin_v1/golden/roles/OCC_14768/role_7_f14873.png",
-    "experiments/mf_reskin_v1/golden/roles/OCC_14768/role_8_f14873.png",
-    "experiments/mf_reskin_v1/golden/roles/OCC_14768/role_9_f14873.png",
-    "experiments/mf_reskin_v1/golden/roles/TURN_795/role_1_f795.png",
-    "experiments/mf_reskin_v1/golden/roles/TURN_795/role_2_f900.png",
-    "experiments/mf_reskin_v1/golden/roles/TURN_795/role_3_f795.png",
-    "experiments/mf_reskin_v1/golden/roles/TURN_795/role_4_f810.png",
-    "experiments/mf_reskin_v1/golden/roles/TURN_795/role_5_f840.png",
-    "experiments/mf_reskin_v1/golden/roles/TURN_795/role_6_f900.png",
-    "experiments/mf_reskin_v1/golden/roles/WALK_7927/role_1_f7972.png",
-    "experiments/mf_reskin_v1/golden/roles/WALK_7927/role_2_f8002.png",
-    "experiments/mf_reskin_v1/golden/roles/WALK_7927/role_3_f7942.png",
-    "experiments/mf_reskin_v1/golden/roles/WALK_7927/role_4_f7942.png",
-    "experiments/mf_reskin_v1/golden/roles/WALK_7927/role_5_f8032.png"
-  ],
-  "head": "ee7aab4d0d1d08a101fea5d0a8c1d2e61087008d",
+  "tracked_modified_delta": [],
+  "head": "9f1b54c5be22306b78aa03399be31f07b5f84e8b",
   "branch": "codex/mf-reskin-v1-golden",
   "root_counts": {
-    "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden": 400,
+    "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden": 404,
     "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN": 338,
     "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden": 180
   },
@@ -128,6 +23,10 @@
     },
     {
       "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\guard_baseline.json",
+      "change": "modified"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\guard_verify.json",
       "change": "modified"
     },
     {
@@ -160,6 +59,22 @@
     },
     {
       "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T135330_publish_repo_r3.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T135359_guard_verify_precommit_r3.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T135410_classify_guard_result_precommit_r3.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T135453_classify_guard_result_precommit_r3_v2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T135519_publish_repo_guards_r3.txt",
       "change": "added"
     },
     {
@@ -579,6 +494,10 @@
       "change": "modified"
     },
     {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\guard_final_classification.json",
+      "change": "modified"
+    },
+    {
       "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\guard_final_classification.round2.json",
       "change": "added"
     },
@@ -684,6 +603,14 @@
     },
     {
       "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\guards\\guard_baseline.json",
+      "change": "modified"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\guards\\guard_final_classification.json",
+      "change": "modified"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\guards\\guard_verify.json",
       "change": "modified"
     },
     {

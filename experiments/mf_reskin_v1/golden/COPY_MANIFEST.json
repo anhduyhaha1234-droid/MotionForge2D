@@ -1,7 +1,7 @@
 {
   "target": "repo",
   "dest_root": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden",
-  "published_at_utc": "2026-09-17T13:55:19Z",
+  "published_at_utc": "2026-09-17T13:56:23Z",
   "file_count": 179,
   "copied_now_count": 3,
   "byte_verified_count": 179,
@@ -1380,10 +1380,10 @@
       "rel": "ledger/commands.jsonl",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\commands.jsonl",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\ledger\\commands.jsonl",
-      "sha256": "778723919f10d7c35cf0b33c1b63b9e9cf31c2e73ef435e6daca6a8688831b15",
-      "bytes": 61941,
+      "sha256": "71dddcc0ceb3ff218905d0680cc80b606ec7087d8cb2f0a5978615dd332aa97f",
+      "bytes": 63978,
       "copied_now": true,
-      "superseded_sha256": "dfb36c9795a185a0485ee4488127e5e962681eb3a747e0563dfddc0eed95b69d"
+      "superseded_sha256": "778723919f10d7c35cf0b33c1b63b9e9cf31c2e73ef435e6daca6a8688831b15"
     },
     {
       "rel": "guards/guard_baseline.json",
@@ -1397,19 +1397,19 @@
       "rel": "guards/guard_verify.json",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\guard_verify.json",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\guards\\guard_verify.json",
-      "sha256": "ef32299ea219c92d99c09daa917cc60678c9d0bb44f939d22d2af8fc30d3d931",
-      "bytes": 57976,
+      "sha256": "91f9562f052a330d6e6803352909f82cdd453d6182b58d47d540927309224425",
+      "bytes": 45156,
       "copied_now": true,
-      "superseded_sha256": "ecdf26430c5a52602231b92486b818fde11663e219f6322517a39ab4b82dee8e"
+      "superseded_sha256": "ef32299ea219c92d99c09daa917cc60678c9d0bb44f939d22d2af8fc30d3d931"
     },
     {
       "rel": "guards/guard_final_classification.json",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\guard_final_classification.json",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\guards\\guard_final_classification.json",
-      "sha256": "d7f611e02874e4799e4eab9cd9ff9771487df9e4120ce34ed91a9f51d6727208",
-      "bytes": 24472,
+      "sha256": "71def3225eed08adc21805039ec41f3784e8b4c2c3192ad6b63e7726902feaf0",
+      "bytes": 3370,
       "copied_now": true,
-      "superseded_sha256": "5314608adda44a5e834ec4784cb3d4514a601bc82bc132d9ad7f1e7a72e5d079"
+      "superseded_sha256": "d7f611e02874e4799e4eab9cd9ff9771487df9e4120ce34ed91a9f51d6727208"
     },
     {
       "rel": "REPORT.md",
