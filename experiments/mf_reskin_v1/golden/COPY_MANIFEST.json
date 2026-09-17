@@ -1,7 +1,7 @@
 {
   "target": "repo",
   "dest_root": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden",
-  "published_at_utc": "2026-09-17T14:06:30Z",
+  "published_at_utc": "2026-09-17T14:08:20Z",
   "file_count": 179,
   "copied_now_count": 3,
   "byte_verified_count": 179,
@@ -1380,10 +1380,10 @@
       "rel": "ledger/commands.jsonl",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\commands.jsonl",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\ledger\\commands.jsonl",
-      "sha256": "87df817ba3bffc7fb27b30cbc9250c6f70e9db7140680f610652e0d6ea1cf061",
-      "bytes": 71266,
+      "sha256": "dcf38ffa11cea73b02550e3bbe799de2d728069cf5a6404ce725e486bb8a8584",
+      "bytes": 71958,
       "copied_now": true,
-      "superseded_sha256": "43b4ac68e95c8a59c498515ed3e6e524548a28c06a7ff7428de56a6ee1248720"
+      "superseded_sha256": "87df817ba3bffc7fb27b30cbc9250c6f70e9db7140680f610652e0d6ea1cf061"
     },
     {
       "rel": "guards/guard_baseline.json",
@@ -1399,8 +1399,7 @@
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\guards\\guard_verify.json",
       "sha256": "14ce96565129bdc00ce8125fde9ea55e768f1a6eecfc48a0b320df020a0cb5bc",
       "bytes": 74093,
-      "copied_now": true,
-      "superseded_sha256": "91f9562f052a330d6e6803352909f82cdd453d6182b58d47d540927309224425"
+      "copied_now": false
     },
     {
       "rel": "guards/guard_final_classification.json",
@@ -1408,16 +1407,16 @@
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\guards\\guard_final_classification.json",
       "sha256": "4e7131b2865732ef5bd294765a15a186324def637d744b7676de1ee6d4f94d4b",
       "bytes": 3370,
-      "copied_now": true,
-      "superseded_sha256": "71def3225eed08adc21805039ec41f3784e8b4c2c3192ad6b63e7726902feaf0"
+      "copied_now": false
     },
     {
       "rel": "REPORT.md",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\report\\REPORT.md",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\REPORT.md",
-      "sha256": "98e9a7e0354b622c69764ae800e9574d58c9f51aab73e82a3ee9469510eb4676",
-      "bytes": 16766,
-      "copied_now": false
+      "sha256": "d6c704fa9ab8e97e6bcfeabaf2cda816bde107359956ba2647fac7e9471aa2d2",
+      "bytes": 18091,
+      "copied_now": true,
+      "superseded_sha256": "98e9a7e0354b622c69764ae800e9574d58c9f51aab73e82a3ee9469510eb4676"
     },
     {
       "rel": "MATRIX.md",
@@ -1431,9 +1430,10 @@
       "rel": "NEXT_REVIEW_PACKET.md",
       "src": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\report\\NEXT_REVIEW_PACKET.md",
       "dst": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\NEXT_REVIEW_PACKET.md",
-      "sha256": "a2e398d8bcb3cb097b857dabdb7d9c431a072084e0b49b900b216f5aeaf6020c",
-      "bytes": 8054,
-      "copied_now": false
+      "sha256": "1dd1b2f659ba00a3be585af909137131a5b8951ac236cde955a0f68d0dfcfb67",
+      "bytes": 8540,
+      "copied_now": true,
+      "superseded_sha256": "a2e398d8bcb3cb097b857dabdb7d9c431a072084e0b49b900b216f5aeaf6020c"
     },
     {
       "rel": "README.md",

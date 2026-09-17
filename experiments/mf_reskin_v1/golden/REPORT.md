@@ -204,6 +204,27 @@ same allowlist root and hash-verified equal (`ledger/round3_preserve.json`):
 `report/round2/{REPORT,MATRIX,NEXT_REVIEW_PACKET,README}.md`. Round-2 bytes are also
 in git history (`674fc0c`, `86e794c`, `278bacf`, `ee7aab4`) — none of it rewritten.
 
+**Where this round's own records live.** The EV publication layout
+(`publish_evidence.py`) kept the **same file list** this round — the packet bounds
+the round to the cutouts, their manifests, the audit, the hash table and the copy
+manifest — so the round-3 records are not byte-copied into the EV as new
+categories. They live in the task runtime root, which is inside the guard allowlist,
+and every one of them is hashed in `HASH_TABLE.json` under `runtime/golden`:
+
+```
+runtime/golden/ledger/round3_preimage.json     pre-write frozen bytes (authority)
+runtime/golden/ledger/round3_tool_patch.json   before/after per patched tool + diffs
+runtime/golden/ledger/round3_preserve.json     the 9 round-2 copies, hash-verified
+runtime/golden/ledger/round3_after.json        after-hashes + the 14/14 frozen checks
+runtime/golden/probe/guard_final_classification.json   the round-3 guard verdict
+runtime/golden/report/round2/**                round-2 doc bytes, unchanged
+runtime/golden/probe/round2/**                 round-2 audit + index bytes, unchanged
+runtime/golden/tools/{round3_preimage,round3_preserve,round3_patch,verify_round3,classify_guard_result_r3}.py
+```
+
+The three patched tools, the command ledger and all raw command output **are**
+byte-copied into the EV `tools/` and `ledger/` sections exactly as before.
+
 ## 6. Gaps I am not hiding (carried from round 2, plus what this round found)
 
 1. **The annotation's declared bbox is still wrong.** It is frozen, and this round

@@ -68,7 +68,8 @@ records the after-hashes; **14/14 checks true, `failures []`**.
 |---|---|---|
 | `wt-golden` branch `codex/mf-reskin-v1-golden` | this round's local commit(s), `experiments/mf_reskin_v1/golden/**` only | `git log --oneline`, `git show --stat`, porcelain `0` |
 | task runtime `…\work\mfv1\runtime\golden\` | round-1 bytes unchanged + round-3 artifacts, preimages, after-images, ledger, guard records | `ledger/round3_*.json`, `guards/*` |
-| evidence root `…\outputs\mf-reskin-v1\20260917T110554Z\GOLDEN\` | re-published byte-verified copies | `COPY_MANIFEST.json` |
+| evidence root `…\outputs\mf-reskin-v1\20260917T110554Z\GOLDEN\` | re-published byte-verified copies (same file list as round 2) | `COPY_MANIFEST.json` |
+| task runtime `…\work\mfv1\runtime\golden\` **for the round-3 records themselves** | `ledger/round3_preimage.json`, `ledger/round3_tool_patch.json`, `ledger/round3_preserve.json`, `ledger/round3_after.json`, `probe/guard_final_classification.json`, the 5 round-3 tool sources, `report/round2/**`, `probe/round2/**` — all inside the guard allowlist and all hashed in `HASH_TABLE.json` under `runtime/golden` | `ledger/round3_*.json`, `HASH_TABLE.json` |
 | `…\GOLDEN\HASH_TABLE.json` / `.md` | SHA-256 + size for every input and output | `tools/publish_evidence.py hashes` |
 
 Round-2 bytes were **preserved before being overwritten** (9 files, hash-verified
