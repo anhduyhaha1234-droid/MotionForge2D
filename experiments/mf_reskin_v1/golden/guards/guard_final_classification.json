@@ -3,13 +3,13 @@
   "produced_by": "tools/classify_guard_result_r3.py",
   "round": "MF-V1-GOLDEN continuation-02 (round 3, cutout-crop fix)",
   "stage": "postcommit",
-  "classified_at_utc": "2026-09-17T14:06:14Z",
+  "classified_at_utc": "2026-09-17T14:09:30Z",
   "source_guard_report": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\guard_verify.json",
   "source_frozen_reassertion": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\round3_after.json",
   "source_guard_verdict_raw": "DRIFT",
-  "head_at_verify": "dcf0544f79881bbc32f62172663a16cd9c4c6900",
+  "head_at_verify": "61dff8d3c1c9fb4f3f95a17ac3fc52329b1504f4",
   "head_at_baseline": "ee7aab4d0d1d08a101fea5d0a8c1d2e61087008d",
-  "branch_tip_now": "dcf0544f79881bbc32f62172663a16cd9c4c6900",
+  "branch_tip_now": "61dff8d3c1c9fb4f3f95a17ac3fc52329b1504f4",
   "branch_at_verify": "codex/mf-reskin-v1-golden",
   "allowlist_roots": [
     "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden",
@@ -18,13 +18,13 @@
   ],
   "in_repo_write_set": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden",
   "raw_problems": [
-    "HEAD changed: ee7aab4d0d1d08a101fea5d0a8c1d2e61087008d -> dcf0544f79881bbc32f62172663a16cd9c4c6900"
+    "HEAD changed: ee7aab4d0d1d08a101fea5d0a8c1d2e61087008d -> 61dff8d3c1c9fb4f3f95a17ac3fc52329b1504f4"
   ],
   "expected_problems": [
-    "HEAD changed: ee7aab4d0d1d08a101fea5d0a8c1d2e61087008d -> dcf0544f79881bbc32f62172663a16cd9c4c6900"
+    "HEAD changed: ee7aab4d0d1d08a101fea5d0a8c1d2e61087008d -> 61dff8d3c1c9fb4f3f95a17ac3fc52329b1504f4"
   ],
   "unexpected_problems": [],
-  "changed_file_count": 390,
+  "changed_file_count": 405,
   "changed_paths_outside_allowlist": [],
   "removed_count": 0,
   "tracked_modified_delta": [],

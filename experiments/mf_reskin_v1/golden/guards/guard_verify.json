@@ -1,19 +1,19 @@
 {
   "mode": "verify",
-  "taken_at_utc": "2026-09-17T14:06:05Z",
+  "taken_at_utc": "2026-09-17T14:09:30Z",
   "verdict": "DRIFT",
   "problems": [
-    "HEAD changed: ee7aab4d0d1d08a101fea5d0a8c1d2e61087008d -> dcf0544f79881bbc32f62172663a16cd9c4c6900"
+    "HEAD changed: ee7aab4d0d1d08a101fea5d0a8c1d2e61087008d -> 61dff8d3c1c9fb4f3f95a17ac3fc52329b1504f4"
   ],
-  "added_count": 68,
+  "added_count": 83,
   "modified_count": 322,
   "removed_count": 0,
   "tracked_modified_delta": [],
-  "head": "dcf0544f79881bbc32f62172663a16cd9c4c6900",
+  "head": "61dff8d3c1c9fb4f3f95a17ac3fc52329b1504f4",
   "branch": "codex/mf-reskin-v1-golden",
   "root_counts": {
-    "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden": 417,
-    "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN": 359,
+    "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden": 423,
+    "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN": 368,
     "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden": 180
   },
   "changed_files": [
@@ -119,6 +119,30 @@
     },
     {
       "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T140548_verify_round3_final.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T140604_guard_verify_final_r3.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T140614_classify_guard_result_final_r3.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T140630_publish_repo_guards_final_r3.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T140820_publish_repo_round3_records_note.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T140830_publish_ev_final_r3.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T140831_hash_table_final_r3.txt",
       "change": "added"
     },
     {
@@ -762,7 +786,43 @@
       "change": "added"
     },
     {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T135943_publish_ev_r3_v2.txt",
+      "change": "added"
+    },
+    {
       "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T135943_round3_tool_patch_v3.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T140028_hash_table_r3.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T140028_round3_tool_patch_v4.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T140511_publish_repo_docs_r3.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T140548_verify_round3_final.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T140604_guard_verify_final_r3.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T140614_classify_guard_result_final_r3.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T140630_publish_repo_guards_final_r3.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T140820_publish_repo_round3_records_note.txt",
       "change": "added"
     },
     {
