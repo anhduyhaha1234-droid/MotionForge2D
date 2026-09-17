@@ -1,0 +1,35 @@
+{
+  "artifact": "guard_final_classification",
+  "produced_by": "tools/classify_guard_result.py",
+  "classified_at_utc": "2026-09-17T12:12:29Z",
+  "source_guard_report": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\guard_verify.json",
+  "source_guard_verdict_raw": "DRIFT",
+  "head_at_verify": "86e794c53fa13542f9909e5e35eb7fd4ef699d35",
+  "branch_at_verify": "codex/mf-reskin-v1-golden",
+  "allowlist_roots": [
+    "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden",
+    "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN",
+    "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden"
+  ],
+  "raw_problems": [
+    "HEAD changed: 2594de06cd5b2355e7e874ae4d6deb8a7b5b1b64 -> 86e794c53fa13542f9909e5e35eb7fd4ef699d35"
+  ],
+  "expected_problems": [
+    "HEAD changed: 2594de06cd5b2355e7e874ae4d6deb8a7b5b1b64 -> 86e794c53fa13542f9909e5e35eb7fd4ef699d35"
+  ],
+  "unexpected_problems": [],
+  "changed_file_count": 693,
+  "changed_paths_outside_allowlist": [],
+  "removed_count": 0,
+  "tracked_modified_delta": [],
+  "checks": {
+    "guard_verdict_recorded": true,
+    "no_unexpected_problems": true,
+    "head_advance_is_expected_commit": true,
+    "removed_count_zero": true,
+    "all_changed_paths_inside_allowlist": true,
+    "tracked_files_newly_modified_empty": true
+  },
+  "verdict": "VERIFIED_WITH_EXPECTED_COMMIT",
+  "note": "write_set_guard.py flags any HEAD movement as a problem; the round-2 packet mandates a local commit on codex/mf-reskin-v1-golden, so the HEAD advance is an expected, packet-required event rather than drift. All drift-relevant predicates are checked separately above."
+}

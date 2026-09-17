@@ -1,18 +1,20 @@
 {
   "mode": "verify",
-  "taken_at_utc": "2026-09-17T11:59:35Z",
-  "verdict": "VERIFIED",
-  "problems": [],
-  "added_count": 165,
+  "taken_at_utc": "2026-09-17T12:12:29Z",
+  "verdict": "DRIFT",
+  "problems": [
+    "HEAD changed: 2594de06cd5b2355e7e874ae4d6deb8a7b5b1b64 -> 86e794c53fa13542f9909e5e35eb7fd4ef699d35"
+  ],
+  "added_count": 692,
   "modified_count": 1,
   "removed_count": 0,
   "tracked_modified_delta": [],
-  "head": "2594de06cd5b2355e7e874ae4d6deb8a7b5b1b64",
+  "head": "86e794c53fa13542f9909e5e35eb7fd4ef699d35",
   "branch": "codex/mf-reskin-v1-golden",
   "root_counts": {
-    "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden": 341,
-    "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN": 0,
-    "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden": 0
+    "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden": 360,
+    "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN": 329,
+    "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden": 179
   },
   "changed_files": [
     {
@@ -21,6 +23,10 @@
     },
     {
       "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\guard_baseline.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\guard_verify.json",
       "change": "added"
     },
     {
@@ -41,6 +47,54 @@
     },
     {
       "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T115544_probe_image_engine_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T115935_guard_verify_precommit_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T120016_publish_repo_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T120346_publish_repo_docs_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T120421_publish_repo_docs_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T120503_guard_verify_final_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T120604_publish_ev_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T120619_classify_guard_result_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T120619_guard_verify_postpublish_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T120709_publish_ev_final_update_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T120731_hash_table_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T121227_publish_ev_ledger_refresh_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\ledger\\raw\\20260917T121228_hash_table_r2_final.txt",
       "change": "added"
     },
     {
@@ -656,6 +710,10 @@
       "change": "added"
     },
     {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\guard_final_classification.json",
+      "change": "added"
+    },
+    {
       "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\probe\\image_engine_probe.json",
       "change": "added"
     },
@@ -668,6 +726,26 @@
       "change": "added"
     },
     {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\report\\MATRIX.md",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\report\\NEXT_REVIEW_PACKET.md",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\report\\README.md",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\report\\REPORT.md",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\tools\\classify_guard_result.py",
+      "change": "added"
+    },
+    {
       "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\tools\\measure_cutout_bounds.py",
       "change": "added"
     },
@@ -677,6 +755,2038 @@
     },
     {
       "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\golden\\tools\\publish_evidence.py",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\COPY_MANIFEST.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\GOLDEN_FIXTURE.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\HASH_TABLE.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\HASH_TABLE.md",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\KEYFRAME_SPEC.md",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\MATRIX.md",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\NEXT_REVIEW_PACKET.md",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\README.md",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\REPORT.md",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\SOURCE_PROBE.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\annotations\\annotation_BOOK.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\annotations\\annotation_CAM_4212.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\annotations\\annotation_CUT_660.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\annotations\\annotation_HOLDOUT_16231.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\annotations\\annotation_OCC_14768.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\annotations\\annotation_TURN_795.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\annotations\\annotation_WALK_7927.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\annotations\\relations_BOOK.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\annotations\\relations_CAM_4212.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\annotations\\relations_CUT_660.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\annotations\\relations_HOLDOUT_16231.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\annotations\\relations_OCC_14768.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\annotations\\relations_TURN_795.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\annotations\\relations_WALK_7927.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\cutout_bounds_audit.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\guard_final_classification.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\image_engine_probe.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\BOOK\\keyframe_f1650.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\BOOK\\keyframe_f1665.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\BOOK\\keyframe_f1680.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\BOOK\\keyframe_f1695.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\BOOK\\keyframe_f1710.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\BOOK\\keyframe_f1725.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\BOOK\\keyframe_f1740.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\BOOK\\keyframe_f1755.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\CAM_4212\\keyframe_f4212.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\CAM_4212\\keyframe_f4227.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\CAM_4212\\keyframe_f4242.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\CAM_4212\\keyframe_f4257.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\CAM_4212\\keyframe_f4272.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\CAM_4212\\keyframe_f4287.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\CAM_4212\\keyframe_f4302.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\CAM_4212\\keyframe_f4317.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\CUT_660\\keyframe_f660.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\CUT_660\\keyframe_f675.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\CUT_660\\keyframe_f690.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\CUT_660\\keyframe_f705.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\CUT_660\\keyframe_f720.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\CUT_660\\keyframe_f735.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\CUT_660\\keyframe_f750.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\CUT_660\\keyframe_f765.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\HOLDOUT_16231\\keyframe_f16231.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\HOLDOUT_16231\\keyframe_f16246.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\HOLDOUT_16231\\keyframe_f16261.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\HOLDOUT_16231\\keyframe_f16276.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\HOLDOUT_16231\\keyframe_f16291.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\HOLDOUT_16231\\keyframe_f16306.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\HOLDOUT_16231\\keyframe_f16321.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\HOLDOUT_16231\\keyframe_f16336.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\OCC_14768\\keyframe_f14768.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\OCC_14768\\keyframe_f14783.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\OCC_14768\\keyframe_f14798.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\OCC_14768\\keyframe_f14813.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\OCC_14768\\keyframe_f14828.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\OCC_14768\\keyframe_f14843.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\OCC_14768\\keyframe_f14858.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\OCC_14768\\keyframe_f14873.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\TURN_795\\keyframe_f795.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\TURN_795\\keyframe_f810.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\TURN_795\\keyframe_f825.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\TURN_795\\keyframe_f840.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\TURN_795\\keyframe_f855.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\TURN_795\\keyframe_f870.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\TURN_795\\keyframe_f885.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\TURN_795\\keyframe_f900.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\WALK_7927\\keyframe_f7927.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\WALK_7927\\keyframe_f7942.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\WALK_7927\\keyframe_f7957.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\WALK_7927\\keyframe_f7972.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\WALK_7927\\keyframe_f7987.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\WALK_7927\\keyframe_f8002.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\WALK_7927\\keyframe_f8017.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\keyframes\\WALK_7927\\keyframe_f8032.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\commands.jsonl",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\guard_baseline.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\guard_verify.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T111637_probe_clip4_container.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T111637_probe_demo_container.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T111637_probe_refB_container.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T111637_probe_ref_container.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T111659_probe_ref_count_frames.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T111700_detect_scene_changes_raw.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T112647_verify_book_window_stills.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T112707_locate_still_frame450.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T112738_locate_prototypeA450_in_demo30s.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T112739_locate_demo_f0_in_ref.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T112917_verify_demo_offset.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T112919_sam2_probe_frame1650.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T113034_verify_demo_offset.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T113057_verify_demo_offset.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T113123_verify_demo_offset.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T113145_verify_demo_offset.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T113233_sam2_probe_frame1650.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T113418_series_BOOKWIN_film1650_1770.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T113448_series_WHOLEFILM.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T113619_analyze_shot_metrics.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T113707_classify_candidates.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T113708_classify_candidates.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T113757_classify_candidates.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T113758_classify_candidates.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T113759_classify_candidates.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T113800_classify_candidates.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T113801_classify_candidates.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T113850_classify_candidates.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T113851_classify_candidates.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T113852_classify_candidates.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T113853_classify_candidates.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T113956_annotate_BOOK.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T114059_annotate_window.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T114110_annotate_window.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T114120_annotate_window.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T114131_annotate_window.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T114142_annotate_window.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T114152_annotate_window.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T114240_measure_role_relations.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T114336_build_fixture.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T114336_measure_role_relations.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T115040_guard_baseline_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T115133_make_references_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T115321_measure_cutout_bounds_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T115435_measure_cutout_bounds_r2_v2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T115544_probe_image_engine_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T115935_guard_verify_precommit_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T120016_publish_repo_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T120346_publish_repo_docs_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T120421_publish_repo_docs_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T120503_guard_verify_final_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T120604_publish_ev_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T120619_classify_guard_result_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T120619_guard_verify_postpublish_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T120709_publish_ev_final_update_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\ledger\\raw\\20260917T120731_hash_table_r2.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\BOOK\\maskindex_f1650.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\BOOK\\maskindex_f1665.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\BOOK\\maskindex_f1680.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\BOOK\\maskindex_f1695.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\BOOK\\maskindex_f1710.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\BOOK\\maskindex_f1725.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\BOOK\\maskindex_f1740.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\BOOK\\maskindex_f1755.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\CAM_4212\\maskindex_f4212.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\CAM_4212\\maskindex_f4227.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\CAM_4212\\maskindex_f4242.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\CAM_4212\\maskindex_f4257.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\CAM_4212\\maskindex_f4272.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\CAM_4212\\maskindex_f4287.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\CAM_4212\\maskindex_f4302.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\CAM_4212\\maskindex_f4317.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\CUT_660\\maskindex_f660.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\CUT_660\\maskindex_f675.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\CUT_660\\maskindex_f690.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\CUT_660\\maskindex_f705.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\CUT_660\\maskindex_f720.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\CUT_660\\maskindex_f735.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\CUT_660\\maskindex_f750.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\CUT_660\\maskindex_f765.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\HOLDOUT_16231\\maskindex_f16231.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\HOLDOUT_16231\\maskindex_f16246.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\HOLDOUT_16231\\maskindex_f16261.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\HOLDOUT_16231\\maskindex_f16276.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\HOLDOUT_16231\\maskindex_f16291.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\HOLDOUT_16231\\maskindex_f16306.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\HOLDOUT_16231\\maskindex_f16321.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\HOLDOUT_16231\\maskindex_f16336.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\OCC_14768\\maskindex_f14768.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\OCC_14768\\maskindex_f14783.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\OCC_14768\\maskindex_f14798.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\OCC_14768\\maskindex_f14813.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\OCC_14768\\maskindex_f14828.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\OCC_14768\\maskindex_f14843.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\OCC_14768\\maskindex_f14858.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\OCC_14768\\maskindex_f14873.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\TURN_795\\maskindex_f795.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\TURN_795\\maskindex_f810.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\TURN_795\\maskindex_f825.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\TURN_795\\maskindex_f840.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\TURN_795\\maskindex_f855.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\TURN_795\\maskindex_f870.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\TURN_795\\maskindex_f885.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\TURN_795\\maskindex_f900.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\WALK_7927\\maskindex_f7927.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\WALK_7927\\maskindex_f7942.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\WALK_7927\\maskindex_f7957.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\WALK_7927\\maskindex_f7972.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\WALK_7927\\maskindex_f7987.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\WALK_7927\\maskindex_f8002.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\WALK_7927\\maskindex_f8017.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\masks\\WALK_7927\\maskindex_f8032.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\probe\\book_window_verification.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\probe\\classify_BOOK_1650.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\probe\\demo_offset_verification.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\probe\\locate_PROTOTYPE_A_frame-450.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\probe\\scenes_candidates.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\probe\\series_BOOKWIN.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\probe\\series_WHOLEFILM.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\probe\\shot_metrics.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\probe\\shots.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\references\\references_BOOK.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\references\\references_CAM_4212.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\references\\references_CUT_660.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\references\\references_HOLDOUT_16231.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\references\\references_OCC_14768.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\references\\references_TURN_795.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\references\\references_WALK_7927.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\references_index.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\BOOK\\role_1_f1680.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\BOOK\\role_2_f1665.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\BOOK\\role_3_f1680.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\BOOK\\role_4_f1755.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\BOOK\\role_5_f1695.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\BOOK\\role_6_f1755.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\BOOK\\role_7_f1695.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\BOOK\\role_8_f1725.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CAM_4212\\role_10_f4242.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CAM_4212\\role_11_f4257.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CAM_4212\\role_12_f4257.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CAM_4212\\role_13_f4257.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CAM_4212\\role_14_f4257.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CAM_4212\\role_15_f4272.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CAM_4212\\role_16_f4272.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CAM_4212\\role_17_f4302.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CAM_4212\\role_18_f4287.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CAM_4212\\role_19_f4272.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CAM_4212\\role_1_f4212.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CAM_4212\\role_20_f4287.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CAM_4212\\role_21_f4272.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CAM_4212\\role_22_f4272.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CAM_4212\\role_23_f4272.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CAM_4212\\role_24_f4287.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CAM_4212\\role_25_f4317.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CAM_4212\\role_2_f4242.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CAM_4212\\role_3_f4257.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CAM_4212\\role_4_f4272.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CAM_4212\\role_5_f4287.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CAM_4212\\role_6_f4257.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CAM_4212\\role_7_f4242.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CAM_4212\\role_8_f4242.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CAM_4212\\role_9_f4242.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CUT_660\\role_10_f720.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CUT_660\\role_11_f735.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CUT_660\\role_12_f750.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CUT_660\\role_13_f750.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CUT_660\\role_14_f765.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CUT_660\\role_15_f750.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CUT_660\\role_16_f750.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CUT_660\\role_17_f750.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CUT_660\\role_18_f750.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CUT_660\\role_19_f750.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CUT_660\\role_1_f660.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CUT_660\\role_20_f750.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CUT_660\\role_2_f660.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CUT_660\\role_3_f660.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CUT_660\\role_4_f720.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CUT_660\\role_5_f675.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CUT_660\\role_6_f660.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CUT_660\\role_7_f660.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CUT_660\\role_8_f660.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\CUT_660\\role_9_f675.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\HOLDOUT_16231\\role_10_f16231.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\HOLDOUT_16231\\role_11_f16231.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\HOLDOUT_16231\\role_12_f16261.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\HOLDOUT_16231\\role_13_f16336.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\HOLDOUT_16231\\role_1_f16276.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\HOLDOUT_16231\\role_2_f16306.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\HOLDOUT_16231\\role_3_f16321.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\HOLDOUT_16231\\role_4_f16321.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\HOLDOUT_16231\\role_5_f16231.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\HOLDOUT_16231\\role_6_f16231.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\HOLDOUT_16231\\role_7_f16321.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\HOLDOUT_16231\\role_8_f16231.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\HOLDOUT_16231\\role_9_f16261.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\OCC_14768\\role_10_f14873.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\OCC_14768\\role_11_f14873.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\OCC_14768\\role_1_f14843.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\OCC_14768\\role_2_f14768.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\OCC_14768\\role_3_f14873.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\OCC_14768\\role_4_f14813.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\OCC_14768\\role_5_f14798.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\OCC_14768\\role_6_f14858.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\OCC_14768\\role_7_f14873.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\OCC_14768\\role_8_f14873.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\OCC_14768\\role_9_f14873.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\TURN_795\\role_1_f795.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\TURN_795\\role_2_f900.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\TURN_795\\role_3_f795.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\TURN_795\\role_4_f810.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\TURN_795\\role_5_f840.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\TURN_795\\role_6_f900.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\WALK_7927\\role_1_f7972.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\WALK_7927\\role_2_f8002.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\WALK_7927\\role_3_f7942.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\WALK_7927\\role_4_f7942.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\roles\\WALK_7927\\role_5_f8032.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\sam2\\overlay_1650.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\sam2\\sam2_probe_1650.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\sheets\\A_book_and_riskloops.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\source_probe\\clip4_container.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\source_probe\\clip4_path.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\source_probe\\demo_container.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\source_probe\\demo_path.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\source_probe\\refB_container.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\source_probe\\refB_path.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\source_probe\\ref_container.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\source_probe\\ref_count_frames.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\source_probe\\ref_path.txt",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\tools\\annotate_window.py",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\tools\\build_fixture.py",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\tools\\build_source_probe.py",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\tools\\classify_guard_result.py",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\tools\\make_references.py",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\tools\\measure_cutout_bounds.py",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\tools\\measure_relations.py",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\tools\\probe_image_engine.py",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\tools\\publish_evidence.py",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\tools\\run_log.py",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\tools\\sam2_probe.py",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\tools\\verify_demo_offset.py",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\tools\\write_set_guard.py",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-11\\tr-x20\\outputs\\mf-reskin-v1\\20260917T110554Z\\GOLDEN\\vision_route_probe.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\COPY_MANIFEST.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\GOLDEN_FIXTURE.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\KEYFRAME_SPEC.md",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\MATRIX.md",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\NEXT_REVIEW_PACKET.md",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\README.md",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\REPORT.md",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\SOURCE_PROBE.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\annotations\\annotation_BOOK.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\annotations\\annotation_CAM_4212.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\annotations\\annotation_CUT_660.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\annotations\\annotation_HOLDOUT_16231.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\annotations\\annotation_OCC_14768.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\annotations\\annotation_TURN_795.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\annotations\\annotation_WALK_7927.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\annotations\\relations_BOOK.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\annotations\\relations_CAM_4212.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\annotations\\relations_CUT_660.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\annotations\\relations_HOLDOUT_16231.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\annotations\\relations_OCC_14768.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\annotations\\relations_TURN_795.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\annotations\\relations_WALK_7927.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\cutout_bounds_audit.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\guards\\guard_baseline.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\guards\\guard_verify.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\image_engine_probe.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\BOOK\\keyframe_f1650.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\BOOK\\keyframe_f1665.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\BOOK\\keyframe_f1680.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\BOOK\\keyframe_f1695.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\BOOK\\keyframe_f1710.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\BOOK\\keyframe_f1725.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\BOOK\\keyframe_f1740.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\BOOK\\keyframe_f1755.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\CAM_4212\\keyframe_f4212.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\CAM_4212\\keyframe_f4227.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\CAM_4212\\keyframe_f4242.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\CAM_4212\\keyframe_f4257.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\CAM_4212\\keyframe_f4272.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\CAM_4212\\keyframe_f4287.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\CAM_4212\\keyframe_f4302.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\CAM_4212\\keyframe_f4317.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\CUT_660\\keyframe_f660.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\CUT_660\\keyframe_f675.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\CUT_660\\keyframe_f690.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\CUT_660\\keyframe_f705.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\CUT_660\\keyframe_f720.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\CUT_660\\keyframe_f735.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\CUT_660\\keyframe_f750.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\CUT_660\\keyframe_f765.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\HOLDOUT_16231\\keyframe_f16231.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\HOLDOUT_16231\\keyframe_f16246.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\HOLDOUT_16231\\keyframe_f16261.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\HOLDOUT_16231\\keyframe_f16276.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\HOLDOUT_16231\\keyframe_f16291.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\HOLDOUT_16231\\keyframe_f16306.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\HOLDOUT_16231\\keyframe_f16321.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\HOLDOUT_16231\\keyframe_f16336.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\OCC_14768\\keyframe_f14768.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\OCC_14768\\keyframe_f14783.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\OCC_14768\\keyframe_f14798.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\OCC_14768\\keyframe_f14813.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\OCC_14768\\keyframe_f14828.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\OCC_14768\\keyframe_f14843.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\OCC_14768\\keyframe_f14858.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\OCC_14768\\keyframe_f14873.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\TURN_795\\keyframe_f795.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\TURN_795\\keyframe_f810.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\TURN_795\\keyframe_f825.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\TURN_795\\keyframe_f840.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\TURN_795\\keyframe_f855.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\TURN_795\\keyframe_f870.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\TURN_795\\keyframe_f885.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\TURN_795\\keyframe_f900.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\WALK_7927\\keyframe_f7927.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\WALK_7927\\keyframe_f7942.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\WALK_7927\\keyframe_f7957.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\WALK_7927\\keyframe_f7972.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\WALK_7927\\keyframe_f7987.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\WALK_7927\\keyframe_f8002.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\WALK_7927\\keyframe_f8017.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\keyframes\\WALK_7927\\keyframe_f8032.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\ledger\\commands.jsonl",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\references\\references_BOOK.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\references\\references_CAM_4212.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\references\\references_CUT_660.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\references\\references_HOLDOUT_16231.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\references\\references_OCC_14768.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\references\\references_TURN_795.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\references\\references_WALK_7927.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\references\\references_index.json",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\BOOK\\role_1_f1680.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\BOOK\\role_2_f1665.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\BOOK\\role_3_f1680.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\BOOK\\role_4_f1755.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\BOOK\\role_5_f1695.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\BOOK\\role_6_f1755.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\BOOK\\role_7_f1695.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\BOOK\\role_8_f1725.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_10_f4242.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_11_f4257.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_12_f4257.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_13_f4257.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_14_f4257.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_15_f4272.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_16_f4272.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_17_f4302.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_18_f4287.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_19_f4272.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_1_f4212.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_20_f4287.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_21_f4272.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_22_f4272.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_23_f4272.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_24_f4287.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_25_f4317.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_2_f4242.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_3_f4257.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_4_f4272.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_5_f4287.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_6_f4257.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_7_f4242.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_8_f4242.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CAM_4212\\role_9_f4242.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_10_f720.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_11_f735.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_12_f750.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_13_f750.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_14_f765.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_15_f750.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_16_f750.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_17_f750.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_18_f750.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_19_f750.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_1_f660.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_20_f750.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_2_f660.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_3_f660.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_4_f720.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_5_f675.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_6_f660.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_7_f660.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_8_f660.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\CUT_660\\role_9_f675.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\HOLDOUT_16231\\role_10_f16231.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\HOLDOUT_16231\\role_11_f16231.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\HOLDOUT_16231\\role_12_f16261.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\HOLDOUT_16231\\role_13_f16336.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\HOLDOUT_16231\\role_1_f16276.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\HOLDOUT_16231\\role_2_f16306.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\HOLDOUT_16231\\role_3_f16321.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\HOLDOUT_16231\\role_4_f16321.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\HOLDOUT_16231\\role_5_f16231.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\HOLDOUT_16231\\role_6_f16231.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\HOLDOUT_16231\\role_7_f16321.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\HOLDOUT_16231\\role_8_f16231.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\HOLDOUT_16231\\role_9_f16261.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\OCC_14768\\role_10_f14873.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\OCC_14768\\role_11_f14873.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\OCC_14768\\role_1_f14843.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\OCC_14768\\role_2_f14768.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\OCC_14768\\role_3_f14873.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\OCC_14768\\role_4_f14813.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\OCC_14768\\role_5_f14798.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\OCC_14768\\role_6_f14858.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\OCC_14768\\role_7_f14873.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\OCC_14768\\role_8_f14873.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\OCC_14768\\role_9_f14873.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\TURN_795\\role_1_f795.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\TURN_795\\role_2_f900.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\TURN_795\\role_3_f795.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\TURN_795\\role_4_f810.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\TURN_795\\role_5_f840.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\TURN_795\\role_6_f900.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\WALK_7927\\role_1_f7972.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\WALK_7927\\role_2_f8002.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\WALK_7927\\role_3_f7942.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\WALK_7927\\role_4_f7942.png",
+      "change": "added"
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\wt-golden\\experiments\\mf_reskin_v1\\golden\\roles\\WALK_7927\\role_5_f8032.png",
       "change": "added"
     }
   ],

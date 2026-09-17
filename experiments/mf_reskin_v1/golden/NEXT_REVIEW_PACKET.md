@@ -31,9 +31,20 @@ Key hashes: fixture `7e1627e4c8c2421e77758b48f0c003c23d0b8b2f50fc73bc2118bc6b06c
 - **G-A8 = outcome (b)**: keyframe spec + exact unmet dependency
   (`KEYFRAME_SPEC.md`; evidence `image_engine_probe.json` + `vision_route_probe.json`).
   No artwork produced, none fabricated, no palette/histogram artifact passed off as a reskin.
-- **G-A11 = VERIFIED**: guard baseline before the first write, verify after →
-  `problems []`, `added 165`, `modified 1` (`ledger/commands.jsonl`, inside the
-  allowlist), `removed 0`; final verify published at `GOLDEN/ledger/guard_verify.json`.
+- **G-A11 = VERIFIED**: guard baseline before the first write, then verify after.
+  Mid-round verify: `problems []`, `added 165`, `modified 1`
+  (`ledger/commands.jsonl`, inside the allowlist), `removed 0`.
+  **Final-settled-tree verify** (`guard_verify_final_state_r2`, after both
+  commits and after the EV publish) reports `verdict DRIFT` whose **only**
+  problem is `HEAD changed: 2594de0… -> 86e794c…` — the local commit the round-2
+  packet mandates, not a data drift. `guard_final_classification.json` checks the
+  drift-relevant predicates separately and returns
+  **`VERIFIED_WITH_EXPECTED_COMMIT`**: 6/6 checks true, `removed_count 0`,
+  `tracked_files_newly_modified []`, `changed_paths_outside_allowlist []`,
+  `unexpected_problems []`, 693 changed paths all inside the allowlist.
+  `write_set_guard.py` treats any HEAD movement as a problem by design; it was
+  **not** modified (round-1 tool bytes stay byte-identical), the classification
+  is an additive round-2 tool instead.
 - EV artifacts present with sha256 in `HASH_TABLE.json`; byte-verified copies in `COPY_MANIFEST.json`.
 
 ## Round-2 numbers (real, from this round's commands)
