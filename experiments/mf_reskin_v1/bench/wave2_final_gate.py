@@ -130,14 +130,15 @@ def git(*a):
 
 out, _ = git("status", "--porcelain")
 chk("worktree clean", out == "", out[:120])
-out, _ = git("rev-parse", "HEAD")
-chk("HEAD is the wave-2 commit", out.startswith("0246968"), out[:12])
-out, _ = git("rev-parse", "HEAD~1")
-chk("parent commit intact", out.startswith("36c912e"), out[:12])
-out, _ = git("show", "--name-only", "--pretty=format:", "HEAD")
+out, rc = git("merge-base", "--is-ancestor", "36c912e", "HEAD")
+chk("HEAD descends from the pinned wave base 36c912e", rc == 0, out[:80])
+out, _ = git("diff", "--name-only", "36c912e..HEAD")
 files = [f for f in out.splitlines() if f.strip()]
-chk("commit touches ONLY the bench allowlist", all(f.startswith("experiments/mf_reskin_v1/bench/") for f in files),
+chk("every commit since 36c912e touches ONLY the bench allowlist",
+    bool(files) and all(f.startswith("experiments/mf_reskin_v1/bench/") for f in files),
     "%d files" % len(files))
+out, rc = git("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
+chk("branch has no upstream (nothing pushed)", rc != 0, out[:60])
 
 # 9. no stray temp files in the CPU temp area
 tmp = Path("C:/Users/Admin/Documents/Codex/work/mfv1/runtime/bench")
