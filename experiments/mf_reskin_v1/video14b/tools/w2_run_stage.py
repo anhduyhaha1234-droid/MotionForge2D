@@ -42,7 +42,12 @@ from mf_comfy import (  # noqa: E402
 from mf_comfy.adapter import PUBLISHABLE_SERVER_TYPES  # noqa: E402
 
 RT = Path(r"C:\Users\Admin\Documents\Codex\work\mfv1\runtime\video14b")
-BASE = "http://127.0.0.1:8210"
+# Wave B reserves its own engine port (8310): a stale lease from wave A's :8210
+# boot can then never be mis-read as this wave's.  The port below is asserted
+# against the instance epoch actually on disk at submit time (main()), so this
+# runner cannot drift from the server it is talking to.
+ENGINE_PORT = 8310
+BASE = f"http://127.0.0.1:{ENGINE_PORT}"
 NODE_INVENTORY_SHA256 = "d9e8e25aa7c6b32fd67100fb7a5bef58c37686414cbf7de5172b2c67b1b63da3"
 OWNER = "video14b"
 
@@ -52,15 +57,25 @@ OWNER = "video14b"
 # product.  A LoadVideo / CreateVideo / PreviewImage node reads or previews and is
 # never a result, however the history entry spells it (the reviewer's defect was a
 # history whose only artifact was `type: "input", filename: source.png`).
-# `is_output_node=True` for all seven in the pinned ComfyUI 0.28.2 checkout.
+#
+# wave B MEASURED correction: the pinned backend (0.37.0, commit 73c9bad4) does NOT
+# publish `SaveVideo` under a `videos` history key.  A real run's history entry
+# (prompt f70e0156, kept at raw/run_b3_book4s_a3_history.json) carries
+#   {"246": {"images": [{"filename": "animate2_book4s_00001_.mp4", "type": "output"}],
+#            "animated": [true]}}
+# i.e. the key is `images` (with `animated`), while the media itself is still an
+# .mp4.  Declaring `videos` made the adapter refuse a perfectly good render with
+# MF_COMFY_ARTIFACT_MISSING ("declared terminal node published a different media
+# kind").  `kind` is the history key and `media_type` is the file category, so
+# SaveVideo is declared as images+video.
 SAVE_NODE_KINDS: dict[str, tuple[str, str]] = {
     "SaveImage": ("images", "image"),
     "SaveImageAdvanced": ("images", "image"),
     "SaveAnimatedPNG": ("images", "image"),
     "SaveAnimatedWEBP": ("images", "image"),
-    "SaveVideo": ("videos", "video"),
-    "SaveWEBM": ("videos", "video"),
-    "VHS_VideoCombine": ("videos", "video"),
+    "SaveVideo": ("images", "video"),
+    "SaveWEBM": ("images", "video"),
+    "VHS_VideoCombine": ("images", "video"),
 }
 
 # Only the server's own written output is publishable, and a caller may only
@@ -157,6 +172,13 @@ def main() -> int:
     if not rec:
         print("REFUSED: no instance epoch on disk", file=sys.stderr)
         return 2
+    if int(rec.get("port") or -1) != ENGINE_PORT:
+        # Fail closed before any POST: submitting to a server other than the
+        # reserved wave-B port would silently mix two boots' lease ledgers.
+        print(json.dumps({"status": "refused_epoch_port_mismatch",
+                          "epoch_port": rec.get("port"), "expected_port": ENGINE_PORT,
+                          "instance_id": rec.get("instance_id")}, indent=1))
+        return 4
     paths = StagePaths(RT / "output" / stage_name)
     lease = InstanceLease(RT / "leases", instance_id=rec["instance_id"], owner=OWNER)
     gate = GpuStageGate(RT / "leases" / "gpu_stage.lock", timeout_s=60.0)
@@ -194,7 +216,7 @@ def main() -> int:
     record = {
         "argv": sys.argv,
         "cwd": os.getcwd(),
-        "port": 8210,
+        "port": ENGINE_PORT,
         "base_url": BASE,
         "stage_root": str(paths.root),
         "workflow_id": workflow_id,

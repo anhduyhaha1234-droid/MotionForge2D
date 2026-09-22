@@ -1,0 +1,82 @@
+--- official/video_wan_vace_14B_v2v.json
++++ run/mf_vace14b_book4s.json
+@@ -48,7 +48,7 @@
+         "Node name for S&R": "CreateVideo"
+       },
+       "widgets_values": [
+-        16
++        30
+       ]
+     },
+     {
+@@ -104,9 +104,9 @@
+       },
+       "widgets_values": [
+         654654950714624,
+-        "randomize",
+-        4,
+-        1,
++        "fixed",
++        20,
++        6.0,
+         "uni_pc",
+         "simple",
+         1
+@@ -660,9 +660,9 @@
+         "Node name for S&R": "WanVaceToVideo"
+       },
+       "widgets_values": [
+-        720,
+-        720,
+-        81,
++        640,
++        368,
++        121,
+         1,
+         1
+       ]
+@@ -695,7 +695,7 @@
+         "Node name for S&R": "SaveVideo"
+       },
+       "widgets_values": [
+-        "video/ComfyUI",
++        "mf_reskin_v1/video14b/vace14b_book4s",
+         "auto",
+         "auto"
+       ]
+@@ -854,7 +854,7 @@
+       ],
+       "flags": {},
+       "order": 14,
+-      "mode": 0,
++      "mode": 4,
+       "inputs": [
+         {
+           "name": "model",
+@@ -940,7 +940,7 @@
+         "Node name for S&R": "CLIPTextEncode"
+       },
+       "widgets_values": [
+-        "The girl is dancing in a sea of flowers, slowly moving her hands. There is a close - up shot of her upper body. The character is surrounded by other transparent glass flowers in the style of Nicoletta Ceccoli, creating a beautiful, surreal, and emotionally expressive movie scene with a white, transparent feel and a dreamy atmosphere. "
++        "A 2D cel-shaded illustration of the same scene redrawn: the seated reader and the standing second person have new designs, new clothing and a new flat colour palette, the room and the furniture are redrawn, and the book is redrawn. The camera, the framing, the composition, the poses, the hand grip and the prop placement stay exactly as in the control video."
+       ],
+       "color": "#232",
+       "bgcolor": "#353"
+@@ -1089,7 +1089,7 @@
+         "Node name for S&R": "LoadVideo"
+       },
+       "widgets_values": [
+-        "video_wan_vace_14B_v2v_reference_image_control_video.mp4",
++        "mf_book_f1650_1770_drive_121f.mp4",
+         "image"
+       ]
+     },
+@@ -1128,7 +1128,7 @@
+         "Node name for S&R": "LoadImage"
+       },
+       "widgets_values": [
+-        "video_wan_vace_14B_v2v_reference_image.jpg",
++        "mf_book_anchor_1650.png",
+         "image"
+       ]
+     },

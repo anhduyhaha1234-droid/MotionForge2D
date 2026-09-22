@@ -1,0 +1,58 @@
+--- official/video_wan_animate2.json
++++ run/mf_animate2_book4s.json
+@@ -38,7 +38,7 @@
+         "Node name for S&R": "LoadImage"
+       },
+       "widgets_values": [
+-        "pink_hair_mech_arms_ref.png",
++        "mf_book_anchor_1650.png",
+         "image"
+       ],
+       "widgets_values_named": {
+@@ -76,7 +76,7 @@
+         "Node name for S&R": "LoadVideo"
+       },
+       "widgets_values": [
+-        "street_dance_drive.mp4",
++        "mf_book_f1650_1770_drive_120f.mp4",
+         "image"
+       ],
+       "widgets_values_named": {
+@@ -169,7 +169,7 @@
+       ],
+       "properties": {},
+       "widgets_values": [
+-        "video/ComfyUI",
++        "mf_reskin_v1/video14b/animate2_book4s",
+         "auto",
+         "auto",
+         "auto"
+@@ -213,7 +213,7 @@
+       ],
+       "properties": {},
+       "widgets_values": [
+-        "video/ComfyUI",
++        "mf_reskin_v1/video14b/animate2_book4s",
+         "auto",
+         "auto",
+         "auto"
+@@ -411,8 +411,8 @@
+         "previewExposures": []
+       },
+       "widgets_values": [
+-        "Character Description: Cartoon character lost\nBackground description: The background is an empty white room",
+-        "A girl doing energetic street dance with rhythmic steps and dynamic arm gestures, background stationary\n",
++        "Character Description: a 2D cel-shaded illustration of a seated older reader holding an open book, redesigned with new clothing, new hair and a new flat colour palette; Background description: the same room redrawn as 2D illustration with new wall colour, new furniture design and a new lighting tint.\nKeep the composition, the camera, the body poses, the hand grip on the book, the prop placement and the second person exactly where they are; change who and what they are, not where they are.",
++        "Same viewpoint as the driving video: no camera movement and no viewpoint change. The driving video supplies body motion and hand gestures only.",
+         "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走",
+         1,
+         0,
+@@ -4185,7 +4185,7 @@
+             "widgets_values": [
+               true,
+               582699151003550,
+-              "randomize",
++              "fixed",
+               1
+             ],
+             "widgets_values_named": {
