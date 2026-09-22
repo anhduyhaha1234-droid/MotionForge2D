@@ -270,6 +270,13 @@ def main() -> int:
                    "sha256": chosen["sha256"], "bytes": chosen["bytes"],
                    "measured": chosen["measured"], "copy": chosen_copy} if chosen else None,
         "rejected_kept": kept,
+        # b4: `rejected` is recorded, not dropped -- the rejection is the evidence
+        # for why the chosen candidate won (rule criteria order in `measurement`).
+        "rejected_candidates": [
+            {"candidate_index": r["candidate_index"], "path": r["path"],
+             "sha256": r["sha256"], "bytes": r["bytes"],
+             "failed_axes": r["failed_axes"], "eligible": r["eligible"]}
+            for r in rejected],
         "duplicates_of_chosen_kept": duplicates,
         "decision_note": None,
     }
@@ -291,6 +298,7 @@ def main() -> int:
         "candidates_collapse_to": report["candidates_collapse_to"],
         "pick_is_trivial_byte_identity": report["pick_is_trivial_byte_identity"],
         "rejected_kept": [k["copy"] for k in kept],
+        "rejected_index": [r["candidate_index"] for r in rejected],
         "failed_axes": {r["candidate_index"]: r["failed_axes"] for r in rows},
         "eligible": {r["candidate_index"]: r["eligible"] for r in rows},
     }, indent=1, ensure_ascii=False))

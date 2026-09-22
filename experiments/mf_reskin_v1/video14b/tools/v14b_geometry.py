@@ -136,7 +136,7 @@ def _diff(a, b) -> dict:
 
 def prove_roundtrip() -> dict:
     import numpy as np
-    from PIL import Image
+    # (b4) `from PIL import Image` removed here: unused import (ruff F401).
 
     grid = synthetic_grid()
     gw, gh = grid.size

@@ -62,7 +62,7 @@ def main() -> int:
     work = out_dir / "work_f07"
     work.mkdir(parents=True, exist_ok=True)
 
-    from PIL import Image
+    # (b4) `from PIL import Image` removed here: unused import (ruff F401).
     pad_frame = G.pad_frame_file(key, key_p)
     ctl_pad = G.pad_video(ctl, ctl_p)
     ctl_crop = G.crop_video(ctl_p, work / "ctl_padded_then_cropped.mp4", reencode=True)

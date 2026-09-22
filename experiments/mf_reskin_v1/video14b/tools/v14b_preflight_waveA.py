@@ -8,7 +8,7 @@ import hashlib
 import json
 import os
 import subprocess
-import sys
+# (b4) `import sys` removed here: unused import (ruff F401).
 
 ROOT = "C:/Users/Admin/Documents/Codex/work/mfv1"
 WT = ROOT + "/wt-video14b"

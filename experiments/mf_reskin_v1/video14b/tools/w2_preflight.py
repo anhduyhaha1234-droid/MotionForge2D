@@ -7,9 +7,10 @@ Subcommands:
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import sys
+# (b4) `import hashlib` removed here: unused import (ruff F401).
+
 from pathlib import Path
 
 PKG = Path(r"C:\Users\Admin\Documents\Codex\work\mfv1\wt-comfy\experiments\mf_reskin_v1\comfy")

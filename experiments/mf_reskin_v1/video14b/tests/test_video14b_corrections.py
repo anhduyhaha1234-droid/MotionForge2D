@@ -26,6 +26,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -41,6 +42,13 @@ RAW = ("C:/Users/Admin/Documents/Codex/2026-09-11/tr-x20/outputs/"
 FILM = ("C:/Users/Admin/MotionForge2D/projects/2dc14177a212/"
         "Tại_sao_thật_tệ_khi_ĐỨNG_TÊN_HỘ_công_ty_.mp4")
 OUT_DIR = "C:/Users/Admin/Documents/Codex/work/mfv1/runtime/video14b/output/waveA_f06"
+
+# The engine's OWN released run payload (wave B attempt a3, the Wan-Animate-2 run).
+# It is the measured authority for the history KEY a real server publishes a SaveVideo
+# node under: `images` (+ `animated`) with an .mp4 filename -- NOT `videos`.  Both
+# expectations in the F05 test below are re-checked against it, so the b4 correction is
+# evidence, not a green-washing edit.
+REAL_HISTORY = os.path.join(EV, "waveB", "raw", "run_b3_book4s_a3_history.json")
 
 
 def load(path, name):
@@ -97,8 +105,17 @@ def test_export_drops_decoded_padding_not_bframe_packet(dec):
     src = open(os.path.join(TOOLS, "v14b_export_decode.py"), encoding="utf-8").read()
     main_body = src.split("def main()")[1]
     assert "-frames:v" not in main_body, "packet-count cutting must not come back"
-    assert "select_filter(keep)" in main_body, \
-        "selection must go through the decoded-frame select filter"
+    # b4 correction: F07 folded the crop into the SAME selection step, so main() now
+    # calls select_filter(keep, crop_ffmpeg) instead of select_filter(keep).  The
+    # mechanism under test is unchanged -- the -vf is still built by the decoded-index
+    # select filter -- so this matches the CALL (arguments allowed) and then pins its
+    # first argument to the decoded-item keep set.  Measured call shape in
+    # tools/v14b_export_decode.py:276 -> "-vf", select_filter(keep, crop_ffmpeg), ...
+    vf_call = re.search(r'"-vf"\s*,\s*select_filter\(([^)]*)\)', main_body)
+    assert vf_call is not None, \
+        "the -vf must come from a decoded-frame select_filter(...) call"
+    assert vf_call.group(1).split(",")[0].strip() == "keep", \
+        "select_filter must receive the decoded-item keep set as its first arg"
     assert "-c:v\", \"copy\"" not in main_body and "-c:v', 'copy'" not in main_body, \
         "the video stream must not be stream-copied for selection"
 
@@ -338,18 +355,33 @@ def test_runner_declares_terminal_outputs_and_rejects_input_only_history(runner,
     assert "input" not in PUBLISHABLE_SERVER_TYPES
 
     # (2) the REAL released VACE run copy: SaveVideo 114 is the declared terminal
-    #     output, and the loader / preview / codec nodes are not declared at all
+    #     output, and the loader / preview / codec nodes are not declared at all.
+    #     b4 correction: `kind` is the HISTORY KEY the server publishes under.  On a
+    #     real server SaveVideo publishes under `images` (with `animated`), not
+    #     `videos` -- measured in REAL_HISTORY and re-asserted right here, which is
+    #     why SAVE_NODE_KINDS["SaveVideo"] is ("images", "video").  `media_type` stays
+    #     "video": the media itself is still an .mp4.
+    hist = json.loads(open(REAL_HISTORY, encoding="utf-8").read())
+    hist_outs = hist[list(hist.keys())[0]]["outputs"]
+    for nid in ("246", "292"):
+        entry = hist_outs[nid]
+        assert "videos" not in entry, \
+            "a real server published this SaveVideo node under `images`, not `videos`"
+        assert entry["images"][0]["type"] == "output", entry
+        assert entry["images"][0]["filename"].endswith(".mp4"), entry
     declared = runner.declared_terminal_outputs(api_class_map(UI_VACE))
-    assert declared == {"114": {"kind": "videos", "media_type": "video",
+    assert declared == {"114": {"kind": "images", "media_type": "video",
                                 "server_types": ("output",)}}, declared
     for not_terminal in ("145", "146", "68"):   # LoadVideo / PreviewImage / CreateVideo
         assert not_terminal not in declared
 
     # (3) the released Wan-Animate-2 run copy: every declared node is a video
-    #     product, and its LoadVideo (240) is never declared
+    #     product, and its LoadVideo (240) is never declared.  Its save nodes
+    #     246/292 ARE the outputs of REAL_HISTORY, which the server published under
+    #     `images` with .mp4 filenames -- the same measured fact as (2).
     anim = runner.declared_terminal_outputs(api_class_map(UI_ANIMATE))
     assert sorted(anim) == ["246", "292"], anim
-    assert all(c["kind"] == "videos" and c["media_type"] == "video"
+    assert all(c["kind"] == "images" and c["media_type"] == "video"
                for c in anim.values()), anim
     assert "240" not in anim
 

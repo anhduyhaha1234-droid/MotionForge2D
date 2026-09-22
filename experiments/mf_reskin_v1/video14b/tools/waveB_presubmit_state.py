@@ -16,8 +16,8 @@ from __future__ import annotations
 import hashlib
 import json
 import socket
-import subprocess
 import sys
+# (b4) `import subprocess` removed here: unused import (ruff F401).
 import time
 from pathlib import Path
 
