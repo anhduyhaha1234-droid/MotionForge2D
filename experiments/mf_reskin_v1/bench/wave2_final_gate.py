@@ -1,5 +1,6 @@
 """MF-V1-BENCH wave-2 FINAL GATE - verifies the delivered state on disk. Exit 0 only if every row passes."""
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -140,7 +141,17 @@ chk("every commit since 36c912e touches ONLY the bench allowlist",
 out, rc = git("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
 chk("branch has no upstream (nothing pushed)", rc != 0, out[:60])
 
-# 9. no stray temp files in the CPU temp area
+# 9. the harness regression suite passes (scoped to the bench package)
+BT = Path("C:/Users/Admin/Documents/Codex/work/mfv1/runtime/bench/_ptgate")
+r = subprocess.run([sys.executable, "-m", "pytest", "experiments/mf_reskin_v1/bench", "-q",
+                    "--cache-clear", "--basetemp=%s" % BT],
+                   cwd="C:/Users/Admin/Documents/Codex/work/mfv1/wt-bench",
+                   capture_output=True, text=True)
+lines = [x for x in r.stdout.strip().splitlines() if x.strip()]
+chk("bench regression suite passes", r.returncode == 0, lines[-1] if lines else r.stderr[-70:])
+shutil.rmtree(BT, ignore_errors=True)
+
+# 10. no stray temp files in the CPU temp area
 tmp = Path("C:/Users/Admin/Documents/Codex/work/mfv1/runtime/bench")
 stray = [p.name for p in tmp.iterdir() if p.name.startswith("_")]
 chk("no stray temp files in runtime/bench", not stray, "; ".join(stray))

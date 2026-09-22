@@ -41,6 +41,19 @@ def size(p):
     return p.stat().st_size if p.exists() else 0
 
 
+def require_nonempty(path, label):
+    """Return the artifact's size, or raise if ffmpeg wrote nothing.
+
+    Measured defect: a filter chain that matches zero frames makes ffmpeg exit 0 with
+    empty stderr and no output file, so a caller that only checks the exit code records
+    a 0-byte "artifact". Absent and zero-byte are treated as the same failure here.
+    """
+    n = size(path)
+    if n == 0:
+        raise SystemExit("ZERO-BYTE/ABSENT artifact: %s (%s) - ffmpeg can exit 0 having written nothing" % (path, label))
+    return n
+
+
 def main(argv):
     ap = argparse.ArgumentParser()
     ap.add_argument("--candidate", required=True)
@@ -63,10 +76,7 @@ def main(argv):
     made = []
 
     def add(path, label):
-        n = size(path)
-        if n == 0:
-            raise SystemExit("ZERO-BYTE/ABSENT artifact: %s (%s) - ffmpeg can exit 0 having written nothing" % (path, label))
-        made.append({"path": str(path), "bytes": n, "label": label})
+        made.append({"path": str(path), "bytes": require_nonempty(path, label), "label": label})
 
     # 1/2 - review copies of the candidate (1x and 0.5x), native geometry
     p = R / "BOOK_r4_candidate_1x.mp4"
