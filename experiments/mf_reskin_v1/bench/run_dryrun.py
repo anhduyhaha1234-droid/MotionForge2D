@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import shutil
 import sys
 import time
@@ -29,12 +30,16 @@ import assertions as A      # noqa: E402
 import sheet as S           # noqa: E402
 
 VENC = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p"]
-RAW = C.BENCH_EV / "raw"
+# Evidence root: MF_BENCH_EV_OUT lets this run write to its own root instead of the frozen
+# wave-1/2 BENCH root (read-only since the correction round). Inputs stay read-only under
+# C.RUNTIME; scratch (broken control clips) goes to C.WORK, never outside the write-set.
+EV_OUT = Path(os.environ.get("MF_BENCH_EV_OUT", str(C.BENCH_EV)))
+RAW = EV_OUT / "raw"
 SRC_EXTRACTS = C.RUNTIME / "src_windows"
-BROKEN = C.RUNTIME / "broken"
-REVIEW = C.BENCH_EV / "review"
-SHEETS = C.BENCH_EV / "sheets"
-CROPS = C.BENCH_EV / "crops"
+BROKEN = C.WORK / "broken"
+REVIEW = EV_OUT / "review"
+SHEETS = EV_OUT / "sheets"
+CROPS = EV_OUT / "crops"
 
 SPEC_BASE = {"expected_frames": 120, "pts_duration": 4.0,
              "video": {"codec": "h264", "width": 640, "height": 360, "pix_fmt": "yuv420p"},
@@ -493,8 +498,10 @@ def step_report():
              "python experiments/mf_reskin_v1/bench/run_dryrun.py "
              "--steps golden,extract,propagate,stills,negatives,sheets,report\n```\n")
     L.append("Command transcript (argv/cwd/exit/duration) for every ffmpeg/ffprobe call: "
-             "`raw/cmd_transcript.jsonl`. Command count in this run: %d, failures: %d.\n"
-             % (len(C.LEDGER), sum(1 for x in C.LEDGER if not x["ok"])))
+             "`raw/cmd_transcript.jsonl`, appended at each command start and terminal "
+             "boundary. Command count in this run: %d, failures: %d.\n"
+             % (C.command_count(),
+                sum(1 for x in C.LEDGER if x.get("phase") == "terminal" and not x.get("ok"))))
 
     L.append("\n## 8. What this harness deliberately does NOT do\n")
     L.append("- no image-scoring / vision / segmentation model, no metric platform, no benchmark suite;\n"
@@ -583,7 +590,7 @@ def main(argv):
             return 2
         STEPS[name]()
     C.flush_ledger()
-    print("TOTAL %.1f s; commands=%d" % (time.time() - t0, len(C.LEDGER)))
+    print("TOTAL %.1f s; commands=%d" % (time.time() - t0, C.command_count()))
     return 0
 
 

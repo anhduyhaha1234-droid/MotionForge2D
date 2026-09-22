@@ -9,9 +9,11 @@ Run:  python -m pytest experiments/mf_reskin_v1/bench -q --cache-clear --basetem
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import numpy as np
@@ -46,7 +48,7 @@ def make_clip(path, w=64, h=36, n=12, color="gray"):
 
 def test_flush_ledger_appends_and_never_truncates(tmp_path):
     """Defect locked: flush_ledger opened the transcript with "w" and a later run
-    replaced an earlier run's 305 rows with 20. Appends only."""
+    replaced an earlier run's 305 rows with 20. Appends only, one header per run."""
     t = tmp_path / "cmd_transcript.jsonl"
     C.LEDGER.clear()
     C.LEDGER.append({"label": "run1-a", "argv": ["ffmpeg"], "exit_code": 0})
@@ -57,10 +59,23 @@ def test_flush_ledger_appends_and_never_truncates(tmp_path):
     C.flush_ledger(t)
     rows = [json.loads(x) for x in t.read_text(encoding="utf-8").splitlines()]
     labels = [r.get("label") for r in rows]
-    assert len(first) == 2 and len(rows) == 4, "each run adds its header plus its rows"
+    # one per-run header for the whole run, then one row per flush: 2 -> 3 rows.
+    # (The pre-fix version added a header on every flush and re-wrote the whole buffer.)
+    assert len(first) == 2 and len(rows) == 3, "each run adds its header plus its rows"
     assert "run1-a" in labels and "run2-a" in labels, "run 1 survived run 2"
     assert labels.count("run1-a") == 1 and labels.count("run2-a") == 1
+    # prefix preservation: the earlier run's bytes are untouched by the later run
+    assert t.read_bytes().startswith(first[0].encode("utf-8") + b"\n")
+    assert json.loads(first[1])["label"] == "run1-a"
     C.LEDGER.clear()
+
+
+@pytest.fixture(autouse=True)
+def _restore_ledger_module():
+    """No test may leave the module-level ledger path or buffer pointing at its tmp dir."""
+    yield
+    C.LEDGER.clear()
+    C.set_ledger_path(None)
 
 
 def test_flush_ledger_header_marks_the_run(tmp_path):
@@ -71,6 +86,171 @@ def test_flush_ledger_header_marks_the_run(tmp_path):
     head = json.loads(t.read_text(encoding="utf-8").splitlines()[0])
     assert head["run"] == "start" and head["commands"] == 1 and "when" in head and "cwd" in head
     C.LEDGER.clear()
+
+
+# --------------------------------------------------------------------------- #
+# 1b. F10 - the ledger must survive an exception and a process kill, and flushing
+#     twice must not duplicate a row. Each test runs its own negative control: the
+#     same check against MF_BENCH_LEDGER_MODE=memory, which is the pre-fix write
+#     path (rows only in memory, written by a final flush), and the same duplicate
+#     detector against the reviewer's real double-flushed probe ledger.
+# --------------------------------------------------------------------------- #
+
+BENCH_DIR = Path(__file__).resolve().parent
+
+# Child process: one command that completes, then either dies by exception before any
+# flush, or starts a command and hangs until the parent kills it.
+CHILD_LEDGER = '''
+import pathlib, sys, time
+sys.path.insert(0, sys.argv[1])
+import common as C
+C.set_ledger_path(pathlib.Path(sys.argv[2]))
+C.run([sys.executable, "-B", "-c", "print('completed before interruption')"], label="completed")
+cmd = C.begin_command([sys.executable, "-B", "-c", "print('never returns')"], label="interrupted")
+print("BEGIN_WRITTEN", cmd, flush=True)
+if sys.argv[3] == "raise":
+    raise SystemExit(3)
+time.sleep(60)
+C.end_command(cmd, 0, 0.0, (0,), 0, 0)
+'''
+
+
+def _child(tmp_path, ledger, action, mode):
+    """Spawn the child with MF_BENCH_LEDGER_MODE=durable (fixed) or memory (pre-fix)."""
+    script = tmp_path / ("child_%s.py" % action)
+    script.write_text(CHILD_LEDGER, encoding="utf-8")
+    env = dict(os.environ, MF_BENCH_LEDGER_MODE=mode)
+    return subprocess.Popen([sys.executable, "-B", str(script), str(BENCH_DIR), str(ledger), action],
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+
+
+def test_ledger_survives_exception_and_process_kill(tmp_path):
+    """F10 rows 1-4: durable at command boundaries, identity per record, prefix preserved,
+    an interrupted start reported `incomplete` with nothing invented.
+
+    Negative control (executed, not argued): the same child with
+    MF_BENCH_LEDGER_MODE=memory reproduces the pre-fix write path, so nothing of it is on
+    disk after the exception. The durability check must therefore report an empty ledger
+    there - proof the check can fail, and not a verdict produced by the fix itself.
+    """
+    ledger = tmp_path / "cmd_transcript.jsonl"
+
+    # (a) the run dies by exception after a command completed and one never returned
+    p = _child(tmp_path, ledger, "raise", "durable")
+    _, err = p.communicate(timeout=120)
+    assert p.returncode == 3, "the child must really die by exception: %s" % err[-400:]
+    d = C.read_ledger(ledger)
+    assert [r["status"] for r in d["records"]] == ["complete", "incomplete"], d["records"]
+    done, lost = d["records"]
+    assert done["label"] == "completed" and done["exit_code"] == 0 and done["duration_s"] > 0, \
+        "a command that finished before the exception keeps its exit code and duration"
+    assert lost["exit_code"] is None and lost["duration_s"] is None, \
+        "an interrupted command must never get an invented exit code or duration"
+    assert all(r.get("run_id") for r in d["rows"]), "every row must join to a run"
+    assert all(r.get("cmd_id") for r in d["commands"]), "every command row needs a command id"
+    assert len(d["run_ids"]) == 1 and d["headers"] == 1, "exactly one run header"
+    assert d["duplicates"] == [] and d["malformed"] == []
+    # the envelope of the completed command is on disk although the child never flushed
+    assert any(r["status"] == "complete" and r["label"] == "completed" for r in d["records"])
+    prefix = ledger.read_bytes()
+
+    # (b) a second child is killed while a command is in flight
+    n_incomplete = sum(1 for r in d["records"] if r["status"] == "incomplete")
+    p2 = _child(tmp_path, ledger, "kill", "durable")
+    deadline = time.time() + 60
+    while len([r for r in C.read_ledger(ledger)["records"] if r["status"] == "incomplete"]) <= n_incomplete:
+        if p2.poll() is not None:
+            pytest.fail("child exited before its start row became durable: %s" % p2.stderr.read()[-400:])
+        if time.time() > deadline:
+            pytest.fail("the start row never became durable, so there was nothing to kill")
+        time.sleep(0.1)
+    before_kill = ledger.read_bytes()
+    p2.kill()
+    p2.communicate(timeout=60)
+    after = C.read_ledger(ledger)
+    assert after["duplicates"] == [], "no row may be duplicated by a kill or a flush"
+    inc = [r for r in after["records"] if r["status"] == "incomplete"]
+    assert len(inc) == n_incomplete + 1, after["records"]
+    assert all(r["exit_code"] is None and r["duration_s"] is None for r in inc), \
+        "a killed command is incomplete: exit code and duration stay null"
+    assert ledger.read_bytes() == before_kill, "the kill changed nothing already on disk"
+    assert ledger.read_bytes().startswith(prefix), \
+        "rows written by the earlier run survive the later run byte-for-byte"
+
+    # (c) negative control: on the pre-fix write path nothing survives the exception
+    legacy = tmp_path / "legacy.jsonl"
+    p3 = _child(tmp_path, legacy, "raise", "memory")
+    p3.communicate(timeout=120)
+    assert p3.returncode == 3
+    assert C.read_ledger(legacy)["records"] == [], \
+        "control: with rows kept in memory (pre-fix path) the same check reports NOT durable"
+    assert not legacy.exists() or legacy.read_bytes() == b""
+
+
+def test_flush_is_idempotent(tmp_path):
+    """F10 rows 5-6: a repeated flush must not duplicate a row, and a later run must not
+    truncate what an earlier run already wrote.
+
+    Negative control (executed): the duplicate detector must FIRE on the shape the wave-1
+    harness really produced - the reviewer's probe ledger holds 6 rows with 2 copies of the
+    same command (rows_after_two_flushes 4, same_command_copies 2). An empty `duplicates`
+    list above is therefore a measurement, not an artefact of a blind detector.
+    """
+    ledger = tmp_path / "cmd_transcript.jsonl"
+    C.set_ledger_path(ledger)
+    C.LEDGER.clear()
+    rc, _, _ = C.run([sys.executable, "-B", "-c", "print('probe')"], label="probe")
+    assert rc == 0
+    n_rows = len(ledger.read_text(encoding="utf-8").splitlines())
+    assert n_rows == 3, "header + start row + terminal row"
+    for _ in range(3):
+        C.flush_ledger()
+    once = C.read_ledger()
+    assert len(ledger.read_text(encoding="utf-8").splitlines()) == n_rows, \
+        "flush must be a no-op on rows that are already on disk"
+    assert once["duplicates"] == [] and len(once["records"]) == 1
+    assert once["records"][0]["status"] == "complete" and once["records"][0]["exit_code"] == 0
+    assert [r.get("phase") for r in once["commands"]] == ["start", "terminal"]
+
+    # a row that is only in memory is appended exactly once, however often flush runs
+    C.LEDGER.append({"label": "manual", "argv": ["x"], "exit_code": 0})
+    C.flush_ledger()
+    a = ledger.read_text(encoding="utf-8").splitlines()
+    C.flush_ledger()
+    C.flush_ledger()
+    b = ledger.read_text(encoding="utf-8").splitlines()
+    assert a == b, "a repeated flush appends nothing"
+    assert sum(1 for x in b if json.loads(x).get("label") == "manual") == 1, \
+        "the same command must not be copied into the ledger twice"
+
+    # a started-but-unfinished command is declared incomplete exactly once, nothing invented
+    cid = C.begin_command([sys.executable, "-B", "-c", "print('never')"], label="unfinished")
+    C.flush_ledger()
+    C.flush_ledger()
+    d = C.read_ledger()
+    inc_rows = [r for r in d["commands"] if r.get("cmd_id") == cid and r.get("phase") == "incomplete"]
+    rec = [r for r in d["records"] if r["cmd_id"] == cid]
+    assert len(inc_rows) == 1, "exactly one incomplete row, however often flush ran"
+    assert rec and rec[0]["status"] == "incomplete"
+    assert rec[0]["exit_code"] is None and rec[0]["duration_s"] is None, \
+        "the incomplete row must not invent an exit code or a duration"
+    assert d["duplicates"] == [] and d["malformed"] == []
+    C.set_ledger_path(None)
+
+    # negative control 1: the real double-flushed probe ledger from the review
+    probe = Path("C:/Users/Admin/Documents/Codex/2026-09-11/tr-x20/outputs/"
+                 "mf-upgrade-review-20260922/bench/probe/raw/cmd_transcript.jsonl")
+    assert probe.exists(), "the reviewer's probe ledger must be readable for this control"
+    pd = C.read_ledger(probe)
+    assert pd["row_count"] == 6 and pd["duplicates"], "control: the twin rows must be detected"
+    assert max(x["copies"] for x in pd["duplicates"]) == 2, pd["duplicates"]
+
+    # negative control 2: any twice-written command is detected, on a hermetic copy
+    crafted = tmp_path / "crafted.jsonl"
+    body = ledger.read_text(encoding="utf-8").splitlines()
+    crafted.write_text("\n".join(body + body[1:3]) + "\n", encoding="utf-8")
+    assert C.read_ledger(crafted)["duplicates"], \
+        "control: a twice-written command must be detected in the ledger"
 
 
 # --------------------------------------------------------------------------- #
