@@ -27,6 +27,7 @@ from .errors import (
     ArtifactMissing,
     BlindResubmitRefused,
     InvalidGraph,
+    LeaseNotHeld,
     MfComfyError,
     MissingModel,
     MissingNode,
@@ -36,6 +37,7 @@ from .errors import (
     WsDisconnected,
     classify_execution_message,
 )
+from .lease import PromptReservations, same_boot_identity
 from .paths import StagePaths
 
 ARTIFACT_KEYS = ("images", "gifs", "videos", "audio")
@@ -72,6 +74,7 @@ class ComfyStageAdapter:
         sampler=None,
         client_id: str | None = None,
         owner: str = "mf-comfy-worker",
+        reservations=None,
     ) -> None:
         self.transport = transport
         self.paths = paths
@@ -83,11 +86,31 @@ class ComfyStageAdapter:
         self.sampler = sampler
         self.client_id = client_id or uuid.uuid4().hex
         self.owner = owner
+        # Durable unresolved-prompt ledger (see mf_comfy.lease.PromptReservations).
+        # It must be the *same* ledger the gate consults, otherwise the gate
+        # guard would look at a different directory than the one we write to:
+        # the gate resolves `<instance state dir>/reservations`, and the epoch
+        # file lives in exactly that directory, so derive from it.
+        if reservations is False:
+            reservations = None
+        elif reservations is None:
+            reservations = getattr(gate, "reservations", None) if gate is not None else None
+            if reservations is None and epoch is not None:
+                reservations = PromptReservations(Path(epoch.path).parent / "reservations")
+            if reservations is None:
+                reservations = PromptReservations(paths.root / "reservations")
+        self.reservations = reservations
         # attempt bookkeeping / counters used as evidence
         self.submit_count = 0
         self.reconcile_count = 0
         self.interrupt_count = 0
         self.interrupt_refusals = 0
+        self.adopted_prompt_id: str | None = None
+        self.reservation: dict | None = None
+        self.reservation_released = False
+        self.gate_acquired = False
+        self.lease_acquired = False
+        self.reservation_events: list[dict] = []
         self.ws_events: list[dict] = []
         self.notes: list[str] = []
         self.instance_epoch: dict | None = None
@@ -229,6 +252,19 @@ class ComfyStageAdapter:
         return {}
 
     # -------------------------------------------------------------- reconcile
+    @staticmethod
+    def _queue_ids(item) -> list[str]:
+        """String ids carried by one `/queue` item.
+
+        The pinned server returns `[number, prompt_id, prompt, extra_data, outputs]`,
+        so the prompt id is at index 1; simplest fakes put it at index 0. Both are
+        accepted, and only string slots are considered so the integer queue number
+        can never be mistaken for an id.
+        """
+        if not isinstance(item, (list, tuple)):
+            return []
+        return [x for x in list(item)[:2] if isinstance(x, str)]
+
     def reconcile(self, prompt_id: str) -> str:
         """Prove the outcome of an ambiguous wait. Never submits anything."""
         self.reconcile_count += 1
@@ -239,7 +275,7 @@ class ComfyStageAdapter:
             q = {}
         for bucket in ("queue_running", "queue_pending"):
             for item in q.get(bucket) or []:
-                if isinstance(item, (list, tuple)) and item and item[0] == prompt_id:
+                if prompt_id in self._queue_ids(item):
                     return "queued"
         try:
             if self._history_entry(prompt_id):
@@ -250,6 +286,163 @@ class ComfyStageAdapter:
             if not self.epoch.matches(self.instance_epoch):
                 return "epoch_lost"
         return "unproven"
+
+    # ------------------------------------------------- durable reservation
+    def _scan_server_for_own_prompt(self, client_id: str) -> tuple[tuple[str, str] | None, bool]:
+        """Find a prompt THIS client already submitted. Returns (found, reads_ok).
+
+        `reads_ok` is False when a queue/history read failed, i.e. absence is not
+        proven. Absence is only ever treated as proof when both reads worked.
+        """
+        if not client_id:
+            return None, False
+        reads_ok = True
+        try:
+            q = self.transport.queue() or {}
+        except TransportError as exc:
+            self.notes.append(f"queue read failed during adoption scan: {exc.to_dict()}")
+            q, reads_ok = {}, False
+        for bucket in ("queue_running", "queue_pending"):
+            for item in q.get(bucket) or []:
+                ids = self._queue_ids(item)
+                if not ids:
+                    continue
+                extra = {}
+                for idx in (3, 2):
+                    if isinstance(item, (list, tuple)) and len(item) > idx and isinstance(item[idx], dict):
+                        extra = item[idx]
+                        break
+                if extra.get("client_id") == client_id:
+                    return ("queue", ids[0]), reads_ok
+        try:
+            full = self.transport.history("") or {}
+        except TransportError as exc:
+            self.notes.append(f"history read failed during adoption scan: {exc.to_dict()}")
+            full, reads_ok = {}, False
+        for prompt_id, entry in full.items():
+            extra = {}
+            if isinstance(entry, dict):
+                info = entry.get("prompt")
+                if isinstance(info, (list, tuple)) and len(info) > 3 and isinstance(info[3], dict):
+                    extra = info[3]
+                elif isinstance(entry.get("extra_data"), dict):
+                    extra = entry["extra_data"]
+            if extra.get("client_id") == client_id:
+                return ("history", str(prompt_id)), reads_ok
+        return None, reads_ok
+
+    def _record_event(self, action: str, detail: dict) -> None:
+        self.reservation_events.append({"action": action, "at": self.clock(), **detail})
+
+    def adopt_pending(self, instance_epoch: dict | None = None) -> dict | None:
+        """Adopt a prompt this server boot already owns — never a second POST.
+
+        Order:
+          1. a reservation of a *different* boot of this same server can never be
+             adopted -> quarantined (its output is foreign output);
+          2. a reservation of this boot with a bound prompt_id is adopted directly;
+          3. a reservation of this boot with no prompt_id is resolved by searching
+             /queue + /history for our own client_id;
+          4. if that search proves the POST never landed, the reservation is
+             released as `not_accepted` and a fresh submit is allowed.
+        """
+        if self.reservations is None:
+            return None
+        epoch = (instance_epoch or self.instance_epoch
+                 or (self.epoch.read() if self.epoch else None) or {})
+        inst = epoch.get("instance_id")
+        # 1) foreign boot identity on the same server
+        for rec in self.reservations.unresolved():
+            if rec.get("instance_id") == inst:
+                continue
+            if rec.get("base_url") and epoch.get("base_url") and rec.get("base_url") != epoch.get("base_url"):
+                continue
+            if rec.get("host") != epoch.get("host"):
+                continue
+            res = self.reservations.quarantine(
+                rec, "server_epoch_changed", closer=self.owner,
+                evidence={"recorded_instance_id": rec.get("instance_id"),
+                          "observed_instance_id": inst,
+                          "recorded_host": rec.get("host"), "observed_host": epoch.get("host"),
+                          "observed_pid": epoch.get("pid")})
+            self._record_event("quarantine_foreign_epoch", {"prompt_id": rec.get("prompt_id"), "result": res})
+        # 2) + 3) + 4) this boot's own unresolved reservations
+        for rec in self.reservations.unresolved(inst):
+            if rec.get("prompt_id"):
+                self.reservation = rec
+                self.adopted_prompt_id = rec["prompt_id"]
+                self._record_event("adopted_bound_prompt", {"prompt_id": rec["prompt_id"]})
+                return rec
+            found, reads_ok = self._scan_server_for_own_prompt(rec.get("client_id", ""))
+            if found:
+                kind, prompt_id = found
+                bound = self.reservations.bind(epoch, rec["attempt_id"], prompt_id, submit_count=0)
+                self.reservation = bound
+                self.adopted_prompt_id = prompt_id
+                self._record_event("adopted_after_lost_ack",
+                                   {"prompt_id": prompt_id, "found_in": kind, "submit_count": 0})
+                return bound
+            if reads_ok and same_boot_identity(epoch, rec):
+                res = self.reservations.close(
+                    rec, "not_accepted", closer=self.owner,
+                    evidence={"reason": "queue and history carry no prompt for this client_id; "
+                                        "boot identity unchanged, so the POST provably never landed",
+                              "client_id": rec.get("client_id")})
+                self._record_event("released_not_accepted", {"result": res})
+                continue
+            # absence not proven (or boot identity no longer matches): keep it
+            self._record_event("kept_unproven", {"prompt_id": rec.get("prompt_id"), "reads_ok": reads_ok})
+        return None
+
+    def close_reservation(self, outcome: str, evidence: dict | None = None,
+                          closer: str | None = None) -> dict:
+        """Release this attempt's reservation exactly once (idempotent)."""
+        if self.reservations is None or self.reservation is None:
+            return {"released": False, "already_released": False, "reason": "no_reservation"}
+        res = self.reservations.close(self.reservation, outcome,
+                                      evidence=evidence or {}, closer=closer or self.owner)
+        if res.get("released") or res.get("already_released"):
+            self.reservation_released = True
+        self._record_event("close", {"outcome": outcome, "result": res})
+        return res
+
+    def reservation_state(self) -> dict:
+        if self.reservations is None or self.reservation is None:
+            return {"exists": False, "released": self.reservation_released}
+        key = self.reservation["key"]
+        marker = Path(self.reservation["path"])
+        cur = self.reservations.read(self.reservation["instance_id"], self.reservation["attempt_id"])
+        return {
+            "exists": marker.exists(),
+            "released": self.reservation_released,
+            "key": key,
+            "marker_path": str(marker),
+            "prompt_id": (cur or self.reservation).get("prompt_id"),
+            "instance_id": (cur or self.reservation).get("instance_id"),
+            "record": cur,
+        }
+
+    def gate_reconcile_hook(self, record: dict) -> str:
+        """Prove (or fail to prove) a foreign reservation's outcome for the gate.
+
+        This is the callback the gate guard uses: a later stage may take the GPU
+        only once the earlier prompt reaches a provable terminal outcome.
+        """
+        pid = record.get("prompt_id")
+        if not pid:
+            found, reads_ok = self._scan_server_for_own_prompt(record.get("client_id", ""))
+            if found:
+                return "queued"
+            return "not_accepted" if reads_ok else "unproven"
+        return self.reconcile(pid)
+
+    def _release_hold(self) -> None:
+        if self.lease is not None:
+            self.lease.release()
+            self.lease_acquired = False
+        if self.gate_acquired and self.gate is not None:
+            self.gate.release()
+            self.gate_acquired = False
 
     # --------------------------------------------------------------- validate
     def _decode_check(self, path: Path, raw: bytes) -> tuple[bool | None, int | None, int | None, str]:
@@ -332,8 +525,6 @@ class ComfyStageAdapter:
         """`/interrupt` is only legal while holding the exclusive lease for this prompt."""
         if self.lease is None:
             self.interrupt_refusals += 1
-            from .errors import LeaseNotHeld
-
             raise LeaseNotHeld("no lease manager configured; interrupt refused")
         try:
             self.lease.assert_held_for(prompt_id=prompt_id, epoch=self.instance_epoch)
@@ -342,6 +533,43 @@ class ComfyStageAdapter:
             raise
         self.interrupt_count += 1
         return self.transport.interrupt(prompt_id)
+
+    def cancel(self, prompt_id: str, wait_terminal_s: float = 0.0,
+               poll_s: float = 1.0) -> dict:
+        """Cancel a prompt we provably own, then release the reservation once.
+
+        The interrupt is still lease-gated (a foreign prompt is never touched).
+        The reservation is only released when the server history proves the
+        prompt reached a terminal state — otherwise it stays unresolved.
+        `wait_terminal_s` waits (bounded) for the server to record the terminal
+        entry after the real `/interrupt`; it never retries the interrupt.
+        """
+        self.interrupt(prompt_id)
+        deadline = self.clock() + float(wait_terminal_s)
+        entry: dict = {}
+        while True:
+            entry = self._history_entry(prompt_id)
+            if entry or self.clock() >= deadline:
+                break
+            self.sleep(poll_s)
+        outcome = self.reconcile(prompt_id)
+        closed = None
+        if entry:
+            closed = self.close_reservation("cancelled",
+                                            evidence={"interrupt": True, "reconcile_outcome": outcome,
+                                                      "terminal_status": ((entry.get("status") or {})
+                                                                          .get("status_str"))})
+            self._release_hold()
+        return {
+            "prompt_id": prompt_id,
+            "interrupt_count": self.interrupt_count,
+            "reconcile_outcome": outcome,
+            "terminal_proven": bool(entry),
+            "waited_terminal_s": float(wait_terminal_s),
+            "close": closed,
+            "reservation_released": self.reservation_released,
+            "reservation": self.reservation_state(),
+        }
 
     # ------------------------------------------------------------------- run
     def run(self, spec: RunSpec, stage_input: StageInput | None = None) -> StageOutput:
@@ -353,7 +581,7 @@ class ComfyStageAdapter:
             status="failed", stage_id=spec.stage_id, workflow_id=spec.workflow_id,
             instance_epoch=instance_epoch or {},
         )
-        gate_acquired = False
+        terminal_proven = False
         try:
             pre = self.preflight(spec.graph, spec.node_inventory_sha256)
             timing["preflight_s"] = round(self.clock() - t_start, 3)
@@ -361,18 +589,54 @@ class ComfyStageAdapter:
             base.node_inventory_sha256 = pre["node_inventory_sha256"]
             base.model_hashes = dict(spec.model_pins)
 
+            # F01 fix, step 1: does this boot already own a prompt? Answer BEFORE
+            # taking the gate, so the adopting attempt can take over its own
+            # reservation instead of POSTing a second prompt.
+            adopted = self.adopt_pending(instance_epoch)
+            adopt_key = self.reservation.get("key") if (adopted and self.reservation) else None
+
             if self.gate is not None:
-                self.gate.acquire(stage_label=spec.stage_id)
-                gate_acquired = True
+                # epoch + reconcile callback: while any OTHER unresolved
+                # reservation owns this server boot the gate refuses, and only a
+                # provable terminal outcome clears one.
+                self.gate.acquire(stage_label=spec.stage_id, epoch=instance_epoch,
+                                  reconcile=self.gate_reconcile_hook, adopt_key=adopt_key)
+                self.gate_acquired = True
             if self.lease is not None:
                 self.lease.acquire(attempt_id=stage_input.attempt_id, prompt_id=None)
+                self.lease_acquired = True
 
-            if self.sampler is not None:
-                self.sampler.start()
-            t_submit = self.clock()
-            prompt_id = self.submit(spec.graph)
-            timing["submit_s"] = round(self.clock() - t_submit, 3)
+            if adopted is not None and adopted.get("prompt_id"):
+                prompt_id = adopted["prompt_id"]
+                base.adopted = True
+                if self.lease is not None:
+                    # the adopted prompt IS ours, so the lease must cover it —
+                    # otherwise `/interrupt` would (correctly) refuse later.
+                    try:
+                        self.lease.set_prompt(prompt_id)
+                    except MfComfyError as exc:
+                        self.notes.append(f"lease binding after adoption skipped: {exc.to_dict()}")
+                self.notes.append(
+                    f"adopted existing prompt {prompt_id} from the durable reservation; "
+                    "no second POST was sent")
+            else:
+                if self.reservations is not None:
+                    attempt_id = stage_input.attempt_id or f"attempt-{uuid.uuid4().hex[:12]}"
+                    self.reservation = self.reservations.open(
+                        instance_epoch or {}, attempt_id, stage_id=spec.stage_id,
+                        owner=self.owner, client_id=self.client_id,
+                        note="opened before the POST: a lost acknowledgement must never resubmit")
+                if self.sampler is not None:
+                    self.sampler.start()
+                t_submit = self.clock()
+                prompt_id = self.submit(spec.graph)
+                timing["submit_s"] = round(self.clock() - t_submit, 3)
+                if self.reservations is not None and self.reservation is not None:
+                    self.reservation = self.reservations.bind(
+                        instance_epoch or {}, self.reservation["attempt_id"], prompt_id,
+                        submit_count=self.submit_count)
             base.prompt_id = prompt_id
+            base.reservation = self.reservation_state()
 
             exec_begin: list[float] = []
             t_wait = self.clock()
@@ -388,7 +652,10 @@ class ComfyStageAdapter:
                 base.timing = timing
                 base.notes = list(self.notes)
                 if outcome == "queued":
-                    base.notes.append("prompt still present in /queue: still running, not a failure")
+                    base.notes.append(
+                        "prompt still present in /queue: still running, not a failure; "
+                        "durable reservation kept and the GPU gate is NOT released")
+                    base.reservation = self.reservation_state()
                     return base
                 if outcome == "completed":
                     entry = self._history_entry(prompt_id)
@@ -405,6 +672,7 @@ class ComfyStageAdapter:
                         reconcile=self.reconcile_count, notes=list(self.notes),
                     )
 
+            terminal_proven = bool(entry)
             status = ((entry.get("status") or {}).get("status_str")) or "unknown"
             if status == "error":
                 messages = (entry.get("status") or {}).get("messages") or []
@@ -426,6 +694,11 @@ class ComfyStageAdapter:
                 "note": "adapter does not assert source-frame mapping; MotionForge owns source clock/PTS",
             }
             base.notes = list(self.notes)
+            base.reservation = self.reservation_state()
+            self.close_reservation("terminal_success",
+                                   evidence={"prompt_id": prompt_id, "terminal_status": status,
+                                             "artifact_count": len(base.artifacts)})
+            base.reservation = self.reservation_state()
             return base
         except MfComfyError as exc:
             base.status = "unresolved" if isinstance(exc, AmbiguousAfterSubmit) else "failed"
@@ -434,9 +707,33 @@ class ComfyStageAdapter:
             base.notes = list(self.notes)
             if self.sampler is not None:
                 base.resources = self.sampler.stop()
+            if isinstance(exc, ServerEpochChanged):
+                # A different boot identity: quarantine. Its output can never be
+                # adopted as this attempt's result and is never released as success.
+                if self.reservations is not None and self.reservation is not None:
+                    res = self.reservations.quarantine(self.reservation, "epoch_lost",
+                                                       closer=self.owner,
+                                                       evidence={"error": exc.to_dict()})
+                    self.reservation_released = True
+                    self._record_event("quarantine_epoch_lost", {"result": res})
+            elif terminal_proven:
+                self.close_reservation("terminal_error", evidence={"error": exc.to_dict()})
+            elif isinstance(exc, (MissingModel, MissingNode, InvalidGraph)):
+                # the server rejected the graph outright: the POST provably never landed
+                self.close_reservation("rejected_no_submit", evidence={"error": exc.to_dict()})
+            base.reservation = self.reservation_state()
             raise
         finally:
-            if self.lease is not None:
-                self.lease.release()
-            if gate_acquired and self.gate is not None:
-                self.gate.release()
+            if self.reservation is not None and not self.reservation_released:
+                # The prompt's outcome is unprovable, so this attempt is NOT done:
+                # the reservation stays on disk and the GPU gate stays held. A
+                # second stage is refused by the gate guard until someone
+                # reconciles this reservation to a provable terminal outcome.
+                base.status = "unresolved"
+                base.reservation = self.reservation_state()
+                self.notes.append(
+                    "durable reservation kept on disk (prompt outcome unprovable): "
+                    "GPU gate and instance lease NOT released")
+                base.notes = list(self.notes)
+            else:
+                self._release_hold()

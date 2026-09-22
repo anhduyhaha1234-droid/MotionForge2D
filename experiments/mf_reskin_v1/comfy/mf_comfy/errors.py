@@ -169,6 +169,32 @@ class GpuStageBusy(MfComfyError):
     code = "MF_COMFY_GPU_STAGE_BUSY"
 
 
+class UnresolvedReservation(MfComfyError):
+    """Gate refused: a prompt of this instance still has an unprovable outcome.
+
+    Raised by `GpuStageGate.acquire` when the durable reservation ledger still
+    holds a reservation for this instance epoch. The reservation is a file on
+    disk, so it survives a caller crash or a process restart; it is released
+    exactly once, and only after the outcome is provable from
+    `/queue` + `/history` + the instance epoch.
+    """
+
+    code = "MF_COMFY_UNRESOLVED_RESERVATION"
+    retryable = True
+
+
+class ReservationConflict(MfComfyError):
+    """Refused to open a reservation while one is already unresolved."""
+
+    code = "MF_COMFY_RESERVATION_CONFLICT"
+
+
+class ReservationMismatch(MfComfyError):
+    """Refused to adopt a reservation that belongs to another boot identity."""
+
+    code = "MF_COMFY_RESERVATION_MISMATCH"
+
+
 OOM_MARKERS = (
     "out of memory",
     "outofmemoryerror",

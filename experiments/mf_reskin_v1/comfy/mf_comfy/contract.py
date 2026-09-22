@@ -78,6 +78,10 @@ class StageOutput:
     source_map: dict = field(default_factory=dict)
     failure: dict | None = None
     notes: list[str] = field(default_factory=list)
+    # durable reservation evidence: was a pre-existing prompt adopted instead of
+    # submitting a second one, and is the reservation still unresolved on disk.
+    adopted: bool = False
+    reservation: dict = field(default_factory=dict)
     generated_at: float = field(default_factory=time.time)
 
     def to_dict(self) -> dict:

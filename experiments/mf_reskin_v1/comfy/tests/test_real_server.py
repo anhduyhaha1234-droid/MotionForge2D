@@ -18,11 +18,11 @@ import pytest
 
 from mf_comfy.adapter import ComfyStageAdapter, RunSpec
 from mf_comfy.errors import (
-    AmbiguousAfterSubmit,
     InvalidGraph,
     LeaseNotHeld,
     MissingModel,
     MissingNode,
+    UnresolvedReservation,
 )
 from mf_comfy.gpugate import GpuStageGate
 from mf_comfy.lease import InstanceEpoch, InstanceLease
@@ -40,7 +40,10 @@ CKPT = RT / "models" / "checkpoints" / "Juggernaut-XL_v9_RunDiffusionPhoto_v2.sa
 PINNED_NODE_INVENTORY_SHA = "52674207e277a8ba881ac39f38df21511a22d2129cbab4c2ef636fc890eef745"
 PINNED_COMFYUI_VERSION = "0.28.2"
 PINNED_DEVICE_VRAM_MIB = 12227
-OBSERVATIONS = EV / "runs" / "real_server_observations.json"
+OBSERVATIONS = Path(
+    r"C:\Users\Admin\Documents\Codex\2026-09-11\tr-x20\outputs"
+    r"\mf-reskin-model-upgrade-20260922\20260922T0345Z\COMFY\raw\real_server_observations.json"
+)
 
 
 def _server_up() -> bool:
@@ -229,3 +232,71 @@ def test_real_interrupt_refused_without_lease_and_works_with_lease(transport):
         # No blind cleanup interrupt: cancelling is only ever done for a prompt we
         # hold the lease for, and this test already proves the stop above.
         lease.release()
+
+
+# ------------------------------------------- real ownership / durable reservation
+def test_real_unresolved_reservation_blocks_caller2_then_releases_once(tmp_path, transport):
+    """F01 on the real server: a still-queued prompt owns the gate until proven.
+
+    One long prompt is submitted with a 1 s stage timeout, so the timeout path is
+    real and the prompt is genuinely still in `/queue`. Caller-2 must be refused
+    with the typed `UnresolvedReservation`; a real `/interrupt` on the prompt we
+    own must then release the reservation exactly once. No artwork is regenerated:
+    the prompt is cancelled before it finishes.
+    """
+    epoch = InstanceEpoch(RT / "instance_epoch.json")
+    rec = epoch.read()
+    assert rec, "instance epoch file missing"
+    graph = light_graph(width=1024, height=1024, steps=150, prefix="mf_pytest_f01")
+    # a fresh seed: a cache hit would complete instantly and defeat the probe
+    graph["3"]["inputs"]["seed"] = int(time.time()) % 2147483647
+    lease = InstanceLease(RT / "leases", instance_id=rec["instance_id"], owner="pytest-f01")
+    gate = GpuStageGate(RT / "leases" / "gpu_stage.lock", timeout_s=5.0)
+    adapter = ComfyStageAdapter(transport, StagePaths(tmp_path / "stage"), lease=lease,
+                                gate=gate, epoch=epoch, owner="pytest-f01")
+    adapter.instance_epoch = rec
+    spec = RunSpec(stage_id="pytest_f01", workflow_id="mf_light_sdxl_v1", graph=graph,
+                   workflow_sha256=hash_workflow(graph),
+                   node_inventory_sha256=PINNED_NODE_INVENTORY_SHA,
+                   stage_timeout_s=1.0, poll_s=1.0)
+    out = adapter.run(spec)
+    assert out.status == "unresolved", out.notes
+    assert out.prompt_id and adapter.submit_count == 1
+    marker = Path(out.reservation["marker_path"])
+    assert marker.exists(), "the durable reservation marker must exist on disk"
+    assert adapter.reservation_released is False
+
+    # caller-2 (another stage) is refused while the prompt is unresolved
+    second = GpuStageGate(RT / "leases" / "gpu_stage.lock", timeout_s=0.0)
+    try:
+        with pytest.raises(UnresolvedReservation) as exc:
+            second.acquire(stage_label="pytest-f01-caller2")
+        assert exc.value.code == "MF_COMFY_UNRESOLVED_RESERVATION"
+        assert exc.value.details["unresolved_count"] >= 1
+    finally:
+        second.release()
+    assert second.held is False
+
+    # cancel the prompt we provably own; release exactly once
+    report = adapter.cancel(out.prompt_id, wait_terminal_s=60.0, poll_s=1.0)
+    assert report["interrupt_count"] == 1
+    assert report["reservation_released"] is True
+    assert report["close"]["release_count"] == 1
+    assert marker.exists() is False, "a released reservation is provably gone"
+    assert adapter.reservations.unresolved(rec["instance_id"]) == []
+    receipts = [r for r in adapter.reservations.receipts() if r["prompt_id"] == out.prompt_id]
+    assert len(receipts) == 1 and receipts[0]["outcome"] == "cancelled"
+
+    # once released, the gate is takeable again
+    third = GpuStageGate(RT / "leases" / "gpu_stage.lock", timeout_s=0.0)
+    try:
+        third.acquire(stage_label="pytest-f01-after-release")
+        assert third.held is True
+    finally:
+        third.release()
+    _obs("f01_real_ownership", {
+        "prompt_id": out.prompt_id, "status_after_timeout": out.status,
+        "caller2_refusal": "MF_COMFY_UNRESOLVED_RESERVATION",
+        "cancel": {k: v for k, v in report.items() if k != "reservation"},
+        "terminal_status": report["close"]["outcome"],
+    })

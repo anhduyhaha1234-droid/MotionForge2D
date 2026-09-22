@@ -82,13 +82,20 @@ def light_graph(ckpt: str = CKPT, seed: int = 42, prefix: str = "fake_out") -> d
 
 
 def history_success(prompt_id: str, filename: str = "fake_out_00001_.png",
-                    subfolder: str = "", server_type: str = "output") -> dict:
+                    subfolder: str = "", server_type: str = "output",
+                    client_id: str | None = None) -> dict:
     return {
-        "prompt": [0, prompt_id, {}, {}, []],
+        "prompt": [0, prompt_id, {},
+                   ({"client_id": client_id} if client_id else {}), []],
         "outputs": {"9": {"images": [{"filename": filename, "subfolder": subfolder,
                                       "type": server_type}]}},
         "status": {"status_str": "success", "completed": True, "messages": []},
     }
+
+
+def queue_item(prompt_id: str, client_id: str | None = None, number: int = 0) -> list:
+    """`/queue` item shape of the pinned server: [number, prompt_id, prompt, extra_data, outputs]."""
+    return [number, prompt_id, {}, ({"client_id": client_id} if client_id else {}), []]
 
 
 def history_error(prompt_id: str, text: str) -> dict:
@@ -136,6 +143,8 @@ class FakeTransport:
         self.view_payload: bytes = png_bytes()
         self.view_items: dict = {}
         self.last_graph: dict | None = None
+        # number of upcoming history() calls that must fail (models a raced read)
+        self.history_fail_calls = 0
         self.capabilities = {"comfyui_version": "fake-0.0", "history_direct_endpoint": True,
                             "device_total_vram_mib": 12227}
 
@@ -161,6 +170,11 @@ class FakeTransport:
         return SubmitResult(prompt_id=f"pid-{self.submit_calls}", number=self.submit_calls)
 
     def history(self, prompt_id: str = "") -> dict:
+        if self.history_fail_calls > 0:
+            self.history_fail_calls -= 1
+            from mf_comfy.errors import TransportError
+
+            raise TransportError("simulated raced /history read", prompt_id=prompt_id)
         if not prompt_id:
             return dict(self.history_map)
         if self.drain_calls < self.history_delay_drains:
@@ -205,25 +219,42 @@ class Rig:
     gate: GpuStageGate | None
     paths: StagePaths
     clock: FakeClock
+    root: Path
 
 
 def make_rig(tmp_path: Path, *, graph: dict | None = None, oi: dict | None = None,
              stage_timeout_s: float = 5.0, poll_s: float = 1.0,
              gate_timeout_s: float = 0.0, with_gate: bool = True,
-             history_delay_drains: int = 0, clock_step: float = 1.0) -> Rig:
+             history_delay_drains: int = 0, clock_step: float = 1.0,
+             lock_path: Path | None = None, epoch_path: Path | None = None,
+             lease_dir: Path | None = None, owner: str = "test-owner",
+             client_id: str | None = None, transport: FakeTransport | None = None,
+             write_epoch: bool = True) -> Rig:
+    """Build one adapter against a task-local layout.
+
+    `lock_path` / `epoch_path` / `lease_dir` / `transport` / `write_epoch` are
+    overridable so a test can build a SECOND rig that shares the first rig's
+    lock, epoch and server state — i.e. a simulated process restart over the same
+    durable dirs, without minting a new boot identity.
+    """
     clock = FakeClock(step=clock_step)
-    transport = FakeTransport(object_info=oi, time_advancer=clock.advance,
-                              history_delay_drains=history_delay_drains)
+    if transport is None:
+        transport = FakeTransport(object_info=oi, time_advancer=clock.advance,
+                                  history_delay_drains=history_delay_drains)
+    else:
+        transport.time_advancer = clock.advance
     paths = StagePaths(tmp_path / "stage")
-    epoch = InstanceEpoch(tmp_path / "instance_epoch.json")
-    rec = epoch.write("http://127.0.0.1:8199", "fake-0.0")
-    lease = InstanceLease(tmp_path / "leases", rec["instance_id"], "test-owner")
-    gate = GpuStageGate(tmp_path / "gpu_stage.lock", timeout_s=gate_timeout_s) if with_gate else None
+    epoch = InstanceEpoch(epoch_path or (tmp_path / "instance_epoch.json"))
+    rec = epoch.write("http://127.0.0.1:8199", "fake-0.0") if write_epoch else epoch.read()
+    lease = InstanceLease(lease_dir or (tmp_path / "leases"), rec["instance_id"], owner)
+    gate = GpuStageGate(lock_path or (tmp_path / "gpu_stage.lock"),
+                        timeout_s=gate_timeout_s) if with_gate else None
     adapter = ComfyStageAdapter(transport, paths, lease=lease, gate=gate, epoch=epoch,
-                                clock=clock, sleep=clock.advance, sampler=NullSampler())
+                                clock=clock, sleep=clock.advance, sampler=NullSampler(),
+                                owner=owner, client_id=client_id)
     adapter.instance_epoch = rec
     return Rig(adapter=adapter, transport=transport, epoch=epoch, rec=rec, lease=lease,
-               gate=gate, paths=paths, clock=clock)
+               gate=gate, paths=paths, clock=clock, root=tmp_path)
 
 
 def make_spec(graph: dict | None = None, **kw) -> RunSpec:
