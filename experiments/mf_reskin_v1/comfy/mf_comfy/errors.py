@@ -189,6 +189,19 @@ class ReservationConflict(MfComfyError):
     code = "MF_COMFY_RESERVATION_CONFLICT"
 
 
+class CorruptReservation(MfComfyError):
+    """Gate refused: a reservation marker exists but cannot be read.
+
+    A malformed / truncated / unreadable marker is UNKNOWN state, not "no
+    reservation": the marker may be the only record of a prompt that is still
+    occupying the server. The gate therefore fails closed with this typed
+    refusal and never submits. The marker itself is left untouched as evidence.
+    """
+
+    code = "MF_COMFY_CORRUPT_RESERVATION"
+    retryable = False
+
+
 class ReservationMismatch(MfComfyError):
     """Refused to adopt a reservation that belongs to another boot identity."""
 

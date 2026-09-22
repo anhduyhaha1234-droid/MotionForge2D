@@ -138,6 +138,7 @@ class FakeTransport:
         self.interrupt_calls: list = []
         self.drain_calls = 0
         self.submit_exception: Exception | None = None
+        self.submit_hook = None  # callable(client_id): rendezvous at the real POST
         self.drain_script: list = []
         self.drain_hooks: list = []
         self.view_payload: bytes = png_bytes()
@@ -165,6 +166,10 @@ class FakeTransport:
     def submit(self, graph: dict, client_id: str) -> SubmitResult:
         self.submit_calls += 1
         self.last_graph = graph
+        # A rendezvous point at the REAL POST: the F01 probe parks caller-1 inside
+        # the POST so a second live caller can try to release its reservation.
+        if self.submit_hook is not None:
+            self.submit_hook(client_id)
         if self.submit_exception is not None:
             raise self.submit_exception
         return SubmitResult(prompt_id=f"pid-{self.submit_calls}", number=self.submit_calls)
@@ -258,9 +263,14 @@ def make_rig(tmp_path: Path, *, graph: dict | None = None, oi: dict | None = Non
 
 
 def make_spec(graph: dict | None = None, **kw) -> RunSpec:
+    # `stage_id` / `workflow_id` / `graph` are overridable so a caller can model a
+    # *different* stage/workflow/graph (the F02 identity variants).
     kw.setdefault("stage_timeout_s", 5.0)
     kw.setdefault("poll_s", 1.0)
-    return RunSpec(stage_id="t", workflow_id="wf_fake", graph=graph or light_graph(), **kw)
+    kw.setdefault("stage_id", "t")
+    kw.setdefault("workflow_id", "wf_fake")
+    kw.setdefault("graph", graph or light_graph())
+    return RunSpec(**kw)
 
 
 def write_epoch(path: Path, payload: dict) -> None:

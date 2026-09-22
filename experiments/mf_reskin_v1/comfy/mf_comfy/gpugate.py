@@ -17,7 +17,7 @@ import uuid
 from contextlib import contextmanager
 from pathlib import Path
 
-from .errors import GpuStageBusy, UnresolvedReservation
+from .errors import CorruptReservation, GpuStageBusy, UnresolvedReservation
 from .lease import InstanceEpoch, PromptReservations
 
 
@@ -145,6 +145,26 @@ class GpuStageGate:
             requested_by=requested_by,
         )
 
+    def assert_no_corrupt(self, requested_by: dict | None = None) -> None:
+        """Fail closed on any marker that exists but cannot be read (F04).
+
+        An unreadable marker cannot even be attributed to an instance, so it is
+        treated as blocking for every caller: unknown state is never "free".
+        """
+        if self.reservations is None:
+            return
+        corrupt = self.reservations.unreadable()
+        if not corrupt:
+            return
+        self.guard_refusals += 1
+        raise CorruptReservation(
+            "refused: a reservation marker exists but cannot be read",
+            lock_path=str(self.lock_path),
+            corrupt_count=len(corrupt),
+            corrupt=corrupt,
+            requested_by=requested_by,
+        )
+
     # -- low level --------------------------------------------------------
     def _try_lock(self, fh) -> bool:
         if os.name == "nt":
@@ -197,6 +217,9 @@ class GpuStageGate:
             "heavy": bool(heavy),
             "acquired_at": time.time(),
         }
+        # An unreadable marker is unknown state: refuse before anything else, and
+        # never wait on the lock hoping it clears (F04).
+        self.assert_no_corrupt(record)
         blocking = self.blocking_reservations(epoch, reconcile, skip_key=adopt_key)
         if blocking:
             self._refuse(blocking, record, "before-lock")
@@ -204,7 +227,14 @@ class GpuStageGate:
         deadline = time.monotonic() + self.timeout_s
         while True:
             if self._try_lock(fh):
-                blocking = self.blocking_reservations(epoch, reconcile, skip_key=adopt_key)
+                try:
+                    self.assert_no_corrupt(record)
+                    blocking = self.blocking_reservations(epoch, reconcile, skip_key=adopt_key)
+                except CorruptReservation:
+                    # never keep the byte lock on a refusal
+                    self._unlock(fh)
+                    fh.close()
+                    raise
                 if blocking:
                     self._unlock(fh)
                     fh.close()

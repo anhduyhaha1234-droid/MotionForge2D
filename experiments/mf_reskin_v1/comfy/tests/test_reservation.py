@@ -109,10 +109,13 @@ def test_f01_lost_acknowledgement_is_adopted_not_resubmitted(tmp_path):
     """A raced POST: the later attempt must adopt the landed prompt, POST once."""
     rig = make_rig(tmp_path / "rig")
     cid = rig.adapter.client_id
+    # F02: the resume must declare the SAME work-item identity (attempt + owner)
+    # as the attempt whose acknowledgement was lost.
+    ident = {"attempt_id": "attempt-lost-ack", "owner": "restart-owner"}
     rig.transport.submit_exception = TransportError("connection reset during POST")
 
     with pytest.raises(AmbiguousAfterSubmit):
-        rig.adapter.run(make_spec(stage_timeout_s=2.0))
+        rig.adapter.run(make_spec(**ident, stage_timeout_s=2.0))
     assert rig.transport.submit_calls == 1
 
     store = _store(rig.adapter)
@@ -128,7 +131,7 @@ def test_f01_lost_acknowledgement_is_adopted_not_resubmitted(tmp_path):
     _simulate_process_exit(rig)
     rig2 = make_rig(rig.root, transport=rig.transport, write_epoch=False,
                     owner="restart-owner")
-    out = rig2.adapter.run(make_spec(stage_timeout_s=2.0))
+    out = rig2.adapter.run(make_spec(**ident, stage_timeout_s=2.0))
 
     assert rig.transport.submit_calls == 1, "a lost acknowledgement must never resubmit"
     assert out.prompt_id == "pid-9"
@@ -141,9 +144,10 @@ def test_f01_lost_acknowledgement_is_adopted_not_resubmitted(tmp_path):
 def test_f01_client_restart_finds_the_same_prompt(tmp_path):
     """New process, same durable dir: same prompt_id, one output, one POST."""
     rig = make_rig(tmp_path / "rig")
+    ident = {"attempt_id": "attempt-restart", "owner": "restart-owner"}
     rig.transport.queue_state["queue_running"] = [
         queue_item("pid-1", rig.adapter.client_id)]
-    res = rig.adapter.run(make_spec(stage_timeout_s=2.0))
+    res = rig.adapter.run(make_spec(**ident, stage_timeout_s=2.0))
     assert res.status == "unresolved"
     assert rig.transport.submit_calls == 1
 
@@ -154,7 +158,7 @@ def test_f01_client_restart_finds_the_same_prompt(tmp_path):
 
     rig2 = make_rig(rig.root, transport=rig.transport, write_epoch=False,
                     owner="restart-owner")
-    out = rig2.adapter.run(make_spec(stage_timeout_s=2.0))
+    out = rig2.adapter.run(make_spec(**ident, stage_timeout_s=2.0))
 
     assert rig.transport.submit_calls == 1
     assert out.prompt_id == "pid-1"

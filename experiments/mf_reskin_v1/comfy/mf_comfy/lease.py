@@ -30,6 +30,17 @@ RESERVATION_UNRESOLVED = "unresolved"
 RESERVATION_RELEASED = "released"
 RESERVATION_QUARANTINED = "quarantined"
 
+# Durable submit lifecycle. `SUBMIT_INFLIGHT` is written *before* the transport
+# POST is attempted, so "the server has no prompt for this client_id" is only
+# ever proof that the POST never landed while the record still says
+# `SUBMIT_OPENING` and its opener is provably gone. Anything else (inflight /
+# acked / ambiguous / a pre-fix record with no state at all) means a POST may
+# still be on the wire and the reservation must keep blocking.
+SUBMIT_OPENING = "opening"
+SUBMIT_INFLIGHT = "inflight"
+SUBMIT_ACKED = "acked"
+SUBMIT_AMBIGUOUS = "ambiguous"
+
 
 def same_boot_identity(a: dict | None, b: dict | None) -> bool:
     """Boot identity of a server launch = `instance_id` + `host`.
@@ -83,6 +94,31 @@ def _write_json_atomic(path: Path, payload: dict) -> None:
     with open(tmp, "w", encoding="utf-8", newline="\n") as fh:
         json.dump(payload, fh, indent=1, sort_keys=True)
     os.replace(tmp, path)
+
+
+def submit_provably_never_started(record: dict | None) -> bool:
+    """True only when the durable record PROVES no POST was ever attempted.
+
+    `mark_submit_inflight` writes `submit_state=inflight` before the transport
+    POST, so:
+      * `opening` + the opener is not a live process on this host -> the POST was
+        never attempted: absent from `/queue` + `/history` really is proof;
+      * anything else (`inflight`, `acked`, `ambiguous`, or a legacy record with
+        no state) -> a POST may be on the wire; absence is NOT proof.
+    """
+    rec = record or {}
+    if rec.get("submit_state") != SUBMIT_OPENING:
+        return False
+    host = rec.get("submit_owner_host") or rec.get("host")
+    if not host or host != socket.gethostname():
+        return True  # another host: we cannot prove its process is gone
+    try:
+        pid = int(rec.get("submit_owner_pid") or 0)
+    except (TypeError, ValueError):
+        return True
+    if pid <= 0 or pid == os.getpid():
+        return True  # unknown or ourselves: not provable
+    return not pid_alive(pid)
 
 
 class InstanceEpoch:
@@ -275,6 +311,10 @@ class PromptReservations:
         client_id: str = "",
         prompt_id: str | None = None,
         note: str = "",
+        workflow_id: str = "",
+        workflow_sha256: str = "",
+        input_digest: str = "",
+        input_identity: dict | None = None,
     ) -> dict:
         """Reserve this instance for one attempt BEFORE the POST is attempted.
 
@@ -303,6 +343,17 @@ class PromptReservations:
             "submit_count": 0,
             "opened_at": time.time(),
             "note": note,
+            # durable identity: adoption must match all of it (F02)
+            "workflow_id": workflow_id,
+            "workflow_sha256": workflow_sha256,
+            "input_digest": input_digest,
+            "input_identity": input_identity or {},
+            # durable submit lifecycle (F01)
+            "submit_state": SUBMIT_OPENING,
+            "submit_owner_pid": os.getpid(),
+            "submit_owner_host": socket.gethostname(),
+            "submit_started_at": None,
+            "submit_settled_at": None,
         }
         _write_json_atomic(path, rec)
         return {**rec, "path": str(path), "created": True}
@@ -329,10 +380,49 @@ class PromptReservations:
             "state": RESERVATION_UNRESOLVED,
             "prompt_id": prompt_id,
             "submit_count": submit_count,
+            "submit_state": SUBMIT_ACKED,
+            "submit_settled_at": time.time(),
             "bound_at": time.time(),
         })
         _write_json_atomic(path, rec)
         return {**rec, "path": str(path)}
+
+    def _patch(self, record: dict, changes: dict) -> dict:
+        """Bounded update of one existing marker.
+
+        Never invents a record that is not on disk: if the marker vanished or is
+        unreadable the update is skipped and reported, so a caller can never
+        silently re-create or rewrite somebody else's evidence.
+        """
+        path = Path(record.get("path") or self.path_for(
+            str(record.get("instance_id") or ""), str(record.get("attempt_id") or "")))
+        cur = _read_json(path)
+        if not isinstance(cur, dict):
+            return {**record, "patch_skipped": "marker missing or unreadable"}
+        cur.update(changes)
+        _write_json_atomic(path, cur)
+        return {**cur, "path": str(path)}
+
+    def mark_submit_inflight(self, record: dict) -> dict:
+        """Durable "a POST is going on the wire", written BEFORE the POST call.
+
+        This is what makes an empty `/queue` + `/history` non-proof: a later
+        caller that finds `inflight` knows a prompt may still land and must leave
+        the reservation unresolved and blocking.
+        """
+        return self._patch(record, {
+            "submit_state": SUBMIT_INFLIGHT,
+            "submit_started_at": time.time(),
+            "submit_owner_pid": os.getpid(),
+            "submit_owner_host": socket.gethostname(),
+        })
+
+    def mark_submit_settled(self, record: dict, state: str = SUBMIT_AMBIGUOUS) -> dict:
+        """The POST returned or raised: record how it ended."""
+        return self._patch(record, {
+            "submit_state": state,
+            "submit_settled_at": time.time(),
+        })
 
     def quarantine(self, record: dict, reason: str, evidence: dict | None = None,
                    *, closer: str = "") -> dict:
@@ -415,6 +505,34 @@ class PromptReservations:
             if instance_id is not None and rec.get("instance_id") != instance_id:
                 continue
             out.append({**rec, "path": str(p)})
+        return out
+
+    def unreadable(self) -> list[dict]:
+        """Markers that exist but cannot be read as a reservation record.
+
+        A malformed marker is neither "no reservation" nor evidence of anybody
+        else's prompt: it is UNKNOWN state, and unknown state must fail closed.
+        The file is never deleted or rewritten here -- it stays as evidence for
+        whoever has to repair it.
+        """
+        out: list[dict] = []
+        for p in sorted(self.root.glob(f"*{self.SUFFIX}")):
+            try:
+                raw = p.read_text(encoding="utf-8")
+            except OSError as exc:
+                out.append({"path": str(p), "reason": f"{type(exc).__name__}:{exc}",
+                            "size": None})
+                continue
+            try:
+                rec = json.loads(raw)
+            except ValueError as exc:
+                out.append({"path": str(p), "reason": f"unparsable JSON: {exc}",
+                            "size": len(raw.encode("utf-8"))})
+                continue
+            if not isinstance(rec, dict) or not rec.get("key") or not rec.get("attempt_id"):
+                out.append({"path": str(p), "reason": "not a reservation record",
+                            "size": len(raw.encode("utf-8")),
+                            "parsed_keys": sorted(rec)[:12] if isinstance(rec, dict) else None})
         return out
 
     def quarantined(self, instance_id: str | None = None) -> list[dict]:

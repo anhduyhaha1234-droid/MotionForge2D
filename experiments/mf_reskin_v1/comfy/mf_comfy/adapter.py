@@ -12,6 +12,7 @@ Design rules enforced here (from `COMFYUI_HUNYUAN_CONTROL.md` + task packet):
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 import uuid
@@ -26,24 +27,32 @@ from .errors import (
     ArtifactHashMismatch,
     ArtifactMissing,
     BlindResubmitRefused,
+    CorruptReservation,
     InvalidGraph,
     LeaseNotHeld,
     MfComfyError,
     MissingModel,
     MissingNode,
     PartialOutput,
+    ReservationConflict,
     ServerEpochChanged,
     TransportError,
     WsDisconnected,
     classify_execution_message,
 )
-from .lease import PromptReservations, same_boot_identity
+from .lease import PromptReservations, same_boot_identity, submit_provably_never_started
 from .paths import StagePaths
 
 ARTIFACT_KEYS = ("images", "gifs", "videos", "audio")
 VIDEO_SUFFIXES = {".mp4", ".webm", ".mkv", ".mov", ".avi", ".gif"}
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff"}
 _MISSING = object()
+
+# A product is a terminal output the server itself wrote, which ComfyUI marks
+# `type == "output"`. An `input` item is a preview of what we SENT and `temp` is
+# a scratch preview: neither is a result. `RunSpec.allowed_types` can only
+# NARROW this set, never widen it (F05).
+PUBLISHABLE_SERVER_TYPES = ("output",)
 
 
 @dataclass
@@ -58,6 +67,16 @@ class RunSpec:
     poll_s: float = 1.0
     expected_artifact_hashes: dict = field(default_factory=dict)
     allowed_types: tuple = ("output",)
+    # --- F02: durable identity of the work item. A previous attempt's prompt may
+    #     only be adopted by the SAME declared identity; `owner` defaults to the
+    #     adapter's owner when empty.
+    attempt_id: str = ""
+    owner: str = ""
+    # --- F05: the declared terminal output(s) of this workflow,
+    #     `{node_id: {"kind": "images", "media_type": "image", "server_types": ("output",)}}`.
+    #     Only these nodes can publish a product. When empty the graph's own
+    #     terminal nodes (ComfyUI `output_node: true`) are used.
+    terminal_outputs: dict = field(default_factory=dict)
 
 
 class ComfyStageAdapter:
@@ -116,10 +135,13 @@ class ComfyStageAdapter:
         self.instance_epoch: dict | None = None
         self.capabilities: dict = {}
         self.node_inventory_sha256 = ""
+        self.object_info: dict = {}
 
     # ---------------------------------------------------------------- preflight
     def preflight(self, graph: dict, node_inventory_sha256: str = "") -> dict:
         object_info = self.transport.object_info()
+        # kept for the declared-terminal-output fallback (`output_node`)
+        self.object_info = object_info
         inv_sha = pinning.verify_node_inventory_pin(object_info, node_inventory_sha256)
         self.node_inventory_sha256 = inv_sha
         self.capabilities = self.transport.probe_capabilities(object_info)
@@ -180,16 +202,29 @@ class ComfyStageAdapter:
                 submit_count=self.submit_count,
             )
         self.submit_count += 1
+        # Durable "a POST is going on the wire" BEFORE the call itself: while this
+        # is on disk, an empty `/queue` + `/history` is NOT proof that the prompt
+        # never landed, so no later caller may release or adopt this reservation by
+        # absence (F01).
+        if self.reservations is not None and self.reservation is not None:
+            self.reservation = self.reservations.mark_submit_inflight(self.reservation)
         try:
             res = self.transport.submit(graph, self.client_id)
         except (MissingNode, MissingModel, InvalidGraph):
+            # the server refused the graph outright: provably no prompt exists
             raise
         except TransportError as exc:
             # The POST may or may not have been accepted: unprovable -> ambiguous.
+            self._settle_submit()
             raise AmbiguousAfterSubmit(
                 "prompt submission outcome is unprovable (transport failed during POST)",
                 submit_attempted=True, prompt_id=None, transport_error=exc.to_dict(),
             ) from exc
+        except BaseException:
+            # Any other failure of the POST is equally unprovable: stamp it as
+            # ambiguous so no caller can ever release it as "never landed".
+            self._settle_submit()
+            raise
         if self.lease is not None:
             try:
                 self.lease.set_prompt(res.prompt_id)
@@ -198,6 +233,11 @@ class ComfyStageAdapter:
         return res.prompt_id
 
     # -------------------------------------------------------------------- wait
+    def _settle_submit(self) -> None:
+        """Stamp the reservation as "the POST ended, outcome unknown" (F01)."""
+        if self.reservations is not None and self.reservation is not None:
+            self.reservation = self.reservations.mark_submit_settled(self.reservation)
+
     def _history_entry(self, prompt_id: str) -> dict:
         """Completion authority.
 
@@ -241,15 +281,23 @@ class ComfyStageAdapter:
                 self.notes.append(f"history poll failed (will retry/reconcile): {exc.to_dict()}")
                 entry = {}
             if entry:
+                # Identity FIRST: a success entry recorded by another launch of the
+                # server is foreign output, never this attempt's result (F03).
+                self._assert_epoch_unchanged(prompt_id, what="while waiting for the prompt")
                 return entry
-            if self.instance_epoch is not None and self.epoch is not None:
-                if not self.epoch.matches(self.instance_epoch):
-                    raise ServerEpochChanged(
-                        "server instance epoch changed while waiting for the prompt",
-                        instance_epoch=self.instance_epoch, observed_epoch=self.epoch.read(),
-                        prompt_id=prompt_id,
-                    )
+            self._assert_epoch_unchanged(prompt_id, what="while waiting for the prompt")
         return {}
+
+    def _assert_epoch_unchanged(self, prompt_id: str, *, what: str) -> None:
+        """Re-check the boot identity immediately before anything is accepted (F03)."""
+        if self.instance_epoch is None or self.epoch is None:
+            return
+        if not self.epoch.matches(self.instance_epoch):
+            raise ServerEpochChanged(
+                f"server instance epoch changed {what}",
+                instance_epoch=self.instance_epoch, observed_epoch=self.epoch.read(),
+                prompt_id=prompt_id,
+            )
 
     # -------------------------------------------------------------- reconcile
     @staticmethod
@@ -277,17 +325,70 @@ class ComfyStageAdapter:
             for item in q.get(bucket) or []:
                 if prompt_id in self._queue_ids(item):
                     return "queued"
+        # Boot identity BEFORE the history read: a success entry from another
+        # launch of the server must land as `epoch_lost`, never as `completed` (F03).
+        if self.instance_epoch is not None and self.epoch is not None:
+            if not self.epoch.matches(self.instance_epoch):
+                return "epoch_lost"
         try:
             if self._history_entry(prompt_id):
                 return "completed"
         except TransportError as exc:
             self.notes.append(f"history read failed during reconcile: {exc.to_dict()}")
-        if self.instance_epoch is not None and self.epoch is not None:
-            if not self.epoch.matches(self.instance_epoch):
-                return "epoch_lost"
         return "unproven"
 
     # ------------------------------------------------- durable reservation
+    @staticmethod
+    def _input_identity(stage_input: StageInput | None) -> dict:
+        """Source identity of a stage input: no paths, no volatile fields."""
+        si = stage_input
+        if si is None:
+            return {}
+        return {
+            "project_id": getattr(si, "project_id", "") or "",
+            "job_id": getattr(si, "job_id", "") or "",
+            "shot_id": getattr(si, "shot_id", "") or "",
+            "source_sha256": getattr(si, "source_sha256", "") or "",
+            "source_frame_range": list(getattr(si, "source_frame_range", None) or []),
+            "reference_assets": dict(getattr(si, "reference_assets", None) or {}),
+        }
+
+    @staticmethod
+    def identity_digest(identity: dict) -> str:
+        """Stable digest of an input identity (canonical JSON, sorted keys)."""
+        blob = json.dumps(identity or {}, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+    def _claim(self, spec: RunSpec, stage_input: StageInput | None, attempt_id: str) -> dict:
+        """The declared identity of the work item this attempt is claiming (F02)."""
+        identity = self._input_identity(stage_input)
+        return {
+            "attempt_id": attempt_id or "",
+            "stage_id": spec.stage_id or "",
+            "workflow_id": spec.workflow_id or "",
+            "workflow_sha256": spec.workflow_sha256 or pinning.hash_workflow(spec.graph),
+            "owner": spec.owner or self.owner,
+            "input_digest": self.identity_digest(identity),
+            "input_identity": identity,
+        }
+
+    @staticmethod
+    def _identity_matches(record: dict, claim: dict) -> bool:
+        """Adoption is legal only for the exact declared work item (F02).
+
+        Every field must be present on BOTH sides and equal: a record written by
+        a build without identity, or by another attempt/stage/workflow/graph/
+        input/owner, can never be adopted. It stays unresolved and blocking
+        instead of being handed to a stranger.
+        """
+        for key in ("attempt_id", "stage_id", "workflow_id", "workflow_sha256",
+                    "owner", "input_digest"):
+            mine = str((claim or {}).get(key) or "")
+            theirs = str((record or {}).get(key) or "")
+            if not mine or not theirs or mine != theirs:
+                return False
+        return True
+
     def _scan_server_for_own_prompt(self, client_id: str) -> tuple[tuple[str, str] | None, bool]:
         """Find a prompt THIS client already submitted. Returns (found, reads_ok).
 
@@ -334,20 +435,32 @@ class ComfyStageAdapter:
     def _record_event(self, action: str, detail: dict) -> None:
         self.reservation_events.append({"action": action, "at": self.clock(), **detail})
 
-    def adopt_pending(self, instance_epoch: dict | None = None) -> dict | None:
+    def adopt_pending(self, instance_epoch: dict | None = None,
+                      claim: dict | None = None) -> dict | None:
         """Adopt a prompt this server boot already owns — never a second POST.
 
         Order:
-          1. a reservation of a *different* boot of this same server can never be
+          1. an unreadable marker is unknown state and fails the attempt closed
+             before anything else (F04);
+          2. a reservation of a *different* boot of this same server can never be
              adopted -> quarantined (its output is foreign output);
-          2. a reservation of this boot with a bound prompt_id is adopted directly;
-          3. a reservation of this boot with no prompt_id is resolved by searching
-             /queue + /history for our own client_id;
-          4. if that search proves the POST never landed, the reservation is
-             released as `not_accepted` and a fresh submit is allowed.
+          3. a reservation of this boot is adopted only when its DURABLE IDENTITY
+             (attempt / stage / workflow / graph / input / owner) equals the claim
+             (F02); several claimants for one identity fail closed, never a coin
+             flip;
+          4. an unbound matching reservation is resolved by searching /queue +
+             /history for the client_id that opened it. Only a record that PROVES
+             the POST never started may be released as `not_accepted`; anything
+             else stays unresolved and blocking (F01).
         """
         if self.reservations is None:
             return None
+        corrupt = self.reservations.unreadable()
+        if corrupt:
+            raise CorruptReservation(
+                "refusing to work on an instance whose reservation ledger holds "
+                "unreadable markers",
+                corrupt_count=len(corrupt), corrupt=corrupt)
         epoch = (instance_epoch or self.instance_epoch
                  or (self.epoch.read() if self.epoch else None) or {})
         inst = epoch.get("instance_id")
@@ -366,32 +479,56 @@ class ComfyStageAdapter:
                           "recorded_host": rec.get("host"), "observed_host": epoch.get("host"),
                           "observed_pid": epoch.get("pid")})
             self._record_event("quarantine_foreign_epoch", {"prompt_id": rec.get("prompt_id"), "result": res})
-        # 2) + 3) + 4) this boot's own unresolved reservations
-        for rec in self.reservations.unresolved(inst):
-            if rec.get("prompt_id"):
-                self.reservation = rec
-                self.adopted_prompt_id = rec["prompt_id"]
-                self._record_event("adopted_bound_prompt", {"prompt_id": rec["prompt_id"]})
-                return rec
-            found, reads_ok = self._scan_server_for_own_prompt(rec.get("client_id", ""))
-            if found:
-                kind, prompt_id = found
-                bound = self.reservations.bind(epoch, rec["attempt_id"], prompt_id, submit_count=0)
-                self.reservation = bound
-                self.adopted_prompt_id = prompt_id
-                self._record_event("adopted_after_lost_ack",
-                                   {"prompt_id": prompt_id, "found_in": kind, "submit_count": 0})
-                return bound
-            if reads_ok and same_boot_identity(epoch, rec):
-                res = self.reservations.close(
-                    rec, "not_accepted", closer=self.owner,
-                    evidence={"reason": "queue and history carry no prompt for this client_id; "
-                                        "boot identity unchanged, so the POST provably never landed",
-                              "client_id": rec.get("client_id")})
-                self._record_event("released_not_accepted", {"result": res})
-                continue
-            # absence not proven (or boot identity no longer matches): keep it
-            self._record_event("kept_unproven", {"prompt_id": rec.get("prompt_id"), "reads_ok": reads_ok})
+        # 2) this boot's own unresolved reservations, bound by durable identity
+        mine = [r for r in self.reservations.unresolved(inst)
+                if self._identity_matches(r, claim or {})]
+        if len(mine) > 1:
+            raise ReservationConflict(
+                "several reservations claim the same work item identity; refusing to choose",
+                attempt_id=(claim or {}).get("attempt_id"),
+                keys=[r.get("key") for r in mine],
+                paths=[r.get("path") for r in mine],
+            )
+        if not mine:
+            self._record_event("no_identity_match", {
+                "claim": {k: (claim or {}).get(k) for k in
+                          ("attempt_id", "stage_id", "workflow_id", "workflow_sha256", "owner")},
+                "unresolved_for_this_boot": len(self.reservations.unresolved(inst)),
+                "note": "a reservation of another work item stays unresolved and keeps "
+                        "blocking the gate for this instance"})
+            return None
+        rec = mine[0]
+        if rec.get("prompt_id"):
+            self.reservation = rec
+            self.adopted_prompt_id = rec["prompt_id"]
+            self._record_event("adopted_bound_prompt", {"prompt_id": rec["prompt_id"]})
+            return rec
+        found, reads_ok = self._scan_server_for_own_prompt(rec.get("client_id", ""))
+        if found:
+            kind, prompt_id = found
+            bound = self.reservations.bind(epoch, rec["attempt_id"], prompt_id, submit_count=0)
+            self.reservation = bound
+            self.adopted_prompt_id = prompt_id
+            self._record_event("adopted_after_lost_ack",
+                               {"prompt_id": prompt_id, "found_in": kind, "submit_count": 0})
+            return bound
+        if reads_ok and same_boot_identity(epoch, rec) and submit_provably_never_started(rec):
+            res = self.reservations.close(
+                rec, "not_accepted", closer=self.owner,
+                evidence={"reason": "queue and history carry no prompt for this client_id AND the "
+                                    "record proves the POST never started (submit_state=opening "
+                                    "with a provably gone opener), so the POST never landed",
+                          "client_id": rec.get("client_id"),
+                          "submit_state": rec.get("submit_state"),
+                          "submit_owner_pid": rec.get("submit_owner_pid")})
+            self._record_event("released_not_accepted", {"result": res})
+            return None
+        # absence is NOT proof: keep it, and keep blocking
+        self._record_event("kept_unproven", {
+            "prompt_id": rec.get("prompt_id"), "reads_ok": reads_ok,
+            "submit_state": rec.get("submit_state"),
+            "reason": "a POST may have been on the wire; absence from /queue + /history "
+                      "is not proof that it never landed"})
         return None
 
     def close_reservation(self, outcome: str, evidence: dict | None = None,
@@ -433,7 +570,11 @@ class ComfyStageAdapter:
             found, reads_ok = self._scan_server_for_own_prompt(record.get("client_id", ""))
             if found:
                 return "queued"
-            return "not_accepted" if reads_ok else "unproven"
+            # Absence only closes the record when it PROVES no POST ever started;
+            # otherwise the gate keeps it blocking (F01).
+            if reads_ok and submit_provably_never_started(record):
+                return "not_accepted"
+            return "unproven"
         return self.reconcile(pid)
 
     def _release_hold(self) -> None:
@@ -477,24 +618,94 @@ class ComfyStageAdapter:
                 return False, None, None, f"{type(exc).__name__}:{exc}"
         return None, None, None, "unknown artifact type: decode not verified"
 
+    def _declared_terminal_outputs(self, spec: RunSpec) -> dict:
+        """The terminal output node(s) of this workflow (F05).
+
+        `RunSpec.terminal_outputs` is the declaration; when it is empty the
+        graph's own terminal nodes are used (ComfyUI marks them
+        `output_node: true`, e.g. SaveImage / SaveAnimatedWEBP).
+        """
+        declared: dict[str, dict] = {}
+        for node_id, conf in (spec.terminal_outputs or {}).items():
+            declared[str(node_id)] = dict(conf or {})
+        if declared:
+            return declared
+        object_info = self.object_info or {}
+        for node_id, node in (spec.graph or {}).items():
+            cls = (node or {}).get("class_type")
+            if (object_info.get(cls) or {}).get("output_node"):
+                declared[str(node_id)] = {}
+        return declared
+
+    @staticmethod
+    def _declared_server_types(conf: dict, spec: RunSpec) -> tuple:
+        """Publishable server types for one declared node.
+
+        A product is what the server WROTE (`type == "output"`). `allowed_types`
+        may only narrow that set: it can never make an `input` preview or a
+        `temp` scratch file into a result (F05).
+        """
+        want = tuple(conf.get("server_types") or spec.allowed_types or PUBLISHABLE_SERVER_TYPES)
+        return tuple(t for t in want if t in PUBLISHABLE_SERVER_TYPES)
+
     def validate_artifacts(self, entry: dict, spec: RunSpec) -> list[dict]:
         outputs = entry.get("outputs") or {}
-        candidates: list[tuple[str, str, dict]] = []
+        declared = self._declared_terminal_outputs(spec)
+        if not declared:
+            raise ArtifactMissing(
+                "workflow declares no terminal output node, so nothing can be published",
+                prompt_id=entry.get("prompt_id"), outputs_keys=list(outputs),
+                terminal_outputs=dict(spec.terminal_outputs or {}))
+        candidates: list[tuple[str, str, dict, dict]] = []
+        ignored: list[dict] = []
         for node_id, node_out in outputs.items():
+            node_id = str(node_id)
+            conf = declared.get(node_id)
+            if conf is None:
+                for key in ARTIFACT_KEYS:
+                    for item in (node_out.get(key) or []):
+                        ignored.append({"node_id": node_id, "kind": key,
+                                        "type": item.get("type", "output"),
+                                        "filename": item.get("filename", ""),
+                                        "why": "node is not a declared terminal output"})
+                continue
             for key in ARTIFACT_KEYS:
                 for item in (node_out.get(key) or []):
-                    candidates.append((node_id, key, item))
+                    if conf.get("kind") and key != conf["kind"]:
+                        raise ArtifactMissing(
+                            "declared terminal node published a different media kind",
+                            node_id=node_id, expected_kind=conf.get("kind"),
+                            actual_kind=key, item=item)
+                    candidates.append((node_id, key, item, conf))
         if not candidates:
-            raise ArtifactMissing("history entry carries no artifact records",
-                                  prompt_id=entry.get("prompt_id"), outputs_keys=list(outputs))
+            raise ArtifactMissing(
+                "history entry carries no artifact on a declared terminal output node",
+                prompt_id=entry.get("prompt_id"), declared_nodes=sorted(declared),
+                outputs_keys=list(outputs), ignored=ignored)
         artifacts: list[dict] = []
-        for node_id, key, item in candidates:
+        for node_id, key, item, conf in candidates:
             filename = item.get("filename", "")
             subfolder = item.get("subfolder", "")
             atype = item.get("type", "output")
-            if atype not in spec.allowed_types:
-                raise ArtifactMissing("artifact type is not publishable", node_id=node_id,
-                                      item=item, allowed_types=list(spec.allowed_types))
+            allowed = self._declared_server_types(conf, spec)
+            if atype not in allowed:
+                # An input preview or temp preview is not a product: ignore it and
+                # let the typed "nothing publishable" failure below decide.
+                ignored.append({"node_id": node_id, "kind": key, "type": atype,
+                                "filename": filename,
+                                "why": "algorithm type is not publishable",
+                                "allowed_types": list(allowed)})
+                continue
+            media = conf.get("media_type")
+            suffix = Path(filename).suffix.lower()
+            if media == "image" and suffix not in IMAGE_SUFFIXES:
+                raise ArtifactMissing("declared terminal node published a non-image "
+                                      "artifact", node_id=node_id, item=item,
+                                      declared_media_type=media)
+            if media == "video" and suffix not in VIDEO_SUFFIXES:
+                raise ArtifactMissing("declared terminal node published a non-video "
+                                      "artifact", node_id=node_id, item=item,
+                                      declared_media_type=media)
             if filename.endswith(".partial"):
                 raise PartialOutput("server produced a .partial artifact", item=item)
             target = self.paths.resolve(filename, subfolder)   # raises PathScopeViolation
@@ -518,6 +729,11 @@ class ComfyStageAdapter:
                 "size_bytes": len(raw), "width": width, "height": height,
                 "decode_verified": decode_ok, "decode_note": decode_note,
             })
+        if not artifacts:
+            raise ArtifactMissing(
+                "no publishable artifact on any declared terminal output node",
+                prompt_id=entry.get("prompt_id"), declared_nodes=sorted(declared),
+                ignored=ignored)
         return artifacts
 
     # -------------------------------------------------------------- interrupt
@@ -574,6 +790,12 @@ class ComfyStageAdapter:
     # ------------------------------------------------------------------- run
     def run(self, spec: RunSpec, stage_input: StageInput | None = None) -> StageOutput:
         stage_input = stage_input or StageInput(stage_id=spec.stage_id, staging_root=str(self.paths.root))
+        # Declared identity of this work item: adoption (and only adoption) is
+        # bound to it, so a stranger can never receive this prompt's output (F02).
+        attempt_id = (stage_input.attempt_id or spec.attempt_id or "").strip()
+        if not attempt_id:
+            attempt_id = f"attempt-{uuid.uuid4().hex[:12]}"
+        claim = self._claim(spec, stage_input, attempt_id)
         t_start = self.clock()
         timing: dict[str, Any] = {}
         instance_epoch = self.instance_epoch or (self.epoch.read() if self.epoch else None)
@@ -589,10 +811,12 @@ class ComfyStageAdapter:
             base.node_inventory_sha256 = pre["node_inventory_sha256"]
             base.model_hashes = dict(spec.model_pins)
 
-            # F01 fix, step 1: does this boot already own a prompt? Answer BEFORE
-            # taking the gate, so the adopting attempt can take over its own
-            # reservation instead of POSTing a second prompt.
-            adopted = self.adopt_pending(instance_epoch)
+            # F01 fix, step 1: does THIS work item already own a prompt? Answer
+            # BEFORE taking the gate, so the adopting attempt can take over its own
+            # reservation instead of POSTing a second prompt. Adoption is bound to
+            # the declared identity, and a reservation of another work item is left
+            # unresolved (it keeps blocking the gate below).
+            adopted = self.adopt_pending(instance_epoch, claim)
             adopt_key = self.reservation.get("key") if (adopted and self.reservation) else None
 
             if self.gate is not None:
@@ -621,10 +845,13 @@ class ComfyStageAdapter:
                     "no second POST was sent")
             else:
                 if self.reservations is not None:
-                    attempt_id = stage_input.attempt_id or f"attempt-{uuid.uuid4().hex[:12]}"
                     self.reservation = self.reservations.open(
                         instance_epoch or {}, attempt_id, stage_id=spec.stage_id,
-                        owner=self.owner, client_id=self.client_id,
+                        owner=claim["owner"], client_id=self.client_id,
+                        workflow_id=claim["workflow_id"],
+                        workflow_sha256=claim["workflow_sha256"],
+                        input_digest=claim["input_digest"],
+                        input_identity=claim["input_identity"],
                         note="opened before the POST: a lost acknowledgement must never resubmit")
                 if self.sampler is not None:
                     self.sampler.start()
@@ -672,6 +899,9 @@ class ComfyStageAdapter:
                         reconcile=self.reconcile_count, notes=list(self.notes),
                     )
 
+            # Identity re-checked immediately before acceptance: the entry only
+            # counts as ours while the server launch is still the one we used (F03).
+            self._assert_epoch_unchanged(prompt_id, what="before accepting the result")
             terminal_proven = bool(entry)
             status = ((entry.get("status") or {}).get("status_str")) or "unknown"
             if status == "error":
