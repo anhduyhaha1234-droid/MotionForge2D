@@ -107,9 +107,20 @@ def run_bytes(argv, cwd=None, expect=(0,), label=None) -> bytes:
 
 
 def flush_ledger(path=None) -> Path:
+    """APPEND this run's ledger to the command transcript.
+
+    Measured defect this fixes: the previous version opened the transcript with "w",
+    so a later harness invocation silently destroyed an earlier run's evidence. The
+    wave-1 run wrote 305 rows; a wave-2 `--steps candidate` run replaced the whole
+    file with 20 rows and the wave-1 bytes were not recoverable from disk. Every run
+    now starts with a run header and no run can truncate another run's transcript.
+    """
     path = Path(path or (BENCH_EV / "raw" / "cmd_transcript.jsonl"))
     ensure(path.parent)
-    with open(path, "w", encoding="utf-8") as f:
+    with open(path, "a", encoding="utf-8") as f:
+        header = {"run": "start", "when": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                  "cwd": str(Path.cwd()), "commands": len(LEDGER)}
+        f.write(json.dumps(header, ensure_ascii=False) + "\n")
         for row in LEDGER:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
     return path

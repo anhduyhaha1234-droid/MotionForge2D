@@ -246,8 +246,9 @@ def a_frame_pairing(path, spec):
     elif adv is not None and adv <= -floor:
         verdict, why = "FAIL", "curve minimised at offset %s (offset 0 is worse by %.4f) -> the candidate is shifted vs the source" % (pf["argmin_offset"], -adv)
     else:
-        verdict, why = "UNMEASURED", ("flat offset curve (advantage %s, spread %s < floor %.2f): the candidate is so close to the source that "
-                                     "no alignment claim is resolvable at this resolution - never PASS" % (adv, pf["discriminator"]["offset_curve_spread"], floor))
+        verdict, why = "UNMEASURED", ("flat offset curve (advantage of offset 0 %s is below the floor %.2f; curve spread over offsets "
+                                     "was %s): the candidate is so close to the source that no alignment claim is resolvable at this "
+                                     "resolution - never PASS" % (adv, floor, pf["discriminator"]["offset_curve_spread"]))
     return {"assertion": "frame_pairing",
             "measured": {"verdict_reason": why,
                          "advantage_of_offset0": adv,
