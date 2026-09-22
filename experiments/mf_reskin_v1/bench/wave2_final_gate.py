@@ -41,11 +41,11 @@ for token, what in [("ca42806b6ec5647f2ac1bf8a555c25fce819a44a27fbb30058a56b39a5
                     ("NOT_REVIEWED", "not reviewed verdict"),
                     ("NEXT_REVIEW_PACKET", "review packet section")]:
     chk("report contains %s" % what, token in txt)
+norm = " ".join(txt.split())   # the report wraps lines, so match on normalised whitespace
 chk("report only mentions QUALITY_ACCEPTED as a negation",
-    "did **not** write `QUALITY_ACCEPTED`" in txt
-    and not any(p in txt for p in ["= QUALITY_ACCEPTED", "STATUS: QUALITY_ACCEPTED",
-                                   "verdict QUALITY_ACCEPTED", "is QUALITY_ACCEPTED",
-                                   "QUALITY_ACCEPTED\n"]))
+    "did **not** write `QUALITY_ACCEPTED`" in norm
+    and not any(p in norm for p in ["= QUALITY_ACCEPTED", "STATUS: QUALITY_ACCEPTED",
+                                    "verdict QUALITY_ACCEPTED", "is QUALITY_ACCEPTED"]))
 chk("report does not self-approve", not any(w in txt for w in ["\nAPPROVED\n", "\nCLOSED\n", "STATUS: APPROVED"]))
 
 # 2. the reviewer request exists with all 7 semantic rows
