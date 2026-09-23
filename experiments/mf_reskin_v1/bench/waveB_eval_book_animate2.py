@@ -28,6 +28,10 @@ sys.path.insert(0, str(WT / "experiments" / "mf_reskin_v1" / "bench"))
 import common as C          # noqa: E402
 import compare as CMP       # noqa: E402
 
+# F10 isolation (c3): this evaluation's evidence ledger is the packet ledger, so it says so
+# explicitly instead of inheriting it as a process-global default.
+C.set_ledger_path(C.EVIDENCE_LEDGER)
+
 NEW = Path("C:/Users/Admin/Documents/Codex/2026-09-11/tr-x20/outputs/mf-reskin-correction-20260922/20260922T0955Z")
 FROZEN = NEW / "manager" / "frozen"
 CAND = FROZEN / "BOOK_animate2_waveB" / "files" / "final_book4s_decoded119_640x360.mp4"

@@ -41,6 +41,12 @@ REVIEW = EV_OUT / "review"
 SHEETS = EV_OUT / "sheets"
 CROPS = EV_OUT / "crops"
 
+# F10 isolation (c3): this harness files its command transcript as EVIDENCE, so it names the
+# ledger explicitly (MF_BENCH_LEDGER still overrides). It used to inherit ledger_path()'s
+# hard-coded default; the default is now scratch, and no caller may rely on a default to reach
+# submitted evidence.
+C.set_ledger_path(Path(os.environ.get("MF_BENCH_LEDGER", str(C.EVIDENCE_LEDGER))))
+
 SPEC_BASE = {"expected_frames": 120, "pts_duration": 4.0,
              "video": {"codec": "h264", "width": 640, "height": 360, "pix_fmt": "yuv420p"},
              "audio": {"codec": "aac", "sample_rate": 44100, "channels": 2},

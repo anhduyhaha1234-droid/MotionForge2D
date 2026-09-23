@@ -8,6 +8,7 @@ Run:  python -m pytest experiments/mf_reskin_v1/bench -q --cache-clear --basetem
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -71,8 +72,23 @@ def test_flush_ledger_appends_and_never_truncates(tmp_path):
 
 
 @pytest.fixture(autouse=True)
-def _restore_ledger_module():
-    """No test may leave the module-level ledger path or buffer pointing at its tmp dir."""
+def _isolate_ledger(tmp_path, monkeypatch):
+    """F10 c3 - every test gets its own ledger path BEFORE its first command, and the module
+    state is reset on teardown AS WELL AS on setup.
+
+    The pre-fix fixture reset only on teardown (`C.set_ledger_path(None)`), so every media test
+    that followed a test which had named a path fell back to the module default - and that
+    default WAS the submitted packet ledger. The reviewer's full-suite verification run appended
+    10,721 bytes / 25 rows of run 20260922T235825-1290fc into submitted evidence that way.
+    Resetting on setup too means no ordering can leak a path in, and exporting MF_BENCH_LEDGER +
+    MF_BENCH_WORK means a subprocess spawned by a test inherits an explicit per-test path
+    instead of a process-global default.
+    """
+    ledger = tmp_path / "cmd_transcript.jsonl"
+    C.LEDGER.clear()
+    C.set_ledger_path(ledger)
+    monkeypatch.setenv("MF_BENCH_LEDGER", str(ledger))
+    monkeypatch.setenv("MF_BENCH_WORK", str(tmp_path))
     yield
     C.LEDGER.clear()
     C.set_ledger_path(None)
@@ -251,6 +267,166 @@ def test_flush_is_idempotent(tmp_path):
     crafted.write_text("\n".join(body + body[1:3]) + "\n", encoding="utf-8")
     assert C.read_ledger(crafted)["duplicates"], \
         "control: a twice-written command must be detected in the ledger"
+
+
+# --------------------------------------------------------------------------- #
+# 1c. F10 c3 - isolation: the SUBMITTED packet ledger must never be a default target.
+#     The pre-fix fixture reset the path only on teardown, so each media test that followed
+#     fell back to the module default - and that default was the packet ledger of the
+#     correction round (review P2/F10: 10,721 bytes / 25 rows of run 20260922T235825-1290fc
+#     landed in already-submitted evidence).
+# --------------------------------------------------------------------------- #
+
+PRE_FIX_COMMIT = "afa22c5"    # last commit whose common.py still defaulted to the packet ledger
+PRE_FIX_COMMON_SHA = "340ebc247b3889e75c70bccba330542dcc9b5914d68832e8fd09d9137be4c868"
+SUBMITTED_PACKET = "mf-reskin-correction-20260922/20260922T0955Z/BENCH"
+
+
+def _evidence_snapshot():
+    """Size + sha256 of the submitted packet ledger (read-only; None when it is absent)."""
+    p = C.EVIDENCE_LEDGER
+    if not p.exists():
+        return None
+    b = p.read_bytes()
+    return {"bytes": len(b), "sha256": hashlib.sha256(b).hexdigest()}
+
+
+def _no_ledger_named(monkeypatch):
+    """Reproduce 'the caller named nothing': no argument, no override, no environment."""
+    monkeypatch.delenv("MF_BENCH_LEDGER", raising=False)
+    C.set_ledger_path(None)
+    return C.ledger_path()
+
+
+def test_default_ledger_never_targets_submitted_evidence(tmp_path, monkeypatch):
+    """F10 c3: with nothing named, the ledger resolves into the run scratch root - never into
+    the submitted packet and never into the frozen wave-1/2 evidence root.
+
+    Executed here: (a) the resolution itself, (b) a real command written through that
+    resolution, proving the rows land in scratch while the packet ledger's bytes do not move,
+    (c) the fail-closed guard for a scratch root that has been pointed at an evidence root.
+    """
+    d = _no_ledger_named(monkeypatch)
+    assert not C.in_evidence_root(d), "the default ledger resolved into an evidence root: %s" % d
+    assert SUBMITTED_PACKET not in str(d).replace("\\", "/"), d
+    assert str(d) != str(C.EVIDENCE_LEDGER), "the packet ledger must stay an explicit choice"
+    assert str(d).replace("\\", "/").startswith(str(tmp_path).replace("\\", "/")), \
+        "the fixture points MF_BENCH_WORK at the test scratch root, so the default lives there"
+
+    before = _evidence_snapshot()
+    rc, _, _ = C.run([sys.executable, "-B", "-c", "print('f10 default ledger')"],
+                     label="f10-default-ledger")
+    assert rc == 0
+    assert d.exists() and len(d.read_text(encoding="utf-8").splitlines()) == 3, \
+        "header + start + terminal row in the scratch ledger"
+    assert _evidence_snapshot() == before, "nothing may be appended to the packet ledger"
+
+    # fail-closed: a scratch root inside an evidence root must not become the default
+    assert C.in_evidence_root(C.BENCH_EV_NEW / "raw" / "cmd_transcript.jsonl"), \
+        "the guard must recognise the packet ledger as evidence"
+    monkeypatch.setenv("MF_BENCH_WORK", str(C.BENCH_EV_NEW))
+    monkeypatch.delenv("MF_BENCH_LEDGER", raising=False)
+    C.set_ledger_path(None)
+    with pytest.raises(RuntimeError) as ei:
+        C.ledger_path()
+    assert "evidence root" in str(ei.value) and "EVIDENCE_LEDGER" in str(ei.value), str(ei.value)
+
+
+def _pre_fix_common_bytes():
+    """The pinned PRE-FIX common.py, read from the git object (never rewritten)."""
+    for rev in (PRE_FIX_COMMIT, "HEAD^"):
+        p = subprocess.run(["git", "show", "%s:experiments/mf_reskin_v1/bench/common.py" % rev],
+                           cwd=str(BENCH_DIR), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if p.returncode == 0 and p.stdout:
+            got = hashlib.sha256(p.stdout).hexdigest()
+            assert got == PRE_FIX_COMMON_SHA, \
+                "git %s:common.py is not the pinned pre-fix bytes: got %s" % (rev, got)
+            return p.stdout
+    pytest.fail("cannot read the pre-fix common.py from git (tried %s and HEAD^)" % PRE_FIX_COMMIT)
+
+
+_PROBE = (
+    "import pathlib, sys\n"
+    "sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))\n"
+    "import common as C\n"
+    "def test_default_ledger_is_not_the_submitted_packet():\n"
+    "    p = str(C.ledger_path()).replace(chr(92), '/')\n"
+    "    assert %r not in p, 'default ledger resolves into the submitted packet: ' + p\n")
+
+
+def _run_probe(tmp_path, name, common_bytes):
+    """Run the same predicate against one version of common.py, with nothing named."""
+    d = tmp_path / name
+    d.mkdir()
+    (d / "common.py").write_bytes(common_bytes)
+    (d / "test_probe_default_ledger.py").write_text(_PROBE % SUBMITTED_PACKET, encoding="utf-8")
+    env = dict(os.environ)
+    env.pop("MF_BENCH_LEDGER", None)
+    env.pop("MF_BENCH_WORK", None)
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    p = subprocess.run([sys.executable, "-m", "pytest", "test_probe_default_ledger.py", "-q",
+                        "-p", "no:cacheprovider"],
+                       cwd=str(d), env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    return p.returncode, p.stdout.decode("utf-8", "replace")
+
+
+def test_default_ledger_negative_control_fails_against_pre_fix_bytes(tmp_path):
+    """Negative control, executed: the predicate that PASSES on the fixed module must FAIL on
+    the pinned pre-fix bytes (sha256 of the committed preimage), otherwise 'the default is not
+    the packet ledger' would be a claim about a check that cannot fail."""
+    rc_pre, out_pre = _run_probe(tmp_path, "pre_fix", _pre_fix_common_bytes())
+    assert rc_pre != 0, "control: the pre-fix bytes must FAIL this predicate\n%s" % out_pre[-900:]
+    assert "1 failed" in out_pre, out_pre[-900:]
+    assert "submitted packet" in out_pre, "the failure must name the packet it wrote into"
+
+    rc_fix, out_fix = _run_probe(tmp_path, "fixed", (BENCH_DIR / "common.py").read_bytes())
+    assert rc_fix == 0, "the fixed module must PASS the same predicate\n%s" % out_fix[-900:]
+    assert "1 passed" in out_fix, out_fix[-900:]
+
+
+CHILD_NO_PATH = """
+import sys
+sys.path.insert(0, sys.argv[1])
+import common as C
+print("RESOLVED_LEDGER=%s" % C.ledger_path(), flush=True)
+C.run([sys.executable, "-B", "-c", "print('child command')"], label="child-default-path")
+"""
+
+
+def test_subprocess_ledger_path_is_explicit(tmp_path):
+    """F10 c3: a test that spawns a subprocess names the ledger path FOR THE CHILD (env/argv),
+    and the child never reaches a process-global default that could be the packet ledger.
+
+    Executed both ways: (a) the child inherits the fixture's explicit MF_BENCH_LEDGER and writes
+    there and nowhere else; (b) with MF_BENCH_LEDGER removed the child still writes into the
+    scratch root named by MF_BENCH_WORK - and the packet ledger is hashed around both runs, so
+    'nowhere else' is measured, not asserted.
+    """
+    script = tmp_path / "child_no_path.py"
+    script.write_text(CHILD_NO_PATH, encoding="utf-8")
+    before = _evidence_snapshot()
+
+    env = dict(os.environ)
+    assert env.get("MF_BENCH_LEDGER"), "the fixture must export an explicit per-test ledger path"
+    p = subprocess.run([sys.executable, "-B", str(script), str(BENCH_DIR)], env=env,
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    assert p.returncode == 0, p.stderr[-600:]
+    resolved = [x for x in p.stdout.splitlines() if x.startswith("RESOLVED_LEDGER=")][0].split("=", 1)[1]
+    assert resolved.replace("\\", "/").startswith(str(tmp_path).replace("\\", "/")), resolved
+    assert Path(resolved).exists()
+    assert C.read_ledger(Path(resolved))["records"][0]["status"] == "complete"
+
+    scratch = tmp_path / "child_scratch"
+    env2 = dict(os.environ, MF_BENCH_WORK=str(scratch))
+    env2.pop("MF_BENCH_LEDGER", None)
+    p2 = subprocess.run([sys.executable, "-B", str(script), str(BENCH_DIR)], env=env2,
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    assert p2.returncode == 0, p2.stderr[-600:]
+    r2 = [x for x in p2.stdout.splitlines() if x.startswith("RESOLVED_LEDGER=")][0].split("=", 1)[1]
+    assert str(scratch).replace("\\", "/") in r2.replace("\\", "/"), r2
+    assert SUBMITTED_PACKET not in r2.replace("\\", "/"), r2
+    assert Path(r2).exists()
+    assert _evidence_snapshot() == before, "a subprocess must not append to the packet ledger"
 
 
 # --------------------------------------------------------------------------- #

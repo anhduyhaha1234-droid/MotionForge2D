@@ -2,9 +2,11 @@
 
 CPU only. No model, no network, no GPU. ffmpeg/ffprobe + stdlib + numpy/Pillow.
 Every external command is recorded (argv/cwd/exit/duration) into a run ledger that is
-written to <BENCH_EV_NEW>/raw/cmd_transcript.jsonl, appended at command boundaries, so an
-exception or a process kill cannot lose an envelope of a command that already finished
-(F10). The wave-1/2 evidence root BENCH_EV is frozen and read-only for the correction round.
+written to that run's ledger path, appended at command boundaries, so an exception or a
+process kill cannot lose an envelope of a command that already finished (F10). The ledger that
+lives inside the submitted packet is an EXPLICIT destination (EVIDENCE_LEDGER); the fallback is
+the run scratch root, so "no explicit path" can never mean "append into submitted evidence"
+(F10 c3). The wave-1/2 evidence root BENCH_EV is frozen and read-only for this round.
 """
 from __future__ import annotations
 
@@ -29,6 +31,43 @@ BENCH_EV_FROZEN = BENCH_EV
 BENCH_EV_NEW = Path("C:/Users/Admin/Documents/Codex/2026-09-11/tr-x20/outputs/"
                     "mf-reskin-correction-20260922/20260922T0955Z/BENCH")
 WORK = Path(os.environ.get("MF_BENCH_WORK", str(RUNTIME)))
+
+# F10 isolation (correction c3). The ledger that belongs to the SUBMITTED packet is a named
+# destination only. It used to be the fallback of ledger_path(), so any caller that forgot to
+# name a path appended its rows into submitted evidence - the reviewer's verification run wrote
+# 10,721 bytes / 25 rows of run 20260922T235825-1290fc into the frozen packet ledger that way.
+EVIDENCE_LEDGER = BENCH_EV_NEW / "raw" / "cmd_transcript.jsonl"
+# The fallback is the SCRATCH root, never an evidence root (WORK honours MF_BENCH_WORK).
+EVIDENCE_ROOTS = (BENCH_EV_NEW, BENCH_EV_FROZEN)
+
+
+def in_evidence_root(path) -> bool:
+    """True when `path` lives inside a submitted/frozen evidence root.
+
+    Such a ledger is real evidence: it may only be written when a caller names it explicitly.
+    Compared as normalised absolute strings, so it is safe to call on a path that does not
+    exist yet and on the two roots that bracket the corpus (packet + frozen wave-1/2).
+    """
+    def norm(p):
+        return str(Path(p).resolve()).replace("\\", "/").lower().rstrip("/")
+    p = norm(path)
+    return any(p == r or p.startswith(r + "/") for r in map(norm, EVIDENCE_ROOTS))
+
+
+def default_ledger() -> Path:
+    """The ledger used when no caller names one: <scratch>/cmd_transcript.jsonl.
+
+    Resolved at CALL time from MF_BENCH_WORK (the old module-level default was computed at
+    import, so MF_BENCH_WORK redirected scratch but not the ledger). It fails closed when the
+    scratch root itself points into an evidence root, because appending to submitted bytes
+    must always require an explicit destination.
+    """
+    p = Path(os.environ.get("MF_BENCH_WORK", str(RUNTIME))) / "cmd_transcript.jsonl"
+    if in_evidence_root(p):
+        raise RuntimeError(
+            "refusing to default the command ledger into an evidence root (%s): name a path "
+            "explicitly (EVIDENCE_LEDGER) or point MF_BENCH_WORK/MF_BENCH_LEDGER at scratch" % p)
+    return p
 
 GOLDEN = WAVE_EV / "GOLDEN"
 GOLDEN_FIXTURE = GOLDEN / "GOLDEN_FIXTURE.json"
@@ -74,19 +113,33 @@ LEDGER: list = []
 # idempotence tests can run their negative control against the exact behaviour they fix.
 RUN_ID = time.strftime("%Y%m%dT%H%M%S", time.localtime()) + "-" + uuid.uuid4().hex[:6]
 LEDGER_MODE = os.environ.get("MF_BENCH_LEDGER_MODE", "durable")
-_LEDGER_FILE = None          # set by set_ledger_path(); default is the correction root
+_LEDGER_FILE = None          # set by set_ledger_path(); the default is the scratch root
 _PERSISTED: set = set()      # (path, row_id) already on disk
 _HEADERS: set = set()        # (path, run_id) already stamped
 _CMD_SEQ = itertools.count(1)
 
 
 def ledger_path(path=None) -> Path:
-    """Append-only command ledger for this run."""
-    return Path(path or _LEDGER_FILE or (BENCH_EV_NEW / "raw" / "cmd_transcript.jsonl"))
+    """Append-only command ledger for this run.
+
+    Precedence: explicit argument > set_ledger_path() > MF_BENCH_LEDGER > default_ledger().
+    Not one of those fallbacks can reach the submitted-packet ledger (EVIDENCE_LEDGER): with
+    nothing named the path is the scratch root, and a scratch root inside an evidence root
+    fails closed instead of appending to submitted bytes (F10 c3).
+    """
+    if path:
+        return Path(path)
+    if _LEDGER_FILE:
+        return Path(_LEDGER_FILE)
+    env = os.environ.get("MF_BENCH_LEDGER")
+    if env:
+        return Path(env)
+    return default_ledger()
 
 
 def set_ledger_path(path):
-    """Point this process at another ledger (tests use a tmp_path); None restores default."""
+    """Point this process at another ledger (tests use a tmp_path); None restores the scratch
+    default - the submitted-packet ledger is never a default."""
     global _LEDGER_FILE
     _LEDGER_FILE = Path(path) if path else None
     return _LEDGER_FILE
