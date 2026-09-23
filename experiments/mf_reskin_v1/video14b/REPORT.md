@@ -68,8 +68,9 @@ Sinh bằng `tools/m1_review_bundle.py` (delegate render cho `waveB_review_bundl
 - Commit 1 (code, round này) = `cf5e7a83e727b0fd42c483fdb226849f42ded477`, parent
   `658e540017f4890e81ec9aab4b625764f80aca51` (**nguyên vẹn**), 11 file / +3,943 dòng, toàn bộ trong
   `experiments/mf_reskin_v1/video14b/**`, 0 file ngoài allowlist.
-- Commit 2 (tài liệu) = commit chứa file này + bản copy `M1_REPORT.md` trong repo; hash đo bằng
-  `git rev-parse HEAD` ngay sau khi commit và báo trong reply của worker (không hứa trước).
+- Commit tài liệu (round này) = commit(s) chứa file này + bản copy `M1_REPORT.md` trong repo; chain đo được:
+  `HEAD^` = commit code `cf5e7a8…`, `HEAD^^` = `658e540…` (**nguyên vẹn**). Hash HEAD cuối cùng nằm trong
+  `NEW/VIDEO14B/CLOSEOUT_STATE.json` → `git.head` (regenerate sau commit cuối) và trong reply của worker.
 - Sau commit: `git status --porcelain` rỗng, `git branch -r --contains HEAD` rỗng (**không** push).
 - `git commit` in `fatal: bad object refs/codex/turn-diffs/…` + `error: failed to perform geometric repack`:
   broken ref **có sẵn**, thuộc git maintenance; commit vẫn landed (đã xác nhận bằng `rev-parse`).

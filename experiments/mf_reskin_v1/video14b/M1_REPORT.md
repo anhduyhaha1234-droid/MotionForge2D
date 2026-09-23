@@ -226,7 +226,11 @@ Tool (đã commit cùng round): `tools/m1_review_bundle.py` (render + copy + ass
 
 **Tuyên bố bắt buộc:** trong round M1 **và** trong round closeout này, **không một frame nào của clip
 được mở/ xem/ kiểm tra bằng mắt** (không có tool vision trên route này và worker cố ý không tự mô tả
-hình). Vì vậy: reference giữ **`NOT_VISUALLY_APPROVED`**, các row semantic (character/hands/book/
+hình). In plain English: **no frame of the clip was visually inspected — not in the M1 round, not in
+this closeout round**; the route has no vision tool and the worker deliberately does not describe the
+picture. There is therefore no visual statement about the book, the hands, the background or identity.
+
+Vì vậy: reference giữ **`NOT_VISUALLY_APPROVED`**, các row semantic (character/hands/book/
 background/identity/blur-flicker) giữ **`NOT_REVIEWED`**, **0** `QUALITY_ACCEPTED`.
 Round này **không** nói clip "đã sửa", "tốt hơn" hay "chấp nhận được" ở bất kỳ dòng nào — chỉ cơ chế + số.
 
@@ -256,8 +260,10 @@ Round này **không** nói clip "đã sửa", "tốt hơn" hay "chấp nhận đ
  11 files changed, 3943 insertions(+)
 ```
 
-- **Commit 2 (tài liệu, cùng lượt)**: file này + bản copy trong repo. HEAD sau commit 2 được ghi ở
-  `REPORT.md` §5 cùng thư mục (đo bằng `git rev-parse HEAD`, không hứa trước).
+- **Commit tài liệu (cùng lượt)**: file này + bản copy trong repo. Chain đo được: `HEAD^` = code commit
+  `cf5e7a8…`, `HEAD^^` = `658e540…` (parent bắt buộc, **nguyên vẹn**). Hash HEAD cuối cùng của round
+  được ghi bằng **số đo** trong `NEW/VIDEO14B/CLOSEOUT_STATE.json` → `git.head` (file này regenerate sau
+  commit cuối) và trong reply của worker — không hứa trước, không tự bịa.
 - `git status --porcelain` sau commit 1 = **rỗng**; `git branch -r --contains HEAD` = **rỗng** (không push).
 - Sự cố đã khai: `git commit` in ra `fatal: bad object refs/codex/turn-diffs/…` +
   `error: failed to perform geometric repack` — đây là git maintenance (`gc --auto`) gặp broken ref
