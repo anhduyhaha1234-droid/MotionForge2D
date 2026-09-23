@@ -841,11 +841,23 @@ def compose_check_run_args(
 
     The audio band is composed from the video's latest completed
     ATTACH_ORIGINAL_AUDIO attempt result (the T03E envelope contract) —
-    never from client-supplied values.  When the persisted evidence is
-    missing or malformed the composition fails closed
-    (``QC_RUN_EVIDENCE_UNAVAILABLE``): nothing is fabricated (GAP-8).
+    never from client-supplied values.  The non-audio band is composed by
+    ``app.services.qc_evidence`` from persisted source/result/annotation
+    artifacts (byte-verified on read).  When the persisted evidence is
+    missing, superseded (stale), foreign, malformed or tampered — or a
+    required fact has no producer at all — the composition fails closed
+    (``QC_RUN_EVIDENCE_UNAVAILABLE``) carrying the typed evidence code:
+    nothing is fabricated (GAP-8).
     """
     detectors = scope_detectors(scope)
+    visual = _compose_visual_evidence(
+        session,
+        scope=scope,
+        detectors=detectors,
+        workspace_id=workspace_id,
+        project_id=project_id,
+        video_item_id=video_item_id,
+    )
     args: dict[str, dict[str, Any]] = {}
     for name in detectors:
         if name in ("audio_missing", "av_sync_drift"):
@@ -863,6 +875,9 @@ def compose_check_run_args(
             if name == "av_sync_drift":
                 args[name]["scene_timeline"] = _scene_timeline(session, video_item_id)
             continue
+        if name in visual:
+            args[name] = dict(visual[name])
+            continue
         raise QcCheckRunSubmitError(
             QC_RUN_EVIDENCE_UNAVAILABLE,
             f"no server-side evidence composition path for scope {scope!r} "
@@ -870,6 +885,61 @@ def compose_check_run_args(
             details={"scope": scope, "detector": name},
         )
     return args
+
+
+def _evidence_managed_root() -> Any:
+    """The public managed-artifact root the evidence reader verifies bytes in.
+
+    Resolved through the application's OWN public accessor
+    (``app.api.deps.get_managed_root``) — the same root every other server
+    component (worker, reconciler, APIs, manifests) resolves through.  A
+    private fallback here would let the evidence reader verify bytes against a
+    root the rest of the application never writes to, which reads as
+    "artifact missing" for evidence that is present.
+    """
+    from app.api.deps import get_managed_root
+
+    return get_managed_root()
+
+
+def _compose_visual_evidence(
+    session: Session,
+    *,
+    scope: str,
+    detectors: Sequence[str],
+    workspace_id: str,
+    project_id: str,
+    video_item_id: str,
+) -> dict[str, dict[str, Any]]:
+    """Compose the non-audio band from persisted, integrity-checked evidence.
+
+    The audio-only band is untouched (returns an empty map without touching
+    the evidence reader — the existing audio-only path keeps working).  Any
+    refusal is surfaced as ``QC_RUN_EVIDENCE_UNAVAILABLE`` whose message and
+    details carry the TYPED evidence code (missing / stale / foreign /
+    malformed / tampered / dependency) plus, when a fact has no producer,
+    the exact dependency report.
+    """
+    if not any(name not in ("audio_missing", "av_sync_drift") for name in detectors):
+        return {}
+    from app.services.qc_evidence import QcEvidenceError, compose_visual_band
+
+    try:
+        return compose_visual_band(
+            session,
+            managed_root=_evidence_managed_root(),
+            workspace_id=workspace_id,
+            project_id=project_id,
+            video_item_id=video_item_id,
+        )
+    except QcEvidenceError as exc:
+        details = dict(exc.details)
+        details["scope"] = scope
+        raise QcCheckRunSubmitError(
+            QC_RUN_EVIDENCE_UNAVAILABLE,
+            f"{exc.code}: {exc.message}",
+            details=details,
+        ) from exc
 
 
 def _scene_timeline(session: Session, video_item_id: str) -> dict[str, Any] | None:
