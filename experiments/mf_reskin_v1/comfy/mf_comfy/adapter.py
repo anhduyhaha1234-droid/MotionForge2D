@@ -135,10 +135,15 @@ class ComfyStageAdapter:
         self.instance_epoch: dict | None = None
         self.capabilities: dict = {}
         self.node_inventory_sha256 = ""
+        # F05: the normalized output contract bound by the reservation this attempt
+        # adopted/opened. When set it — never the caller's current spec — decides
+        # which terminal node a result may be read from.
+        self.bound_output_contract: dict | None = None
         self.object_info: dict = {}
 
     # ---------------------------------------------------------------- preflight
-    def preflight(self, graph: dict, node_inventory_sha256: str = "") -> dict:
+    def preflight(self, graph: dict, node_inventory_sha256: str = "",
+                  workflow_sha256: str = "") -> dict:
         object_info = self.transport.object_info()
         # kept for the declared-terminal-output fallback (`output_node`)
         self.object_info = object_info
@@ -150,7 +155,9 @@ class ComfyStageAdapter:
             "node_inventory_sha256": inv_sha,
             "node_class_count": len(object_info or {}),
             "capabilities": self.capabilities,
-            "workflow_sha256": pinning.hash_workflow(graph),
+            # A supplied pin is COMPARED with the hash of the graph actually being
+            # submitted; it is never merely echoed (F02).
+            "workflow_sha256": pinning.verify_workflow_pin(graph, workflow_sha256),
         }
 
     def _validate_graph(self, object_info: dict, graph: dict) -> None:
@@ -359,17 +366,36 @@ class ComfyStageAdapter:
         blob = json.dumps(identity or {}, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
+    @staticmethod
+    def output_contract_digest(contract: dict) -> str:
+        """Stable digest of a normalized output contract (F05)."""
+        blob = json.dumps(contract or {}, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
     def _claim(self, spec: RunSpec, stage_input: StageInput | None, attempt_id: str) -> dict:
-        """The declared identity of the work item this attempt is claiming (F02)."""
+        """The declared identity of the work item this attempt is claiming (F02).
+
+        `workflow_sha256` is never taken on trust: when the caller supplies a pin
+        the graph is hashed and the pin must match, so the *correct* pin of an
+        OLD graph can never be presented as the identity of a NEW graph. A bad
+        pin fails typed (`MF_COMFY_WORKFLOW_HASH_MISMATCH`) right here, i.e.
+        before any adoption, staging or POST.
+
+        The normalized output contract is part of the identity (F05): it is bound
+        durably at submit time, so a declaration changed across a restart is an
+        identity mismatch instead of a licence to publish something else.
+        """
         identity = self._input_identity(stage_input)
         return {
             "attempt_id": attempt_id or "",
             "stage_id": spec.stage_id or "",
             "workflow_id": spec.workflow_id or "",
-            "workflow_sha256": spec.workflow_sha256 or pinning.hash_workflow(spec.graph),
+            "workflow_sha256": pinning.verify_workflow_pin(spec.graph, spec.workflow_sha256),
             "owner": spec.owner or self.owner,
             "input_digest": self.identity_digest(identity),
             "input_identity": identity,
+            "output_contract_digest": self.output_contract_digest(
+                self._normalized_output_contract(spec)),
         }
 
     @staticmethod
@@ -378,16 +404,40 @@ class ComfyStageAdapter:
 
         Every field must be present on BOTH sides and equal: a record written by
         a build without identity, or by another attempt/stage/workflow/graph/
-        input/owner, can never be adopted. It stays unresolved and blocking
-        instead of being handed to a stranger.
+        input/owner, or under a different output contract, can never be adopted.
+        It stays unresolved and blocking instead of being handed to a stranger.
         """
         for key in ("attempt_id", "stage_id", "workflow_id", "workflow_sha256",
-                    "owner", "input_digest"):
+                    "owner", "input_digest", "output_contract_digest"):
             mine = str((claim or {}).get(key) or "")
             theirs = str((record or {}).get(key) or "")
             if not mine or not theirs or mine != theirs:
                 return False
         return True
+
+    @staticmethod
+    def _same_work_item(record: dict, claim: dict) -> bool:
+        """Does this record describe the same work item the caller is claiming?
+
+        Used on the gate -> new-reservation path: when a record of THIS boot is
+        still unresolved and its durable identity does NOT match the caller, but
+        it *is* the same work item (same attempt, or same stage+workflow), the
+        caller must not be allowed to POST a second prompt for it. A caller
+        declaring a genuinely different work item is an independent new request
+        and is not blocked here (F02).
+        """
+        rec = record or {}
+        clm = claim or {}
+        rec_attempt = str(rec.get("attempt_id") or "")
+        clm_attempt = str(clm.get("attempt_id") or "")
+        if rec_attempt and clm_attempt and rec_attempt == clm_attempt:
+            return True
+        rec_stage = str(rec.get("stage_id") or "")
+        clm_stage = str(clm.get("stage_id") or "")
+        rec_wf = str(rec.get("workflow_id") or "")
+        clm_wf = str(clm.get("workflow_id") or "")
+        return bool(rec_stage and clm_stage and rec_stage == clm_stage
+                    and rec_wf and clm_wf and rec_wf == clm_wf)
 
     def _scan_server_for_own_prompt(self, client_id: str) -> tuple[tuple[str, str] | None, bool]:
         """Find a prompt THIS client already submitted. Returns (found, reads_ok).
@@ -490,6 +540,33 @@ class ComfyStageAdapter:
                 paths=[r.get("path") for r in mine],
             )
         if not mine:
+            # F02 (gate -> new-reservation branch): a reservation of THIS boot may
+            # still describe the SAME work item while its durable identity does not
+            # match this caller. That is not a licence to open a second reservation
+            # and POST: reaching the gate would let the reconcile hook prove the
+            # old prompt terminal, free its marker and silently submit a duplicate.
+            # The only legal paths are (a) recovery of the exact same identity and
+            # (b) a genuinely independent request for a DIFFERENT work item.
+            conflicts = [r for r in self.reservations.unresolved(inst)
+                         if self._same_work_item(r, claim or {})]
+            if conflicts:
+                raise ReservationConflict(
+                    "an unresolved reservation already claims this work item, but its "
+                    "durable identity does not match this caller; refusing to silently "
+                    "submit a second prompt. Recover it with the exact identity "
+                    "(attempt/stage/workflow/graph/output contract/input/owner) or "
+                    "reconcile its outcome first.",
+                    attempt_id=(claim or {}).get("attempt_id"),
+                    incoming={k: (claim or {}).get(k) for k in
+                              ("attempt_id", "stage_id", "workflow_id", "workflow_sha256",
+                               "owner", "input_digest", "output_contract_digest")},
+                    existing=[{k: r.get(k) for k in
+                               ("key", "attempt_id", "stage_id", "workflow_id",
+                                "workflow_sha256", "owner", "input_digest",
+                                "output_contract_digest", "prompt_id", "submit_state",
+                                "state")} for r in conflicts],
+                    paths=[r.get("path") for r in conflicts],
+                )
             self._record_event("no_identity_match", {
                 "claim": {k: (claim or {}).get(k) for k in
                           ("attempt_id", "stage_id", "workflow_id", "workflow_sha256", "owner")},
@@ -498,6 +575,18 @@ class ComfyStageAdapter:
                         "blocking the gate for this instance"})
             return None
         rec = mine[0]
+        # F05: the normalized output contract is durable. A record whose contract is
+        # missing or corrupt cannot be validated against the caller's CURRENT
+        # declaration, so it fails closed instead of publishing whatever the current
+        # spec happens to name.
+        contract = rec.get("output_contract")
+        if not isinstance(contract, dict) or not contract.get("nodes"):
+            raise CorruptReservation(
+                "the reservation carries no durable normalized output contract; refusing "
+                "to validate a result against the caller's current declaration",
+                attempt_id=rec.get("attempt_id"), path=rec.get("path"),
+                present=[k for k in ("output_contract", "output_contract_digest") if k in rec])
+        self.bound_output_contract = contract
         if rec.get("prompt_id"):
             self.reservation = rec
             self.adopted_prompt_id = rec["prompt_id"]
@@ -618,13 +707,18 @@ class ComfyStageAdapter:
                 return False, None, None, f"{type(exc).__name__}:{exc}"
         return None, None, None, "unknown artifact type: decode not verified"
 
-    def _declared_terminal_outputs(self, spec: RunSpec) -> dict:
+    def _declared_terminal_outputs(self, spec: RunSpec, contract: dict | None = None) -> dict:
         """The terminal output node(s) of this workflow (F05).
 
+        With a durable `contract` (the one bound at submit time) THAT contract
+        governs: the caller's current spec can never re-declare a different node
+        for an attempt that was already submitted. Without one,
         `RunSpec.terminal_outputs` is the declaration; when it is empty the
         graph's own terminal nodes are used (ComfyUI marks them
         `output_node: true`, e.g. SaveImage / SaveAnimatedWEBP).
         """
+        if isinstance(contract, dict) and isinstance(contract.get("nodes"), dict):
+            return {str(k): dict(v or {}) for k, v in contract["nodes"].items()}
         declared: dict[str, dict] = {}
         for node_id, conf in (spec.terminal_outputs or {}).items():
             declared[str(node_id)] = dict(conf or {})
@@ -637,20 +731,47 @@ class ComfyStageAdapter:
                 declared[str(node_id)] = {}
         return declared
 
+    def _normalized_output_contract(self, spec: RunSpec) -> dict:
+        """The durable, normalized result contract of one submit (F05).
+
+        Normalized = the resolved terminal node ids (explicit declaration, or the
+        graph's own `output_node` nodes) with their kind / media type / publishable
+        server types, plus the expected artifact pins. This exact structure is
+        written into the reservation and is the only thing any later read of the
+        same attempt may validate against.
+        """
+        declared = self._declared_terminal_outputs(spec)
+        nodes: dict[str, dict] = {}
+        for node_id in sorted(declared):
+            conf = declared[node_id] or {}
+            nodes[str(node_id)] = {
+                "kind": conf.get("kind") or "",
+                "media_type": conf.get("media_type") or "",
+                "server_types": list(self._declared_server_types(conf, spec)),
+            }
+        pins = {str(k): str(v) for k, v in sorted((spec.expected_artifact_hashes or {}).items())}
+        return {"nodes": nodes, "expected_artifact_pins": pins}
+
     @staticmethod
     def _declared_server_types(conf: dict, spec: RunSpec) -> tuple:
         """Publishable server types for one declared node.
 
         A product is what the server WROTE (`type == "output"`). `allowed_types`
         may only narrow that set: it can never make an `input` preview or a
-        `temp` scratch file into a result (F05).
+        `temp` scratch file into a result (F05). An explicit `server_types` on
+        the declaration is authoritative and is never widened.
         """
-        want = tuple(conf.get("server_types") or spec.allowed_types or PUBLISHABLE_SERVER_TYPES)
+        want = conf.get("server_types")
+        if want is None:
+            want = spec.allowed_types or PUBLISHABLE_SERVER_TYPES
         return tuple(t for t in want if t in PUBLISHABLE_SERVER_TYPES)
 
-    def validate_artifacts(self, entry: dict, spec: RunSpec) -> list[dict]:
+    def validate_artifacts(self, entry: dict, spec: RunSpec,
+                           contract: dict | None = None) -> list[dict]:
         outputs = entry.get("outputs") or {}
-        declared = self._declared_terminal_outputs(spec)
+        bound = contract if contract is not None else getattr(self, "bound_output_contract", None)
+        declared = self._declared_terminal_outputs(spec, bound)
+        pins = (bound or {}).get("expected_artifact_pins") if isinstance(bound, dict) else None
         if not declared:
             raise ArtifactMissing(
                 "workflow declares no terminal output node, so nothing can be published",
@@ -716,7 +837,8 @@ class ComfyStageAdapter:
             with open(target, "wb") as fh:
                 fh.write(raw)
             sha = pinning.sha256_file(target)
-            expected = (spec.expected_artifact_hashes or {}).get(filename)
+            expected = (pins if pins is not None
+                        else (spec.expected_artifact_hashes or {})).get(filename)
             if expected and expected != sha:
                 raise ArtifactHashMismatch("artifact hash differs from the recorded expectation",
                                            filename=filename, expected=expected, actual=sha)
@@ -795,7 +917,9 @@ class ComfyStageAdapter:
         attempt_id = (stage_input.attempt_id or spec.attempt_id or "").strip()
         if not attempt_id:
             attempt_id = f"attempt-{uuid.uuid4().hex[:12]}"
-        claim = self._claim(spec, stage_input, attempt_id)
+        # `claim` is built after preflight (below): the normalized output contract
+        # resolves against the loaded node inventory, and the caller's workflow pin
+        # is verified against the real graph hash before any adoption or POST.
         t_start = self.clock()
         timing: dict[str, Any] = {}
         instance_epoch = self.instance_epoch or (self.epoch.read() if self.epoch else None)
@@ -805,11 +929,16 @@ class ComfyStageAdapter:
         )
         terminal_proven = False
         try:
-            pre = self.preflight(spec.graph, spec.node_inventory_sha256)
+            pre = self.preflight(spec.graph, spec.node_inventory_sha256, spec.workflow_sha256)
             timing["preflight_s"] = round(self.clock() - t_start, 3)
             base.workflow_sha256 = pre["workflow_sha256"]
             base.node_inventory_sha256 = pre["node_inventory_sha256"]
             base.model_hashes = dict(spec.model_pins)
+
+            # Declared identity of this work item (F02), including the normalized
+            # output contract (F05). A pin that does not match the real graph hash
+            # raises inside `_claim` here — before adoption, staging or POST.
+            claim = self._claim(spec, stage_input, attempt_id)
 
             # F01 fix, step 1: does THIS work item already own a prompt? Answer
             # BEFORE taking the gate, so the adopting attempt can take over its own
@@ -844,6 +973,9 @@ class ComfyStageAdapter:
                     f"adopted existing prompt {prompt_id} from the durable reservation; "
                     "no second POST was sent")
             else:
+                # F05: the normalized output contract is bound durably HERE, before
+                # the POST, and it governs every later read of this attempt.
+                contract = self._normalized_output_contract(spec)
                 if self.reservations is not None:
                     self.reservation = self.reservations.open(
                         instance_epoch or {}, attempt_id, stage_id=spec.stage_id,
@@ -852,7 +984,10 @@ class ComfyStageAdapter:
                         workflow_sha256=claim["workflow_sha256"],
                         input_digest=claim["input_digest"],
                         input_identity=claim["input_identity"],
+                        output_contract=contract,
+                        output_contract_digest=self.output_contract_digest(contract),
                         note="opened before the POST: a lost acknowledgement must never resubmit")
+                self.bound_output_contract = contract
                 if self.sampler is not None:
                     self.sampler.start()
                 t_submit = self.clock()

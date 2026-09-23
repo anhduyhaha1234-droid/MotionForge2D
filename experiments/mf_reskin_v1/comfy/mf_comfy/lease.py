@@ -315,6 +315,8 @@ class PromptReservations:
         workflow_sha256: str = "",
         input_digest: str = "",
         input_identity: dict | None = None,
+        output_contract: dict | None = None,
+        output_contract_digest: str = "",
     ) -> dict:
         """Reserve this instance for one attempt BEFORE the POST is attempted.
 
@@ -348,6 +350,10 @@ class PromptReservations:
             "workflow_sha256": workflow_sha256,
             "input_digest": input_digest,
             "input_identity": input_identity or {},
+            # durable NORMALIZED output contract bound before the POST (F05):
+            # the declaration used for the first submit governs every later read
+            "output_contract": output_contract or {},
+            "output_contract_digest": output_contract_digest,
             # durable submit lifecycle (F01)
             "submit_state": SUBMIT_OPENING,
             "submit_owner_pid": os.getpid(),

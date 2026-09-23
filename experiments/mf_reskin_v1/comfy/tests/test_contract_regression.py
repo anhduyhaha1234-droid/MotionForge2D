@@ -8,8 +8,15 @@ Registered rows (packet MF-V1-COMFY correction round), one test per row:
     F04  test_corrupt_reservation_blocks_gate
     F05  test_output_contract_ignores_input_preview_and_requires_terminal_output
 
+Round c2 rows (graph pin + durable output contract + identity-bound resubmit):
+
+    F02-a  test_f02_graph_pin_is_compared_before_adoption_or_submit
+    F02-b  test_f02_independent_new_request_after_valid_terminal
+    F05    test_f05_output_contract_is_durable_across_restart
+
 Each row's reviewer reproduction (READ/root-probes/comfy/reviewer_micro_results.json,
 READ/root-probes/input-only-result.json) is encoded as the first phase of its test.
+The c2 rows encode `REVIEW_ROOT/evidence/valid-pin-probes/` (f02a, f02b, f05).
 
 NEGATIVE CONTROL. This file has to fail on the pre-fix preimage. Every access to a
 new contract field is therefore wrapped in a helper that raises `AssertionError`
@@ -240,8 +247,18 @@ def test_adoption_requires_exact_attempt_stage_workflow_owner(tmp_path):
     Reviewer reproduction (`foreign_attempt_adoption`): a video-owner /
     video-stage / unrelated-workflow caller received the image-attempt /
     image-owner output with `status: validated, adopted: true`. Each identity
-    field is varied on its own here; every variant must be refused and must not
-    resubmit, and two claimants for one identity must fail closed.
+    field is varied on its own here; every variant must be refused, must not
+    adopt, and — in BOTH the running state and after the old prompt has become a
+    success (`valid-pin-probes/f02b`) — must never silently POST a second prompt
+    for the same work item. Two claimants for one identity must fail closed.
+
+    CORRECTED CONTRACT (c2). This test used to assert `submit_calls == 2` for the
+    completed case ("it may only POST its own work item"). That encoded the wrong
+    contract: an unresolved reservation that belongs to the same work item is not
+    a licence to open a new reservation and POST once the gate's reconcile hook
+    has proved the old prompt terminal. Total POST for the conflicting case is
+    exactly 1; the independent-new-request positive control lives in
+    `test_f02_independent_new_request_after_valid_terminal`.
     """
     base = dict(attempt_id="att-f02", stage_id="stage-image", workflow_id="wf-image",
                 owner="image-owner")
@@ -277,8 +294,11 @@ def test_adoption_requires_exact_attempt_stage_workflow_owner(tmp_path):
         #     must not POST anything at all.
         stranger = make_rig(root, transport=rig.transport, write_epoch=False,
                             owner=override.get("owner", base["owner"]))
-        with pytest.raises(UnresolvedReservation):
+        with pytest.raises(MfComfyError) as exc_running:
             stranger.adapter.run(_new_spec(**spec_kw), stage_input)
+        assert getattr(exc_running.value, "code", "") in (
+            "MF_COMFY_UNRESOLVED_RESERVATION", "MF_COMFY_RESERVATION_CONFLICT"), \
+            f"a foreign {label} must be refused with a typed code, got {exc_running.value!r}"
         assert stranger.adapter.adopted_prompt_id is None, \
             f"a foreign {label} must never adopt this prompt"
         assert rig.transport.submit_calls == 1, \
@@ -286,29 +306,35 @@ def test_adoption_requires_exact_attempt_stage_workflow_owner(tmp_path):
         assert _markers(store) != [], \
             f"the refusal for a foreign {label} must keep the reservation"
 
-        # (ii) the prompt finishes while the stranger is looking: it must never
-        #      receive that output, and must never adopt it -- it may only run its
-        #      own prompt (a different prompt_id), or fail unproven.
+        # (ii) the prompt finishes while the stranger is looking (independent
+        #      reviewer probe `valid-pin-probes/f02b`): the old marker may NOT be
+        #      reconciled free and then re-submitted. Measured on the pre-fix bytes:
+        #      the gate reconcile hook cleared the marker, POST pid-2 followed and
+        #      the attempt ended `AmbiguousAfterSubmit` with total POST=2.
+        #      Required: a typed refusal, no output of the other work item, and NO
+        #      additional POST.
         rig.transport.queue_state["queue_running"] = []
         rig.transport.history_map["pid-1"] = history_success("pid-1", "first_image.png")
         other = make_rig(root, transport=rig.transport, write_epoch=False,
                          owner=override.get("owner", base["owner"]))
-        try:
-            out = other.adapter.run(_new_spec(**spec_kw), stage_input)
-            own_prompt = out.prompt_id
-            status = out.status
-        except MfComfyError as exc:
-            own_prompt = (exc.details or {}).get("prompt_id")
-            status = getattr(exc, "code", type(exc).__name__)
+        with pytest.raises(MfComfyError) as exc_done:
+            other.adapter.run(_new_spec(**spec_kw), stage_input)
+        status = getattr(exc_done.value, "code", type(exc_done.value).__name__)
+        assert status in ("MF_COMFY_UNRESOLVED_RESERVATION",
+                          "MF_COMFY_RESERVATION_CONFLICT"), \
+            f"a foreign {label} must be refused with a typed code, got {exc_done.value!r}"
         assert other.adapter.adopted_prompt_id is None, \
             f"a foreign {label} must never adopt the completed prompt"
-        assert own_prompt != "pid-1", \
-            f"a foreign {label} must never continue/report the other work item's prompt"
         assert not list(rig.paths.root.rglob("first_image.png")), \
             f"a foreign {label} must never receive the other work item's output"
-        assert rig.transport.submit_calls == 2, "it may only POST its own work item"
-        results[label] = {"refused_while_running": "MF_COMFY_UNRESOLVED_RESERVATION",
-                          "own_prompt": own_prompt, "status": status,
+        assert rig.transport.submit_calls == 1, (
+            f"a foreign {label} must never silently POST a second prompt for this work "
+            "item: the old prompt reaching a terminal state is not a licence to resubmit "
+            "(the pre-fix bytes measured total POST=2 here)")
+        assert _markers(store) != [], \
+            f"the conflicting {label} claim must leave the reservation blocking"
+        results[label] = {"refused_while_running": "MF_COMFY_RESERVATION_CONFLICT",
+                          "refused_when_completed": status,
                           "adopted": other.adapter.adopted_prompt_id,
                           "submit_calls": rig.transport.submit_calls}
 
@@ -527,3 +553,405 @@ def test_output_contract_ignores_input_preview_and_requires_terminal_output(tmp_
                                       stage_timeout_s=1.0, **declaring))
     assert not list(rig6.paths.root.rglob("*.png")), \
         "the adopted prompt must obey the same output contract"
+
+
+# =========================================================== F02-a (P1, c2)
+def test_f02_graph_pin_is_compared_before_adoption_or_submit(tmp_path):
+    """F02-a. A supplied workflow pin is COMPARED with the real graph hash.
+
+    Independent reviewer probe `valid-pin-probes/f02a`: the caller pinned the
+    ORIGINAL graph, the job stayed unresolved, the process exited, and only then
+    was the graph seed changed to 7 while the OLD pin was kept. On the pre-fix
+    bytes `_claim` echoed `spec.workflow_sha256`, so the restart came back
+    `validated / adopted=true` and staged `stage/original.png` — the output of the
+    OLD graph handed over as the result of the NEW one.
+
+    Required: a typed mismatch (MF_COMFY_WORKFLOW_HASH_MISMATCH) BEFORE adoption,
+    staging and POST, and no artifact. Graph changed with NO pin is refused too,
+    in both the running and the completed state.
+    """
+    from mf_comfy.errors import WorkflowPinMismatch
+    from mf_comfy.pinning import hash_workflow
+
+    pinned = {"terminal_outputs": {"9": {"kind": "images", "media_type": "image"}}}
+
+    def two_terminal(seed=42):
+        g = light_graph(seed=seed)
+        g["10"] = dict(g["9"])
+        return g
+
+    original, changed = two_terminal(), two_terminal(seed=7)
+    base = dict(attempt_id="att-a", stage_id="stage-a", workflow_id="wf-a")
+
+    # (1) a bad pin on the very first attempt never reaches the wire
+    rig = make_rig(tmp_path / "bad-pin-first", owner="owner-f02a")
+    with pytest.raises(WorkflowPinMismatch):
+        rig.adapter.run(_new_spec(**base, owner="owner-f02a", graph=original,
+                                  workflow_sha256="0" * 64, **pinned))
+    assert rig.transport.submit_calls == 0, "a bad pin must not reach the POST"
+    assert _markers(_store(rig.adapter)) == [], "a bad pin must not open a reservation"
+    assert not list(rig.paths.root.rglob("*.png"))
+
+    # (2) reviewer probe f02a: correct pin of the ORIGINAL graph, then graph changed
+    root2 = tmp_path / "pin-then-change"
+    rig2 = make_rig(root2, owner="owner-f02a")
+    rig2.transport.queue_state["queue_running"] = [queue_item("pid-1", rig2.adapter.client_id)]
+    first = rig2.adapter.run(_new_spec(**base, owner="owner-f02a", graph=original,
+                                       workflow_sha256=hash_workflow(original),
+                                       stage_timeout_s=1.0, **pinned))
+    assert first.status == "unresolved" and first.prompt_id == "pid-1"
+    _simulate_process_exit(rig2)
+    rig2.transport.queue_state["queue_running"] = []
+    rig2.transport.history_map["pid-1"] = history_success("pid-1", "original.png")
+    restart = make_rig(root2, transport=rig2.transport, write_epoch=False, owner="owner-f02a")
+    with pytest.raises(WorkflowPinMismatch):
+        restart.adapter.run(_new_spec(**base, owner="owner-f02a", graph=changed,
+                                      workflow_sha256=hash_workflow(original),
+                                      stage_timeout_s=1.0, **pinned))
+    assert restart.adapter.adopted_prompt_id is None, \
+        "the old graph's prompt must never be adopted for the new graph"
+    assert rig2.transport.submit_calls == 1, "a mismatching pin must not POST"
+    assert not list(rig2.paths.root.rglob("*.png")), "no artifact may be staged"
+    assert _markers(_store(rig2.adapter)) != [], "the old reservation stays blocking"
+
+    # (3) positive control: the SAME graph + the SAME pin still adopts exactly once
+    rig3 = make_rig(root2, transport=rig2.transport, write_epoch=False, owner="owner-f02a")
+    out3 = rig3.adapter.run(_new_spec(**base, owner="owner-f02a", graph=original,
+                                      workflow_sha256=hash_workflow(original),
+                                      stage_timeout_s=1.0, **pinned))
+    assert out3.status == "validated" and out3.adopted is True
+    assert [a["filename"] for a in out3.artifacts] == ["original.png"]
+    assert rig2.transport.submit_calls == 1, "an honest resume never POSTs again"
+
+    # (4) graph changed with NO pin: running state -> typed refusal, no artifact
+    root4 = tmp_path / "changed-no-pin"
+    rig4 = make_rig(root4, owner="owner-f02a")
+    rig4.transport.queue_state["queue_running"] = [queue_item("pid-1", rig4.adapter.client_id)]
+    b = dict(attempt_id="att-b", stage_id="stage-b", workflow_id="wf-b")
+    r4 = rig4.adapter.run(_new_spec(**b, owner="owner-f02a", graph=original,
+                                    stage_timeout_s=1.0, **pinned))
+    assert r4.status == "unresolved" and r4.prompt_id == "pid-1"
+    _simulate_process_exit(rig4)
+    nopin = make_rig(root4, transport=rig4.transport, write_epoch=False, owner="owner-f02a")
+    with pytest.raises(MfComfyError) as exc_nopin:
+        nopin.adapter.run(_new_spec(**b, owner="owner-f02a", graph=changed,
+                                    stage_timeout_s=1.0, **pinned))
+    assert getattr(exc_nopin.value, "code", "") in (
+        "MF_COMFY_UNRESOLVED_RESERVATION", "MF_COMFY_RESERVATION_CONFLICT"), exc_nopin.value
+    assert rig4.transport.submit_calls == 1 and not list(rig4.paths.root.rglob("*.png"))
+    assert nopin.adapter.adopted_prompt_id is None
+
+    # (5) ... and in the COMPLETED state: the old graph's result is never handed over
+    rig4.transport.queue_state["queue_running"] = []
+    rig4.transport.history_map["pid-1"] = history_success("pid-1", "original.png")
+    nopin2 = make_rig(root4, transport=rig4.transport, write_epoch=False, owner="owner-f02a")
+    with pytest.raises(MfComfyError) as exc_nopin2:
+        nopin2.adapter.run(_new_spec(**b, owner="owner-f02a", graph=changed,
+                                     stage_timeout_s=1.0, **pinned))
+    assert getattr(exc_nopin2.value, "code", "") in (
+        "MF_COMFY_UNRESOLVED_RESERVATION", "MF_COMFY_RESERVATION_CONFLICT"), exc_nopin2.value
+    assert rig4.transport.submit_calls == 1, \
+        "a changed graph whose prompt completed is not a licence to resubmit"
+    assert nopin2.adapter.adopted_prompt_id is None
+    assert not list(rig4.paths.root.rglob("*.png"))
+
+    # (6) combined tamper (graph + owner) is refused by the same rule
+    combo = make_rig(root4, transport=rig4.transport, write_epoch=False, owner="owner-f02a-x")
+    with pytest.raises(MfComfyError) as exc_combo:
+        combo.adapter.run(_new_spec(**b, owner="owner-f02a-x", graph=changed,
+                                    stage_timeout_s=1.0, **pinned))
+    assert getattr(exc_combo.value, "code", "") == "MF_COMFY_RESERVATION_CONFLICT", exc_combo.value
+    assert combo.adapter.adopted_prompt_id is None
+    assert rig4.transport.submit_calls == 1 and not list(rig4.paths.root.rglob("*.png"))
+
+    # (7) read-error case: an unreadable server is not an excuse to resubmit
+    rig4.transport.history_fail_calls = 8
+    err = make_rig(root4, transport=rig4.transport, write_epoch=False, owner="owner-f02a")
+    with pytest.raises(MfComfyError) as exc_err:
+        err.adapter.run(_new_spec(**b, owner="owner-f02a", graph=changed,
+                                  stage_timeout_s=1.0, **pinned))
+    assert getattr(exc_err.value, "code", "") == "MF_COMFY_RESERVATION_CONFLICT", exc_err.value
+    assert rig4.transport.submit_calls == 1
+    assert _store(rig4.adapter).receipts() == [], \
+        "a failed server read must never release (or claim) the reservation"
+    assert _markers(_store(rig4.adapter)) != []
+
+
+# =========================================================== F02-b (P1, c2)
+def test_f02_independent_new_request_after_valid_terminal(tmp_path):
+    """F02-b positive control: the conflict rule does NOT ban subsequent jobs.
+
+    The refusal above applies to a caller that collides with an unresolved
+    reservation of the SAME work item. Two other paths must keep working:
+
+      * recovery of the exact same identity -> adopt once, total POST stays 1;
+      * a genuinely independent new request -> valid, and it may POST its own
+        prompt once the previous work item reached a VALID TERMINAL.
+    """
+    root = tmp_path / "rig"
+    rig = make_rig(root, owner="owner-a")
+    rig.transport.queue_state["queue_running"] = [queue_item("pid-1", rig.adapter.client_id)]
+    first = rig.adapter.run(_new_spec(attempt_id="att-a", stage_id="stage-a",
+                                      workflow_id="wf-a", owner="owner-a",
+                                      stage_timeout_s=1.0))
+    assert first.status == "unresolved" and first.prompt_id == "pid-1"
+    _simulate_process_exit(rig)
+    store = _store(rig.adapter)
+
+    # (1) a DIFFERENT work item is a fresh claim: the identity layer does not refuse
+    #     it (no conflict), and the F01 gate still blocks because A is unresolved.
+    fresh = make_rig(root, transport=rig.transport, write_epoch=False, owner="owner-a")
+    with pytest.raises(MfComfyError) as exc_fresh:
+        fresh.adapter.run(_new_spec(attempt_id="att-b", stage_id="stage-b",
+                                    workflow_id="wf-b", owner="owner-a",
+                                    stage_timeout_s=1.0))
+    assert getattr(exc_fresh.value, "code", "") == "MF_COMFY_UNRESOLVED_RESERVATION", \
+        f"a new work item must be blocked by the F01 gate, not by the identity rule: {exc_fresh.value!r}"
+    assert rig.transport.submit_calls == 1
+
+    # (2) A reaches a VALID TERMINAL: the same identity adopts its own prompt once.
+    rig.transport.queue_state["queue_running"] = []
+    rig.transport.history_map["pid-1"] = history_success("pid-1", "a_result.png")
+    same = make_rig(root, transport=rig.transport, write_epoch=False, owner="owner-a")
+    done = same.adapter.run(_new_spec(attempt_id="att-a", stage_id="stage-a",
+                                      workflow_id="wf-a", owner="owner-a",
+                                      stage_timeout_s=1.0))
+    assert done.status == "validated" and done.adopted is True
+    assert [a["filename"] for a in done.artifacts] == ["a_result.png"]
+    assert rig.transport.submit_calls == 1, "recovery of the same identity never POSTs again"
+    assert _markers(store) == [], "a valid terminal released the reservation exactly once"
+
+    # (3) ... and now an independent new request runs and validates its OWN output.
+    staged_before = {p.name for p in rig.paths.root.rglob("*.png")}
+    rig.transport.history_map["pid-2"] = history_success("pid-2", "b_result.png")
+    nxt = make_rig(root, transport=rig.transport, write_epoch=False, owner="owner-b")
+    out = nxt.adapter.run(_new_spec(attempt_id="att-b", stage_id="stage-b",
+                                    workflow_id="wf-b", owner="owner-b",
+                                    stage_timeout_s=1.0))
+    assert out.status == "validated", out.notes
+    assert out.adopted is False and out.prompt_id == "pid-2"
+    assert [a["filename"] for a in out.artifacts] == ["b_result.png"]
+    assert rig.transport.submit_calls == 2
+    assert {p.name for p in rig.paths.root.rglob("*.png")} - staged_before == {"b_result.png"}, \
+        "the new request must stage its OWN output and nothing of the previous work item"
+
+    # (4) re-running the SAME stage under a NEW attempt is allowed after the valid
+    #     terminal too: the rule bans conflicting concurrent claims, not all
+    #     subsequent jobs.
+    rig.transport.history_map["pid-3"] = history_success("pid-3", "a_result2.png")
+    again = make_rig(root, transport=rig.transport, write_epoch=False, owner="owner-a")
+    out2 = again.adapter.run(_new_spec(attempt_id="att-a2", stage_id="stage-a",
+                                       workflow_id="wf-a", owner="owner-a",
+                                       stage_timeout_s=1.0))
+    assert out2.status == "validated", out2.notes
+    assert out2.adopted is False and out2.prompt_id == "pid-3"
+    assert [a["filename"] for a in out2.artifacts] == ["a_result2.png"]
+    assert rig.transport.submit_calls == 3
+
+
+# =========================================================== F05 (P1, c2)
+def test_f05_output_contract_is_durable_across_restart(tmp_path):
+    """F05. The FIRST submit's normalized result contract governs every later read.
+
+    Independent reviewer probe `valid-pin-probes/f05`: the graph has two terminal
+    nodes (9, 10). The first submit declares node 9 and stays unresolved; the
+    restart re-declares node 10 for the same graph/attempt/owner. On the pre-fix
+    bytes the adapter adopted pid-1 and staged `different.png` (node 10) — a result
+    the first submit never asked for. Required: fail closed, no staging, no POST.
+    """
+    def two_terminal(seed=42):
+        g = light_graph(seed=seed)
+        g["10"] = dict(g["9"])
+        return g
+
+    def decl(node="9", kind="images", media_type="image"):
+        return {"terminal_outputs": {node: {"kind": kind, "media_type": media_type}}}
+
+    def unresolved_run(root, *, attempt, stage, wf, owner, **extra):
+        rig = make_rig(root, owner=owner)
+        rig.transport.queue_state["queue_running"] = [queue_item("pid-1", rig.adapter.client_id)]
+        out = rig.adapter.run(_new_spec(attempt_id=attempt, stage_id=stage, workflow_id=wf,
+                                        owner=owner, graph=two_terminal(),
+                                        stage_timeout_s=1.0, **extra))
+        assert out.status == "unresolved" and out.prompt_id == "pid-1", out.notes
+        _simulate_process_exit(rig)
+        rig.transport.queue_state["queue_running"] = []
+        entry = history_success("pid-1", "original.png")
+        entry["outputs"]["10"] = {"images": [{"filename": "different.png",
+                                             "subfolder": "", "type": "output"}]}
+        rig.transport.history_map["pid-1"] = entry
+        return rig
+
+    # (0) unchanged normalized contract: the completed output is adopted exactly once,
+    #     read from the node the FIRST submit declared (never from node 10).
+    rig0 = unresolved_run(tmp_path / "unchanged", attempt="att-f05", stage="stage-f05",
+                          wf="wf-f05", owner="owner-f05", **decl())
+    same0 = make_rig(tmp_path / "unchanged", transport=rig0.transport, write_epoch=False,
+                     owner="owner-f05")
+    out0 = same0.adapter.run(_new_spec(attempt_id="att-f05", stage_id="stage-f05",
+                                       workflow_id="wf-f05", owner="owner-f05",
+                                       graph=two_terminal(), stage_timeout_s=1.0, **decl()))
+    assert out0.status == "validated" and out0.adopted is True
+    assert [a["filename"] for a in out0.artifacts] == ["original.png"], \
+        "the first submit's declaration (node 9) must still govern the read"
+    assert not (rig0.paths.root / "different.png").exists(), \
+        "the re-declared node's artifact must never be staged"
+    assert rig0.transport.submit_calls == 1
+
+    # (1) reviewer probe f05: declaration changed across the restart -> fail closed
+    rig1 = unresolved_run(tmp_path / "changed-node", attempt="att-f05", stage="stage-f05",
+                          wf="wf-f05", owner="owner-f05", **decl("9"))
+    other = make_rig(tmp_path / "changed-node", transport=rig1.transport, write_epoch=False,
+                     owner="owner-f05")
+    with pytest.raises(MfComfyError) as exc1:
+        other.adapter.run(_new_spec(attempt_id="att-f05", stage_id="stage-f05",
+                                    workflow_id="wf-f05", owner="owner-f05",
+                                    graph=two_terminal(), stage_timeout_s=1.0, **decl("10")))
+    assert getattr(exc1.value, "code", "") == "MF_COMFY_RESERVATION_CONFLICT", exc1.value
+    assert other.adapter.adopted_prompt_id is None, "the re-declared contract must not adopt"
+    assert rig1.transport.submit_calls == 1, "a re-declared terminal node must not POST"
+    assert not list(rig1.paths.root.rglob("*.png")), \
+        "no artifact may be staged for a changed output contract"
+    assert _markers(_store(rig1.adapter)) != [], "the changed contract keeps it blocking"
+
+    # (2) single-field tamper: same node, different declared kind -> refused
+    kt = make_rig(tmp_path / "changed-node", transport=rig1.transport, write_epoch=False,
+                  owner="owner-f05")
+    with pytest.raises(MfComfyError) as exc_kt:
+        kt.adapter.run(_new_spec(attempt_id="att-f05", stage_id="stage-f05",
+                                 workflow_id="wf-f05", owner="owner-f05",
+                                 graph=two_terminal(), stage_timeout_s=1.0,
+                                 **decl("9", kind="videos", media_type="video")))
+    assert getattr(exc_kt.value, "code", "") == "MF_COMFY_RESERVATION_CONFLICT", exc_kt.value
+    assert rig1.transport.submit_calls == 1
+
+    # (3) combined tamper (extra node + media type + a different artifact pin) -> refused
+    ct = make_rig(tmp_path / "changed-node", transport=rig1.transport, write_epoch=False,
+                  owner="owner-f05")
+    with pytest.raises(MfComfyError) as exc_ct:
+        ct.adapter.run(_new_spec(attempt_id="att-f05", stage_id="stage-f05",
+                                 workflow_id="wf-f05", owner="owner-f05",
+                                 graph=two_terminal(), stage_timeout_s=1.0,
+                                 terminal_outputs={"9": {"kind": "images", "media_type": "image"},
+                                                   "10": {"kind": "videos", "media_type": "video"}},
+                                 expected_artifact_hashes={"original.png": "0" * 64}))
+    assert getattr(exc_ct.value, "code", "") == "MF_COMFY_RESERVATION_CONFLICT", exc_ct.value
+    assert rig1.transport.submit_calls == 1 and not list(rig1.paths.root.rglob("*.png"))
+
+    # (4) expected-artifact pins are part of the durable contract too
+    pt = make_rig(tmp_path / "changed-node", transport=rig1.transport, write_epoch=False,
+                  owner="owner-f05")
+    with pytest.raises(MfComfyError) as exc_pt:
+        pt.adapter.run(_new_spec(attempt_id="att-f05", stage_id="stage-f05",
+                                 workflow_id="wf-f05", owner="owner-f05",
+                                 graph=two_terminal(), stage_timeout_s=1.0,
+                                 expected_artifact_hashes={"original.png": "1" * 64}, **decl("9")))
+    assert getattr(exc_pt.value, "code", "") == "MF_COMFY_RESERVATION_CONFLICT", exc_pt.value
+    assert rig1.transport.submit_calls == 1
+
+    # (5) fallback declaration (graph terminal nodes) is durable as well: it
+    #     resolves to EVERY terminal node of the graph, and the same fallback on a
+    #     restart adopts the completed output exactly once.
+    rig5 = unresolved_run(tmp_path / "fallback", attempt="att-fb", stage="stage-fb",
+                          wf="wf-fb", owner="owner-f05")
+    fb = make_rig(tmp_path / "fallback", transport=rig5.transport, write_epoch=False,
+                  owner="owner-f05")
+    out5 = fb.adapter.run(_new_spec(attempt_id="att-fb", stage_id="stage-fb",
+                                    workflow_id="wf-fb", owner="owner-f05",
+                                    graph=two_terminal(), stage_timeout_s=1.0))
+    assert out5.status == "validated" and out5.adopted is True
+    assert sorted(a["filename"] for a in out5.artifacts) == ["different.png", "original.png"], \
+        "the fallback declaration covers both graph terminal nodes (9 and 10)"
+    assert rig5.transport.submit_calls == 1
+
+    # (6) fallback -> explicit declaration is a CONTRACT CHANGE -> refused
+    rig6 = unresolved_run(tmp_path / "fb-then-explicit", attempt="att-fb2", stage="stage-fb2",
+                          wf="wf-fb2", owner="owner-f05")
+    ex = make_rig(tmp_path / "fb-then-explicit", transport=rig6.transport, write_epoch=False,
+                  owner="owner-f05")
+    with pytest.raises(MfComfyError) as exc_ex:
+        ex.adapter.run(_new_spec(attempt_id="att-fb2", stage_id="stage-fb2",
+                                 workflow_id="wf-fb2", owner="owner-f05",
+                                 graph=two_terminal(), stage_timeout_s=1.0, **decl("9")))
+    assert getattr(exc_ex.value, "code", "") == "MF_COMFY_RESERVATION_CONFLICT", exc_ex.value
+    assert rig6.transport.submit_calls == 1 and not list(rig6.paths.root.rglob("*.png"))
+
+    # (7) lost ACK + restart: the recovered prompt is still read under the BOUND
+    #     contract, and a changed declaration is still refused afterwards.
+    root7 = tmp_path / "lost-ack"
+    rig7 = make_rig(root7, owner="owner-f05c", client_id="cid-f05c")
+    rig7.transport.submit_exception = MfComfyError("connection reset during POST")
+    with pytest.raises(MfComfyError):
+        rig7.adapter.run(_new_spec(attempt_id="att-la", stage_id="stage-la",
+                                   workflow_id="wf-la", owner="owner-f05c",
+                                   graph=two_terminal(), stage_timeout_s=1.0, **decl("9")))
+    assert rig7.transport.submit_calls == 1
+    store7 = _store(rig7.adapter)
+    marker7 = _markers(store7)[0]
+    assert _record(store7, marker7).get("submit_state") == "ambiguous"
+    assert _record(store7, marker7).get("output_contract", {}).get("nodes"), \
+        "the normalized contract must be durable even for a POST whose ACK was lost"
+    _simulate_process_exit(rig7)
+    rig7.transport.submit_exception = None
+    # the server DID accept the prompt: history carries it for this client_id
+    rig7.transport.history_map["pid-1"] = history_success("pid-1", "lost_ack.png",
+                                                          client_id="cid-f05c")
+    found = make_rig(root7, transport=rig7.transport, write_epoch=False,
+                     owner="owner-f05c", client_id="cid-f05c")
+    out7 = found.adapter.run(_new_spec(attempt_id="att-la", stage_id="stage-la",
+                                       workflow_id="wf-la", owner="owner-f05c",
+                                       graph=two_terminal(), stage_timeout_s=1.0, **decl("9")))
+    assert out7.status == "validated" and out7.adopted is True
+    assert [a["filename"] for a in out7.artifacts] == ["lost_ack.png"]
+    assert rig7.transport.submit_calls == 1, "the recovered prompt must never be re-POSTed"
+
+    # (8a) a LEGACY record without the durable contract field fails closed
+    root8 = tmp_path / "legacy"
+    rig8 = unresolved_run(root8, attempt="att-lg", stage="stage-lg", wf="wf-lg",
+                          owner="owner-f05d", **decl("9"))
+    store8 = _store(rig8.adapter)
+    marker8 = _markers(store8)[0]
+    legacy = _record(store8, marker8)
+    legacy.pop("output_contract", None)
+    legacy.pop("output_contract_digest", None)
+    marker8.write_text(json.dumps(legacy, indent=1, sort_keys=True), encoding="utf-8")
+    lg = make_rig(root8, transport=rig8.transport, write_epoch=False, owner="owner-f05d")
+    with pytest.raises(MfComfyError) as exc_lg:
+        lg.adapter.run(_new_spec(attempt_id="att-lg", stage_id="stage-lg", workflow_id="wf-lg",
+                                 owner="owner-f05d", graph=two_terminal(),
+                                 stage_timeout_s=1.0, **decl("9")))
+    assert getattr(exc_lg.value, "code", "") in (
+        "MF_COMFY_RESERVATION_CONFLICT", "MF_COMFY_CORRUPT_RESERVATION"), exc_lg.value
+    assert rig8.transport.submit_calls == 1 and not list(rig8.paths.root.rglob("*.png"))
+
+    # (8b) a matching digest with a CORRUPT contract body fails closed as corrupt
+    root9 = tmp_path / "corrupt-contract"
+    rig9 = unresolved_run(root9, attempt="att-cc", stage="stage-cc", wf="wf-cc",
+                          owner="owner-f05e", **decl("9"))
+    store9 = _store(rig9.adapter)
+    marker9 = _markers(store9)[0]
+    broken = _record(store9, marker9)
+    broken["output_contract"] = {"nodes": None}
+    marker9.write_text(json.dumps(broken, indent=1, sort_keys=True), encoding="utf-8")
+    cc = make_rig(root9, transport=rig9.transport, write_epoch=False, owner="owner-f05e")
+    with pytest.raises(MfComfyError) as exc_cc:
+        cc.adapter.run(_new_spec(attempt_id="att-cc", stage_id="stage-cc", workflow_id="wf-cc",
+                                 owner="owner-f05e", graph=two_terminal(),
+                                 stage_timeout_s=1.0, **decl("9")))
+    assert getattr(exc_cc.value, "code", "") == "MF_COMFY_CORRUPT_RESERVATION", exc_cc.value
+    assert rig9.transport.submit_calls == 1 and not list(rig9.paths.root.rglob("*.png"))
+
+    # (9) direct proof that the BOUND contract governs the read: validate an entry
+    #     whose history also carries node 10, while the caller's CURRENT spec
+    #     declares node 10. The bound contract (node 9) decides.
+    probe = make_rig(tmp_path / "bound-governs", owner="owner-f05x")
+    probe.adapter.bound_output_contract = {
+        "nodes": {"9": {"kind": "images", "media_type": "image", "server_types": ["output"]}},
+        "expected_artifact_pins": {}}
+    entry_probe = history_success("pid-x", "original.png")
+    entry_probe["outputs"]["10"] = {"images": [{"filename": "different.png",
+                                                "subfolder": "", "type": "output"}]}
+    arts = probe.adapter.validate_artifacts(entry_probe, _new_spec(**decl("10")))
+    assert [a["filename"] for a in arts] == ["original.png"], \
+        "the durable contract, not the current spec, decides which node is a product"
+    assert not (probe.paths.root / "different.png").exists()
