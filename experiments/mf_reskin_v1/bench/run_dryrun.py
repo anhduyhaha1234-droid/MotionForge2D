@@ -12,7 +12,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import shutil
@@ -464,7 +463,6 @@ def step_report():
         for r in c["assertions"]:
             agg.setdefault(r["assertion"], []).append(r["verdict"])
     for name, verdicts in sorted(agg.items()):
-        row = A.TECHNICAL_ROWS.get(name, "-")
         L.append("| %s (harness row) | %s | %s | %s |" % (
             name, "/".join(verdicts),
             json.dumps(next((r["measured"] for c in prop.get("clips", []) if "assertions" in c

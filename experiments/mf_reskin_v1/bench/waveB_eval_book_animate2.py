@@ -26,7 +26,6 @@ import numpy as np
 WT = Path("C:/Users/Admin/Documents/Codex/work/mfv1/wt-bench")
 sys.path.insert(0, str(WT / "experiments" / "mf_reskin_v1" / "bench"))
 import common as C          # noqa: E402
-import compare as CMP       # noqa: E402
 
 # F10 isolation (c3): this evaluation's evidence ledger is the packet ledger, so it says so
 # explicitly instead of inheriting it as a process-global default.

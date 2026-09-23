@@ -87,7 +87,6 @@ def a_duration_contract(path, spec):
     f = P.container_facts(path)
     v = f.get("video") or {}
     dur = f.get("format_duration_s") if f.get("format_duration_s") is not None else v.get("duration_s")
-    n = v.get("nb_frames")
     exp_dur = (spec.get("expected_frames") / float(C.FPS)) if spec.get("expected_frames") else None
     ok_rate = _rr(v.get("r_frame_rate")) == 30.0 and _rr(v.get("avg_frame_rate")) == 30.0
     ok_dur = (dur is not None and exp_dur is not None and abs(dur - exp_dur) <= (1.0 / C.FPS))
@@ -287,7 +286,6 @@ def evaluate(path, spec):
 def build_broken(src, kind, out_dir) -> Path:
     src, out_dir = Path(src), C.ensure(out_dir)
     out = out_dir / ("broken_%s.mp4" % kind.lower())
-    D = "4"  # clips are 4 s / 120 frames
     if kind == "SOURCE_COPY":
         shutil.copyfile(src, out)
     elif kind == "TAIL_TRUNCATE":
