@@ -22,11 +22,19 @@ Classification rules
                  -> own_client_process_exited_after_engine_stop
   collateral     removed, but neither engine chain nor a proven own_client
 
-Verdict
+VERDICT
   SHUTDOWN_CONFIRMED_WITH_DISCLOSED_OWN_CLIENT_EXIT
-      port closed + no LISTENING row for the port + every engine-chain pid carries a
-      successful taskkill + collateral_removed == []
-  SHUTDOWN_UNPROVEN   otherwise
+      ALL FOUR PILLARS hold together and NO contradiction exists (NR09, round D):
+        P1 engine ABSENT   - no engine-chain pid survives in the AFTER dump;
+        P2 verified stop   - every engine-chain pid carries a pid-scoped stop action
+                             (exact `/PID <pid>`, never /T, /IM or /FI) with rc=0;
+        P3 epoch binding   - every piece of evidence belongs to ONE frozen epoch/port;
+        P4 corroboration   - an own-client exit carries its own self-exit receipt.
+      plus port closed (by REFUSAL), no LISTENING row after, collateral_removed == [].
+  SHUTDOWN_UNPROVEN_CONTRADICTION
+      the evidence contradicts itself (engine still present, a successful connect next
+      to port_closed=true, evidence from a different epoch/port) - NOT confirmed.
+  SHUTDOWN_UNPROVEN   otherwise: evidence missing, ambiguous, timed out or unproven.
 
 Usage:
   python w2_classify_shutdown.py <wave2_dir> [--write] [--probe-now]
@@ -77,6 +85,35 @@ AUTHORITY_FIELDS = (
 
 # WSAEWOULDBLOCK / WSAETIMEDOUT / EAGAIN: the probe never learned the state.
 TIMEOUT_CODES = (10035, 10060, 110, 11)
+
+# ---------------------------------------------------------------------------
+# NR09 (round D): the reviewer measured that this classifier confirmed contradictory
+# evidence.  Five synthetic variants - no self-exit receipt, engine still present, a
+# non-stop command with rc=0, a successful connect next to port_closed=true, and
+# evidence from another epoch/port - ALL returned
+# SHUTDOWN_CONFIRMED_WITH_DISCLOSED_OWN_CLIENT_EXIT.  The cause was that a verdict
+# was built from flags that were never cross-checked against each other: rc=0 alone
+# counted as "taskkilled", the engine was never required to be ABSENT afterwards,
+# port_closed was taken on trust even when a connect had SUCCEEDED, no evidence was
+# bound to an epoch/port, and the own-client attribution was optional.
+#
+# This module classifies; it never stops anything.  The only authority a CONFIRMED
+# verdict may rest on is evidence that is present, self-consistent and bound to one
+# frozen epoch/port - anything else is an explicit unproven state.
+# ---------------------------------------------------------------------------
+VERDICT_CONFIRMED = "SHUTDOWN_CONFIRMED_WITH_DISCLOSED_OWN_CLIENT_EXIT"
+VERDICT_UNPROVEN = "SHUTDOWN_UNPROVEN"
+VERDICT_CONTRADICTED = "SHUTDOWN_UNPROVEN_CONTRADICTION"
+
+# A refusal proves the port stopped listening; a timeout proves nothing (F09).
+REFUSAL_CODES = (10061, 104, 111)
+# Accepted stop verbs.  They are DATA, used only to VERIFY a stop a real shutdown
+# already performed - this module never builds or runs one (see kill_audit()).
+STOP_ACTION_VERBS = ("taskkill", "stop-process", "terminateprocess")
+# Switches that widen a stop beyond the single verified pid.
+WIDE_KILL_SWITCHES = ("/t", "/im", "/fi")
+EXPLAINED_CLASSES = ("engine_chain_stopped",
+                     "own_client_process_exited_after_engine_stop")
 
 
 def authority_report(*, before_rows, after_rows, chain_pids, stop_log,
@@ -133,6 +170,162 @@ def authority_report(*, before_rows, after_rows, chain_pids, stop_log,
         "note": ("an empty set cannot 'succeed': missing authority => UNPROVEN, "
                  "never CONFIRMED"),
     }
+
+def _base(argv0: str) -> str:
+    """Last path component of an argv[0], lower-cased (either separator)."""
+    return (argv0 or "").replace(chr(92), "/").rsplit("/", 1)[-1].lower()
+
+
+
+def verify_stop_argv(argv, pid) -> dict:
+    """P2: is this argv a pid-scoped stop of EXACTLY `pid`?
+
+    Pure function.  A row is a verified stop only when it names a stop verb, selects
+    the exact pid through `/PID <pid>` and carries NO widening switch.  A probe or any
+    other command that happens to exit 0 is rejected by name - that is the reviewer's
+    "non-stop command with rc=0" variant.
+    """
+    problems: list[str] = []
+    if not isinstance(argv, (list, tuple)) or not argv:
+        return {"verified": False, "pid": pid, "problems": ["argv_missing"]}
+    low = [str(a).lower() for a in argv]
+    if _base(low[0]) not in STOP_ACTION_VERBS:
+        problems.append(f"not_a_stop_verb: {_base(low[0]) or '(empty)'}")
+    wide = [w for w in low if w in WIDE_KILL_SWITCHES]
+    if wide:
+        problems.append(f"widening_switch: {wide}")
+    pid_selectors = [i for i, a in enumerate(low) if a == "/pid"]
+    if len(pid_selectors) != 1:
+        problems.append(f"/PID_selectors={len(pid_selectors)} (must be exactly one)")
+    elif str(argv[pid_selectors[0] + 1] if pid_selectors[0] + 1 < len(argv) else "").strip() \
+            != str(pid):
+        problems.append("pid_selector_does_not_name_this_pid")
+    return {"verified": not problems, "pid": pid, "argv": [str(a) for a in argv],
+            "problems": problems,
+            "stop_verb": _base(low[0]), "widening_switches": wide}
+
+
+def verified_stop_actions(stop_log, chain_pids, before_rows) -> dict:
+    """P2 over the whole stop_log: rc=0 AND a verified pid-scoped action AND ownership.
+
+    rc=0 is necessary and nowhere near sufficient: the pid must be part of the frozen
+    engine chain AND its before-dump cmdline must carry the engine mark, so a stop of
+    some other process can never be counted towards the engine's shutdown.
+    """
+    chain = set(chain_pids or [])
+    before = {r["pid"]: r for r in (before_rows or [])}
+    verified: list[int] = []
+    rejected: list[dict] = []
+    for row in (stop_log or []):
+        pid = row.get("pid") if isinstance(row, dict) else None
+        rc = row.get("returncode") if isinstance(row, dict) else None
+        if not isinstance(pid, int):
+            rejected.append({"row": row, "reason": "no_integer_pid"})
+            continue
+        if rc != 0:
+            rejected.append({"pid": pid, "reason": f"returncode={rc} (must be 0)"})
+            continue
+        if pid not in chain:
+            rejected.append({"pid": pid, "reason": "pid_is_not_in_the_engine_chain"})
+            continue
+        owned_mark = ENGINE_MARK in ((before.get(pid) or {}).get("cmdline") or "")
+        if not owned_mark:
+            rejected.append({"pid": pid,
+                             "reason": f"before-dump cmdline does not carry {ENGINE_MARK}"})
+            continue
+        check = verify_stop_argv(row.get("argv"), pid)
+        if not check["verified"]:
+            rejected.append({"pid": pid, "reason": "; ".join(check["problems"])})
+            continue
+        verified.append(pid)
+    return {"verified_pids": sorted(verified), "verified": bool(verified),
+            "rejected": rejected,
+            "chain": sorted(chain),
+            "all_chain_pids_verified": bool(chain) and chain <= set(verified),
+            "note": ("rc=0 without a pid-scoped stop action of the exact owned pid is "
+                     "NOT a stop; rejected rows are named")}
+
+
+def owner_chain_stop_order(chain_pids, before_rows) -> dict:
+    """The order a real shutdown must follow: leaf -> root, derived from ppid.
+
+    Derived, not declared: the evidence's own `engine_chain_leaf_to_root` list is
+    recorded next to the derived order so a wrong label cannot silently become the
+    stop order.  Nothing here stops anything.
+    """
+    chain = [int(p) for p in (chain_pids or [])]
+    ppid = {r["pid"]: r.get("ppid") for r in (before_rows or [])}
+    remaining = sorted(chain)
+    order: list[int] = []
+    while remaining:
+        leaves = [p for p in remaining if not any(ppid.get(q) == p for q in remaining)]
+        if not leaves:                      # a cycle: cannot derive, fall back to input
+            order = list(chain)
+            break
+        order.extend(leaves)
+        remaining = [p for p in remaining if p not in leaves]
+    return {"declared": chain, "derived_leaf_to_root": order,
+            "matches_declared": order == chain,
+            "single_pid_trivially_ordered": len(chain) <= 1, "ppid_source": "before-dump"}
+
+
+def epoch_binding(ev, *, resolved_port) -> dict:
+    """P3: bind every piece of evidence to ONE frozen epoch/port.
+
+    The classifier resolves the port from the runtime instance_epoch.json; a record
+    that declares a DIFFERENT port, or none at all, cannot be used to confirm a
+    shutdown of the instance this process is a continuation of.
+
+    `bound` is what CONFIRMED needs (absence of a binding is missing evidence, not a
+    contradiction).  `mismatch` is true only when something WAS declared and disagrees
+    - that is the self-contradiction, and only that may flip the verdict to
+    CONTRADICTION.
+    """
+    epoch = ev.get("instance_epoch")
+    declared = ev.get("port")
+    problems: list[str] = []
+    mismatch = False
+    if not isinstance(epoch, dict):
+        problems.append("instance_epoch_missing")
+    else:
+        eport = epoch.get("port")
+        if eport is None:
+            problems.append("instance_epoch_has_no_port")
+        elif str(eport) != str(resolved_port):
+            problems.append(f"instance_epoch_port_{eport}_not_the_resolved_{resolved_port}")
+            mismatch = True
+    if declared is not None:
+        if str(declared) != str(resolved_port):
+            problems.append(f"record_port_{declared}_not_the_resolved_{resolved_port}")
+            mismatch = True
+    return {"bound": not problems, "mismatch": mismatch, "resolved_port": int(resolved_port),
+            "declared_record_port": declared,
+            "declared_epoch_port": (epoch or {}).get("port") if isinstance(epoch, dict) else None,
+            "declared_instance_id": (epoch or {}).get("instance_id") if isinstance(epoch, dict) else None,
+            "problems": problems,
+            "note": ("a record from another epoch/port is not evidence about this instance")}
+
+
+def contradiction_report(*, port_closed, connect_ex_after, listening_after,
+                         engine_absent_after, epoch_mismatch) -> dict:
+    """Any pair of facts that cannot both be true makes CONFIRMED unreachable.
+
+    Only evidence that is PRESENT and disagrees counts here.  Absent evidence is a
+    missing-authority problem, never a contradiction, so an empty evidence set can
+    still never be called contradictory.
+    """
+    contras: list[str] = []
+    if port_closed is True and connect_ex_after == 0:
+        contras.append("port_closed_true_but_connect_ex_after_0 (a connect SUCCEEDED)")
+    if engine_absent_after is False:
+        contras.append("engine_chain_pid_still_present_in_the_after_dump")
+    if epoch_mismatch:
+        contras.append("evidence_declares_another_epoch_port_than_the_resolved_one")
+    if port_closed is True and listening_after:
+        contras.append("port_closed_true_but_a_LISTENING_row_exists_after")
+    return {"contradictions": contras, "contradictory": bool(contras),
+            "note": "a contradiction is never confirmed; it is an explicit unproven state"}
+
 
 SOURCE_ARTIFACTS = (
     "wave2_pids_before_stop.txt",
@@ -318,12 +511,14 @@ def kill_audit(path: str | Path | None = None) -> dict:
     tree = ast.parse(p.read_text(encoding="utf-8"))
     tokens = ("taskkill", "stop-process", "killall", "pkill", "terminateprocess")
     hits: list[dict] = []
+    inspected = 0
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
         fn = node.func
         name = getattr(fn, "attr", None) or getattr(fn, "id", None)
         if name in ("run", "Popen", "call", "check_output", "system"):
+            inspected += 1
             for a in node.args:
                 if isinstance(a, ast.List):
                     for e in a.elts:
@@ -337,8 +532,15 @@ def kill_audit(path: str | Path | None = None) -> dict:
         "self_source": str(p).replace("\\", "/"),
         "kill_call_sites": hits,
         "kills_process": bool(hits),
+        "subprocess_call_nodes_inspected": inspected,
+        "audit_is_non_vacuous": inspected > 0,
+        "stop_verbs_are_data_only": True,
+        "stop_verbs_present_as_data": list(STOP_ACTION_VERBS),
+        "stop_verbs_are_used_only_to_verify": [
+            "verify_stop_argv", "verified_stop_actions"],
         "note": ("the end-state check is separate from the stop action and must never "
-                 "stop a process to rewrite history"),
+                 "stop a process to rewrite history; the stop verbs above exist only so "
+                 "a stop a REAL shutdown already performed can be verified"),
     }
 
 
@@ -375,9 +577,12 @@ def main() -> int:
     chain_rows = {str(k): v for k, v in (ev.get("engine_chain_rows") or {}).items()}
 
     stop_log = ev.get("stop_log") or []
-    taskkilled = sorted(int(e["pid"]) for e in stop_log
-                        if isinstance(e.get("pid"), int) and e.get("returncode") == 0)
-    refused = [e for e in stop_log if e.get("action") == "REFUSED_NOT_ENGINE"]
+    # NR09: rc=0 alone used to count every row as "taskkilled".  A stop only counts
+    # when it is a pid-scoped stop command for the EXACT owned chain pid.
+    stop_audit = verified_stop_actions(stop_log, chain_pids, rows_before)
+    taskkilled = stop_audit["verified_pids"]
+    refused = [e for e in stop_log if isinstance(e, dict)
+               and e.get("action") == "REFUSED_NOT_ENGINE"]
 
     listeners_before_lines = (ev.get("listeners_before") or {}).get("lines") or []
     clients_before = established_clients(listeners_before_lines, PORT)
@@ -386,6 +591,11 @@ def main() -> int:
     listening_after = [ln for ln in listeners_after_lines
                        if len(ln.split()) > 3 and ln.split()[3].upper() == "LISTENING"
                        and f":{PORT}" in ln]
+    # NR09 P1/P3: the engine must be ABSENT afterwards, and every piece of evidence
+    # must belong to the one epoch/port this classifier resolved.
+    engine_absent_after = not (set(chain_pids) & pids_after)
+    epoch = epoch_binding(ev, resolved_port=PORT)
+    stop_order = owner_chain_stop_order(chain_pids, rows_before)
 
     first_pass_blocking = None
     pp = wave2 / "wave2_port_probe_after_r4.json"
@@ -409,7 +619,12 @@ def main() -> int:
         else:
             own_tool = OWN_TOOL_MARK in cmdline
             client = clients_before.get(pid)
-            if own_tool and client:
+            # NR09 P4: the self-exit corroboration is REQUIRED, never optional.  An
+            # own-tool client that vanished without its own run record / runlog is an
+            # unproven exit, not a disclosed one.
+            self_exit_hits = (self_exit_corroboration(wave2, cmdline)
+                              if (own_tool and client) else [])
+            if own_tool and client and self_exit_hits:
                 cls = "own_client_process_exited_after_engine_stop"
                 evidence.append(f"before-dump cmdline runs this task's own tool: {cmdline}")
                 evidence.append(
@@ -421,8 +636,17 @@ def main() -> int:
                 if pid not in taskkilled:
                     evidence.append(
                         f"NOT targeted by any taskkill: stop_log pids = {taskkilled}")
-                for hit in self_exit_corroboration(wave2, cmdline):
+                for hit in self_exit_hits:
                     evidence.append(f"self-exit record: {json.dumps(hit, ensure_ascii=False)}")
+            elif own_tool and client:
+                cls = "own_client_exit_without_self_exit_receipt"
+                evidence.append(f"before-dump cmdline runs this task's own tool: {cmdline}")
+                evidence.append(
+                    f"ESTABLISHED client of engine :{PORT} \"{client['line']}\"")
+                evidence.append(
+                    "NO self-exit receipt found: runs/<run_id>/run_record.json and "
+                    "raw/<run_id>.runlog.txt are both absent or unattributable, so this "
+                    "exit is unproven and the shutdown is NOT confirmed")
             else:
                 cls = "unclassified_removed"
                 evidence.append(f"cmdline: {cmdline or '(pid absent from before-dump)'}")
@@ -436,7 +660,10 @@ def main() -> int:
         }
 
     collateral = sorted(pid for pid in removed
-                        if classification[str(pid)]["class"] == "unclassified_removed")
+                        if classification[str(pid)]["class"] not in EXPLAINED_CLASSES)
+    own_client_uncorroborated = sorted(
+        pid for pid in removed
+        if classification[str(pid)]["class"] == "own_client_exit_without_self_exit_receipt")
 
     port_closed = ev.get("port_closed")
     if port_closed is None:
@@ -464,10 +691,33 @@ def main() -> int:
                             before_dump_present=before_path.is_file(),
                             after_dump_present=after_path.is_file())
 
-    confirmed = (auth["authoritative"] and bool(port_closed) and not listening_after
-                 and not collateral and set(chain_pids) <= set(taskkilled))
-    verdict = ("SHUTDOWN_CONFIRMED_WITH_DISCLOSED_OWN_CLIENT_EXIT" if confirmed
-               else "SHUTDOWN_UNPROVEN")
+    closure_proven_by_refusal = bool(
+        (isinstance(port_error_code, int) and port_error_code in REFUSAL_CODES)
+        or (isinstance(first_pass_blocking, dict)
+            and first_pass_blocking.get("connect_refused") is True))
+
+    contra = contradiction_report(
+        port_closed=ev.get("port_closed") if isinstance(ev.get("port_closed"), bool)
+        else (True if port_closed else None),
+        connect_ex_after=ev.get("connect_ex_after"),
+        listening_after=listening_after,
+        engine_absent_after=engine_absent_after,
+        epoch_mismatch=epoch["mismatch"])
+
+    pillars = {
+        "p1_engine_absent_after": engine_absent_after,
+        "p2_verified_stop_action_for_the_owned_chain": stop_audit["all_chain_pids_verified"],
+        "p3_epoch_port_binding": epoch["bound"],
+        "p4_own_client_exit_corroborated": not own_client_uncorroborated,
+        "port_closed_proven_by_refusal": closure_proven_by_refusal,
+        "no_listening_row_after": not listening_after,
+        "collateral_removed_empty": not collateral,
+        "stop_order_derived_leaf_to_root": bool(stop_order["derived_leaf_to_root"]),
+        "no_contradiction": not contra["contradictory"],
+    }
+    confirmed = bool(port_closed) and all(pillars.values())
+    verdict = (VERDICT_CONFIRMED if confirmed
+               else (VERDICT_CONTRADICTED if contra["contradictory"] else VERDICT_UNPROVEN))
     unproven_reason = None
     if not confirmed:
         reasons = []
@@ -480,8 +730,20 @@ def main() -> int:
             reasons.append("listening_row_present_after")
         if collateral:
             reasons.append(f"collateral_removed={collateral}")
-        if not set(chain_pids) <= set(taskkilled):
-            reasons.append("engine_chain_not_all_taskkilled")
+        if not stop_audit["all_chain_pids_verified"]:
+            reasons.append("engine_chain_without_a_verified_pid_scoped_stop")
+        if not engine_absent_after:
+            reasons.append(f"engine_pid_still_present_after: "
+                           f"{sorted(set(chain_pids) & pids_after)}")
+        if not epoch["bound"]:
+            reasons.append("epoch_port_binding: " + ",".join(epoch["problems"]))
+        if own_client_uncorroborated:
+            reasons.append(f"own_client_exit_without_self_exit_receipt="
+                           f"{own_client_uncorroborated}")
+        if not closure_proven_by_refusal:
+            reasons.append(f"port_closure_not_proven_by_refusal (error_code={port_error_code})")
+        if contra["contradictions"]:
+            reasons.append("CONTRADICTION: " + "; ".join(contra["contradictions"]))
         unproven_reason = "; ".join(reasons)
 
     # the survivors recorded by the stop pass are the authority; the frozen
@@ -526,6 +788,11 @@ def main() -> int:
         },
         "engine_chain_leaf_to_root": chain_pids,
         "taskkilled_pids_from_stop_log": taskkilled,
+        "verified_stop_audit": stop_audit,
+        "stop_order_leaf_to_root": stop_order,
+        "epoch_binding": epoch,
+        "contradictions": contra,
+        "own_client_uncorroborated": own_client_uncorroborated,
         "stop_log_refused_rows": refused,
         "pid_set_diff": {"removed": removed, "added": added},
         "pid_classification": classification,
@@ -551,11 +818,15 @@ def main() -> int:
                 and first_pass_blocking.get("connect_refused") is True),
             "survivor_pids_rechecked": sorted(recheck_pids),
             "no_listening_row_after": not listening_after,
-            "engine_chain_all_taskkilled": (bool(chain_pids)
-                                            and set(chain_pids) <= set(taskkilled)),
+            "engine_chain_all_taskkilled": stop_audit["all_chain_pids_verified"],
             "collateral_removed_empty": not collateral,
             "removed_set_fully_explained": all(
-                v["class"] != "unclassified_removed" for v in classification.values()),
+                v["class"] in EXPLAINED_CLASSES for v in classification.values()),
+            "pillars": pillars,
+            "engine_absent_after": engine_absent_after,
+            "epoch_port_bound": epoch["bound"],
+            "own_client_exit_corroborated": not own_client_uncorroborated,
+            "contradictions": contra["contradictions"],
         },
         "read_only_recheck": read_only,
     }
@@ -570,10 +841,12 @@ def main() -> int:
                            "bytes": outp.stat().st_size}
     print(json.dumps({k: rec[k] for k in ("verdict", "unproven_reason", "authority",
                                           "collateral_removed", "pid_classification",
-                                          "verdict_basis", "self_audit_no_kill_path",
+                                          "verdict_basis", "verified_stop_audit",
+                                          "stop_order_leaf_to_root", "epoch_binding",
+                                          "contradictions", "self_audit_no_kill_path",
                                           "read_only_recheck")},
                      indent=1, ensure_ascii=False))
-    return 0 if verdict.startswith("SHUTDOWN_CONFIRMED") else 1
+    return 0 if verdict == VERDICT_CONFIRMED else 1
 
 
 if __name__ == "__main__":
