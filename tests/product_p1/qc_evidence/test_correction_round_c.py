@@ -242,6 +242,19 @@ def test_incompatible_pin_refuses_instead_of_measuring_identity(evidence_db) -> 
 
 
 def test_missing_reference_asset_is_a_dependency_not_a_source_substitution(evidence_db) -> None:  # noqa: ANN001, E501
+    """Round D / NR04 SUPERSEDES the round-C expectation in this test.
+
+    Round C refused when the pack carried no dedicated ``reference`` slot,
+    which made a valid six-slot LEGACY pack an unconditional
+    ``QC_EVIDENCE_DEPENDENCY`` (a seventh, fixture-only asset demand).  Round D
+    resolves the identity reference through the DECLARED pose/reference mapping
+    (``reference`` then the pack's own core pose slot): deleting the optional
+    ``reference`` asset alone must therefore still publish a real, measured
+    identity — pinned to the pack's OWN published core pose bytes, never to the
+    video's source frames.  The refusal must remain when the authority is
+    genuinely absent (both mapped slots removed) and must name the true missing
+    authority.
+    """
     session_factory, managed_root, ids = evidence_db
     with session_factory() as session:
         session.execute(
@@ -251,12 +264,33 @@ def test_missing_reference_asset_is_a_dependency_not_a_source_substitution(evide
             )
         )
         session.commit()
+    # (a) legacy six-slot pack: still measurable, through the declared mapping
+    args = _compose(session_factory, managed_root, ids)["identity_drift"]
+    pinned = args["pinned_reference"]
+    assert pinned["identity"]["pose_slot"] == "front"
+    assert pinned["identity"]["reference_slot_source"] == "declared_core_pose_mapping"
+    assert pinned["identity"]["reference_slot_mapping"] == ["reference", "front"]
+    assert pinned["artifact_id"] != ids.source_artifact_id
+    assert pinned["artifact_id"] not in ids.reference_artifact_ids.values()
+    assert args["measured_coverage"]["count"] == 3
+    assert args["pin_coverage"]["count"] == 3
+    # (b) no authority at all: fail closed by name, never a source substitute
+    with session_factory() as session:
+        session.execute(
+            delete(CharacterAsset).where(
+                CharacterAsset.pose_slot == "front",
+                CharacterAsset.pack_version_id == ids.pack_version_ids["Character"],
+            )
+        )
+        session.commit()
     with pytest.raises(QcEvidenceError) as raised:
         _compose(session_factory, managed_root, ids)
     error = raised.value
     assert _codes(error)["identity_drift"] == QC_EVIDENCE_DEPENDENCY
-    report = error.details["failed_detectors"]["identity_drift"]["details"]["dependency"]
+    details = error.details["failed_detectors"]["identity_drift"]["details"]
+    report = details["dependency"]
     assert "reference" in report["missing_producer"]
+    assert details["identity_reference_slots"] == ["reference", "front"]
 
 
 def test_tampered_reference_bytes_refuse(evidence_db) -> None:  # noqa: ANN001

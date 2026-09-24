@@ -18,6 +18,16 @@ over that measured change set.  When the render carries no observable content
 for the required region, the measurement refuses (``QcEvidenceError``) instead
 of falling back to the source — a source annotation substituted for an
 observation would read as green against a broken render.
+
+Object GEOMETRY is NOT measured with the source-difference primitive (round D /
+NR03): *"the output differs from the source inside the box the annotation
+expects"* is not evidence that the actor is there — a render replaced by one
+uniform unrelated level satisfies it and produced source-shaped boxes with a
+0 clipping ratio.  Geometry comes from :func:`rendered_object_bbox`: the pixels
+the output paints over ITS OWN dominant level (:func:`background_level`),
+seeded by the annotation and grown over the contiguous object.  The
+source-difference primitive (:func:`changed_mask` and friends) remains as the
+change baseline for the temporal/stacking comparisons only.
 """
 
 from __future__ import annotations
@@ -30,7 +40,11 @@ import numpy as np
 from app.services.qc_evidence.errors import dependency, malformed
 
 #: Revision of the observation definitions (bump when a definition changes).
-OBSERVATION_REVISION = "1.0.0"
+#: 1.1.0 (round D / NR03): the rendered-object measurement (render-own
+#: background) replaces "differs from the source" as the geometry authority,
+#: and the rendered cut is searched over the annotation's whole span and is
+#: reported only when it is a DOMINANT discontinuity.
+OBSERVATION_REVISION = "1.1.0"
 
 #: Refusal scope used by the pure measurement helpers.
 _SCOPE = "qc_evidence_render_observation"
@@ -123,6 +137,121 @@ def changed_count(
     return int(changed_mask(source, rendered, region=region, detector=detector).sum())
 
 
+#: A rendered shot change is reported only when its inter-frame discontinuity
+#: dominates every other measured delta inside the searched span by this
+#: factor.  A cut is a STEP in the output; camera/background motion is not —
+#: without this test the largest motion delta would be reported as a cut the
+#: render does not carry.  Below the factor the result is a typed
+#: "not observable" state (see :func:`observed_boundary`), never a green.
+CUT_DOMINANCE_FACTOR = 2.0
+
+#: Minimum number of decodable consecutive frame pairs a cut search must
+#: measure before any discontinuity may be reported.
+CUT_SUPPORT_FRAMES = 2
+
+
+def background_level(frame: Any, *, detector: str = _SCOPE) -> float:
+    """The render frame's OWN dominant gray level (its measured background).
+
+    Measured per frame from the decoded output bytes — never a constant, never
+    a source-side value, never derived from the imported source.  Every
+    rendered-object measurement below is defined against this level, which is
+    what makes "the actor is there" an OUTPUT fact instead of "the output
+    differs from the source here".
+    """
+    array = _gray(frame, detector=detector)
+    values, counts = np.unique(array, return_counts=True)
+    # np.unique is sorted, so argmax picks the LOWEST level on a tie
+    # (deterministic tie-break).
+    return float(values[int(np.argmax(counts))])
+
+
+def rendered_object_mask(frame: Any, *, detector: str = _SCOPE) -> np.ndarray:
+    """Boolean mask of the pixels the RENDER paints over its own background.
+
+    ``|render(x) - background_level(render)| > 0``: the output's own content.
+    A render whose whole frame is one uniform level carries no object pixels —
+    it can be measured only as "nothing is painted there".
+    """
+    array = _gray(frame, detector=detector)
+    return np.abs(array - background_level(frame, detector=detector)) > 0.0
+
+
+def grown_region(mask: np.ndarray, region: Region) -> Region | None:
+    """Grow ``region`` over the CONTIGUOUS True pixels of ``mask``.
+
+    The annotated region only SEEDS the measurement; when the rendered object
+    continues past the seed's edge the window follows it, so an object the
+    output paints up to (or clipped at) the frame border carries its REAL
+    measured geometry instead of the annotation's box.  Growth is bounded by
+    the frame itself and stops as soon as the object stops, so no radius is
+    invented.  ``None`` when the seed holds no object pixel.
+    """
+    height, width = int(mask.shape[0]), int(mask.shape[1])
+    x0, y0, x1, y1 = clamp_region(region, mask.shape)
+    if x1 <= x0 or y1 <= y0 or not mask[y0:y1, x0:x1].any():
+        return None
+    while True:
+        if x0 > 0 and mask[y0:y1, x0].any():
+            x0 -= 1
+        elif x1 < width and mask[y0:y1, x1 - 1].any():
+            x1 += 1
+        elif y0 > 0 and mask[y0, x0:x1].any():
+            y0 -= 1
+        elif y1 < height and mask[y1 - 1, x0:x1].any():
+            y1 += 1
+        else:
+            break
+    return x0, y0, x1, y1
+
+
+def rendered_object_bbox(
+    frame: Any,
+    *,
+    region: Region,
+    detector: str = _SCOPE,
+) -> Region | None:
+    """Measured bbox of the object the RENDER itself paints inside ``region``.
+
+    Returns ``None`` when the output paints NO object there (a uniform /
+    unrelated frame, a missing actor) — the caller must refuse; the source's
+    pixels are never substituted for the observation.
+    """
+    mask = rendered_object_mask(frame, detector=detector)
+    grown = grown_region(mask, region)
+    if grown is None:
+        return None
+    gx0, gy0, gx1, gy1 = grown
+    inner = bbox_of_mask(mask[gy0:gy1, gx0:gx1])
+    if inner is None:
+        return None
+    return (gx0 + inner[0], gy0 + inner[1], gx0 + inner[2], gy0 + inner[3])
+
+
+def border_contact(
+    bbox: Region, shape: tuple[int, int]
+) -> list[str]:
+    """Frame sides a measured bbox touches (``left``/``right``/``top``/...).
+
+    A rendered object whose measured extent reaches a frame edge is CUT OFF by
+    the output: that is the observable signal a pixel measurement can carry
+    for a clipped silhouette (a bbox measured from real pixels can never lie
+    outside the frame).
+    """
+    height, width = int(shape[0]), int(shape[1])
+    x0, y0, x1, y1 = (int(v) for v in bbox)
+    sides: list[str] = []
+    if x0 <= 0:
+        sides.append("left")
+    if y0 <= 0:
+        sides.append("top")
+    if x1 >= width:
+        sides.append("right")
+    if y1 >= height:
+        sides.append("bottom")
+    return sides
+
+
 def frame_delta(a: Any, b: Any, *, detector: str = _SCOPE) -> float:
     """Mean absolute decoded difference between two same-geometry frames."""
     left = _gray(a, detector=detector)
@@ -139,37 +268,103 @@ def observed_boundary(
     render_frames: Mapping[int, Any],
     boundary: int,
     *,
-    neighbourhood: int = 1,
+    span: tuple[int, int] | None = None,
     detector: str = _SCOPE,
-) -> dict[str, Any] | None:
-    """Observed cut frame nearest ``boundary``, measured on the RENDER bytes.
+) -> dict[str, Any]:
+    """Observed cut near ``boundary``, measured on the RENDER bytes.
 
-    A cut at frame ``f`` means a new shot starts at ``f``, so the observable
-    is the inter-frame delta ``|frame(f) - frame(f-1)|``.  The observed cut is
-    the argmax of that delta inside ``boundary ± neighbourhood`` (deterministic
-    tie-break: closest to the intended boundary, then lowest frame).  Returns
-    ``None`` when the decoded render carries no measurable pair at all.
+    A cut at frame ``f`` means a new shot starts at ``f``, so the observable is
+    the inter-frame delta ``|frame(f) - frame(f-1)|``.  ``span`` is the SEARCH
+    SPAN the annotation supports (the scene's own frame range); EVERY
+    consecutive pair inside it is measured, so a cut the renderer moved away
+    from the planned frame is still found — a ±1-frame search could only ever
+    re-find the planned frame.  Defaults to ``boundary ± 1`` when no span is
+    given.
+
+    The reported cut is the argmax of the delta inside the span, and it is
+    returned as OBSERVED only when the discontinuity is real:
+
+    * at least :data:`CUT_SUPPORT_FRAMES` decodable consecutive pairs exist;
+    * the peak delta is strictly positive;
+    * the peak is an ISOLATED STEP: it dominates the deltas of the decoded
+      frames immediately around it by :data:`CUT_DOMINANCE_FACTOR` — a shot
+      change changes the frame once and then the new shot continues, while
+      motion changes every frame by a comparable amount.
+
+    Otherwise ``observed`` is False and ``reason`` names the typed
+    not-observable state (``no_measurable_frame_pair`` / ``no_change_at_all``
+    / ``insufficient_search_support`` / ``no_distinguishable_cut``): the
+    largest motion delta is never reported as a cut.
     """
+    boundary = int(boundary)
+    if span is None:
+        search = (boundary - 1, boundary + 1)
+    else:
+        low, high = int(span[0]), int(span[1])
+        search = (min(low, high), max(low, high))
     deltas: dict[int, float] = {}
-    for frame in range(int(boundary) - neighbourhood, int(boundary) + neighbourhood + 1):
+    for frame in range(search[0], search[1] + 1):
         previous, current = frame - 1, frame
         if previous in render_frames and current in render_frames:
             deltas[current] = frame_delta(
                 render_frames[previous], render_frames[current], detector=detector
             )
-    if not deltas:
-        return None
-    observed = sorted(
-        deltas.items(), key=lambda item: (-item[1], abs(item[0] - int(boundary)), item[0])
-    )[0]
-    return {
-        "frame": int(observed[0]),
-        "delta": float(observed[1]),
+    payload: dict[str, Any] = {
+        "frame": None,
+        "delta": None,
+        "peak_frame": None,
+        "runner_up_delta": None,
         "deltas": {str(frame): value for frame, value in sorted(deltas.items())},
-        "neighbourhood": [int(boundary) - neighbourhood, int(boundary) + neighbourhood],
-        "definition": "argmax over |render(f) - render(f-1)| inside the boundary "
-        "neighbourhood of the decoded RENDER artifact",
+        "measured_frames": sorted(deltas),
+        "search_span": [search[0], search[1]],
+        "neighbourhood": [search[0], search[1]],
+        "dominance_factor": CUT_DOMINANCE_FACTOR,
+        "support_frames_required": CUT_SUPPORT_FRAMES,
+        "observed": False,
+        "reason": "no_measurable_frame_pair",
+        "definition": "argmax over |render(f) - render(f-1)| inside the "
+        "annotation-supported SEARCH SPAN of the decoded RENDER artifact; "
+        "reported only when the peak is a dominant discontinuity (a cut is a "
+        "step, motion is not)",
     }
+    if not deltas:
+        return payload
+    ordered = sorted(
+        deltas.items(), key=lambda item: (-item[1], abs(item[0] - boundary), item[0])
+    )
+    peak_frame, peak_delta = ordered[0]
+    runner_up = max(
+        (value for frame, value in deltas.items() if frame != peak_frame), default=0.0
+    )
+    payload["delta"] = float(peak_delta)
+    payload["peak_frame"] = int(peak_frame)
+    payload["runner_up_delta"] = float(runner_up)
+    if peak_delta <= 0.0:
+        payload["reason"] = "no_change_at_all"
+        return payload
+    if len(deltas) < CUT_SUPPORT_FRAMES:
+        payload["reason"] = "insufficient_search_support"
+        return payload
+    neighbour_max = max(
+        (
+            value
+            for frame, value in deltas.items()
+            if frame in (peak_frame - 1, peak_frame + 1)
+        ),
+        default=0.0,
+    )
+    payload["neighbour_max_delta"] = float(neighbour_max)
+    if peak_delta < CUT_DOMINANCE_FACTOR * neighbour_max:
+        # The peak is not an ISOLATED step: the frames around it change by a
+        # comparable amount, which is what smooth motion looks like.  The
+        # output carries no distinguishable cut here — report the typed
+        # not-observable state instead of the largest motion delta.
+        payload["reason"] = "no_distinguishable_cut"
+        return payload
+    payload["observed"] = True
+    payload["reason"] = None
+    payload["frame"] = int(peak_frame)
+    return payload
 
 
 def measured_stacking(
@@ -330,15 +525,22 @@ def stacking_order(
 
 
 __all__ = [
+    "CUT_DOMINANCE_FACTOR",
+    "CUT_SUPPORT_FRAMES",
     "OBSERVATION_REVISION",
     "Region",
+    "background_level",
     "bbox_of_mask",
+    "border_contact",
     "changed_bbox",
     "changed_count",
     "changed_mask",
     "clamp_region",
     "frame_delta",
+    "grown_region",
     "measured_stacking",
     "observed_boundary",
+    "rendered_object_bbox",
+    "rendered_object_mask",
     "stacking_order",
 ]
