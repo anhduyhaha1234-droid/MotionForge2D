@@ -652,7 +652,12 @@ class ComfyStageAdapter:
         if self.reservations is None:
             return view
         store = self.reservations
-        view["corrupt"] = list(store.unreadable()) + list(store.unreadable_receipts())
+        # Round D (NR02): quarantine bytes are authority too. An unreadable or
+        # identity-incomplete quarantine record is UNKNOWN state, so it joins the
+        # corrupt set instead of being silently skipped by `quarantined()`.
+        view["corrupt"] = (list(store.unreadable())
+                           + list(store.unreadable_receipts())
+                           + list(store.unreadable_quarantines()))
         for bucket, records, what, suffix in (
                 ("markers", store.unresolved(), "unresolved reservation", store.SUFFIX),
                 ("receipts", store.receipts(), "completion receipt", ".released.json"),
@@ -725,8 +730,9 @@ class ComfyStageAdapter:
         when this caller is free to submit (an independent new work item, or
         nothing durable claims this attempt).
 
-        Fixed order: integrity (`ledger_candidates`) -> reconcile on independent
-        identity -> release/reuse -> and only THEN may a stage submit.
+        Fixed order: integrity (`ledger_candidates`) -> enumerate the COMPLETE
+        candidate union and resolve its conflicts (round D) -> reconcile on
+        independent identity -> release/reuse -> and only THEN may a stage submit.
         """
         view = self.ledger_candidates(instance_epoch)
         if view["corrupt"]:
@@ -748,15 +754,65 @@ class ComfyStageAdapter:
                 misnamed=[{k: m.get(k) for k in ("path", "what", "name_instance",
                                                  "name_attempt")} for m in ours[:8]],
                 observed_instance_id=inst)
-        for rec in view["quarantined"]:
-            if inst and rec.get("instance_id") == inst and self._same_work_item(rec, claim):
-                raise CorruptReservation(
-                    "a quarantine record and this attempt describe the same work item of the "
-                    "same server boot: the ledger contradicts itself, so neither an implicit "
-                    "release nor a new POST is legal",
-                    quarantine_reason=rec.get("quarantine_reason"),
-                    recorded_attempt_id=rec.get("attempt_id"),
-                    observed_instance_id=inst, path=rec.get("path"))
+        # ---- Round D (NR01): resolve the COMPLETE candidate union first.
+        # Round C handed back the first successful receipt as soon as it reached
+        # it, so a second durable record that also claimed this attempt -- a
+        # wrong-owner marker, a duplicate receipt, a quarantine record -- was never
+        # read: the caller received "validated" evidence while the ledger disagreed
+        # with itself. The union is now enumerated IN FULL (unresolved markers u
+        # completion receipts u quarantine records, plus the records whose own file
+        # name contradicts the body they carry) and every conflict is decided
+        # BEFORE any reuse, staging or POST.
+        claims: list[tuple[str, dict]] = []
+        for bucket in ("markers", "receipts", "quarantined"):
+            for rec in view[bucket]:
+                if self._same_attempt(rec, claim):
+                    claims.append((bucket, rec))
+        for item in view["misnamed"]:
+            rec = item.get("record") or {}
+            if self._same_attempt(rec, claim):
+                claims.append(("misnamed", rec))
+        self._record_event("durable_union_enumerated", {
+            "union": {"markers": len(view["markers"]), "receipts": len(view["receipts"]),
+                      "quarantined": len(view["quarantined"]),
+                      "misnamed": len(view["misnamed"]), "corrupt": len(view["corrupt"])},
+            "claimants": [{"bucket": bucket, "path": rec.get("path"),
+                           "recorded_instance_id": rec.get("instance_id"),
+                           "recorded_owner": rec.get("owner"),
+                           "recorded_attempt_id": rec.get("attempt_id"),
+                           "state": rec.get("state"), "outcome": rec.get("outcome")}
+                          for bucket, rec in claims],
+            "note": "the whole union is enumerated and integrity-checked BEFORE any "
+                    "reuse decision; a quarantine record or a second claimant of this "
+                    "attempt refuses below"})
+        for bucket, rec in claims:
+            if bucket != "quarantined":
+                continue
+            # Durable evidence that an attempt's outcome was NOT proven can never be
+            # turned into a licence for a new POST: under the same boot the ledger
+            # contradicts itself, and under a different boot the epoch change is not
+            # proof that the attempt never landed (NR02).
+            raise ReservationConflict(
+                "a quarantine record claims this attempt, so the ledger holds no proof "
+                "of its outcome; neither an implicit release nor a new POST for this "
+                "attempt is legal",
+                recorded_instance_id=rec.get("instance_id"),
+                observed_instance_id=inst,
+                recorded_attempt_id=rec.get("attempt_id"),
+                quarantine_reason=rec.get("quarantine_reason"),
+                recorded_host=rec.get("host"), path=rec.get("path"))
+        if len(claims) > 1:
+            raise ReservationConflict(
+                "more than one durable record claims this attempt; refusing to choose "
+                "one of them and refusing a second POST for it",
+                attempt_id=(claim or {}).get("attempt_id"),
+                observed_instance_id=inst,
+                claimants=[{"bucket": bucket, "path": rec.get("path"),
+                            "recorded_instance_id": rec.get("instance_id"),
+                            "recorded_owner": rec.get("owner"),
+                            "recorded_attempt_id": rec.get("attempt_id"),
+                            "state": rec.get("state"), "outcome": rec.get("outcome")}
+                           for bucket, rec in claims])
         for rec in view["receipts"]:
             if not self._same_attempt(rec, claim):
                 self._record_event("terminal_record_other_attempt", {

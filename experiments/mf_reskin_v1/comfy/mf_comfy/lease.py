@@ -733,6 +733,48 @@ class PromptReservations:
                             "recorded_attempt_id": rec.get("attempt_id")})
         return out
 
+    def unreadable_quarantines(self) -> list[dict]:
+        """Quarantine records that exist but carry no usable authority.
+
+        Round D (NR02): a quarantine record is durable state ABOUT an attempt that
+        could not be reconciled, so it can never be read as "nothing was
+        quarantined". Bytes that do not parse, or that do not say which
+        instance/attempt they describe, are UNKNOWN state: they fail the attempt
+        closed instead of silently disappearing from the candidate union and
+        licensing a new POST. Nothing is repaired or deleted here -- the bytes stay
+        as evidence for whoever has to repair them.
+        """
+        out: list[dict] = []
+        for p in sorted(self.root.glob("*.quarantined.json")):
+            try:
+                raw = p.read_text(encoding="utf-8")
+            except OSError as exc:
+                out.append({"path": str(p), "reason": f"{type(exc).__name__}:{exc}",
+                            "size": None})
+                continue
+            try:
+                rec = json.loads(raw)
+            except ValueError as exc:
+                out.append({"path": str(p), "reason": f"unparsable JSON: {exc}",
+                            "size": len(raw.encode("utf-8"))})
+                continue
+            if not isinstance(rec, dict) or not rec.get("key") or not rec.get("attempt_id"):
+                out.append({"path": str(p), "reason": "not a quarantine record",
+                            "size": len(raw.encode("utf-8")),
+                            "parsed_keys": sorted(rec)[:12] if isinstance(rec, dict) else None})
+                continue
+            problems = [f"missing authority field {f}"
+                        for f in authority_problems(rec, MARKER_AUTHORITY_FIELDS)]
+            problems += identity_integrity_problems(rec)
+            problems += name_body_problems(p, rec, ".quarantined.json")
+            if problems:
+                out.append({"path": str(p), "reason": "; ".join(problems),
+                            "size": len(raw.encode("utf-8")),
+                            "parsed_keys": sorted(rec)[:12],
+                            "recorded_instance_id": rec.get("instance_id"),
+                            "recorded_attempt_id": rec.get("attempt_id")})
+        return out
+
     def quarantined(self, instance_id: str | None = None) -> list[dict]:
         out: list[dict] = []
         for p in sorted(self.root.glob("*.quarantined.json")):
