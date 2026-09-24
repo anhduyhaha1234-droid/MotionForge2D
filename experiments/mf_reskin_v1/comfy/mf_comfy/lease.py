@@ -12,6 +12,7 @@ silently attributed and never resubmitted (C-A8).
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -119,6 +120,122 @@ def submit_provably_never_started(record: dict | None) -> bool:
     if pid <= 0 or pid == os.getpid():
         return True  # unknown or ourselves: not provable
     return not pid_alive(pid)
+
+
+# Required authority fields. A durable record that does not carry them cannot be
+# attributed to an instance, an attempt or a work item at all: it is UNKNOWN
+# state and every decision about it must fail closed (round C, Codex finding
+# `lease.py:536`: a marker without `instance_id` used to be read as "another
+# boot's record", get quarantined, and licence a fresh POST).
+MARKER_AUTHORITY_FIELDS = ("schema", "state", "key", "instance_id", "host", "attempt_id")
+RECEIPT_AUTHORITY_FIELDS = ("schema", "state", "key", "instance_id", "host", "attempt_id",
+                            "outcome")
+
+# The durable identity of one work item. `adapter._identity_matches` compares all
+# of these on BOTH sides; no subset may ever be used to adopt or to refuse.
+DURABLE_IDENTITY_FIELDS = ("attempt_id", "stage_id", "workflow_id", "workflow_sha256",
+                           "owner", "input_digest", "output_contract_digest")
+
+
+def canonical_digest(payload) -> str:
+    """Stable digest of a durable payload (canonical JSON, sorted keys).
+
+    The single implementation used by the ledger AND by the adapter, so a body
+    written by one side can always be re-hashed by the other.
+    """
+    blob = json.dumps(payload if payload is not None else {}, sort_keys=True,
+                      separators=(",", ":"))
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+def authority_problems(record: dict | None, fields) -> list[str]:
+    """Authority fields that are absent, blank or not a string."""
+    rec = record if isinstance(record, dict) else {}
+    out: list[str] = []
+    for name in fields:
+        value = rec.get(name)
+        if not isinstance(value, str) or not value.strip():
+            out.append(name)
+    return out
+
+
+def body_digest_problems(record: dict | None, body_field: str, digest_field: str) -> list[str]:
+    """Body <-> digest integrity of one durable field pair.
+
+    Neither half may exist without the other, and a body must hash to the digest
+    recorded next to it. This is what stops a mutated body (a contract re-pointed
+    from output node 9 to 10, an input identity rewritten) from being validated
+    against its own stale digest.
+    """
+    rec = record if isinstance(record, dict) else {}
+    body = rec.get(body_field)
+    digest = rec.get(digest_field)
+    has_body = bool(body)
+    has_digest = isinstance(digest, str) and bool(digest.strip())
+    if has_body and not has_digest:
+        return [f"{body_field} is recorded without {digest_field}"]
+    if has_digest and not has_body:
+        return [f"{digest_field} is recorded without {body_field}"]
+    if not has_body and not has_digest:
+        return []          # nothing recorded: consistent, just absent
+    if canonical_digest(body) != digest.strip().lower():
+        return [f"{body_field} does not hash to the recorded {digest_field}"]
+    return []
+
+
+def identity_integrity_problems(record: dict | None) -> list[str]:
+    """Integrity of the durable identity carried by a marker or a receipt."""
+    return (body_digest_problems(record, "input_identity", "input_digest")
+            + body_digest_problems(record, "output_contract", "output_contract_digest"))
+
+
+def name_body_problems(path, record: dict | None, suffix: str = "") -> list[str]:
+    """The ledger file name encodes `<instance>__<attempt>`: the record may not
+    disagree with the name it is stored under.
+
+    A record whose file name claims one instance/attempt while its body claims
+    another cannot be attributed at all — it is unknown state, not a foreign
+    record that may be quarantined to unlock a new POST.
+    """
+    name = Path(path).name if path is not None else ""
+    if not name:
+        return []
+    stem = name[: -len(suffix)] if suffix and name.endswith(suffix) else Path(name).stem
+    if "__" not in stem:
+        return []
+    left, right = stem.split("__", 1)
+    rec = record if isinstance(record, dict) else {}
+    out: list[str] = []
+    inst = rec.get("instance_id")
+    if inst:
+        sanitized = re.sub(r"[^0-9A-Za-z._-]", "_", str(inst))
+        if left not in (str(inst), sanitized):
+            out.append(f"instance_id {inst!r} disagrees with the file name {name!r}")
+    attempt = rec.get("attempt_id")
+    if attempt is not None:
+        raw = str(attempt) if str(attempt) else "noattempt"
+        sanitized = re.sub(r"[^0-9A-Za-z._-]", "_", raw)
+        if right not in (raw, sanitized):
+            out.append(f"attempt_id {attempt!r} disagrees with the file name {name!r}")
+    return out
+
+
+def receipt_problems(record: dict | None, path=None) -> list[str]:
+    """Integrity of a completion receipt.
+
+    A receipt is identity evidence for a finished attempt, so it is held to the
+    same standard as a marker: authority fields, a positive `release_count`, a
+    name that describes it, and a body that hashes to its own digest.
+    """
+    rec = record if isinstance(record, dict) else {}
+    out = [f"missing authority field {f}" for f in authority_problems(rec, RECEIPT_AUTHORITY_FIELDS)]
+    count = rec.get("release_count")
+    if not isinstance(count, int) or isinstance(count, bool) or count < 1:
+        out.append("release_count is not a positive integer")
+    if path is not None:
+        out += name_body_problems(path, rec, ".released.json")
+    out += identity_integrity_problems(rec)
+    return out
 
 
 class InstanceEpoch:
@@ -452,7 +569,15 @@ class PromptReservations:
 
     def close(self, record: dict, outcome: str, *, evidence: dict | None = None,
               closer: str = "") -> dict:
-        """Release a reservation exactly once. Never releases an unproven one."""
+        """Release a reservation exactly once. Never releases an unproven one.
+
+        The receipt is not just a ledger note: it is the durable record that
+        identity resolution reads on the next attempt, so it carries the whole
+        durable identity of the work item (attempt / stage / workflow / graph /
+        input / owner / normalized output contract) plus whatever validated
+        evidence the caller supplies. `Round C (lease.py:555)`: without those
+        fields a completed attempt could not be reconciled with a replay at all.
+        """
         key = record["key"]
         self.closed_dir.mkdir(parents=True, exist_ok=True)
         receipt = self.closed_dir / f"{key}.released.json"
@@ -469,6 +594,20 @@ class PromptReservations:
             "closed_at": time.time(),
             "closer": closer,
             "close_evidence": evidence or {},
+            # -- durable work-item identity (so a replay can be reconciled) -----
+            "base_url": record.get("base_url") or "",
+            "server_pid": record.get("server_pid"),
+            "client_id": record.get("client_id") or "",
+            "stage_id": record.get("stage_id") or "",
+            "owner": record.get("owner") or "",
+            "workflow_id": record.get("workflow_id") or "",
+            "workflow_sha256": record.get("workflow_sha256") or "",
+            "input_digest": record.get("input_digest") or "",
+            "input_identity": record.get("input_identity") or {},
+            "output_contract": record.get("output_contract") or {},
+            "output_contract_digest": record.get("output_contract_digest") or "",
+            "submit_state": record.get("submit_state"),
+            "submit_count": record.get("submit_count"),
         }
         try:
             fd = os.open(receipt, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
@@ -539,6 +678,59 @@ class PromptReservations:
                 out.append({"path": str(p), "reason": "not a reservation record",
                             "size": len(raw.encode("utf-8")),
                             "parsed_keys": sorted(rec)[:12] if isinstance(rec, dict) else None})
+                continue
+            # Round C: a record also has to describe ITSELF — authority fields and
+            # a body that hashes to the digest recorded next to it. Without that it
+            # cannot even be attributed to a boot, so "another boot's record ->
+            # quarantine -> POST again" is off the table. (A record stored under a
+            # NAME that describes another instance/attempt is handled separately by
+            # the adapter: it is a competing claimant, refused as a conflict.)
+            problems = [f"missing authority field {f}"
+                        for f in authority_problems(rec, MARKER_AUTHORITY_FIELDS)]
+            problems += identity_integrity_problems(rec)
+            if problems:
+                out.append({"path": str(p), "reason": "; ".join(problems),
+                            "size": len(raw.encode("utf-8")),
+                            "parsed_keys": sorted(rec)[:12],
+                            "recorded_instance_id": rec.get("instance_id"),
+                            "recorded_attempt_id": rec.get("attempt_id")})
+        return out
+
+    def unreadable_receipts(self) -> list[dict]:
+        """Receipts that exist but cannot be read as a completion record.
+
+        Same rule as an unreadable marker: unknown state fails closed. A receipt
+        is the ONLY record that an attempt already finished, so silently skipping
+        an unreadable one would licence exactly the second POST this round is
+        about. Nothing is repaired or deleted here — the bytes stay as evidence.
+        """
+        out: list[dict] = []
+        if not self.closed_dir.exists():
+            return out
+        for p in sorted(self.closed_dir.glob("*.released.json")):
+            try:
+                raw = p.read_text(encoding="utf-8")
+            except OSError as exc:
+                out.append({"path": str(p), "reason": f"{type(exc).__name__}:{exc}",
+                            "size": None})
+                continue
+            try:
+                rec = json.loads(raw)
+            except ValueError as exc:
+                out.append({"path": str(p), "reason": f"unparsable JSON: {exc}",
+                            "size": len(raw.encode("utf-8"))})
+                continue
+            if not isinstance(rec, dict):
+                out.append({"path": str(p), "reason": "not a receipt record",
+                            "size": len(raw.encode("utf-8"))})
+                continue
+            problems = receipt_problems(rec, p)
+            if problems:
+                out.append({"path": str(p), "reason": "; ".join(problems),
+                            "size": len(raw.encode("utf-8")),
+                            "parsed_keys": sorted(rec)[:12],
+                            "recorded_instance_id": rec.get("instance_id"),
+                            "recorded_attempt_id": rec.get("attempt_id")})
         return out
 
     def quarantined(self, instance_id: str | None = None) -> list[dict]:

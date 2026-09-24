@@ -12,8 +12,8 @@ Design rules enforced here (from `COMFYUI_HUNYUAN_CONTROL.md` + task packet):
 """
 from __future__ import annotations
 
-import hashlib
 import json
+import os
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -26,6 +26,7 @@ from .errors import (
     AmbiguousAfterSubmit,
     ArtifactHashMismatch,
     ArtifactMissing,
+    AttemptAlreadyTerminal,
     BlindResubmitRefused,
     CorruptReservation,
     InvalidGraph,
@@ -40,13 +41,30 @@ from .errors import (
     WsDisconnected,
     classify_execution_message,
 )
-from .lease import PromptReservations, same_boot_identity, submit_provably_never_started
+from .lease import (
+    DURABLE_IDENTITY_FIELDS,
+    PromptReservations,
+    canonical_digest,
+    identity_integrity_problems,
+    name_body_problems,
+    same_boot_identity,
+    submit_provably_never_started,
+)
 from .paths import StagePaths
 
 ARTIFACT_KEYS = ("images", "gifs", "videos", "audio")
 VIDEO_SUFFIXES = {".mp4", ".webm", ".mkv", ".mov", ".avi", ".gif"}
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff"}
 _MISSING = object()
+
+# The media type each publishable artifact kind must declare (round C: a durable
+# contract whose `kind` and `media_type` disagree is not a contract).
+_MEDIA_OF_KIND = {"images": "image", "gifs": "image", "videos": "video", "audio": "audio"}
+
+# The fields of `_input_identity`. A durable input identity may not carry anything
+# else: an unknown field is a declaration no normalizer of ours ever produced.
+_IDENTITY_FIELDS = ("project_id", "job_id", "shot_id", "source_sha256",
+                    "source_frame_range", "reference_assets")
 
 # A product is a terminal output the server itself wrote, which ComfyUI marks
 # `type == "output"`. An `input` item is a preview of what we SENT and `temp` is
@@ -363,14 +381,12 @@ class ComfyStageAdapter:
     @staticmethod
     def identity_digest(identity: dict) -> str:
         """Stable digest of an input identity (canonical JSON, sorted keys)."""
-        blob = json.dumps(identity or {}, sort_keys=True, separators=(",", ":"))
-        return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+        return canonical_digest(identity)
 
     @staticmethod
     def output_contract_digest(contract: dict) -> str:
         """Stable digest of a normalized output contract (F05)."""
-        blob = json.dumps(contract or {}, sort_keys=True, separators=(",", ":"))
-        return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+        return canonical_digest(contract)
 
     def _claim(self, spec: RunSpec, stage_input: StageInput | None, attempt_id: str) -> dict:
         """The declared identity of the work item this attempt is claiming (F02).
@@ -406,9 +422,13 @@ class ComfyStageAdapter:
         a build without identity, or by another attempt/stage/workflow/graph/
         input/owner, or under a different output contract, can never be adopted.
         It stays unresolved and blocking instead of being handed to a stranger.
+
+        Round C: this comparison is only ever reached for a record that already
+        passed `_record_integrity`, i.e. whose body provably hashes to the digest
+        recorded next to it — otherwise a mutated body could compare "equal" on a
+        stale digest.
         """
-        for key in ("attempt_id", "stage_id", "workflow_id", "workflow_sha256",
-                    "owner", "input_digest", "output_contract_digest"):
+        for key in DURABLE_IDENTITY_FIELDS:
             mine = str((claim or {}).get(key) or "")
             theirs = str((record or {}).get(key) or "")
             if not mine or not theirs or mine != theirs:
@@ -438,6 +458,388 @@ class ComfyStageAdapter:
         clm_wf = str(clm.get("workflow_id") or "")
         return bool(rec_stage and clm_stage and rec_stage == clm_stage
                     and rec_wf and clm_wf and rec_wf == clm_wf)
+
+    # =============================================== durable resolve (round C)
+    # The resolver used to look at UNRESOLVED MARKERS ONLY, so a completed
+    # attempt's receipt and a quarantined record were invisible to it: an
+    # identical replay looked like brand-new work and POSTed again, and a
+    # tampered marker body was reconciled against its own stale digest. These
+    # methods build the candidate UNION of all three sources, all of them
+    # integrity-checked, and reconcile on independent identity before anything
+    # may be released, staged or submitted.
+    @staticmethod
+    def _same_attempt(record: dict | None, claim: dict | None) -> bool:
+        """Same `attempt_id` == the same work item for a TERMINAL record.
+
+        Deliberately narrower than `_same_work_item`: a completion receipt is
+        finished business, so a NEW attempt for the same stage/workflow (a
+        re-render that declares its own `attempt_id`) is genuinely new work and
+        must never be blocked by it (round C, C07: no over-locking).
+        """
+        mine = str((record or {}).get("attempt_id") or "")
+        theirs = str((claim or {}).get("attempt_id") or "")
+        return bool(mine and theirs and mine == theirs)
+
+    @staticmethod
+    def _contract_schema_problems(contract) -> list[dict]:
+        """Semantic/schema consistency of a durable normalized output contract.
+
+        The digest already proves the body is the one that was bound at submit
+        time; this proves the body IS a contract — a normalized declaration can
+        only ever name publishable kinds, a matching media type, server types
+        that narrow (never widen) the publishable set, and sha256 pins.
+        """
+        if not contract:
+            return []
+        if not isinstance(contract, dict):
+            return [{"problem": "normalized output contract is not an object"}]
+        problems: list[dict] = []
+        nodes = contract.get("nodes")
+        if not isinstance(nodes, dict) or not nodes:
+            return [{"problem": "normalized output contract declares no terminal node"}]
+        for node_id in sorted(nodes, key=str):
+            conf = nodes[node_id]
+            if not isinstance(conf, dict):
+                problems.append({"problem": "declared terminal node is not an object",
+                                 "node_id": str(node_id)})
+                continue
+            kind, media = conf.get("kind"), conf.get("media_type")
+            if kind and kind not in ARTIFACT_KEYS:
+                # An EMPTY kind is normal: when the caller declares no terminal
+                # output, the normalized contract names the graph's own terminal
+                # nodes without a media kind and the server output decides.
+                problems.append({"problem": "declared node kind is not publishable",
+                                 "node_id": str(node_id), "kind": kind,
+                                 "publishable_kinds": list(ARTIFACT_KEYS)})
+            elif kind and media and _MEDIA_OF_KIND.get(kind) != media:
+                problems.append({"problem": "declared node media type does not match its kind",
+                                 "node_id": str(node_id), "kind": kind, "media_type": media,
+                                 "expected_media_type": _MEDIA_OF_KIND.get(kind)})
+            server_types = conf.get("server_types")
+            if not isinstance(server_types, (list, tuple)):
+                problems.append({"problem": "declared node server_types is not a sequence",
+                                 "node_id": str(node_id), "server_types": server_types})
+            elif [t for t in server_types if t not in PUBLISHABLE_SERVER_TYPES]:
+                problems.append({"problem": "declared node server_types widen the publishable "
+                                            "set",
+                                 "node_id": str(node_id), "server_types": list(server_types),
+                                 "publishable": list(PUBLISHABLE_SERVER_TYPES)})
+        pins = contract.get("expected_artifact_pins", {})
+        if not isinstance(pins, dict):
+            problems.append({"problem": "expected_artifact_pins is not an object",
+                             "expected_artifact_pins": pins})
+        else:
+            for filename, digest in sorted(pins.items()):
+                if not isinstance(digest, str) or len(digest) != 64:
+                    problems.append({"problem": "artifact pin is not a sha256 hex digest",
+                                     "filename": filename, "pin": digest})
+        return problems
+
+    @staticmethod
+    def _input_identity_schema_problems(identity) -> list[dict]:
+        """Semantic/schema consistency of a durable input identity."""
+        if not identity:
+            return []
+        if not isinstance(identity, dict):
+            return [{"problem": "input identity is not an object"}]
+        problems: list[dict] = []
+        unknown = sorted(set(identity) - set(_IDENTITY_FIELDS))
+        if unknown:
+            problems.append({"problem": "input identity carries unknown fields",
+                             "unknown_fields": unknown,
+                             "known_fields": list(_IDENTITY_FIELDS)})
+        source = identity.get("source_sha256")
+        if source not in (None, "") and (not isinstance(source, str) or len(source) != 64):
+            problems.append({"problem": "source_sha256 is not a 64-character digest",
+                             "source_sha256": source})
+        frames = identity.get("source_frame_range")
+        if frames is not None and (not isinstance(frames, list)
+                                   or any(not isinstance(v, int) or isinstance(v, bool)
+                                          for v in frames)):
+            problems.append({"problem": "source_frame_range is not a list of integers",
+                             "source_frame_range": frames})
+        if identity.get("reference_assets") is not None \
+                and not isinstance(identity["reference_assets"], dict):
+            problems.append({"problem": "reference_assets is not an object"})
+        return problems
+
+    def _record_integrity(self, record: dict, *, what: str, path=None,
+                          suffix: str = "") -> list[dict]:
+        """Integrity of ONE durable record, BEFORE it takes part in the resolve.
+
+        Only an internally consistent record may be reconciled:
+
+          * its identity bodies must hash to the digests recorded next to them
+            (`input_identity`↔`input_digest`, `output_contract`↔
+            `output_contract_digest`) — this is what stops a mutated body from
+            being validated against a stale digest;
+          * it may not be stored under a name that describes a different
+            instance/attempt than the body it carries;
+          * its normalized contract and input identity must actually BE a
+            contract / an identity.
+
+        Anything else is UNKNOWN state, and unknown state fails closed: never an
+        adoption, never a release, never a licence for a second POST.
+        """
+        rec = record if isinstance(record, dict) else {}
+        problems: list[dict] = []
+        for detail in identity_integrity_problems(rec):
+            problems.append({
+                "problem": "durable identity body does not match its own digest",
+                "what": what, "detail": detail,
+                "recorded_input_digest": rec.get("input_digest") or "",
+                "recomputed_input_digest":
+                    canonical_digest(rec.get("input_identity") or {}),
+                "recorded_output_contract_digest": rec.get("output_contract_digest") or "",
+                "recomputed_output_contract_digest":
+                    canonical_digest(rec.get("output_contract") or {}),
+            })
+        if path is not None:
+            parts = self._file_name_parts(path, suffix)
+            for detail in name_body_problems(path, rec, suffix):
+                problem = {"problem": "record disagrees with the file it is stored in",
+                           "class": "name", "what": what, "detail": detail,
+                           "path": str(path)}
+                if parts:
+                    problem["name_instance"], problem["name_attempt"] = parts
+                problems.append(problem)
+        for problem in self._contract_schema_problems(rec.get("output_contract")):
+            problems.append({**problem, "class": "contract"})
+        for problem in self._input_identity_schema_problems(rec.get("input_identity")):
+            problems.append({**problem, "class": "input"})
+        return problems
+
+    @staticmethod
+    def _file_name_parts(path, suffix: str = "") -> tuple[str, str] | None:
+        """`<instance>__<attempt>` as encoded by the ledger file name, or None."""
+        if path is None:
+            return None
+        name = Path(path).name
+        stem = name[: -len(suffix)] if suffix and name.endswith(suffix) else Path(name).stem
+        if "__" not in stem:
+            return None
+        return tuple(stem.split("__", 1))  # type: ignore[return-value]
+
+    def _assert_record_integrity(self, record: dict, *, what: str, path=None,
+                                 suffix: str = "") -> None:
+        problems = self._record_integrity(record, what=what, path=path, suffix=suffix)
+        if not problems:
+            return
+        misnamed = [p for p in problems if p.get("class") == "name"]
+        if misnamed and len(misnamed) == len(problems):
+            raise ReservationConflict(
+                f"refusing to reconcile a {what} that is stored under a name describing a "
+                "different instance/attempt than the record it carries",
+                attempt_id=(record or {}).get("attempt_id"),
+                path=str(path) if path else (record or {}).get("path"),
+                problems=misnamed[:8])
+        raise CorruptReservation(
+            f"refusing to reconcile a {what} that does not describe itself",
+            attempt_id=(record or {}).get("attempt_id"),
+            path=str(path) if path else (record or {}).get("path"),
+            problem_count=len(problems), problems=problems[:12])
+
+    def ledger_candidates(self, instance_epoch: dict | None = None) -> dict:
+        """UNION of every durable record that can speak about this boot.
+
+        unresolved markers ∪ completion receipts ∪ quarantine records, each one
+        integrity-checked before it is allowed to take part in identity
+        resolution. Round C: looking at unresolved markers only is exactly why a
+        completed attempt could be POSTed a second time.
+        """
+        view = {"markers": [], "receipts": [], "quarantined": [], "corrupt": [],
+                "misnamed": [], "instance_epoch": instance_epoch or {}}
+        if self.reservations is None:
+            return view
+        store = self.reservations
+        view["corrupt"] = list(store.unreadable()) + list(store.unreadable_receipts())
+        for bucket, records, what, suffix in (
+                ("markers", store.unresolved(), "unresolved reservation", store.SUFFIX),
+                ("receipts", store.receipts(), "completion receipt", ".released.json"),
+                ("quarantined", store.quarantined(), "quarantine record",
+                 ".quarantined.json")):
+            for rec in records:
+                problems = self._record_integrity(rec, what=what, path=rec.get("path"),
+                                                  suffix=suffix)
+                misnamed = [p for p in problems if p.get("class") == "name"]
+                rest = [p for p in problems if p.get("class") != "name"]
+                if rest:
+                    view["corrupt"].append({"path": rec.get("path"), "what": what,
+                                            "problems": rest[:8]})
+                elif misnamed:
+                    # A record whose own file name describes another instance/attempt
+                    # cannot be attributed by name, so it is a competing claimant
+                    # rather than a candidate: reconciled as a conflict, never
+                    # silently chosen (round C, C04 alternate key/path).
+                    view["misnamed"].append({"path": rec.get("path"), "what": what,
+                                             "record": rec, "problems": misnamed[:4],
+                                             "name_instance": misnamed[0].get("name_instance"),
+                                             "name_attempt": misnamed[0].get("name_attempt")})
+                else:
+                    view[bucket].append(rec)
+        return view
+
+    def _replayed_evidence(self, receipt: dict) -> list[dict] | None:
+        """Durable validated evidence of a completed attempt, if it is still intact.
+
+        Never re-fetches and never re-POSTs: the recorded staged artifacts are
+        re-hashed on disk, re-checked against their recorded size and confined to
+        this stage root, and only then handed back. Missing or changed bytes mean
+        the evidence is gone, which is a REFUSAL — not a new attempt.
+        """
+        if str(receipt.get("outcome") or "") != "terminal_success":
+            return None
+        records = (receipt.get("close_evidence") or {}).get("artifacts")
+        if not isinstance(records, list) or not records:
+            return None
+        root = str(Path(self.paths.root).resolve()).lower().rstrip(os.sep)
+        artifacts: list[dict] = []
+        for item in records:
+            if not isinstance(item, dict):
+                return None
+            raw_path = str(item.get("staged_path") or "")
+            if not raw_path:
+                return None
+            real = Path(raw_path)
+            try:
+                real = real.resolve()
+            except OSError:
+                return None
+            where = str(real).lower()
+            if where != root and not where.startswith(root + os.sep):
+                return None
+            if not real.exists() or real.stat().st_size != item.get("size_bytes"):
+                return None
+            if pinning.sha256_file(real) != item.get("sha256"):
+                return None
+            artifacts.append({**item, "staged_path": str(real),
+                              "reused_from": receipt.get("path")})
+        return artifacts
+
+    def resolve_durable_prior(self, claim: dict, instance_epoch: dict | None = None) -> dict | None:
+        """Reconcile the durable UNION against this caller's declared identity.
+
+        Returns the receipt to REPLAY when a terminal completion of exactly this
+        work item can hand its durable validated evidence back, raises the typed
+        refusal when the durable state forbids a new attempt, and returns None
+        when this caller is free to submit (an independent new work item, or
+        nothing durable claims this attempt).
+
+        Fixed order: integrity (`ledger_candidates`) -> reconcile on independent
+        identity -> release/reuse -> and only THEN may a stage submit.
+        """
+        view = self.ledger_candidates(instance_epoch)
+        if view["corrupt"]:
+            raise CorruptReservation(
+                "refusing to resolve this attempt: durable reservation state is unreadable",
+                corrupt_count=len(view["corrupt"]), corrupt=view["corrupt"][:12])
+        inst = str((instance_epoch or {}).get("instance_id") or "")
+        # A claimant stored under a name that describes another instance/attempt is
+        # not a candidate that may be chosen and not a foreign record that may be
+        # quarantined to unlock a POST: it is a competing claim about OUR state.
+        ours = [m for m in view["misnamed"]
+                if inst and (m.get("name_instance") == inst
+                             or str((m.get("record") or {}).get("instance_id") or "") == inst)]
+        if ours:
+            raise ReservationConflict(
+                "a durable claimant is stored under a name that describes a different "
+                "instance/attempt than the record it carries; refusing to choose which "
+                "record is the real one",
+                misnamed=[{k: m.get(k) for k in ("path", "what", "name_instance",
+                                                 "name_attempt")} for m in ours[:8]],
+                observed_instance_id=inst)
+        for rec in view["quarantined"]:
+            if inst and rec.get("instance_id") == inst and self._same_work_item(rec, claim):
+                raise CorruptReservation(
+                    "a quarantine record and this attempt describe the same work item of the "
+                    "same server boot: the ledger contradicts itself, so neither an implicit "
+                    "release nor a new POST is legal",
+                    quarantine_reason=rec.get("quarantine_reason"),
+                    recorded_attempt_id=rec.get("attempt_id"),
+                    observed_instance_id=inst, path=rec.get("path"))
+        for rec in view["receipts"]:
+            if not self._same_attempt(rec, claim):
+                self._record_event("terminal_record_other_attempt", {
+                    "receipt": rec.get("path"), "recorded_attempt_id": rec.get("attempt_id"),
+                    "outcome": rec.get("outcome"),
+                    "note": "a terminal record of another attempt is finished business; "
+                            "this independently declared work item is free to run"})
+                continue
+            outcome = str(rec.get("outcome") or "")
+            same_boot = same_boot_identity(rec, instance_epoch)
+            if same_boot and self._identity_matches(rec, claim or {}):
+                replayed = self._replayed_evidence(rec)
+                if replayed is not None:
+                    self._record_event("replayed_terminal_receipt", {
+                        "receipt": rec.get("path"), "outcome": outcome,
+                        "prompt_id": rec.get("prompt_id"),
+                        "artifact_count": len(replayed),
+                        "note": "completion is already proven for this exact work item; the "
+                                "durable validated evidence is handed back instead of "
+                                "submitting a second prompt"})
+                    return {"receipt": rec, "artifacts": replayed}
+            if not same_boot:
+                raise AttemptAlreadyTerminal(
+                    "a previous server boot already reached a terminal outcome for this exact "
+                    "attempt; the durable receipt forbids an implicit second attempt (a new "
+                    "piece of work must declare its own attempt_id)",
+                    recorded_instance_id=rec.get("instance_id"),
+                    observed_instance_id=inst, recorded_outcome=outcome,
+                    receipt=rec.get("path"), release_count=rec.get("release_count"),
+                    recorded_host=rec.get("host"))
+            if not self._identity_matches(rec, claim or {}):
+                raise ReservationConflict(
+                    "a released reservation covers this attempt with a DIFFERENT durable "
+                    "identity; refusing to choose between the recorded identity and the "
+                    "declared one",
+                    incoming={k: (claim or {}).get(k) for k in DURABLE_IDENTITY_FIELDS},
+                    existing={k: rec.get(k) for k in DURABLE_IDENTITY_FIELDS},
+                    receipt=rec.get("path"), outcome=outcome)
+            raise AttemptAlreadyTerminal(
+                f"this attempt already reached a terminal outcome "
+                f"({outcome or 'unknown'}); refusing a second POST. The durable receipt is "
+                f"kept as evidence",
+                recorded_outcome=outcome, receipt=rec.get("path"),
+                release_count=rec.get("release_count"),
+                reopened_by=rec.get("closer"),
+                reusable_artifacts=bool((rec.get("close_evidence") or {}).get("artifacts")))
+        return None
+
+    def _replayed_output(self, spec: RunSpec, prior: dict,
+                         stage_input: StageInput | None, base: StageOutput) -> StageOutput:
+        """Hand back the durable validated evidence of an already-terminal attempt.
+
+        No gate, no lease, no POST and no re-fetch: completion is already proven
+        by the receipt and the artifact bytes were re-hashed on disk. `adopted` is
+        True because this attempt took over existing evidence instead of making
+        new output.
+        """
+        receipt = prior["receipt"]
+        base.status = "validated"
+        base.adopted = True
+        base.prompt_id = receipt.get("prompt_id")
+        base.artifacts = prior["artifacts"]
+        base.timing = {"replay_s": 0.0}
+        base.source_map = {
+            "exact_frame_mapping": None,
+            "note": "replayed from a durable completion receipt; no new server interaction",
+        }
+        base.reservation = {
+            "exists": False,
+            "released": True,
+            "source": "completion_receipt",
+            "receipt_path": receipt.get("path"),
+            "receipt_outcome": receipt.get("outcome"),
+            "release_count": receipt.get("release_count"),
+            "receipt_instance_id": receipt.get("instance_id"),
+            "observed_instance_id": (self.instance_epoch or {}).get("instance_id"),
+            "submit_calls": self.submit_count,
+        }
+        base.notes = list(self.notes)
+        base.notes.append(
+            "reused durable validated evidence from the completion receipt of this exact "
+            "work item; no gate, no lease and no second POST were needed")
+        return base
 
     def _scan_server_for_own_prompt(self, client_id: str) -> tuple[tuple[str, str] | None, bool]:
         """Find a prompt THIS client already submitted. Returns (found, reads_ok).
@@ -529,15 +931,41 @@ class ComfyStageAdapter:
                           "recorded_host": rec.get("host"), "observed_host": epoch.get("host"),
                           "observed_pid": epoch.get("pid")})
             self._record_event("quarantine_foreign_epoch", {"prompt_id": rec.get("prompt_id"), "result": res})
-        # 2) this boot's own unresolved reservations, bound by durable identity
-        mine = [r for r in self.reservations.unresolved(inst)
-                if self._identity_matches(r, claim or {})]
+        # 2) this boot's own unresolved reservations, bound by durable identity.
+        # Integrity FIRST (round C): a record may only be reconciled once it has
+        # proven it describes itself, so a re-pointed output contract or a
+        # rewritten input identity can never be validated against its own stale
+        # digest.
+        same_boot = self.reservations.unresolved(inst)
+        for rec in same_boot:
+            self._assert_record_integrity(rec, what="unresolved reservation of this boot",
+                                          path=rec.get("path"),
+                                          suffix=self.reservations.SUFFIX)
+        mine = [r for r in same_boot if self._identity_matches(r, claim or {})]
+        claimants = [r for r in same_boot if self._same_work_item(r, claim or {})]
         if len(mine) > 1:
             raise ReservationConflict(
                 "several reservations claim the same work item identity; refusing to choose",
                 attempt_id=(claim or {}).get("attempt_id"),
                 keys=[r.get("key") for r in mine],
                 paths=[r.get("path") for r in mine],
+            )
+        if mine and len(claimants) > 1:
+            # Round C (Codex `one_exact_one_wrong_same_attempt`): one record that
+            # matches this identity exactly PLUS another that also claims this work
+            # item is not licence to adopt the exact subset — the wrong claimant
+            # may be the one holding the prompt.
+            raise ReservationConflict(
+                "one reservation matches this identity exactly while another also claims "
+                "this work item; refusing to pick the exact subset",
+                attempt_id=(claim or {}).get("attempt_id"),
+                incoming={k: (claim or {}).get(k) for k in DURABLE_IDENTITY_FIELDS},
+                claimant_count=len(claimants),
+                claimants=[{k: r.get(k) for k in
+                            ("key", "attempt_id", "stage_id", "workflow_id", "owner",
+                             "input_digest", "output_contract_digest", "prompt_id",
+                             "submit_state", "state", "path")} for r in claimants],
+                paths=[r.get("path") for r in claimants],
             )
         if not mine:
             # F02 (gate -> new-reservation branch): a reservation of THIS boot may
@@ -547,8 +975,7 @@ class ComfyStageAdapter:
             # old prompt terminal, free its marker and silently submit a duplicate.
             # The only legal paths are (a) recovery of the exact same identity and
             # (b) a genuinely independent request for a DIFFERENT work item.
-            conflicts = [r for r in self.reservations.unresolved(inst)
-                         if self._same_work_item(r, claim or {})]
+            conflicts = claimants
             if conflicts:
                 raise ReservationConflict(
                     "an unresolved reservation already claims this work item, but its "
@@ -766,6 +1193,26 @@ class ComfyStageAdapter:
             want = spec.allowed_types or PUBLISHABLE_SERVER_TYPES
         return tuple(t for t in want if t in PUBLISHABLE_SERVER_TYPES)
 
+    def _staging_report(self, records: list[dict]) -> dict:
+        """Isolated staging vs publication, told apart explicitly (round C).
+
+        An artifact is written into the stage root BEFORE it can be validated, so
+        a failing validation can legitimately leave isolated staged bytes behind.
+        That is not a published result, and a report may never claim "0 staged"
+        while a file exists: this says how many files are isolated-staged, which
+        ones, and that the published count is zero.
+        """
+        return {
+            "stage_root": str(self.paths.root),
+            "isolated_staged": len(records),
+            "published": 0,
+            "records": [{k: r.get(k) for k in ("node_id", "kind", "filename", "server_type",
+                                               "staged_path", "sha256", "size_bytes")}
+                        for r in records],
+            "note": "isolated staging only: these bytes were never accepted or published, "
+                    "and they are kept as failure evidence",
+        }
+
     def validate_artifacts(self, entry: dict, spec: RunSpec,
                            contract: dict | None = None) -> list[dict]:
         outputs = entry.get("outputs") or {}
@@ -804,6 +1251,10 @@ class ComfyStageAdapter:
                 prompt_id=entry.get("prompt_id"), declared_nodes=sorted(declared),
                 outputs_keys=list(outputs), ignored=ignored)
         artifacts: list[dict] = []
+        # Round C: an artifact written into the stage root is ISOLATED STAGING
+        # until it passes every check. A validation failure may therefore leave a
+        # real file behind, and the typed failure has to say so (never "0 staged").
+        staged: list[dict] = []
         for node_id, key, item, conf in candidates:
             filename = item.get("filename", "")
             subfolder = item.get("subfolder", "")
@@ -837,14 +1288,20 @@ class ComfyStageAdapter:
             with open(target, "wb") as fh:
                 fh.write(raw)
             sha = pinning.sha256_file(target)
+            staged.append({"node_id": node_id, "kind": key, "filename": filename,
+                           "subfolder": subfolder, "server_type": atype,
+                           "staged_path": str(target), "sha256": sha,
+                           "size_bytes": len(raw)})
             expected = (pins if pins is not None
                         else (spec.expected_artifact_hashes or {})).get(filename)
             if expected and expected != sha:
                 raise ArtifactHashMismatch("artifact hash differs from the recorded expectation",
-                                           filename=filename, expected=expected, actual=sha)
+                                           filename=filename, expected=expected, actual=sha,
+                                           staging=self._staging_report(staged))
             decode_ok, width, height, decode_note = self._decode_check(target, raw)
             if decode_ok is False:
-                raise PartialOutput("artifact did not fully decode", item=item, note=decode_note)
+                raise PartialOutput("artifact did not fully decode", item=item,
+                                    note=decode_note, staging=self._staging_report(staged))
             artifacts.append({
                 "node_id": node_id, "kind": key, "filename": filename, "subfolder": subfolder,
                 "server_type": atype, "staged_path": str(target), "sha256": sha,
@@ -939,6 +1396,16 @@ class ComfyStageAdapter:
             # output contract (F05). A pin that does not match the real graph hash
             # raises inside `_claim` here — before adoption, staging or POST.
             claim = self._claim(spec, stage_input, attempt_id)
+
+            # Round C: the durable resolve now covers ALL THREE sources at once
+            # (unresolved markers ∪ completion receipts ∪ quarantine records). A
+            # terminal receipt of exactly this work item either hands its durable
+            # validated evidence back or refuses HERE — before the gate, before the
+            # lease and before any POST, so a replay can never become a second
+            # submission even if it is a fresh process.
+            prior = self.resolve_durable_prior(claim, instance_epoch)
+            if prior is not None:
+                return self._replayed_output(spec, prior, stage_input, base)
 
             # F01 fix, step 1: does THIS work item already own a prompt? Answer
             # BEFORE taking the gate, so the adopting attempt can take over its own
@@ -1062,13 +1529,23 @@ class ComfyStageAdapter:
             base.reservation = self.reservation_state()
             self.close_reservation("terminal_success",
                                    evidence={"prompt_id": prompt_id, "terminal_status": status,
-                                             "artifact_count": len(base.artifacts)})
+                                             "artifact_count": len(base.artifacts),
+                                             # durable validated evidence: a later replay of
+                                             # this exact work item reuses it instead of
+                                             # POSTing a second prompt (round C)
+                                             "artifacts": [dict(a) for a in base.artifacts]})
             base.reservation = self.reservation_state()
             return base
         except MfComfyError as exc:
             base.status = "unresolved" if isinstance(exc, AmbiguousAfterSubmit) else "failed"
             base.failure = exc.to_dict()
             base.timing = timing
+            staging = (getattr(exc, "details", None) or {}).get("staging")
+            if isinstance(staging, dict) and staging.get("isolated_staged"):
+                self.notes.append(
+                    f"isolated staging: {staging['isolated_staged']} file(s) were written into "
+                    "the stage root and then failed validation; they were never accepted or "
+                    "published and are kept as failure evidence")
             base.notes = list(self.notes)
             if self.sampler is not None:
                 base.resources = self.sampler.stop()

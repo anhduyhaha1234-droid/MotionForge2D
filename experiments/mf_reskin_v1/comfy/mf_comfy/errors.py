@@ -196,9 +196,34 @@ class CorruptReservation(MfComfyError):
     reservation": the marker may be the only record of a prompt that is still
     occupying the server. The gate therefore fails closed with this typed
     refusal and never submits. The marker itself is left untouched as evidence.
+
+    Round C widens this to every durable record that cannot be classified by
+    itself: a missing authority field (`instance_id` and friends), a body that
+    does not hash to its own recorded digest, a normalized contract that is not
+    a contract, or a record stored under a name it does not describe. Such a
+    record is never adopted, never released and never a licence to POST again.
     """
 
     code = "MF_COMFY_CORRUPT_RESERVATION"
+    retryable = False
+
+
+class AttemptAlreadyTerminal(MfComfyError):
+    """Refused: a durable completion receipt already covers this exact attempt.
+
+    The identity resolution of round C includes completion receipts, so an
+    attempt whose terminal outcome is already recorded may never become a
+    second POST. The only two legal dispositions are:
+
+      * reuse the durable validated evidence that the receipt carries (same
+        server boot, `terminal_success`, artifacts still intact on disk), or
+      * this typed refusal.
+
+    A genuinely NEW work item is unaffected: it declares its own `attempt_id`
+    and is neither blocked nor over-locked by an earlier terminal record.
+    """
+
+    code = "MF_COMFY_ATTEMPT_ALREADY_TERMINAL"
     retryable = False
 
 
