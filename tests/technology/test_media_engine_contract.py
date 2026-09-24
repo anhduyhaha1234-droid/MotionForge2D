@@ -19,14 +19,22 @@ from pathlib import Path
 import pytest
 
 from app.schemas.media_engine import (
+    CAPABILITY_REFERENCE_REQUIREMENTS,
     E01_JOB_STORE,
     FORBIDDEN_DEGRADATION_TARGETS,
+    IDENTITY_COMPONENT_FIELDS,
+    IDENTITY_PROOF_FIELDS,
     MEDIA_ENGINE_CONTRACT_VERSION,
     NO_AUTO_DOWNLOAD_FROM_UI,
+    PUBLISHABLE_SERVER_TYPES,
+    RESERVATION_IDENTITY_FIELDS,
+    SERVER_OUTPUT_TYPES,
+    SERVER_PUBLISHABLE_TYPES,
     SOURCE_LOCKED_CAPABILITIES,
     STATE_ORDER,
     STATE_TRANSITION_TABLE,
     AudioHandoff,
+    BackendIdentityProof,
     CacheEntry,
     CacheIdentity,
     CastBinding,
@@ -54,6 +62,7 @@ from app.schemas.media_engine import (
     OutputContract,
     ReferenceArtifact,
     ReferenceChange,
+    ReferenceRequirement,
     ReplayAction,
     ReplayDecision,
     ResourceBudget,
@@ -64,8 +73,11 @@ from app.schemas.media_engine import (
     assert_publishable_set,
     assert_shared_stack,
     cache_identity_for,
+    identity_integrity,
     invalidate_for_reference_change,
+    reservation_identity_for,
     resolve_replay,
+    verify_identity_proof,
 )
 
 SHA_A = "a" * 64
@@ -169,6 +181,11 @@ def make_request(
             pts_end_ticks=60928,
             fps_num=30,
             fps_den=1,
+            # The stream's rational time_base, measured by BENCH/VIDEO14B on the
+            # very clip this fixture mirrors — NOT the 30/1 frame rate (R6).
+            stream_timebase_num=1,
+            stream_timebase_den=15360,
+            decoded_frame_count=20,
         ),
         cast=cast if cast is not None else (make_cast(),),
         pins=pins if pins is not None else make_pins(),
@@ -199,6 +216,9 @@ def make_reservation(
     submit_state: str = "acked",
     prompt_id: str | None = "prompt-1",
     owner_session: str = "session-owner",
+    server_epoch: str | None = "epoch-7",
+    workspace_id: str | None = "ws-1",
+    output_contract_digest: str | None = "oc" + "3" * 14,
 ) -> InflightReservation:
     return InflightReservation(
         attempt_id="attempt-1",
@@ -209,6 +229,43 @@ def make_reservation(
         workflow_digest="wd" + "1" * 14,
         input_digest="id" + "2" * 14,
         prompt_id=prompt_id,
+        workspace_id=workspace_id,
+        server_epoch=server_epoch,
+        output_contract_digest=output_contract_digest,
+    )
+
+
+def make_proof(
+    requester_session: str = "session-owner",
+    resolution: str = "resolved",
+    server_epoch: str = "epoch-7",
+    workspace_id: str = "ws-1",
+    attempt_id: str = "attempt-1",
+    job_id: str = "job-1",
+    stage: str = "video_apply",
+    workflow_digest: str = "wd" + "1" * 14,
+    input_digest: str = "id" + "2" * 14,
+    output_contract_digest: str = "oc" + "3" * 14,
+    integrity: bool = True,
+) -> BackendIdentityProof:
+    """A backend-RESOLVED identity claim — never a caller-supplied boolean."""
+
+    claim = {
+        "requester_session": requester_session,
+        "workspace_id": workspace_id,
+        "job_id": job_id,
+        "attempt_id": attempt_id,
+        "stage": stage,
+        "server_epoch": server_epoch,
+        "workflow_digest": workflow_digest,
+        "input_digest": input_digest,
+        "output_contract_digest": output_contract_digest,
+        "resolution": resolution,
+    }
+    return BackendIdentityProof(
+        integrity_sha256=identity_integrity(**claim) if integrity else SHA_D,
+        resolved_by="e01_attempt_row",
+        **claim,
     )
 
 
@@ -460,6 +517,71 @@ def test_publication_gate_is_fail_closed() -> None:
         )
 
 
+def make_output_artifact(
+    artifact_id: str = "art-out-1",
+    server_output_type: str = "output",
+    publishable: bool = True,
+    kind: str = "video",
+) -> ManagedArtifact:
+    return ManagedArtifact(
+        artifact_id=artifact_id,
+        kind=kind,
+        media_type="video/mp4",
+        sha256=SHA_D,
+        store_relative_path="video/out.mp4",
+        size_bytes=1024,
+        publishable=publishable,
+        server_output_type=server_output_type,
+    )
+
+
+def test_empty_publish_allowlist_refuses() -> None:
+    """D03 — the exact R7 case: ``publishable_types=()`` used to return the artifact.
+
+    An empty allow-list is not "no narrowing" — it is a refusal.  The valid output
+    still passes through the default (server-owned) allow-list.
+    """
+
+    video = make_output_artifact()
+    with pytest.raises(MediaEngineRefusal) as exc:
+        assert_publishable_set([video], publishable_types=())
+    assert exc.value.code is MediaEngineRefusalCode.ARTIFACT_NOT_MANAGED
+    assert "EMPTY" in exc.value.detail
+
+    assert assert_publishable_set([video]) == (video,)
+    assert assert_publishable_set([video], publishable_types=SERVER_PUBLISHABLE_TYPES) == (video,)
+    assert assert_publishable_set([video], publishable_types=PUBLISHABLE_SERVER_TYPES) == (video,)
+
+
+@pytest.mark.parametrize("server_output_type", ["temp", "input", "intermediate", "preview"])
+def test_non_output_server_classifications_refuse_publication(server_output_type: str) -> None:
+    """D03 — the SERVER's node-output classification is the publication authority."""
+
+    artifact = make_output_artifact(server_output_type=server_output_type)
+    # The producing node staged it as publishable; that flag is not authority.
+    assert artifact.publishable is True and artifact.server_output_type == server_output_type
+    with pytest.raises(MediaEngineRefusal) as exc:
+        assert_publishable_set([artifact], publishable_types=SERVER_PUBLISHABLE_TYPES)
+    assert exc.value.code is MediaEngineRefusalCode.ARTIFACT_NOT_MANAGED
+    assert server_output_type in exc.value.detail
+
+
+def test_server_output_type_vocabulary_is_closed_and_narrowing_only() -> None:
+    assert SERVER_OUTPUT_TYPES[0] == "output"
+    assert PUBLISHABLE_SERVER_TYPES == ("output",) == SERVER_PUBLISHABLE_TYPES
+    with pytest.raises(ValueError):
+        make_output_artifact(server_output_type="whatever")
+    with pytest.raises(ValueError):
+        assert_publishable_set([make_output_artifact()], publishable_types=("preview",))
+    with pytest.raises(ValueError):
+        assert_publishable_set([make_output_artifact()], publishable_types=("output", "preview"))
+    # A non-publishable intermediate keeps refusing, whatever its server type.
+    with pytest.raises(MediaEngineRefusal):
+        assert_publishable_set([make_output_artifact(publishable=False)])
+    with pytest.raises(MediaEngineRefusal):
+        assert_publishable_set([make_output_artifact(kind="pose_sheet")])
+
+
 def test_unknown_artifact_kind_is_rejected() -> None:
     with pytest.raises(ValueError):
         ManagedArtifact(
@@ -488,7 +610,14 @@ def test_request_carries_every_frozen_fact() -> None:
     )
     assert request.capability is MediaCapability.SOURCE_VIDEO_MOTION_TRANSFER
     assert request.source.shot_range.key() == "100-119"
-    assert request.source.timebase == "30/1"
+    # fps and the stream's rational time_base are DIFFERENT facts (R6).  The
+    # fixture mirrors the measured clip: 30/1 fps stored at a 1/15360 time_base.
+    assert request.source.fps == "30/1"
+    assert request.source.stream_timebase == "1/15360"
+    assert request.source.timebase == "1/15360"
+    assert request.source.timebase != request.source.fps
+    assert request.source.ticks_per_frame == (512, 1)
+    assert request.source.decoded_frame_count == 20
     assert (request.source.pts_start_ticks, request.source.pts_end_ticks) == (0, 60928)
     binding = request.cast[0]
     assert (binding.role, binding.character_id, binding.pack_version_id) == (
@@ -524,6 +653,135 @@ def test_shot_range_is_inclusive_and_checked() -> None:
     assert not ShotRange(start_frame=0, end_frame=8).overlaps(
         ShotRange(start_frame=9, end_frame=20)
     )
+
+
+# ── 2b. the two rate facts, PTS invariants, capability-aware references ────────
+
+
+def make_source(**kwargs: object) -> SourceLock:
+    """A source lock mirroring the measured clip: 30/1 fps at a 1/15360 time_base."""
+
+    base: dict[str, object] = {
+        "source_artifact_id": "art-source-1",
+        "source_sha256": SHA_A,
+        "shot_range": make_range(),
+        "pts_start_ticks": 0,
+        "pts_end_ticks": 60928,
+        "fps_num": 30,
+        "fps_den": 1,
+        "stream_timebase_num": 1,
+        "stream_timebase_den": 15360,
+        "decoded_frame_count": 20,
+    }
+    base.update(kwargs)
+    return SourceLock(**base)
+
+
+def test_fps_and_stream_timebase_are_different_quantities() -> None:
+    """D02 — the R6 defect: ``timebase`` reported the fps instead of the stream's."""
+
+    lock = make_source()
+    assert lock.fps == "30/1"
+    assert lock.stream_timebase == "1/15360"
+    assert lock.timebase == lock.stream_timebase
+    assert lock.timebase != lock.fps
+    assert lock.ticks_per_frame == (512, 1)
+
+    # A fractional frame rate is representable and never becomes the time_base.
+    ntsc = make_source(fps_num=30000, fps_den=1001)
+    assert ntsc.fps == "30000/1001"
+    assert ntsc.stream_timebase == "1/15360"
+    assert ntsc.ticks_per_frame == (64064, 125)  # (1001 * 15360) / 30000, reduced
+
+    # An unprobed stream refuses to invent a time_base rather than answering "30/1".
+    unprobed = make_source(stream_timebase_num=None, stream_timebase_den=None)
+    assert unprobed.stream_timebase is None
+    assert unprobed.timebase is None
+    assert unprobed.fps == "30/1"
+    with pytest.raises(ValueError):
+        make_source(stream_timebase_den=None)
+
+
+def test_pts_must_be_ordered_and_match_the_declared_count() -> None:
+    """D02 — ordered PTS / range / count, with a nonzero start allowed."""
+
+    with pytest.raises(ValueError):
+        make_source(pts_start_ticks=10, pts_end_ticks=1)
+    with pytest.raises(ValueError):
+        make_source(shot_range=make_range(100, 119), decoded_frame_count=19)
+    with pytest.raises(ValueError):
+        make_source(pts_start_ticks=2048, pts_end_ticks=4096, decoded_frame_count=20)
+    zero_span = make_source(pts_start_ticks=0, pts_end_ticks=0, decoded_frame_count=None)
+    assert zero_span.pts_span_ticks == 0
+    nonzero = make_source(pts_start_ticks=512, pts_end_ticks=60928)
+    assert nonzero.pts_start_ticks == 512 and nonzero.pts_span_ticks == 60416
+
+
+def test_decoded_map_carries_the_stream_timebase_not_the_fps() -> None:
+    """D02 — decoded-map semantics preserved: rational time_base + source indices."""
+
+    decoded = DecodedMap(
+        decoded_frames=20,
+        first_pts_ticks=0,
+        timebase=make_source().stream_timebase,
+        mapping=tuple(range(100, 120)),
+    )
+    assert decoded.timebase == "1/15360"
+    assert decoded.timebase != make_source().fps
+    assert len(decoded.mapping) == decoded.decoded_frames
+    with pytest.raises(ValueError):
+        DecodedMap(decoded_frames=20, first_pts_ticks=0, timebase="1/15360", mapping=(0, 1))
+
+
+def test_source_motion_requires_reference_pixels() -> None:
+    """D02 — zero-ref source-motion FAILS explicitly (it used to be accepted)."""
+
+    with pytest.raises(MediaEngineRefusal) as exc:
+        make_request(cast=())
+    assert exc.value.code is MediaEngineRefusalCode.REFERENCE_REQUIREMENT_UNMET
+    assert exc.value.as_dict()["code"] == "reference_requirement_unmet"
+    assert "source_video_motion_transfer" in exc.value.detail
+
+    with pytest.raises(MediaEngineRefusal) as exc2:
+        make_request(cast=(make_cast(references=()),))
+    assert exc2.value.code is MediaEngineRefusalCode.REFERENCE_REQUIREMENT_UNMET
+    assert "protagonist" in exc2.value.detail
+
+    # One reference pixel per bound role is enough, and the happy path still works.
+    assert make_request().cast[0].references[0].sha256 == SHA_B
+
+
+def test_controlled_edit_is_not_forced_to_carry_character_references() -> None:
+    """D02 — a profile that requires no character refs is not forced to carry them."""
+
+    controlled = CAPABILITY_REFERENCE_REQUIREMENTS[MediaCapability.VIDEO_EDIT_CONTROLLED]
+    assert (controlled.min_roles, controlled.min_references_per_role) == (0, 0)
+    request = make_request(capability=MediaCapability.VIDEO_EDIT_CONTROLLED, cast=())
+    assert request.cast == ()
+    assert CAPABILITY_REFERENCE_REQUIREMENTS[MediaCapability.TEXT_TO_VIDEO].min_roles == 0
+
+    # The minima are code-owned and NORMATIVE.
+    multi = CAPABILITY_REFERENCE_REQUIREMENTS[MediaCapability.IMAGE_EDIT_MULTI_REFERENCE]
+    assert multi.min_references_per_role == 2
+    with pytest.raises(MediaEngineRefusal) as exc:
+        make_request(capability=MediaCapability.IMAGE_EDIT_MULTI_REFERENCE)
+    assert exc.value.code is MediaEngineRefusalCode.REFERENCE_REQUIREMENT_UNMET
+
+
+def test_every_capability_declares_a_normative_reference_requirement() -> None:
+    assert set(CAPABILITY_REFERENCE_REQUIREMENTS) == set(MediaCapability)
+    for requirement in CAPABILITY_REFERENCE_REQUIREMENTS.values():
+        assert requirement.rationale
+        assert requirement.min_roles >= 0 and requirement.min_references_per_role >= 0
+    with pytest.raises(ValueError):
+        ReferenceRequirement(min_roles=0, min_references_per_role=0)  # rationale required
+    with pytest.raises(ValueError):
+        ReferenceRequirement(min_roles=-1, min_references_per_role=0, rationale="x")
+    # An unmet reference requirement never silently passes.
+    strict = ReferenceRequirement(min_roles=1, min_references_per_role=1, rationale="x")
+    assert strict.unmet_reason((make_cast(),)) is None
+    assert strict.unmet_reason(()) is not None
+    assert strict.unmet_reason((make_cast(references=()),)) is not None
 
 
 # ── 3. cache identity ─────────────────────────────────────────────────────────
@@ -633,6 +891,38 @@ def test_every_cache_identity_component_changes_the_digest(component: str) -> No
     assert mutated.digest != base.digest, f"{component} is not part of the cache identity"
 
 
+def test_cache_distinguishes_capability_and_stream_timebase_but_not_the_epoch() -> None:
+    """D04 — what the cache gained, and the fact that belongs to the reservation.
+
+    The 12 mutation controls above are retained unchanged.  These rows are the
+    distinctions this round added: the capability and the STREAM time_base are cache
+    facts, while the server epoch is a RESERVATION fact — so re-interpreting the same
+    ticks invalidates the cache, and a new server epoch does not.
+    """
+
+    assert len(IDENTITY_COMPONENT_FIELDS) == 12
+    assert "server_epoch" not in IDENTITY_COMPONENT_FIELDS
+    base = cache_identity_for(make_request())
+
+    other_capability = cache_identity_for(
+        make_request(capability=MediaCapability.TEXT_TO_VIDEO, cast=())
+    )
+    assert other_capability.digest != base.digest
+    assert other_capability.settings_digest != base.settings_digest
+
+    other_timebase = cache_identity_for(
+        make_request(source=make_source(stream_timebase_num=1, stream_timebase_den=12800))
+    )
+    assert other_timebase.digest != base.digest
+    assert other_timebase.settings_digest != base.settings_digest
+
+    # The SAME request keeps the same cache identity (determinism, no epoch input).
+    assert cache_identity_for(make_request()).digest == base.digest
+    assert reservation_identity_for(make_reservation(server_epoch="epoch-9")) != (
+        reservation_identity_for(make_reservation(server_epoch="epoch-7"))
+    )
+
+
 def test_reference_change_invalidates_only_the_affected_shots() -> None:
     shots = (
         CacheEntry(
@@ -693,60 +983,174 @@ def test_replay_actions_are_exactly_two() -> None:
     assert "post" not in {a.value for a in ReplayAction}
 
 
+def test_replay_owner_is_proven_before_the_acked_reattach() -> None:
+    """D01 — the exact C-CONTRACT R6 case, inverted.
+
+    Before the fix, ``resolve_replay`` took the ACKed-prompt re-attach branch
+    BEFORE the owner check, so a requester that was not the owner was accepted
+    whenever the caller's own ``identity_matches`` boolean said so.  The owner is
+    now proven from the backend-resolved identity proof, first.
+    """
+
+    decision = resolve_replay(
+        make_reservation(owner_session="session-owner", submit_state="acked", prompt_id="prompt-1"),
+        proof=make_proof(requester_session="session-intruder"),
+    )
+    assert decision.action is ReplayAction.REFUSE
+    assert decision.reason_code == "reservation_owned_by_other_session"
+    assert decision.issues_post is False
+    # The caller's word is no longer part of the signature at all.
+    assert "identity_matches" not in resolve_replay.__code__.co_varnames
+    assert "requester_session" not in resolve_replay.__code__.co_varnames
+
+    # ...and the legitimate owner still re-attaches: no over-locking.
+    owner = resolve_replay(make_reservation(), proof=make_proof())
+    assert owner.action is ReplayAction.RE_ATTACH
+    assert owner.reason_code == "re_attach_acked_prompt"
+    assert owner.issues_post is False
+
+
+def test_identity_proof_carries_backend_resolved_identity_and_integrity() -> None:
+    """D01 — owner/workspace/job/attempt/stage/epoch/workflow/input+output+integrity."""
+
+    assert set(IDENTITY_PROOF_FIELDS) == {
+        "requester_session",
+        "workspace_id",
+        "job_id",
+        "attempt_id",
+        "stage",
+        "server_epoch",
+        "workflow_digest",
+        "input_digest",
+        "output_contract_digest",
+        "resolution",
+    }
+    proof = make_proof()
+    assert verify_identity_proof(proof) is True
+    # A mutated claim no longer verifies — the digest binds the resolved facts.
+    tampered = proof.model_copy(update={"server_epoch": "epoch-8"})
+    assert verify_identity_proof(tampered) is False
+    assert tampered.server_epoch == "epoch-8" and proof.server_epoch == "epoch-7"
+    with pytest.raises(ValueError):
+        make_proof(resolution="probably_fine")
+
+
 @pytest.mark.parametrize(
-    ("reservation", "identity_matches", "requester", "expected_action", "expected_reason"),
+    ("reservation_kwargs", "proof_kwargs", "expected_action", "expected_reason"),
     [
+        # D01 — the exact R6 case: another owner, ACKed prompt.
         (
-            make_reservation(submit_state="ambiguous", prompt_id=None),
-            True,
-            "session-owner",
+            {"owner_session": "session-owner"},
+            {"requester_session": "session-intruder"},
             ReplayAction.REFUSE,
-            "unresolved_ambiguous_reservation",
+            "reservation_owned_by_other_session",
+        ),
+        ({}, {}, ReplayAction.RE_ATTACH, "re_attach_acked_prompt"),
+        # D01 — changed epoch refuses BEFORE the ACKed re-attach branch.
+        (
+            {"server_epoch": "epoch-7"},
+            {"server_epoch": "epoch-8"},
+            ReplayAction.REFUSE,
+            "reservation_server_epoch_changed",
+        ),
+        ({"workspace_id": "ws-9"}, {}, ReplayAction.REFUSE, "reservation_workspace_mismatch"),
+        (
+            {"output_contract_digest": "oc" + "9" * 14},
+            {},
+            ReplayAction.REFUSE,
+            "reservation_output_contract_mismatch",
         ),
         (
-            make_reservation(submit_state="acked", prompt_id="prompt-1"),
-            False,
-            "session-owner",
+            {},
+            {"attempt_id": "attempt-2"},
+            ReplayAction.REFUSE,
+            "reservation_identity_mismatch",
+        ),
+        ({}, {"job_id": "job-2"}, ReplayAction.REFUSE, "reservation_identity_mismatch"),
+        ({}, {"stage": "image_apply"}, ReplayAction.REFUSE, "reservation_identity_mismatch"),
+        (
+            {},
+            {"workflow_digest": "wd" + "9" * 14},
             ReplayAction.REFUSE,
             "reservation_identity_mismatch",
         ),
         (
-            make_reservation(submit_state="acked", prompt_id="prompt-1"),
-            True,
-            "session-owner",
-            ReplayAction.RE_ATTACH,
-            "re_attach_acked_prompt",
+            {},
+            {"input_digest": "id" + "9" * 14},
+            ReplayAction.REFUSE,
+            "reservation_identity_mismatch",
+        ),
+        # D01 — unknown / ambiguous / multi-claim claims refuse with 0 POST.
+        ({}, {"resolution": "unknown"}, ReplayAction.REFUSE, "identity_proof_unknown"),
+        ({}, {"resolution": "ambiguous"}, ReplayAction.REFUSE, "identity_proof_ambiguous"),
+        ({}, {"resolution": "multi_claim"}, ReplayAction.REFUSE, "identity_proof_multi_claim"),
+        ({}, {"integrity": False}, ReplayAction.REFUSE, "identity_proof_integrity_failed"),
+        (
+            {"server_epoch": None, "workspace_id": None, "output_contract_digest": None},
+            {},
+            ReplayAction.REFUSE,
+            "reservation_identity_incomplete",
+        ),
+        # submit-state ordering, retained from the previous round
+        (
+            {"submit_state": "ambiguous", "prompt_id": None},
+            {},
+            ReplayAction.REFUSE,
+            "unresolved_ambiguous_reservation",
         ),
         (
-            make_reservation(submit_state="inflight", prompt_id=None),
-            True,
-            "session-owner",
+            {"submit_state": "inflight", "prompt_id": None},
+            {},
             ReplayAction.REFUSE,
             "reservation_not_acked_no_second_submit",
         ),
         (
-            make_reservation(submit_state="outstanding", prompt_id=None),
-            True,
-            "session-other",
+            {"submit_state": "outstanding", "prompt_id": None},
+            {},
             ReplayAction.REFUSE,
-            "reservation_owned_by_other_session",
+            "reservation_not_acked_no_second_submit",
         ),
     ],
 )
 def test_unresolved_replay_never_duplicates_the_post(
-    reservation: InflightReservation,
-    identity_matches: bool,
-    requester: str,
+    reservation_kwargs: dict[str, object],
+    proof_kwargs: dict[str, object],
     expected_action: ReplayAction,
     expected_reason: str,
 ) -> None:
     decision = resolve_replay(
-        reservation, requester_session=requester, identity_matches=identity_matches
+        make_reservation(**reservation_kwargs), proof=make_proof(**proof_kwargs)
     )
     assert decision.action is expected_action
     assert decision.reason_code == expected_reason
     # The load-bearing assertion: no branch can ever issue a POST.
     assert decision.issues_post is False
+
+
+def test_reservation_identity_is_epoch_bound_but_the_cache_is_not() -> None:
+    """D04 — the reservation identity and the cache identity differ on the epoch."""
+
+    assert set(RESERVATION_IDENTITY_FIELDS) == {
+        "attempt_id",
+        "job_id",
+        "stage",
+        "workspace_id",
+        "owner_session",
+        "server_epoch",
+        "workflow_digest",
+        "input_digest",
+        "output_contract_digest",
+    }
+    assert "server_epoch" not in IDENTITY_COMPONENT_FIELDS
+    assert reservation_identity_for(make_reservation(server_epoch="epoch-7")) != (
+        reservation_identity_for(make_reservation(server_epoch="epoch-8"))
+    )
+    assert reservation_identity_for(make_reservation()) == reservation_identity_for(
+        make_reservation()
+    )
+    assert reservation_identity_for(make_reservation(owner_session="someone-else")) != (
+        reservation_identity_for(make_reservation())
+    )
 
 
 def test_a_decision_that_would_post_is_refused_by_construction() -> None:
@@ -1125,7 +1529,16 @@ def test_module_imports_no_persistence_or_network_libraries() -> None:
 
     forbidden = {"sqlalchemy", "requests", "httpx", "app", "subprocess", "socket", "asyncio"}
     assert imported & forbidden == set()
-    assert imported <= {"__future__", "hashlib", "json", "datetime", "enum", "typing", "pydantic"}
+    assert imported <= {
+        "__future__",
+        "hashlib",
+        "json",
+        "datetime",
+        "enum",
+        "fractions",
+        "typing",
+        "pydantic",
+    }
 
     body = source.lower()
     for needle in ("create_engine(", "sessionmaker(", "redis", "celery", "threading"):

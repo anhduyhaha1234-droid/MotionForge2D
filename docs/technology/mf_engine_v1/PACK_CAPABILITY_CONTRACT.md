@@ -56,6 +56,36 @@ gates; migration is opt-in per pack, and a legacy pack is never silently reinter
   while being *complete for capability Y*. The gate is therefore per capability:
   `assert_compatible(pack, capability)`.
 
+### 2.3 The frozen shape of the declaration (decided this round)
+
+Codex chose **one existing pack/version authority with two versioned branches**, so the
+declaration is now concrete and implementable (full storage plan: `S13_P00_DELTA_MATRIX.md` §5):
+
+```
+pack_contract_version        VARCHAR(32) NOT NULL DEFAULT 'legacy_six_slot_2d'
+                             CHECK (pack_contract_version IN
+                                    ('legacy_six_slot_2d','reference_pack_v1'))
+requirement_manifest_json    TEXT        NULL   -- required IFF reference_pack_v1
+requirement_manifest_sha256  VARCHAR(64) NULL   -- frozen at publish, never re-derived
+```
+
+- **One authority, two branches.** The declaration lives on the existing immutable
+  `character_pack_version` row. **No second pack table, no second cast table, no second asset
+  table**; reference pixels stay in `character_asset`, addressed by `artifact_id` + hash.
+- **The manifest is frozen.** It is written once, hashed once and bound to the immutable version;
+  the publish snapshot (T07A) records `pack_contract_version` + `requirement_manifest_sha256`. A
+  `reference_pack_v1` pack with no manifest cannot exist (CHECK) and cannot be published.
+- **The profile engine carries version + hash + NORMATIVE minima.** The capability profile
+  (`CAPABILITY_REFERENCE_REQUIREMENTS` in `app/schemas/media_engine.py`) states the minimum
+  reference set per capability. A pack declaration may only **select or add** suitable
+  requirements for the packs it describes; it may **never lower a minimum to pass**, and the
+  evaluator refuses that explicitly rather than accepting a weakened pack.
+- **ONE compatibility evaluator with two branches** (`S13_P00_DELTA_MATRIX.md` §5.5), so
+  `blocked` / `fallback_allowed` semantics stay single-sourced.
+- **`CORE_POSE_SLOTS` and completeness apply to LEGACY ONLY.** `legacy_six_slot_2d` keeps today's
+  six-slot completeness gate unchanged; a `reference_pack_v1` pack is **never** forced to carry
+  six manual poses, and "missing pose" wording must never appear for one.
+
 ## 3. The five anti-regression rules
 
 1. **No universal flat-2D rejection.** A flat-2D six-pose pack remains valid for the
@@ -98,27 +128,28 @@ gates; migration is opt-in per pack, and a legacy pack is never silently reinter
 | Workspace isolation | **Preserved** — a pack is workspace-scoped; `workspace_mismatch` refuses |
 | Source-overlay refusal | **Preserved** — `source_overlay_refusal` still refuses a mapping that would overwrite source-locked content |
 
-## 5. What is explicitly NOT proposed
+## 5. What this changes on disk — decided, no longer deferred
 
-- **No migration, no new table, no new column** in this task. `reference_pack_v1`'s
-  requirement declaration is a contract proposal; persisting it is a **later packet** with
-  its own migration scope and its own Codex approval (see `S13_P00_DELTA_MATRIX.md` §5).
-- **No change to `CORE_POSE_SLOTS`** and no change to the existing completeness validator.
-- **No second cast table** and no second pack table. `CastBinding` in the media-engine
-  request is a *projection* of the existing project-cast pin.
+- **This task writes no migration.** The `reference_pack_v1` persistence decision is **TAKEN**
+  (Codex R7 direction, §2.3): an additive `pack_contract_version` column plus a frozen
+  requirement/reference manifest on the existing immutable `character_pack_version` row. The
+  concrete DDL, the affected fields/FK/CHECK, the upgrade/downgrade and the measured
+  single-head `down_revision` discovery are in **`S13_P00_DELTA_MATRIX.md` §5**; the migration
+  itself is owned by **T01A → T01B → T04A**, serialized, and is *not* implemented here.
+- **No change to `CORE_POSE_SLOTS`** and no change to the existing completeness validator: both
+  stay legacy-only.
+- **No second cast table and no second pack table.** `CastBinding` in the media-engine request is
+  a *projection* of the existing project-cast pin.
 - **No automatic mapping mutation.** Nothing in this contract lets an engine change which
   `CharacterID`/`PackVersion` a role is mapped to; see `S13_P01_TASK_CONTRACTS.md` §3.
 
-## 6. Open questions this proposal puts to Codex
+## 6. Decision record (this proposal's questions, answered)
 
-1. Should `pack_contract_version` be a required column on the pack table (needing a
-   migration), or a declared capability profile keyed by pack id in a later table? This
-   proposal recommends the migration be a **separate, explicitly approved packet**.
-2. For `reference_pack_v1`, is the requirement profile owned by the *engine capability*
-   registry (so every pack for that capability inherits one profile) or by the *pack*
-   (so two packs may legitimately demand different reference sets for the same capability)?
-   This proposal supports per-pack declaration with capability-profile defaults.
-3. Does the compatibility evaluator (`CompatibilityEvaluateResponse`) gain a
-   `reference_pack_v1` branch, or does it stay legacy-only with a new evaluator beside it?
-   This proposal prefers **one evaluator, two contract branches**, so `blocked` /
-   `fallback_allowed` semantics stay single-sourced.
+1. **Where does `pack_contract_version` live?** On the existing pack-version table, as one
+   additive, NOT NULL, server-defaulted column with a closed CHECK — *not* a new capability-profile
+   table. Legacy rows read `legacy_six_slot_2d`; no legacy pack changes behaviour.
+2. **Who owns the requirement profile — the capability or the pack?** Both, in a fixed order:
+   the capability profile owns the **normative minimum**, and a pack may only select or add
+   requirements on top of it. A pack can never lower a minimum to pass.
+3. **One evaluator or two?** **ONE evaluator, two branches** (legacy / reference), so
+   `blocked` and `fallback_allowed` semantics cannot diverge between two implementations.

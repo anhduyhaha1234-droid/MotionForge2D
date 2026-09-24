@@ -87,7 +87,7 @@ returning nothing.
 |---|---|
 | Identity | `workspace_id`, `project_id`, `series_id?`, `video_id`, `stage`, `attempt_id`, `job_id?` |
 | Capability | `capability: MediaCapability` |
-| Source lock | `source: SourceLock` — `source_artifact_id`, `source_sha256` (64 hex), `shot_range`, `pts_start_ticks`, `pts_end_ticks`, `fps_num`/`fps_den` |
+| Source lock | `source: SourceLock` — `source_artifact_id`, `source_sha256` (64 hex), `shot_range`, `pts_start_ticks`, `pts_end_ticks`, `fps_num`/`fps_den`, `stream_timebase_num`/`stream_timebase_den?`, `decoded_frame_count?` |
 | Cast | `cast: tuple[CastBinding, ...]` — `role` → `character_id` + immutable `pack_version_id` + `references: tuple[ReferenceArtifact, ...]` (id + sha256) + optional `style_version` |
 | Pins | `pins: WorkflowPins` — `workflow_id`, `workflow_version`, `workflow_hash`, `model: ModelPin` (`model_id`, `revision`, `file_sha256`, `precision`), `nodes: tuple[NodePin, ...]` (`node_id`, `node_class`, `config_hash`), `config_hash`, `seed` |
 | Output | `output: OutputContract` — geometry, fps, `frame_count`, container, codec, `audio: AudioHandoff`, `publishable_types` |
@@ -95,8 +95,30 @@ returning nothing.
 
 `ShotRange` is **inclusive** in the source clip's own index space
 (`frame_count = end - start + 1`), which is the frame-index space the S12/BENCH work
-already measured (`first_pts`/`last_pts`/timebase semantics). `SourceLock.timebase`
-renders the rational fps as `num/den`.
+already measured (`first_pts`/`last_pts`/timebase semantics).
+
+**FPS and the stream's rational time_base are DIFFERENT quantities** (C-CONTRACT R6). The
+schema carries both: `fps_num`/`fps_den` is the frame rate (`SourceLock.fps`, e.g. `30/1`) and
+`stream_timebase_num`/`stream_timebase_den` is the container's rational time_base
+(`SourceLock.stream_timebase`, e.g. `1/15360`) — a 30/1 clip is routinely stored at 1/15360, and
+`ticks_per_frame` = 512 for exactly that pair. `SourceLock.timebase` is an alias of
+`stream_timebase` and therefore **never returns the fps**; when the stream time_base has not been
+probed it returns `None`, which is a refusal to invent a value rather than a substitution. The
+pair is all-or-nothing (half a rational raises). `SourceLock` also validates, in the model:
+
+- **ordered PTS** — `pts_end_ticks >= pts_start_ticks`;
+- **range/count** — `decoded_frame_count`, when declared, must equal
+  `shot_range.frame_count`, and the PTS span must be able to hold that many frames at
+  `fps × stream time_base` (exact rational arithmetic; a nonzero `pts_start_ticks` is allowed,
+  because PTS is a timeline position, not a zero-based offset).
+
+**Capability-aware required references.** `CAPABILITY_REFERENCE_REQUIREMENTS` states the
+normative minimum reference set per capability, and `MediaEngineRequest` enforces it at
+construction: `source_video_motion_transfer` needs ≥ 1 bound role carrying ≥ 1 reference artifact
+(a zero-ref source-motion request refuses with `reference_requirement_unmet`),
+`image_edit_multi_reference` needs ≥ 2 references per bound role, while `video_edit_controlled`
+and `text_to_video` require none and are **not** forced to carry character references their
+profile does not need. A capability with no declared profile is refused rather than assumed.
 
 ### 3.1 Backend-managed artifacts are the authority
 
@@ -132,7 +154,19 @@ never supplied by a caller. The payload that is hashed is declared once, in
 
 A parametrised test mutates each component (source sha, shot range, pts, cast, pack, assets,
 style, workflow, model, node config, seed, settings) and asserts the digest **changes** for
-every one of them: the nine components are proven present, not merely documented.
+every one of them: the twelve component facts are proven present, not merely documented.
+
+### 4.0 What the cache holds, and what belongs to the RESERVATION instead (D04)
+
+The 12-component mutation control set is unchanged (the output-width control already passed and
+was left alone). Two clarifications came out of this round:
+
+- the **source stream time_base** is part of `settings_digest` — re-interpreting the same ticks
+  against a different time_base changes every decoded frame, so it must invalidate the cache.
+  This is the only additive change to the hashed payload; the component COUNT stays 12;
+- the **server epoch is deliberately NOT a cache fact.** It belongs to the reservation identity
+  (`RESERVATION_IDENTITY_FIELDS`, §5). A retry in a new epoch may re-use cached render output; it
+  must never re-use another process's in-flight POST.
 
 ### 4.1 Reference change → invalidate the affected shots only
 
@@ -154,23 +188,44 @@ rather than silently reporting success.
 `InflightReservation` is the durable record written **before** the upstream POST, with
 `submit_state ∈ {outstanding, inflight, acked, ambiguous}` (the same lifecycle the COMFY
 round froze). Invariants: `acked` requires a `prompt_id`; `outstanding`/`inflight` must not
-carry one.
+carry one. It now also carries the durable identity a re-attach must prove — `workspace_id`,
+`server_epoch`, `output_contract_digest` — because a reservation that cannot prove its epoch or
+its output contract must refuse, not guess (R6: the reservation previously had neither).
 
-`ReplayAction` has exactly two members: `re_attach`, `refuse`. `resolve_replay(...)`
-returns a `ReplayDecision`:
+**The caller's word is never the authority.** `resolve_replay(reservation, *, proof:)` takes a
+`BackendIdentityProof` — a claim the BACKEND resolved from its own records — and no
+`identity_matches` boolean exists in the signature any more. The proof carries
+`requester_session` (owner), `workspace_id`, `job_id`, `attempt_id`, `stage`, `server_epoch`,
+`workflow_digest`, `input_digest`, `output_contract_digest`, plus `resolution` and an
+`integrity_sha256` over exactly those fields (`identity_integrity` /
+`verify_identity_proof`): a mutated or replayed claim fails its own integrity check, and
+`resolution` must be `resolved`.
 
-| Reservation state | Identity matches | Result | Reason code |
+`ReplayAction` still has exactly two members: `re_attach`, `refuse`. The checks run in this
+order, and the order is the fix — ownership is proven **before** any ACKed-prompt re-attach:
+
+| # | Condition | Result | Reason code |
 |---|---|---|---|
-| `ambiguous` | — | refuse | `unresolved_ambiguous_reservation` |
-| any | no | refuse | `reservation_identity_mismatch` |
-| `acked` + prompt_id | yes | **re_attach** | `re_attach_acked_prompt` |
-| `outstanding` / `inflight` | yes, other owner | refuse | `reservation_owned_by_other_session` |
-| `outstanding` / `inflight` | yes, same owner | refuse | `reservation_not_acked_no_second_submit` |
+| 1 | proof integrity does not verify | refuse | `identity_proof_integrity_failed` |
+| 2 | `resolution = unknown` / `ambiguous` / `multi_claim` | refuse | `identity_proof_unknown` / `identity_proof_ambiguous` / `identity_proof_multi_claim` |
+| 3 | reservation cannot prove workspace/epoch/output contract | refuse | `reservation_identity_incomplete` |
+| 4 | **requester is not the owner** | refuse | `reservation_owned_by_other_session` |
+| 5 | workspace differs | refuse | `reservation_workspace_mismatch` |
+| 6 | **server epoch changed** | refuse | `reservation_server_epoch_changed` |
+| 7 | attempt / job / stage differ, or workflow/input digest differ | refuse | `reservation_identity_mismatch` |
+| 8 | output contract digest differs | refuse | `reservation_output_contract_mismatch` |
+| 9 | `ambiguous` | refuse | `unresolved_ambiguous_reservation` |
+| 10 | `acked` + `prompt_id`, owner and every fact proven | **re_attach** | `re_attach_acked_prompt` |
+| 11 | otherwise (`outstanding` / `inflight`) | refuse | `reservation_not_acked_no_second_submit` |
 
 `ReplayDecision.issues_post` is a constant `False` and is enforced: constructing a decision
-with `issues_post=True` raises `replay_refused`. There is no third action and no code path
-that can issue a second upstream submission for the same attempt — the structural reason a
-replay cannot duplicate the POST.
+with `issues_post=True` raises `replay_refused`. There is no third action, no caller-supplied
+boolean and no code path that can issue a second upstream submission for the same attempt —
+the structural reason a replay cannot duplicate the POST.
+
+`RESERVATION_IDENTITY_FIELDS` / `reservation_identity_for()` give the reservation identity its
+own digest (attempt, job, stage, workspace, owner, **server epoch**, workflow, input, output
+contract) — deliberately a different fact from the cache identity (§4.0).
 
 ---
 
@@ -211,12 +266,27 @@ paths are store-relative.
 `kind ∈ {image, video, audio, pose_sheet, mask, graph}`. `PUBLISHABLE_ARTIFACT_KINDS =
 (image, video, audio)`: a `mask`, `graph` or `pose_sheet` is a legitimate **managed
 intermediate** and stays in the result, but marking one `publishable=True` raises
-`artifact_not_managed`. `assert_publishable_set(artifacts, publishable_types=...)` is the
-publication gate: it selects publishable artifacts, refuses when there are none
-(`artifact_not_managed` — fail-closed, never an empty success), and refuses a
-`publishable_types` set that is not a subset of the server-owned
-`SERVER_PUBLISHABLE_TYPES = ("output",)`. `OutputContract` enforces the same narrowing rule,
-so a caller can only ever **narrow** the publish allow-list. This mirrors the COMFY round's
+`artifact_not_managed`.
+
+**The SERVER's node-output classification is the publication authority** (C-CONTRACT R7). Each
+`ManagedArtifact` now carries `server_output_type ∈ SERVER_OUTPUT_TYPES = (output, preview,
+intermediate, temp, input)` — the backend's own classification of the node output it came from.
+`assert_publishable_set(artifacts, publishable_types=...)` is the gate, and it refuses in this
+order:
+
+1. **an EMPTY `publishable_types` REFUSES** — `publishable_types=()` no longer returns whatever
+   was staged; "publish nothing" and "publish everything the artifacts claim" are different acts;
+2. a `publishable_types` set that is not a subset of the server-owned
+   `PUBLISHABLE_SERVER_TYPES = ("output",)` is a `ValueError`, never a widened publication
+   (`OutputContract` enforces the same narrowing rule);
+3. no publishable artifact at all → `artifact_not_managed` (fail-closed, never an empty success);
+4. an artifact whose `server_output_type` does not survive the effective allow-list —
+   `temp`, `input`, `intermediate`, `preview` — refuses with `artifact_not_managed` **even when
+   its own `publishable` flag is `True`**, because that flag records what the producing node
+   staged, not what may be published;
+5. a `mask` / `graph` / `pose_sheet` kind refuses as before.
+
+A valid `output` artifact still passes, unchanged. This mirrors the COMFY round's
 `PUBLISHABLE_SERVER_TYPES` finding and the S12 publication authority.
 
 ---
@@ -270,16 +340,18 @@ rules, not re-implemented here.
 
 ## 9. Refusal taxonomy and its proofs
 
-`MediaEngineRefusalCode` (12 codes, each carrying a detail string, surfaced via
+`MediaEngineRefusalCode` (13 codes, each carrying a detail string, surfaced via
 `MediaEngineRefusal.as_dict()`): `media_capability_unavailable`,
 `capability_degradation_refused`, `client_artifact_path_refused`, `client_graph_refused`,
 `artifact_not_managed`, `replay_refused`, `model_unavailable`, `auto_download_refused`,
 `gpu_lease_held`, `second_job_store_refused`, `competing_concurrency_engine_refused`,
-`state_transition_refused`. Refusals are raised, never swallowed into a generic error.
+`state_transition_refused`, and `reference_requirement_unmet` (added this round: a capability's
+normative minimum reference set is not satisfied — e.g. a source-motion request with zero
+reference pixels). Refusals are raised, never swallowed into a generic error.
 
-The four gate-critical refusal cases are proven non-vacuous by mutation controls
-(`NEW/CONTRACT/raw/negative_controls.json`): each guard is removed from the module, the
-guard's own test must then FAIL, and the file is restored byte-identically.
+The gate-critical refusal cases are proven non-vacuous by mutation controls
+(`raw/negative_controls.json` in this round's evidence root): each guard is removed from the
+module, the guard's own test must then FAIL, and the file is restored byte-identically.
 
 | Control | Guard removed | Tests that must fail | Result |
 |---|---|---|---|
@@ -287,19 +359,24 @@ guard's own test must then FAIL, and the file is restored byte-identically.
 | N2 | client path/graph refusal | `test_request_refuses_a_client_supplied_path`, `test_request_refuses_a_client_supplied_graph` | DETECTED (2 failed) |
 | N3 | replay no-second-POST guard | `test_unresolved_replay_never_duplicates_the_post`, `test_a_decision_that_would_post_is_refused_by_construction` | DETECTED (2 failed) |
 | N4 | reference-change invalidation | `test_reference_change_invalidates_only_the_affected_shots` | DETECTED (1 failed) |
+| N5 | ordered-PTS / fps-vs-timebase guard | `test_fps_and_stream_timebase_are_different_quantities`, `test_pts_must_be_ordered_and_match_the_declared_count` | DETECTED (this round) |
+| N6 | owner-before-ACK ownership guard | `test_replay_owner_is_proven_before_the_acked_reattach`, `test_unresolved_replay_never_duplicates_the_post` | DETECTED (this round) |
+| N7 | publication server-type + empty allow-list guard | `test_empty_publish_allowlist_refuses`, `test_non_output_server_classifications_refuse_publication` | DETECTED (this round) |
+| N8 | capability-aware reference requirement | `test_source_motion_requires_reference_pixels`, `test_controlled_edit_is_not_forced_to_carry_character_references` | DETECTED (this round) |
 
 ---
 
-## 10. Open questions this proposal puts to Codex
+## 10. Decision record (this proposal's questions, answered)
 
-1. `ResourceBudget.resource_class` is a free string here; E01's authority is
-   `RESOURCE_CLASSES = (cpu_light, cpu_heavy, gpu, io)` (`app/persistence/jobs.py`). Should
-   the contract import that constant (creating a schema → persistence import) or keep the
-   value free-form and validate at the E01 boundary? This proposal keeps it free-form.
-2. `MediaEngineResult` does not carry the `OutputContract` it was requested with; the
-   publish allow-list is therefore enforced at publication
-   (`assert_publishable_set`) rather than at result construction. Confirm that split.
-3. Should `pose_sheet` ever be publishable? This proposal says no
-   (`PUBLISHABLE_ARTIFACT_KINDS = image, video, audio`) because the legacy pose-sheet pack
-   path publishes through its own authority (`PackVersion` + `CORE_POSE_SLOTS`), not through
-   the media engine.
+1. **`ResourceBudget.resource_class`**: stays a free string here and is validated at the E01
+   boundary — the contract does not import `app/persistence/jobs.py` (it must stay pure: no
+   schema → persistence import).
+2. **The result DTO does not carry the `OutputContract`**: confirmed. The publish allow-list is
+   enforced at publication (`assert_publishable_set`, now with the server
+   `server_output_type` authority) rather than at result construction.
+3. **Is `pose_sheet` ever publishable?** No (`PUBLISHABLE_ARTIFACT_KINDS = image, video,
+   audio`): the legacy pose-sheet pack publishes through its own authority (`PackVersion` +
+   `CORE_POSE_SLOTS`, legacy branch only), not through the media engine.
+4. **New this round:** the two domain docs that carried the deferred reference-pack decision
+   (`PACK_CAPABILITY_CONTRACT.md` §5/§6, `S13_P00_DELTA_MATRIX.md` §5/§7) no longer defer it —
+   see `S13_P00_DELTA_MATRIX.md` §5 for the frozen storage plan.

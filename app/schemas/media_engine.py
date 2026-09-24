@@ -31,6 +31,12 @@ Consequences enforced by this module, never by convention:
    date, and a UI click can never trigger a download.
 6. There is exactly one job store (E01) and one concurrency engine (the E01
    lease).  A second job database or a competing engine is refused.
+7. Identity is BACKEND-resolved.  A replay is settled against a resolved
+   identity proof, and ownership is proven BEFORE an ACKed prompt may be
+   re-attached; a caller's boolean is never the authority (C-CONTRACT R6).
+8. The frame rate and the stream's rational time_base are DIFFERENT quantities,
+   and the SERVER's node-output classification — not a caller's allow-list and
+   not an artifact's own flag — decides what may be published.
 """
 
 from __future__ import annotations
@@ -39,6 +45,7 @@ import hashlib
 import json
 from datetime import date
 from enum import Enum
+from fractions import Fraction
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -46,18 +53,24 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 __all__ = [
     "ARTIFACT_KINDS",
     "CAPABILITY_ABSENCE_IS_EXPLICIT",
+    "CAPABILITY_REFERENCE_REQUIREMENTS",
     "COMPETING_CONCURRENCY_ENGINE_ALLOWED",
     "E01_JOB_STORE",
     "FORBIDDEN_DEGRADATION_TARGETS",
     "IDENTITY_COMPONENT_FIELDS",
+    "IDENTITY_PROOF_FIELDS",
     "MEDIA_ENGINE_CONTRACT_VERSION",
     "NO_AUTO_DOWNLOAD_FROM_UI",
     "PUBLISHABLE_ARTIFACT_KINDS",
+    "PUBLISHABLE_SERVER_TYPES",
+    "RESERVATION_IDENTITY_FIELDS",
     "SECOND_JOB_DATABASE_ALLOWED",
+    "SERVER_OUTPUT_TYPES",
     "SERVER_PUBLISHABLE_TYPES",
     "SOURCE_LOCKED_CAPABILITIES",
     "STATE_ORDER",
     "AudioHandoff",
+    "BackendIdentityProof",
     "CacheEntry",
     "CacheIdentity",
     "CastBinding",
@@ -86,6 +99,7 @@ __all__ = [
     "OutputContract",
     "ReferenceArtifact",
     "ReferenceChange",
+    "ReferenceRequirement",
     "ReplayAction",
     "ReplayDecision",
     "ResourceBudget",
@@ -96,8 +110,11 @@ __all__ = [
     "assert_publishable_set",
     "assert_shared_stack",
     "cache_identity_for",
+    "identity_integrity",
     "invalidate_for_reference_change",
+    "reservation_identity_for",
     "resolve_replay",
+    "verify_identity_proof",
 ]
 
 
@@ -119,6 +136,16 @@ PUBLISHABLE_ARTIFACT_KINDS = ("image", "video", "audio")
 #: The SERVER-owned publishable node-output types (COMFY round authority).  A
 #: caller's ``OutputContract.publishable_types`` may only narrow this set.
 SERVER_PUBLISHABLE_TYPES = ("output",)
+#: The complete server-side node-output CLASSIFICATION vocabulary.  The backend
+#: classifies every node output it stages; the classification is the authority,
+#: never the caller and never the artifact's own ``publishable`` flag.  Only the
+#: members of :data:`PUBLISHABLE_SERVER_TYPES` may ever leave the engine, so a
+#: ``temp`` / ``input`` / ``intermediate`` output refuses publication even when a
+#: caller lists it in an allow-list and even when the artifact claims
+#: ``publishable=True``.
+SERVER_OUTPUT_TYPES = ("output", "preview", "intermediate", "temp", "input")
+#: Alias kept so the COMFY-round vocabulary is nameable from this module too.
+PUBLISHABLE_SERVER_TYPES = SERVER_PUBLISHABLE_TYPES
 
 
 class MediaEngineRefusalCode(str, Enum):
@@ -136,6 +163,11 @@ class MediaEngineRefusalCode(str, Enum):
     SECOND_JOB_STORE_REFUSED = "second_job_store_refused"
     COMPETING_CONCURRENCY_ENGINE_REFUSED = "competing_concurrency_engine_refused"
     STATE_TRANSITION_REFUSED = "state_transition_refused"
+    #: The request's cast does not satisfy the capability's normative minimum
+    #: reference requirement (e.g. a source-motion request with zero reference
+    #: pixels).  A pack declaration may only SELECT/ADD requirements; it can never
+    #: lower this minimum to make a request pass.
+    REFERENCE_REQUIREMENT_UNMET = "reference_requirement_unmet"
 
 
 class MediaEngineRefusal(Exception):
@@ -184,6 +216,72 @@ FORBIDDEN_DEGRADATION_TARGETS: dict[MediaCapability, frozenset[MediaCapability]]
             MediaCapability.IMAGE_EDIT_MULTI_REFERENCE,
             MediaCapability.SOURCE_VIDEO_MOTION_TRANSFER,
         }
+    ),
+}
+
+
+class ReferenceRequirement(BaseModel):
+    """The NORMATIVE MINIMUM reference set a capability requires.
+
+    These minima are code-owned — the backend authority.  A pack declaration may
+    only *select* or *add* suitable requirements for the packs it describes; it
+    can never lower a minimum in order to make a request pass.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    #: How many cast roles the capability needs bound (0 = cast is optional).
+    min_roles: int = Field(ge=0)
+    #: How many reference pixels EACH bound role must carry.
+    min_references_per_role: int = Field(ge=0)
+    #: Why the minimum exists — surfaced verbatim in the refusal detail.
+    rationale: str = Field(min_length=1)
+
+    def unmet_reason(self, cast: tuple[CastBinding, ...]) -> str | None:
+        """``None`` when satisfied, else the exact unmet condition."""
+        if len(cast) < self.min_roles:
+            return (
+                f"needs at least {self.min_roles} bound role(s) carrying reference "
+                f"pixels; got {len(cast)}"
+            )
+        for binding in cast:
+            if len(binding.references) < self.min_references_per_role:
+                return (
+                    f"role {binding.role!r} needs at least "
+                    f"{self.min_references_per_role} reference artifact(s); got "
+                    f"{len(binding.references)}"
+                )
+        return None
+
+
+#: Capability-aware required references.  A source-motion request with zero
+#: reference pixels is REFUSED (`reference_requirement_unmet`): it cannot invent a
+#: performer out of an empty cast.  A controlled edit operates on the locked source
+#: clip and is NOT forced to carry character references when its profile does not
+#: require them (``min_roles=0``).
+CAPABILITY_REFERENCE_REQUIREMENTS: dict[MediaCapability, ReferenceRequirement] = {
+    MediaCapability.SOURCE_VIDEO_MOTION_TRANSFER: ReferenceRequirement(
+        min_roles=1,
+        min_references_per_role=1,
+        rationale="motion transfer drives a locked source clip onto bound cast "
+        "pixels; with zero references there is no identity to transfer onto",
+    ),
+    MediaCapability.IMAGE_EDIT_MULTI_REFERENCE: ReferenceRequirement(
+        min_roles=1,
+        min_references_per_role=2,
+        rationale="a MULTI-reference edit needs at least two reference artifacts "
+        "per bound role; a single reference is a single-reference edit",
+    ),
+    MediaCapability.VIDEO_EDIT_CONTROLLED: ReferenceRequirement(
+        min_roles=0,
+        min_references_per_role=0,
+        rationale="a controlled edit operates on the locked source clip; its "
+        "profile does not require character reference pixels",
+    ),
+    MediaCapability.TEXT_TO_VIDEO: ReferenceRequirement(
+        min_roles=0,
+        min_references_per_role=0,
+        rationale="text-to-video has no reference input by definition",
     ),
 }
 
@@ -301,7 +399,16 @@ class ShotRange(BaseModel):
 
 
 class SourceLock(BaseModel):
-    """Source hash + shot range + PTS.  Backend-resolved, never client paths."""
+    """Source hash + shot range + PTS + the TWO different rate facts.
+
+    ``fps_num``/``fps_den`` is the **frame rate**.  ``stream_timebase_num``/
+    ``stream_timebase_den`` is the container's **rational time_base** (seconds per
+    tick) as probed from the stream.  They are not the same quantity: a 30/1 fps
+    clip is routinely stored at 1/15360, and the R6 defect was exactly a
+    ``timebase`` that reported the fps.  ``stream_timebase`` (and its alias
+    ``timebase``) therefore reports the STREAM value, or ``None`` when the backend
+    has not probed it — it never substitutes the frame rate.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -312,10 +419,82 @@ class SourceLock(BaseModel):
     pts_end_ticks: int = Field(ge=0)
     fps_num: int = Field(gt=0)
     fps_den: int = Field(gt=0)
+    #: Container rational time_base.  Declared as a PAIR or not at all, so half a
+    #: rational can never be read.
+    stream_timebase_num: int | None = Field(default=None, gt=0)
+    stream_timebase_den: int | None = Field(default=None, gt=0)
+    #: Decoded frame count, when the backend has already decoded the range.
+    decoded_frame_count: int | None = Field(default=None, gt=0)
+
+    @model_validator(mode="after")
+    def _check(self) -> SourceLock:
+        if (self.stream_timebase_num is None) != (self.stream_timebase_den is None):
+            raise ValueError(
+                "stream time_base must be a complete rational pair "
+                "(stream_timebase_num AND stream_timebase_den), never half of one"
+            )
+        if self.pts_end_ticks < self.pts_start_ticks:
+            raise ValueError(
+                "pts_end_ticks must be >= pts_start_ticks: PTS must be ordered "
+                f"(got start={self.pts_start_ticks}, end={self.pts_end_ticks})"
+            )
+        if (
+            self.decoded_frame_count is not None
+            and self.decoded_frame_count != self.shot_range.frame_count
+        ):
+            raise ValueError(
+                "decoded_frame_count must equal the shot range's frame count "
+                f"({self.shot_range.frame_count}); got {self.decoded_frame_count}"
+            )
+        if self.decoded_frame_count is not None and self.stream_timebase is not None:
+            required = (self.decoded_frame_count - 1) * Fraction(
+                self.fps_den * self.stream_timebase_den,
+                self.fps_num * self.stream_timebase_num,
+            )
+            if self.pts_span_ticks < required:
+                raise ValueError(
+                    f"pts span {self.pts_span_ticks} ticks cannot hold "
+                    f"{self.decoded_frame_count} frames at fps {self.fps} and stream "
+                    f"time_base {self.stream_timebase}: at least {required} ticks "
+                    "are required"
+                )
+        return self
 
     @property
-    def timebase(self) -> str:
+    def fps(self) -> str:
+        """The frame rate as a rational — a DIFFERENT fact from the time_base."""
         return f"{self.fps_num}/{self.fps_den}"
+
+    @property
+    def stream_timebase(self) -> str | None:
+        """The stream's rational time_base (``num/den``), or ``None`` if unprobed."""
+        if self.stream_timebase_num is None or self.stream_timebase_den is None:
+            return None
+        return f"{self.stream_timebase_num}/{self.stream_timebase_den}"
+
+    @property
+    def timebase(self) -> str | None:
+        """Alias of :attr:`stream_timebase` — NEVER the frame rate (R6 fix).
+
+        Returning ``None`` for an unprobed stream is a refusal to invent a value,
+        not a substitution: a caller can no longer be handed ``"30/1"`` here.
+        """
+        return self.stream_timebase
+
+    @property
+    def pts_span_ticks(self) -> int:
+        return self.pts_end_ticks - self.pts_start_ticks
+
+    @property
+    def ticks_per_frame(self) -> tuple[int, int] | None:
+        """Reduced ``(num, den)`` ticks per frame — the two rate facts combined."""
+        if self.stream_timebase is None:
+            return None
+        ratio = Fraction(
+            self.fps_den * self.stream_timebase_den,
+            self.fps_num * self.stream_timebase_num,
+        )
+        return (ratio.numerator, ratio.denominator)
 
 
 class ReferenceArtifact(BaseModel):
@@ -492,6 +671,20 @@ class MediaEngineRequest(BaseModel):
         roles = [b.role for b in self.cast]
         if len(roles) != len(set(roles)):
             raise ValueError("cast roles must be unique within a request")
+        requirement = CAPABILITY_REFERENCE_REQUIREMENTS.get(self.capability)
+        if requirement is None:
+            # An unprofiled capability cannot be checked, so it cannot be served.
+            raise MediaEngineRefusal(
+                MediaEngineRefusalCode.REFERENCE_REQUIREMENT_UNMET,
+                f"{self.capability.value} has no declared reference requirement "
+                "profile; an unverifiable request is refused rather than assumed",
+            )
+        unmet = requirement.unmet_reason(self.cast)
+        if unmet is not None:
+            raise MediaEngineRefusal(
+                MediaEngineRefusalCode.REFERENCE_REQUIREMENT_UNMET,
+                f"{self.capability.value} {unmet} — {requirement.rationale}",
+            )
         return self
 
 
@@ -614,6 +807,13 @@ def cache_identity_for(request: MediaEngineRequest) -> CacheIdentity:
             {
                 "stage": request.stage,
                 "capability": request.capability.value,
+                # The STREAM time_base (never the fps) is part of the render facts:
+                # re-interpreting the same ticks against a different time_base
+                # changes every decoded frame, so it must invalidate the cache.
+                # The server epoch is deliberately ABSENT here — it is a
+                # reservation fact (see RESERVATION_IDENTITY_FIELDS), so a retry in
+                # a new epoch re-uses cache but never re-uses an in-flight POST.
+                "source_stream_timebase": request.source.stream_timebase,
                 "width": request.output.width,
                 "height": request.output.height,
                 "fps": request.output.timebase,
@@ -723,11 +923,23 @@ class ManagedArtifact(BaseModel):
     store_relative_path: str = Field(min_length=1)
     size_bytes: int = Field(ge=0)
     publishable: bool = False
+    #: The SERVER's classification of the node output this artifact came from
+    #: (``output`` | ``preview`` | ``intermediate`` | ``temp`` | ``input``).  The
+    #: publication GATE combines it with the caller's allow-list: this field is the
+    #: authority, the artifact's own ``publishable`` flag records only what the
+    #: producing node staged.  Classification-only here — publication is decided in
+    #: exactly one place (:func:`assert_publishable_set`), never inferred twice.
+    server_output_type: str = "output"
 
     @model_validator(mode="after")
     def _check(self) -> ManagedArtifact:
         if self.kind not in ARTIFACT_KINDS:
             raise ValueError(f"kind must be one of {ARTIFACT_KINDS}")
+        if self.server_output_type not in SERVER_OUTPUT_TYPES:
+            raise ValueError(
+                f"server_output_type must be one of {SERVER_OUTPUT_TYPES}; "
+                f"got {self.server_output_type!r}"
+            )
         if self.publishable and self.kind not in PUBLISHABLE_ARTIFACT_KINDS:
             raise MediaEngineRefusal(
                 MediaEngineRefusalCode.ARTIFACT_NOT_MANAGED,
@@ -873,34 +1085,65 @@ class MediaEngineResult(BaseModel):
 def assert_publishable_set(
     artifacts: tuple[ManagedArtifact, ...] | list[ManagedArtifact],
     *,
-    publishable_types: tuple[str, ...] = ("output",),
+    publishable_types: tuple[str, ...] = SERVER_PUBLISHABLE_TYPES,
 ) -> tuple[ManagedArtifact, ...]:
     """The publication gate for a result's artifacts.
 
-    Only managed artifacts the backend flagged publishable may be published, and
-    the allow-list a caller passes may only NARROW the server-owned default —
-    never widen it.  Publication is fail-closed: no publishable artifact, or a
-    kind outside the allow-list, is a typed refusal, never an empty success.
+    Three authorities act in this order, and none of them is the caller's:
+
+    1. an **EMPTY** ``publishable_types`` REFUSES outright.  Publishing nothing on
+       purpose and "publishing whatever was staged" are not the same act, and an
+       empty allow-list must never degrade into "no narrowing, so everything the
+       artifacts claim".
+    2. the allow-list may only NARROW the server-owned
+       :data:`PUBLISHABLE_SERVER_TYPES`; anything else is a ``ValueError``, never a
+       widened publication.
+    3. an artifact's own ``server_output_type`` (the backend's classification of
+       the node output) must survive the effective allow-list.  ``temp`` /
+       ``input`` / ``intermediate`` / ``preview`` outputs REFUSE — a
+       ``publishable=True`` flag on a temp node cannot manufacture authority.
+
+    Then the kind check: a ``mask`` / ``graph`` / ``pose_sheet`` is managed but
+    never publishable.  Publication is fail-closed: no admitted artifact is a typed
+    refusal, never an empty success.
     """
 
-    if not set(publishable_types) <= set(SERVER_PUBLISHABLE_TYPES):
+    if not publishable_types:
+        raise MediaEngineRefusal(
+            MediaEngineRefusalCode.ARTIFACT_NOT_MANAGED,
+            "the publish allow-list is EMPTY: a narrowed-to-nothing allow-list "
+            "refuses — publication is never inferred from the artifacts' own "
+            "publishable flags",
+        )
+    if not set(publishable_types) <= set(PUBLISHABLE_SERVER_TYPES):
         raise ValueError(
-            f"publishable_types may only narrow {SERVER_PUBLISHABLE_TYPES}; "
+            f"publishable_types may only narrow {PUBLISHABLE_SERVER_TYPES}; "
             f"got {publishable_types}"
         )
+    admitted_server_types = set(publishable_types) & set(PUBLISHABLE_SERVER_TYPES)
     selected = tuple(a for a in artifacts if a.publishable)
     if not selected:
         raise MediaEngineRefusal(
             MediaEngineRefusalCode.ARTIFACT_NOT_MANAGED,
             "no managed publishable artifact to publish",
         )
+    admitted: list[ManagedArtifact] = []
     for artifact in selected:
+        if artifact.server_output_type not in admitted_server_types:
+            raise MediaEngineRefusal(
+                MediaEngineRefusalCode.ARTIFACT_NOT_MANAGED,
+                f"artifact {artifact.artifact_id} is a "
+                f"{artifact.server_output_type!r} node output and refuses "
+                f"publication; the server admits only "
+                f"{sorted(admitted_server_types)}",
+            )
         if artifact.kind not in PUBLISHABLE_ARTIFACT_KINDS:
             raise MediaEngineRefusal(
                 MediaEngineRefusalCode.ARTIFACT_NOT_MANAGED,
                 f"artifact {artifact.artifact_id} ({artifact.kind}) is not publishable",
             )
-    return selected
+        admitted.append(artifact)
+    return tuple(admitted)
 
 
 # ── replay ────────────────────────────────────────────────────────────────────
@@ -927,6 +1170,12 @@ class InflightReservation(BaseModel):
     workflow_digest: str = Field(min_length=8)
     input_digest: str = Field(min_length=8)
     prompt_id: str | None = None
+    #: Backend-resolved durable identity (R6: the reservation must be able to prove
+    #: its epoch and its output contract before any re-attach).  A reservation that
+    #: cannot prove one of these REFUSES instead of guessing.
+    workspace_id: str | None = Field(default=None, min_length=1)
+    server_epoch: str | None = Field(default=None, min_length=1)
+    output_contract_digest: str | None = Field(default=None, min_length=8)
 
     @model_validator(mode="after")
     def _check(self) -> InflightReservation:
@@ -937,6 +1186,111 @@ class InflightReservation(BaseModel):
         if self.submit_state in ("outstanding", "inflight") and self.prompt_id:
             raise ValueError("un-acked reservation must not carry a prompt_id")
         return self
+
+
+#: The exact fields a backend-resolved identity claim carries.  ONE authority, so
+#: the payload that is digested and the claim that is compared cannot drift apart.
+IDENTITY_PROOF_FIELDS = (
+    "requester_session",
+    "workspace_id",
+    "job_id",
+    "attempt_id",
+    "stage",
+    "server_epoch",
+    "workflow_digest",
+    "input_digest",
+    "output_contract_digest",
+    "resolution",
+)
+
+
+def identity_integrity(**claim: Any) -> str:
+    """Integrity digest over a backend identity claim.
+
+    The backend computes it when it RESOLVES the claim; a caller cannot mint one by
+    repeating a claim back, and a mutated claim fails
+    :func:`verify_identity_proof`.
+    """
+
+    return _digest({name: claim[name] for name in IDENTITY_PROOF_FIELDS})
+
+
+class BackendIdentityProof(BaseModel):
+    """A BACKEND-RESOLVED identity claim.  Never a caller's boolean.
+
+    The R6 defect was a replay that trusted the caller's ``identity_matches`` flag
+    and took the ACKed-prompt re-attach branch before checking ownership.  The
+    authority is this object, produced by the backend from its own records:
+
+    * ``resolution`` says how the claim was resolved — ``resolved`` | ``unknown`` |
+      ``ambiguous`` | ``multi_claim``.  Anything except ``resolved`` refuses, so an
+      unknown / ambiguous / multi-claim principal can never re-attach;
+    * ``integrity_sha256`` binds the claim to the resolved facts, so a mutated or
+      replayed claim is detectable (:func:`verify_identity_proof`).
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    requester_session: str = Field(min_length=1)
+    workspace_id: str = Field(min_length=1)
+    job_id: str = Field(min_length=1)
+    attempt_id: str = Field(min_length=1)
+    stage: str = Field(min_length=1)
+    server_epoch: str = Field(min_length=1)
+    workflow_digest: str = Field(min_length=8)
+    input_digest: str = Field(min_length=8)
+    output_contract_digest: str = Field(min_length=8)
+    resolution: str
+    integrity_sha256: str = Field(min_length=64, max_length=64)
+    #: Which backend record the claim was resolved from (e.g. ``e01_attempt_row``).
+    resolved_by: str | None = None
+
+    @model_validator(mode="after")
+    def _check(self) -> BackendIdentityProof:
+        if self.resolution not in ("resolved", "unknown", "ambiguous", "multi_claim"):
+            raise ValueError("resolution must be resolved|unknown|ambiguous|multi_claim")
+        return self
+
+
+def verify_identity_proof(proof: BackendIdentityProof) -> bool:
+    """Whether a claim's integrity digest matches its own fields."""
+
+    expected = identity_integrity(
+        **{name: getattr(proof, name) for name in IDENTITY_PROOF_FIELDS}
+    )
+    return expected == proof.integrity_sha256
+
+
+#: The reservation-side identity facts a re-attach must prove.  The CACHE identity
+#: deliberately does NOT contain these: a retry in a new epoch may legitimately
+#: re-use cached render output, but it must never re-use another process's in-flight
+#: POST.
+RESERVATION_IDENTITY_FIELDS = (
+    "attempt_id",
+    "job_id",
+    "stage",
+    "workspace_id",
+    "owner_session",
+    "server_epoch",
+    "workflow_digest",
+    "input_digest",
+    "output_contract_digest",
+)
+
+
+def reservation_identity_for(reservation: InflightReservation) -> str:
+    """Digest of the durable reservation identity.  Pure and deterministic.
+
+    Distinct from the cache identity on purpose: the cache is keyed on the render
+    facts (source / range / PTS / cast / pack / assets / style / workflow / model /
+    settings) and is epoch-INDEPENDENT, while a reservation is epoch-BOUND — which is
+    exactly why a changed server epoch invalidates a reservation and not a cache
+    entry (D04).
+    """
+
+    return _digest(
+        {name: getattr(reservation, name) for name in RESERVATION_IDENTITY_FIELDS}
+    )
 
 
 class ReplayDecision(BaseModel):
@@ -963,46 +1317,77 @@ class ReplayDecision(BaseModel):
 def resolve_replay(
     reservation: InflightReservation,
     *,
-    requester_session: str,
-    identity_matches: bool,
+    proof: BackendIdentityProof,
 ) -> ReplayDecision:
     """Resolve an unresolved replay by re-attaching or refusing.
 
-    Re-attach is only possible when the reservation is durable, its identity
-    (attempt/stage/workflow digest/input digest) matches the caller's, and the
-    upstream prompt is already acked.  Everything else refuses — a new POST is
-    never an option, which is what stops a replay from duplicating work.
+    The ORDER of these checks is the fix, not a detail of it:
+
+    1. the claim's own integrity must verify, and its ``resolution`` must be
+       ``resolved`` — unknown / ambiguous / multi-claim refuses with zero POSTs;
+    2. the reservation must be able to prove its workspace, server epoch and output
+       contract; one it cannot prove refuses (``reservation_identity_incomplete``);
+    3. **ownership is proven BEFORE the ACKed-prompt branch**: a requester that is
+       not the reservation's owner refuses (``reservation_owned_by_other_session``)
+       even when the prompt is ACKed — the R6 defect took the re-attach branch first
+       and accepted any requester whose caller-supplied boolean said it matched;
+    4. workspace, epoch, attempt/job/stage, workflow/input digest and output-contract
+       digest must all match, and a changed epoch refuses;
+    5. only then: ``ambiguous`` refuses, and a genuinely ``acked`` prompt re-attaches.
+
+    ``issues_post`` is a constant ``False`` throughout: there is no third action and
+    no branch that can issue a second upstream POST.
     """
 
+    def _refuse(reason_code: str) -> ReplayDecision:
+        return ReplayDecision(
+            action=ReplayAction.REFUSE,
+            reservation=reservation,
+            reason_code=reason_code,
+        )
+
+    if not verify_identity_proof(proof):
+        return _refuse("identity_proof_integrity_failed")
+    if proof.resolution == "unknown":
+        return _refuse("identity_proof_unknown")
+    if proof.resolution == "ambiguous":
+        return _refuse("identity_proof_ambiguous")
+    if proof.resolution == "multi_claim":
+        return _refuse("identity_proof_multi_claim")
+    if (
+        reservation.workspace_id is None
+        or reservation.server_epoch is None
+        or reservation.output_contract_digest is None
+    ):
+        return _refuse("reservation_identity_incomplete")
+    if reservation.owner_session != proof.requester_session:
+        return _refuse("reservation_owned_by_other_session")
+    if reservation.workspace_id != proof.workspace_id:
+        return _refuse("reservation_workspace_mismatch")
+    if reservation.server_epoch != proof.server_epoch:
+        return _refuse("reservation_server_epoch_changed")
+    if (
+        reservation.attempt_id != proof.attempt_id
+        or reservation.job_id != proof.job_id
+        or reservation.stage != proof.stage
+    ):
+        return _refuse("reservation_identity_mismatch")
+    if (
+        reservation.workflow_digest != proof.workflow_digest
+        or reservation.input_digest != proof.input_digest
+    ):
+        return _refuse("reservation_identity_mismatch")
+    if reservation.output_contract_digest != proof.output_contract_digest:
+        return _refuse("reservation_output_contract_mismatch")
     if reservation.submit_state == "ambiguous":
-        return ReplayDecision(
-            action=ReplayAction.REFUSE,
-            reservation=reservation,
-            reason_code="unresolved_ambiguous_reservation",
-        )
-    if not identity_matches:
-        return ReplayDecision(
-            action=ReplayAction.REFUSE,
-            reservation=reservation,
-            reason_code="reservation_identity_mismatch",
-        )
+        return _refuse("unresolved_ambiguous_reservation")
     if reservation.submit_state == "acked" and reservation.prompt_id:
         return ReplayDecision(
             action=ReplayAction.RE_ATTACH,
             reservation=reservation,
             reason_code="re_attach_acked_prompt",
         )
-    if reservation.owner_session != requester_session:
-        return ReplayDecision(
-            action=ReplayAction.REFUSE,
-            reservation=reservation,
-            reason_code="reservation_owned_by_other_session",
-        )
-    return ReplayDecision(
-        action=ReplayAction.REFUSE,
-        reservation=reservation,
-        reason_code="reservation_not_acked_no_second_submit",
-    )
+    return _refuse("reservation_not_acked_no_second_submit")
 
 
 # ── model registry ────────────────────────────────────────────────────────────
