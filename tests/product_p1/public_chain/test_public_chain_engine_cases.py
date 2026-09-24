@@ -89,7 +89,10 @@ def test_no_engine_row_is_reported_as_product_complete() -> None:
             assert token not in blob, (
                 f"{row['id']} carries the claim {token!r} in {sorted(claim_fields)}"
             )
-        assert (row["cannot_claim"] if row["kind"] == "engineering_case" else row["must_not_claim"]).strip(), row
+        denial = (
+            row["cannot_claim"] if row["kind"] == "engineering_case" else row["must_not_claim"]
+        )
+        assert denial.strip(), row
 
 
 def test_engine_denials_name_the_forbidden_product_claims() -> None:
