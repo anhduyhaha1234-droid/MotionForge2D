@@ -1,5 +1,7 @@
 "use client";
 
+import { Suspense } from "react";
+
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -18,11 +20,33 @@ const items = [
   { href: "/export", label: "Xuất 4K", icon: Clapperboard },
 ];
 
+/**
+ * Next.js App Router prerenders every static route under (app)/, and AppShell
+ * renders AppNav from the SHARED layout. A bare useSearchParams() call here
+ * therefore aborts the prerender of the FIRST route with
+ *   useSearchParams() should be wrapped in a suspense boundary at page "/apply"
+ * (missing-suspense-with-csr-bailout), so the production build emits no app
+ * at all. Fix shape: the hook is isolated in <AppNavWithQueryParams/> and
+ * wrapped in a Suspense boundary whose fallback is the SAME sidebar markup
+ * with no deep-link params - which is exactly the correct prerendered shell,
+ * because a static prerender has no query string. usePathname()/useQuery()
+ * are prerender-safe and keep their server-rendered output.
+ */
 export function AppNav() {
-  const pathname = usePathname();
+  return (
+    <Suspense fallback={<AppNavSidebar projectId={null} videoItemId={null} />}>
+      <AppNavWithQueryParams />
+    </Suspense>
+  );
+}
+
+function AppNavWithQueryParams() {
   const params = useSearchParams();
-  const projectId = params.get("project");
-  const videoItemId = params.get("video");
+  return <AppNavSidebar projectId={params.get("project")} videoItemId={params.get("video")} />;
+}
+
+function AppNavSidebar({ projectId, videoItemId }: { projectId: string | null; videoItemId: string | null }) {
+  const pathname = usePathname();
   const { data: gpu } = useQuery({ queryKey: ["gpu-info"], queryFn: () => api.getGpuInfo(), staleTime: 60_000 });
 
   return (
