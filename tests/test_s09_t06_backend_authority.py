@@ -21,7 +21,9 @@ partial-unique enforced, never MAIN):
   bytes/hash;
 - tampered manifest / tampered snapshot fail closed;
 - v1 full-apply-authority access fails closed REAPPROVAL_REQUIRED;
-- no migration/schema drift: single Alembic head a10b11c12d3e, models
+- no migration/schema drift: the Alembic head is pinned LIVE — exactly one
+  script head, equal to the version a fresh ``upgrade head`` writes, and a
+  descendant of the historical ``a10b11c12d3e`` pin (S09-T06A-C4) — models
   unchanged, OpenAPI additive with no duplicate operation ids.
 """
 
@@ -144,7 +146,7 @@ def _seed_full(session: Any) -> Seed:
     session.add(job)
     session.flush()
     scene = Scene(
-        video_item_id=video.id, position=0, start_frame=0, end_frame=180,
+        video_item_id=video.id, position=0, start_frame=0, end_frame=179,
         start_time_ms=0, end_time_ms=6000, status="pending",
     )
     session.add(scene)
@@ -189,7 +191,14 @@ def _seed_full(session: Any) -> Seed:
         0, 90, 0, 3000, GEN,
         kind="character",
         confidence_source="user",
-        segmentation={"points": [{"x": 10.0, "y": 20.0, "label": "center"}]},
+        # The executable region comes ONLY from a box (ruling Q1:
+        # segmentation.boxes[0] -> prompt.boxes[0]); points alone are
+        # evidence, never a region.  The points-only denial path is covered
+        # explicitly in section 10.
+        segmentation={
+            "points": [{"x": 10.0, "y": 20.0, "label": "center"}],
+            "boxes": [{"x": 0.1, "y": 0.2, "w": 0.3, "h": 0.4}],
+        },
         prompt={"points": [{"x": 5.0, "y": 6.0, "label": "p"}]},
         mask_artifact_id=mask.id,
     )
@@ -787,6 +796,14 @@ def test_v1_full_apply_authority_requires_reapproval(env):  # type: ignore[no-un
 
 
 def test_single_head_and_models_unchanged(tmp_path: Path) -> None:
+    """LIVE Alembic pin (never a frozen literal that can rot silently).
+
+    Exactly one script head must exist, the freshly upgraded database must
+    report that same version, and the head must remain a descendant of the
+    historical S09-T06A-C4 pin — so a branch swap or a dropped migration
+    fails here instead of after a downstream consumer breaks."""
+    from alembic.script import ScriptDirectory
+
     db = tmp_path / "head-c4.db"
     cfg = _config(db)
     command.upgrade(cfg, "head")
@@ -794,7 +811,19 @@ def test_single_head_and_models_unchanged(tmp_path: Path) -> None:
     with engine.connect() as conn:
         version = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
     engine.dispose()
-    assert version == "a10b11c12d3e"
+
+    script = ScriptDirectory.from_config(cfg)
+    heads = sorted(script.get_heads())
+    assert len(heads) == 1, f"migrations must have exactly one head, got {heads}"
+    assert version == heads[0], (
+        f"live head {heads[0]!r} != upgraded database {version!r}"
+    )
+    reachable = {
+        rev.revision for rev in script.walk_revisions(base="base", head=heads[0])
+    }
+    assert HISTORICAL_HEAD_PIN in reachable, (
+        f"{HISTORICAL_HEAD_PIN!r} is no longer an ancestor of the live head {heads[0]!r}"
+    )
 
 
 def test_openapi_additive_no_duplicate_and_removed_zero() -> None:  # type: ignore[no-untyped-def]
@@ -969,3 +998,111 @@ def test_reapprove_api_conflict_zero_mutation(http_env):  # type: ignore[no-unty
     )
     assert conflict.status_code == 409, conflict.text
     assert _rows() == before
+
+# ── 10. geometry authority: points-only typed denial vs boxed positive ──
+
+#: Historical S09-T06A-C4 head pin; the LIVE head must stay a descendant.
+HISTORICAL_HEAD_PIN = "a10b11c12d3e"
+
+#: typed code recorded when evidence carries points but no box.
+CODE_BOX_MISSING = "OCCURRENCE_GEOMETRY_BOX_MISSING"
+
+
+def _write_geometry(session: Any, segment_id: str, segmentation: Any, prompt: Any) -> None:
+    """Rewrite one segment's persisted geometry evidence (test fixture only)."""
+    session.execute(
+        text(
+            "UPDATE occurrence_segment SET segmentation_json = :seg, "
+            "prompt_json = :prm WHERE id = :sid"
+        ),
+        {
+            "seg": None if segmentation is None else json.dumps(segmentation),
+            "prm": None if prompt is None else json.dumps(prompt),
+            "sid": segment_id,
+        },
+    )
+    session.flush()
+
+
+def test_points_only_geometry_typed_denial_and_boxed_positive(env):  # type: ignore[no-untyped-def]
+    """Points-only evidence is DENIED with a typed code; boxed geometry passes.
+
+    Measured contract: ``has_geometry`` is True for points-only evidence, but
+    the executable region can only come from a box (``segmentation.boxes`` ->
+    ``prompt.boxes``).  With no box the segment records
+    ``OCCURRENCE_GEOMETRY_BOX_MISSING``, is excluded from the frozen timeline
+    block, and the checkpoint stays non-executable — no rectangle is guessed.
+    """
+    session, seed, _factory, _db = env
+    repo = S09ApprovalRepository(session)
+    rows_start = _row_count(session)
+
+    # (a) points-only -> typed denial, zero extra mutation, convergent replay.
+    _write_geometry(
+        session,
+        seed.segment,
+        {"points": [{"x": 10.0, "y": 20.0, "label": "center"}]},
+        {"points": [{"x": 5.0, "y": 6.0, "label": "p"}]},
+    )
+    denied, created = _reapprove(repo, seed, note="points-only denial")
+    assert created is True
+    denied_auth = denied.snapshot["full_apply_authority"]
+    denied_seg = denied_auth["segments"][0]
+    assert denied_seg["geometry"]["has_geometry"] is True
+    assert denied_seg["eligibility"]["executable"] is False
+    assert CODE_BOX_MISSING in denied_seg["eligibility"]["reason"]
+    assert denied_auth["eligibility"]["full_apply_executable"] is False
+    assert any(
+        CODE_BOX_MISSING in reason for reason in denied_auth["eligibility"]["reasons"]
+    )
+    denied_timeline = denied_auth["timeline"]
+    assert denied_timeline["occurrences"] == []
+    assert [row["reason_code"] for row in denied_timeline["excluded"]] == [
+        CODE_BOX_MISSING
+    ]
+    assert _row_count(session) == rows_start + 1
+    denied_bytes = _stored_bytes(session, denied.id)
+
+    replay, created_again = _reapprove(repo, seed, note="points-only denial")
+    assert created_again is False
+    assert replay.id == denied.id
+    assert _row_count(session) == rows_start + 1  # zero mutation on replay
+    assert _stored_bytes(session, denied.id) == denied_bytes
+
+    # (b) boxed positive -> region authority present and executable.
+    _write_geometry(
+        session,
+        seed.segment,
+        {
+            "points": [{"x": 10.0, "y": 20.0, "label": "center"}],
+            "boxes": [{"x": 0.1, "y": 0.2, "w": 0.3, "h": 0.4}],
+        },
+        {"points": [{"x": 5.0, "y": 6.0, "label": "p"}]},
+    )
+    allowed, created_boxed = _reapprove(repo, seed, note="boxed positive")
+    assert created_boxed is True
+    assert allowed.id != denied.id
+    allowed_auth = allowed.snapshot["full_apply_authority"]
+    allowed_seg = allowed_auth["segments"][0]
+    assert allowed_seg["geometry"]["has_geometry"] is True
+    assert allowed_seg["eligibility"]["executable"] is True
+    assert allowed_seg["eligibility"]["reason"] == ""
+    assert allowed_auth["eligibility"]["full_apply_executable"] is True
+    assert allowed_auth["eligibility"]["reasons"] == []
+    allowed_timeline = allowed_auth["timeline"]
+    assert allowed_timeline["excluded"] == []
+    assert len(allowed_timeline["occurrences"]) == 1
+    occurrence = allowed_timeline["occurrences"][0]
+    # measured shape: the timeline entry is keyed by logical_id (the segment
+    # authority row carries occurrence_segment_id) and the region is exposed
+    # as affected_region + raw_box with its provenance.
+    assert occurrence["logical_id"] == allowed_seg["logical_id"]
+    assert occurrence["geometry_source"] == "segmentation.boxes[0]"
+    assert occurrence["raw_box"] == [0.1, 0.2, 0.3, 0.4]
+    assert occurrence["affected_region"] == [0.1, 0.2, 0.3, 0.4]
+    assert occurrence["scale_mode"] == "normalized"
+    assert denied_timeline["excluded"][0]["occurrence_segment_id"] == seed.segment
+
+    # The denied checkpoint is IMMUTABLE: a later positive never rewrites it.
+    assert _stored_bytes(session, denied.id) == denied_bytes
+    assert _row_count(session) == rows_start + 2
