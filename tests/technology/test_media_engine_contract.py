@@ -19,6 +19,7 @@ from pathlib import Path
 import pytest
 
 from app.schemas.media_engine import (
+    BACKEND_IDENTITY_PROOF_CONSTRUCTION_BOUNDARY,
     CAPABILITY_REFERENCE_REQUIREMENTS,
     E01_JOB_STORE,
     FORBIDDEN_DEGRADATION_TARGETS,
@@ -33,6 +34,7 @@ from app.schemas.media_engine import (
     SOURCE_LOCKED_CAPABILITIES,
     STATE_ORDER,
     STATE_TRANSITION_TABLE,
+    UNCLASSIFIED_SERVER_OUTPUT_TYPE,
     AudioHandoff,
     BackendIdentityProof,
     CacheEntry,
@@ -74,6 +76,7 @@ from app.schemas.media_engine import (
     assert_shared_stack,
     cache_identity_for,
     identity_integrity,
+    independent_references,
     invalidate_for_reference_change,
     reservation_identity_for,
     resolve_replay,
@@ -141,16 +144,24 @@ def make_output(
     height: int = 360,
     frame_count: int = 20,
     audio: AudioHandoff | None = None,
+    fps_num: int = 30,
+    fps_den: int = 1,
+    stream_timebase_num: int | None = 1,
+    stream_timebase_den: int | None = 15360,
 ) -> OutputContract:
     return OutputContract(
         width=width,
         height=height,
-        fps_num=30,
-        fps_den=1,
+        fps_num=fps_num,
+        fps_den=fps_den,
         frame_count=frame_count,
         container="mp4",
         video_codec="h264",
         audio=audio if audio is not None else AudioHandoff(mode="silent"),
+        # The OUTPUT stream's rational time_base, measured on the same clip the
+        # source fixture mirrors — never the 30/1 frame rate (NR05.3).
+        stream_timebase_num=stream_timebase_num,
+        stream_timebase_den=stream_timebase_den,
     )
 
 
@@ -473,6 +484,9 @@ def test_intermediate_artifacts_are_managed_but_never_publishable() -> None:
         store_relative_path="video/out.mp4",
         size_bytes=1024,
         publishable=True,
+        # NR05.4: the classification is SUPPLIED by the server.  Omitting it is
+        # recorded as "unclassified" and refuses publication — never "output".
+        server_output_type="output",
     )
     assert assert_publishable_set([mask, video]) == (video,)
 
@@ -499,6 +513,7 @@ def test_publication_gate_is_fail_closed() -> None:
         store_relative_path="video/out.mp4",
         size_bytes=1024,
         publishable=True,
+        server_output_type="output",
     )
     assert assert_publishable_set([video], publishable_types=("output",)) == (video,)
     with pytest.raises(ValueError):
@@ -630,7 +645,13 @@ def test_request_carries_every_frozen_fact() -> None:
     assert request.pins.seed == 1234
     assert request.pins.model.file_sha256 == SHA_C
     assert request.pins.nodes[0].node_id == "node-1"
-    assert request.output.timebase == "30/1" and request.output.audio.mode == "silent"
+    # NR05.3 — the output exposes fps and the STREAM time_base separately; the
+    # frame rate is never handed back as a time_base.
+    assert request.output.fps == "30/1"
+    assert request.output.stream_timebase == "1/15360"
+    assert request.output.timebase == "1/15360" != request.output.fps
+    assert request.output.timebase == request.source.timebase
+    assert request.output.audio.mode == "silent"
     assert request.budget.resource_class == "gpu"
 
 
@@ -711,8 +732,20 @@ def test_pts_must_be_ordered_and_match_the_declared_count() -> None:
         make_source(shot_range=make_range(100, 119), decoded_frame_count=19)
     with pytest.raises(ValueError):
         make_source(pts_start_ticks=2048, pts_end_ticks=4096, decoded_frame_count=20)
-    zero_span = make_source(pts_start_ticks=0, pts_end_ticks=0, decoded_frame_count=None)
-    assert zero_span.pts_span_ticks == 0
+    # NR05.2 — an ordered but ZERO-span range over a 20-frame shot is impossible
+    # timing: it is refused EVEN when the optional decoded count is omitted.
+    with pytest.raises(ValueError):
+        make_source(pts_start_ticks=0, pts_end_ticks=0, decoded_frame_count=None)
+    with pytest.raises(ValueError):
+        make_source(pts_start_ticks=0, pts_end_ticks=0)
+    # A SINGLE-frame range may legitimately be a point in time.
+    single = make_source(
+        shot_range=make_range(100, 100),
+        pts_start_ticks=0,
+        pts_end_ticks=0,
+        decoded_frame_count=None,
+    )
+    assert single.pts_span_ticks == 0 and single.shot_range.frame_count == 1
     nonzero = make_source(pts_start_ticks=512, pts_end_ticks=60928)
     assert nonzero.pts_start_ticks == 512 and nonzero.pts_span_ticks == 60416
 
@@ -818,7 +851,7 @@ def _mutators() -> dict[str, Callable[[], MediaEngineRequest]]:
             source=SourceLock(
                 source_artifact_id="art-source-1",
                 source_sha256=SHA_A,
-                shot_range=make_range(100, 118),
+                shot_range=make_range(101, 120),
                 pts_start_ticks=0,
                 pts_end_ticks=60928,
                 fps_num=30,
@@ -911,7 +944,12 @@ def test_cache_distinguishes_capability_and_stream_timebase_but_not_the_epoch() 
     assert other_capability.settings_digest != base.settings_digest
 
     other_timebase = cache_identity_for(
-        make_request(source=make_source(stream_timebase_num=1, stream_timebase_den=12800))
+        make_request(
+            source=make_source(stream_timebase_num=1, stream_timebase_den=12800),
+            # NR05.1: the locked output follows its source, so the digest delta is
+            # the stream time_base and nothing else.
+            output=make_output(stream_timebase_num=1, stream_timebase_den=12800),
+        )
     )
     assert other_timebase.digest != base.digest
     assert other_timebase.settings_digest != base.settings_digest
@@ -1543,3 +1581,247 @@ def test_module_imports_no_persistence_or_network_libraries() -> None:
     body = source.lower()
     for needle in ("create_engine(", "sessionmaker(", "redis", "celery", "threading"):
         assert needle not in body, f"{needle} would create a second engine"
+
+
+# ── 9. NR05 corrections — source/output timeline, publication, references ─────
+
+
+def test_source_locked_output_must_reproduce_the_source_timeline() -> None:
+    """NR05.1 — a 20-frame locked source used to accept ``frame_count=2``."""
+
+    honest = make_request(output=make_output(frame_count=20))
+    assert honest.output.frame_count == honest.source.shot_range.frame_count == 20
+
+    with pytest.raises(MediaEngineRefusal) as exc:
+        make_request(output=make_output(frame_count=2))
+    assert exc.value.code is MediaEngineRefusalCode.SOURCE_OUTPUT_TIMELINE_MISMATCH
+    assert "20 frame(s)" in exc.value.detail and "2 frame(s)" in exc.value.detail
+
+    with pytest.raises(MediaEngineRefusal) as fps_exc:
+        make_request(output=make_output(fps_num=24))
+    assert fps_exc.value.code is MediaEngineRefusalCode.SOURCE_OUTPUT_TIMELINE_MISMATCH
+    assert "30/1" in fps_exc.value.detail and "24/1" in fps_exc.value.detail
+
+    with pytest.raises(MediaEngineRefusal) as tb_exc:
+        make_request(output=make_output(stream_timebase_num=1, stream_timebase_den=12800))
+    assert tb_exc.value.code is MediaEngineRefusalCode.SOURCE_OUTPUT_TIMELINE_MISMATCH
+    assert "1/15360" in tb_exc.value.detail and "1/12800" in tb_exc.value.detail
+
+    # An unprobed output time_base is UNKNOWN, not a mismatch, and a fractional
+    # frame rate round-trips exactly.
+    unprobed = make_request(
+        output=make_output(stream_timebase_num=None, stream_timebase_den=None)
+    )
+    assert unprobed.output.timebase is None
+    fractional = make_request(
+        source=make_source(fps_num=30000, fps_den=1001),
+        output=make_output(fps_num=30000, fps_den=1001),
+    )
+    assert fractional.output.fps == "30000/1001"
+
+    # A single-frame (image-like) locked round stays legal.
+    single = make_request(
+        source=make_source(
+            shot_range=make_range(100, 100),
+            pts_start_ticks=0,
+            pts_end_ticks=0,
+            decoded_frame_count=1,
+        ),
+        output=make_output(frame_count=1),
+    )
+    assert single.output.frame_count == single.source.shot_range.frame_count == 1
+
+    # A capability that is NOT source-locked owns its own timeline.
+    free = make_request(
+        capability=MediaCapability.TEXT_TO_VIDEO,
+        cast=(),
+        output=make_output(frame_count=2, fps_num=24),
+    )
+    assert free.output.frame_count == 2
+
+
+def test_impossible_timing_is_refused_without_the_optional_decoded_count() -> None:
+    """NR05.2 — the optional decoded count was the only thing that caught this."""
+
+    with pytest.raises(ValueError) as exc:
+        make_source(pts_start_ticks=10, pts_end_ticks=10, decoded_frame_count=None)
+    assert "ZERO" in str(exc.value)
+
+    with pytest.raises(ValueError):
+        make_source(pts_start_ticks=2048, pts_end_ticks=4096, decoded_frame_count=None)
+    with pytest.raises(ValueError):
+        make_source(decoded_frame_count=19)
+
+    # Legitimate timing passes with AND without the optional count.
+    for lock in (make_source(), make_source(decoded_frame_count=None)):
+        assert lock.pts_start_ticks == 0
+        assert lock.pts_end_ticks == 60928
+        assert lock.pts_span_ticks == 60928
+
+
+def test_output_timebase_is_the_stream_timebase_never_the_fps() -> None:
+    """NR05.3 — ``OutputContract.timebase`` used to answer the FPS ``30/1``."""
+
+    output = make_request().output
+    assert output.fps == "30/1"
+    assert output.stream_timebase == "1/15360"
+    assert output.timebase == "1/15360"
+    assert output.timebase != output.fps
+    assert output.timebase == make_request().source.timebase
+
+    unprobed = make_output(stream_timebase_num=None, stream_timebase_den=None)
+    assert unprobed.timebase is None and unprobed.stream_timebase is None
+    assert unprobed.fps == "30/1"
+    with pytest.raises(ValueError):
+        make_output(stream_timebase_den=None)
+
+
+def test_absent_server_classification_is_recorded_and_refuses_publication() -> None:
+    """NR05.4 — an omitted classification silently became ``output`` and published."""
+
+    absent = ManagedArtifact(
+        artifact_id="art-absent",
+        kind="video",
+        media_type="video/mp4",
+        sha256=SHA_D,
+        store_relative_path="temp/a.mp4",
+        size_bytes=1,
+        publishable=True,
+    )
+    assert absent.server_output_type == UNCLASSIFIED_SERVER_OUTPUT_TYPE == "unclassified"
+    assert absent.server_output_type != "output"
+    with pytest.raises(MediaEngineRefusal) as exc:
+        assert_publishable_set([absent], publishable_types=SERVER_PUBLISHABLE_TYPES)
+    assert exc.value.code is MediaEngineRefusalCode.ARTIFACT_NOT_MANAGED
+    assert "unclassified" in exc.value.detail
+
+    assert SERVER_OUTPUT_TYPES[0] == "output"
+    assert UNCLASSIFIED_SERVER_OUTPUT_TYPE in SERVER_OUTPUT_TYPES
+    assert PUBLISHABLE_SERVER_TYPES == ("output",) == SERVER_PUBLISHABLE_TYPES
+    with pytest.raises(MediaEngineRefusal) as unclassified_exc:
+        assert_publishable_set(
+            [make_output_artifact(server_output_type=UNCLASSIFIED_SERVER_OUTPUT_TYPE)]
+        )
+    assert unclassified_exc.value.code is MediaEngineRefusalCode.ARTIFACT_NOT_MANAGED
+
+    explicit = make_output_artifact(server_output_type="output")
+    assert assert_publishable_set([explicit]) == (explicit,)
+
+
+def test_duplicate_reference_authority_cannot_satisfy_the_minimum() -> None:
+    """NR05.5 — two copies of ONE reference were counted as two references."""
+
+    one = make_artifact()
+    with pytest.raises(MediaEngineRefusal) as exc:
+        make_request(
+            capability=MediaCapability.IMAGE_EDIT_MULTI_REFERENCE,
+            cast=(make_cast(references=(one, one)),),
+        )
+    assert exc.value.code is MediaEngineRefusalCode.REFERENCE_REQUIREMENT_UNMET
+    assert "INDEPENDENT" in exc.value.detail
+    assert "not additional evidence" in exc.value.detail
+
+    # Identical BYTES under a second id are the same evidence, not a second source.
+    with pytest.raises(MediaEngineRefusal):
+        make_request(
+            capability=MediaCapability.IMAGE_EDIT_MULTI_REFERENCE,
+            cast=(
+                make_cast(
+                    references=(
+                        make_artifact("art-ref-1", SHA_B),
+                        make_artifact("art-ref-9", SHA_B),
+                    ),
+                ),
+            ),
+        )
+
+    # Two genuinely different reference pixels satisfy the minimum.
+    ok = make_request(
+        capability=MediaCapability.IMAGE_EDIT_MULTI_REFERENCE,
+        cast=(
+            make_cast(
+                references=(
+                    make_artifact("art-ref-1", SHA_B),
+                    make_artifact("art-ref-2", SHA_D),
+                ),
+            ),
+        ),
+    )
+    assert len(ok.cast[0].references) == 2
+
+    # The dedup authority is one function, and a single-reference capability is
+    # unaffected by it.
+    binding = make_cast(references=(one, one, make_artifact("art-ref-2", SHA_D)))
+    assert independent_references(binding) == (one, make_artifact("art-ref-2", SHA_D))
+    assert independent_references(make_cast()) == (one,)
+    strict = ReferenceRequirement(min_roles=1, min_references_per_role=2, rationale="x")
+    assert strict.unmet_reason((binding,)) is None
+    assert strict.unmet_reason((make_cast(references=(one, one)),)) is not None
+    assert make_request(cast=(make_cast(references=(one, one)),)).cast[0].references == (
+        one,
+        one,
+    )
+
+
+def test_backend_identity_proof_documents_the_construction_boundary() -> None:
+    """NR05 limit — a self-computed digest is field integrity, NOT origin proof."""
+
+    boundary = BACKEND_IDENTITY_PROOF_CONSTRUCTION_BOUNDARY
+    for key in (
+        "constructed_at",
+        "produced_by",
+        "facts_read",
+        "caller_role",
+        "integrity_scope",
+        "not_provided",
+    ):
+        assert boundary[key].strip()
+    assert "signature" in boundary["not_provided"]
+    assert "InflightReservation" in boundary["produced_by"]
+    assert "E01" in boundary["produced_by"]
+    assert "backend" in boundary["constructed_at"]
+    assert "never" in boundary["facts_read"]
+    assert all(
+        not any(word in key for word in ("key", "secret", "private")) for key in boundary
+    )
+
+    reservation = make_reservation().model_copy(
+        update={
+            "workspace_id": "ws-1",
+            "server_epoch": "boot-1",
+            "output_contract_digest": "o" * 64,
+        }
+    )
+    claim = {
+        "requester_session": "session-owner",
+        "workspace_id": "ws-1",
+        "job_id": "job-1",
+        "attempt_id": "attempt-1",
+        "stage": "video_apply",
+        "server_epoch": "boot-1",
+        "workflow_digest": "wd" + "1" * 14,
+        "input_digest": "id" + "2" * 14,
+        "output_contract_digest": "o" * 64,
+        "resolution": "resolved",
+    }
+    self_minted = BackendIdentityProof(**claim, integrity_sha256=identity_integrity(**claim))
+    # The LIMIT, stated as a test rather than as a claim: the digest verifies
+    # without any backend, so it proves tamper-evidence only.
+    assert verify_identity_proof(self_minted) is True
+    tampered = BackendIdentityProof(
+        **{**claim, "job_id": "other-job"}, integrity_sha256=identity_integrity(**claim)
+    )
+    assert verify_identity_proof(tampered) is False
+    unknown = {**claim, "resolution": "unknown"}
+    assert (
+        resolve_replay(
+            reservation,
+            proof=BackendIdentityProof(
+                **unknown, integrity_sha256=identity_integrity(**unknown)
+            ),
+        ).action
+        is ReplayAction.REFUSE
+    )
+    assert (
+        resolve_replay(reservation, proof=self_minted).action is ReplayAction.RE_ATTACH
+    )

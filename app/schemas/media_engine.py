@@ -35,8 +35,17 @@ Consequences enforced by this module, never by convention:
    identity proof, and ownership is proven BEFORE an ACKed prompt may be
    re-attached; a caller's boolean is never the authority (C-CONTRACT R6).
 8. The frame rate and the stream's rational time_base are DIFFERENT quantities,
-   and the SERVER's node-output classification — not a caller's allow-list and
-   not an artifact's own flag — decides what may be published.
+   on the source AND on the output, and the SERVER's node-output
+   classification — not a caller's allow-list and not an artifact's own flag —
+   decides what may be published.  A classification nobody supplied is recorded
+   as ``unclassified`` and refuses publication; it is never defaulted to
+   ``output``.
+9. A source-locked capability keeps the source's timeline: same frame count,
+   same frame rate, same declared stream time_base.  The output DTO can no
+   longer describe a different, shorter or re-rated shot of the same source.
+10. A reference minimum counts INDEPENDENT reference pixels; duplicating one
+    reference entry (or aliasing identical bytes under a second id) never
+    manufactures the second reference a multi-reference capability requires.
 """
 
 from __future__ import annotations
@@ -67,6 +76,8 @@ __all__ = [
     "SECOND_JOB_DATABASE_ALLOWED",
     "SERVER_OUTPUT_TYPES",
     "SERVER_PUBLISHABLE_TYPES",
+    "BACKEND_IDENTITY_PROOF_CONSTRUCTION_BOUNDARY",
+    "UNCLASSIFIED_SERVER_OUTPUT_TYPE",
     "SOURCE_LOCKED_CAPABILITIES",
     "STATE_ORDER",
     "AudioHandoff",
@@ -111,6 +122,7 @@ __all__ = [
     "assert_shared_stack",
     "cache_identity_for",
     "identity_integrity",
+    "independent_references",
     "invalidate_for_reference_change",
     "reservation_identity_for",
     "resolve_replay",
@@ -136,6 +148,11 @@ PUBLISHABLE_ARTIFACT_KINDS = ("image", "video", "audio")
 #: The SERVER-owned publishable node-output types (COMFY round authority).  A
 #: caller's ``OutputContract.publishable_types`` may only narrow this set.
 SERVER_PUBLISHABLE_TYPES = ("output",)
+#: The classification the backend records when it has NOT classified a node
+#: output.  It is a REAL vocabulary member (so "not supplied" stays visible as
+#: data instead of being silently defaulted to ``output``) and it is NEVER
+#: publishable: the publication gate admits only :data:`PUBLISHABLE_SERVER_TYPES`.
+UNCLASSIFIED_SERVER_OUTPUT_TYPE = "unclassified"
 #: The complete server-side node-output CLASSIFICATION vocabulary.  The backend
 #: classifies every node output it stages; the classification is the authority,
 #: never the caller and never the artifact's own ``publishable`` flag.  Only the
@@ -143,7 +160,14 @@ SERVER_PUBLISHABLE_TYPES = ("output",)
 #: ``temp`` / ``input`` / ``intermediate`` output refuses publication even when a
 #: caller lists it in an allow-list and even when the artifact claims
 #: ``publishable=True``.
-SERVER_OUTPUT_TYPES = ("output", "preview", "intermediate", "temp", "input")
+SERVER_OUTPUT_TYPES = (
+    "output",
+    "preview",
+    "intermediate",
+    "temp",
+    "input",
+    UNCLASSIFIED_SERVER_OUTPUT_TYPE,
+)
 #: Alias kept so the COMFY-round vocabulary is nameable from this module too.
 PUBLISHABLE_SERVER_TYPES = SERVER_PUBLISHABLE_TYPES
 
@@ -168,6 +192,11 @@ class MediaEngineRefusalCode(str, Enum):
     #: pixels).  A pack declaration may only SELECT/ADD requirements; it can never
     #: lower this minimum to make a request pass.
     REFERENCE_REQUIREMENT_UNMET = "reference_requirement_unmet"
+    #: A source-locked capability's OUTPUT must reproduce the locked source's own
+    #: timeline: the same frame count, the same frame rate and (when the output
+    #: declares one) the same stream time_base as the source it was locked to.  An
+    #: output that shortens, extends or re-rates the locked shot is refused.
+    SOURCE_OUTPUT_TIMELINE_MISMATCH = "source_output_timeline_mismatch"
 
 
 class MediaEngineRefusal(Exception):
@@ -220,6 +249,27 @@ FORBIDDEN_DEGRADATION_TARGETS: dict[MediaCapability, frozenset[MediaCapability]]
 }
 
 
+def independent_references(binding: CastBinding) -> tuple[ReferenceArtifact, ...]:
+    """The INDEPENDENT reference evidence a cast binding actually carries.
+
+    Two reference entries are independent only when they resolve to DIFFERENT
+    reference pixels (different ``sha256``).  Repeating one artifact — by copying
+    the same tuple entry, by re-using the same ``artifact_id``, or by aliasing the
+    same bytes under a second id — adds no evidence, so it can never satisfy a
+    ``min_references_per_role`` minimum.  Order of first appearance is kept so a
+    refusal can name the role it belongs to deterministically.
+    """
+
+    seen: set[str] = set()
+    distinct: list[ReferenceArtifact] = []
+    for reference in binding.references:
+        if reference.sha256 in seen:
+            continue
+        seen.add(reference.sha256)
+        distinct.append(reference)
+    return tuple(distinct)
+
+
 class ReferenceRequirement(BaseModel):
     """The NORMATIVE MINIMUM reference set a capability requires.
 
@@ -245,12 +295,22 @@ class ReferenceRequirement(BaseModel):
                 f"pixels; got {len(cast)}"
             )
         for binding in cast:
-            if len(binding.references) < self.min_references_per_role:
-                return (
+            distinct = independent_references(binding)
+            if len(distinct) < self.min_references_per_role:
+                supplied = len(binding.references)
+                duplicates = supplied - len(distinct)
+                detail = (
                     f"role {binding.role!r} needs at least "
-                    f"{self.min_references_per_role} reference artifact(s); got "
-                    f"{len(binding.references)}"
+                    f"{self.min_references_per_role} INDEPENDENT reference "
+                    f"artifact(s); got {len(distinct)}"
                 )
+                if duplicates:
+                    detail += (
+                        f" — {supplied} entries were supplied but {duplicates} of "
+                        "them repeat reference pixels already counted; a "
+                        "duplicated tuple entry is not additional evidence"
+                    )
+                return detail
         return None
 
 
@@ -446,15 +506,33 @@ class SourceLock(BaseModel):
                 "decoded_frame_count must equal the shot range's frame count "
                 f"({self.shot_range.frame_count}); got {self.decoded_frame_count}"
             )
-        if self.decoded_frame_count is not None and self.stream_timebase is not None:
-            required = (self.decoded_frame_count - 1) * Fraction(
+        # NR05.2: the optional ``decoded_frame_count`` must not be the ONLY thing
+        # that makes impossible timing detectable.  The locked RANGE declares how
+        # many frames the shot holds, so that count is the authority when the
+        # backend has not supplied a decoded count yet.
+        frames = (
+            self.decoded_frame_count
+            if self.decoded_frame_count is not None
+            else self.shot_range.frame_count
+        )
+        if frames > 1 and self.pts_span_ticks == 0:
+            raise ValueError(
+                f"pts span is ZERO (start={self.pts_start_ticks}, "
+                f"end={self.pts_end_ticks}) but the locked range "
+                f"{self.shot_range.key()} holds {frames} frames: a multi-frame "
+                "shot cannot be a point in time.  An ordered but zero-span range "
+                "is incomplete timing and is refused even when "
+                "decoded_frame_count is omitted (NR05.2)"
+            )
+        if self.stream_timebase is not None:
+            required = (frames - 1) * Fraction(
                 self.fps_den * self.stream_timebase_den,
                 self.fps_num * self.stream_timebase_num,
             )
             if self.pts_span_ticks < required:
                 raise ValueError(
                     f"pts span {self.pts_span_ticks} ticks cannot hold "
-                    f"{self.decoded_frame_count} frames at fps {self.fps} and stream "
+                    f"{frames} frames at fps {self.fps} and stream "
                     f"time_base {self.stream_timebase}: at least {required} ticks "
                     "are required"
                 )
@@ -602,11 +680,22 @@ class OutputContract(BaseModel):
     container: str = Field(min_length=1)
     video_codec: str = Field(min_length=1)
     audio: AudioHandoff
+    #: The OUTPUT stream's rational time_base (seconds per tick), when the
+    #: backend has probed the encoded result.  A DIFFERENT quantity from
+    #: ``fps_num``/``fps_den``, declared as a PAIR or not at all, and ``None``
+    #: means "not probed" — never a substitute for the frame rate.
+    stream_timebase_num: int | None = Field(default=None, gt=0)
+    stream_timebase_den: int | None = Field(default=None, gt=0)
     #: Server-owned publish allow-list; a caller may only NARROW it.
     publishable_types: tuple[str, ...] = SERVER_PUBLISHABLE_TYPES
 
     @model_validator(mode="after")
     def _check(self) -> OutputContract:
+        if (self.stream_timebase_num is None) != (self.stream_timebase_den is None):
+            raise ValueError(
+                "output stream time_base must be a complete rational pair "
+                "(stream_timebase_num AND stream_timebase_den), never half of one"
+            )
         if not set(self.publishable_types) <= set(SERVER_PUBLISHABLE_TYPES):
             raise ValueError(
                 f"publishable_types may only narrow {SERVER_PUBLISHABLE_TYPES}; "
@@ -615,8 +704,27 @@ class OutputContract(BaseModel):
         return self
 
     @property
-    def timebase(self) -> str:
+    def fps(self) -> str:
+        """The output FRAME RATE as a rational — NOT the time_base."""
         return f"{self.fps_num}/{self.fps_den}"
+
+    @property
+    def stream_timebase(self) -> str | None:
+        """The output stream's time_base (``num/den``), or ``None`` if unprobed."""
+        if self.stream_timebase_num is None or self.stream_timebase_den is None:
+            return None
+        return f"{self.stream_timebase_num}/{self.stream_timebase_den}"
+
+    @property
+    def timebase(self) -> str | None:
+        """Alias of :attr:`stream_timebase` — NEVER the frame rate.
+
+        Reading the fps here was the NR05.3 defect: ``OutputContract.timebase``
+        answered ``"30/1"`` for a stream stored at ``1/15360``.  An unprobed
+        output returns ``None`` (a refusal to invent the value), and the frame
+        rate stays available, unambiguously, as :attr:`fps`.
+        """
+        return self.stream_timebase
 
 
 class ResourceBudget(BaseModel):
@@ -684,6 +792,61 @@ class MediaEngineRequest(BaseModel):
             raise MediaEngineRefusal(
                 MediaEngineRefusalCode.REFERENCE_REQUIREMENT_UNMET,
                 f"{self.capability.value} {unmet} — {requirement.rationale}",
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _check_source_output_timeline(self) -> MediaEngineRequest:
+        """A source-locked capability owns the source's timeline — and keeps it.
+
+        NR05.1: a 20-frame locked source used to accept ``output.frame_count=2``.
+        The product rule is that the ACTION, CAMERA, CUTS, TIMELINE and AUDIO of
+        the source are preserved, so for a source-locked capability the output
+        contract must describe the SAME timeline:
+
+        * frame count identical to the locked shot range (and therefore to the
+          decoded count when the backend supplied one);
+        * frame rate identical as an exact rational (``fps_num/fps_den``), so a
+          29.97/30 mix-up cannot pass;
+        * a DECLARED output stream time_base identical to the source's.  An
+          unprobed output time_base is ``None`` — unknown, not a mismatch.
+
+        Capabilities that are NOT source-locked (``text_to_video``,
+        ``image_edit_multi_reference``) own their own timeline and are never
+        constrained to the source's frame count, which keeps single-frame /
+        image rounds and free-length generation legal.
+        """
+
+        if self.capability not in SOURCE_LOCKED_CAPABILITIES:
+            return self
+        source, output = self.source, self.output
+        expected = source.shot_range.frame_count
+        if output.frame_count != expected:
+            raise MediaEngineRefusal(
+                MediaEngineRefusalCode.SOURCE_OUTPUT_TIMELINE_MISMATCH,
+                f"{self.capability.value} is locked to source shot "
+                f"{source.shot_range.key()} ({expected} frame(s)); an output of "
+                f"{output.frame_count} frame(s) does not reproduce the locked "
+                "timeline — the action, camera, cuts and audio of the source are "
+                "preserved, so the output must carry the same frames",
+            )
+        if output.fps_num * source.fps_den != source.fps_num * output.fps_den:
+            raise MediaEngineRefusal(
+                MediaEngineRefusalCode.SOURCE_OUTPUT_TIMELINE_MISMATCH,
+                f"{self.capability.value} keeps the source frame rate "
+                f"{source.fps}; the output declares {output.fps} — re-rating a "
+                "locked shot is not a preservation of its timeline",
+            )
+        if (
+            output.stream_timebase is not None
+            and source.stream_timebase is not None
+            and output.stream_timebase != source.stream_timebase
+        ):
+            raise MediaEngineRefusal(
+                MediaEngineRefusalCode.SOURCE_OUTPUT_TIMELINE_MISMATCH,
+                f"{self.capability.value} keeps the source stream time_base "
+                f"{source.stream_timebase}; the output declares "
+                f"{output.stream_timebase}",
             )
         return self
 
@@ -924,12 +1087,18 @@ class ManagedArtifact(BaseModel):
     size_bytes: int = Field(ge=0)
     publishable: bool = False
     #: The SERVER's classification of the node output this artifact came from
-    #: (``output`` | ``preview`` | ``intermediate`` | ``temp`` | ``input``).  The
-    #: publication GATE combines it with the caller's allow-list: this field is the
-    #: authority, the artifact's own ``publishable`` flag records only what the
-    #: producing node staged.  Classification-only here — publication is decided in
-    #: exactly one place (:func:`assert_publishable_set`), never inferred twice.
-    server_output_type: str = "output"
+    #: (``output`` | ``preview`` | ``intermediate`` | ``temp`` | ``input`` |
+    #: ``unclassified``).  The publication GATE combines it with the caller's
+    #: allow-list: this field is the authority, the artifact's own ``publishable``
+    #: flag records only what the producing node staged.  Classification-only here
+    #: — publication is decided in exactly one place
+    #: (:func:`assert_publishable_set`), never inferred twice.
+    #:
+    #: NR05.4: an OMITTED classification is recorded as
+    #: :data:`UNCLASSIFIED_SERVER_OUTPUT_TYPE` and refuses publication.  It is
+    #: never defaulted to ``"output"``: "nobody classified this" is not
+    #: "the server says output".
+    server_output_type: str = UNCLASSIFIED_SERVER_OUTPUT_TYPE
 
     @model_validator(mode="after")
     def _check(self) -> ManagedArtifact:
@@ -1207,12 +1376,54 @@ IDENTITY_PROOF_FIELDS = (
 def identity_integrity(**claim: Any) -> str:
     """Integrity digest over a backend identity claim.
 
-    The backend computes it when it RESOLVES the claim; a caller cannot mint one by
-    repeating a claim back, and a mutated claim fails
-    :func:`verify_identity_proof`.
+    LIMIT (recorded, not claimed as fixed): this is a DETERMINISTIC, PUBLIC
+    digest over :data:`IDENTITY_PROOF_FIELDS`.  Any party holding the field
+    values can recompute it, so a self-computed digest is tamper-evidence
+    ONLY — it does NOT prove that a backend produced the claim and it does NOT
+    authenticate a producer.  Where the proof may legitimately be constructed,
+    and what a future integration must add if real origin proof is required, is
+    recorded in :data:`BACKEND_IDENTITY_PROOF_CONSTRUCTION_BOUNDARY`.  No
+    signing subsystem is invented here; what this contract guarantees is that a
+    MUTATED claim fails :func:`verify_identity_proof` and that a claim whose
+    ``resolution`` is not ``resolved`` (unknown / ambiguous / multi_claim) can
+    never take the re-attach branch.
     """
 
     return _digest({name: claim[name] for name in IDENTITY_PROOF_FIELDS})
+
+
+#: WHERE a :class:`BackendIdentityProof` may be constructed — the exact future
+#: backend-construction boundary.  This is a DOCUMENTED LIMIT of the pure DTO, not
+#: an implemented provenance/attestation mechanism.
+BACKEND_IDENTITY_PROOF_CONSTRUCTION_BOUNDARY: dict[str, str] = {
+    "constructed_at": (
+        "inside the backend's replay-resolution step, from the backend's OWN "
+        "durable records"
+    ),
+    "produced_by": (
+        "the generation runtime / E01 durable-job adapter that owns the "
+        "InflightReservation row (app/persistence/jobs.py; S13 T03B "
+        "integration — every replay-resolution call site)"
+    ),
+    "facts_read": (
+        "the reservation row, the attempt/lease record and the upstream prompt id "
+        "already stored server-side — never a value echoed from the request"
+    ),
+    "caller_role": (
+        "an HTTP caller may never SUPPLY a proof: a proof arriving in a request "
+        "body is a client-supplied input and is refused (see "
+        "MediaEngineRefusalCode.CLIENT_GRAPH_REFUSED / the client-input guards)"
+    ),
+    "integrity_scope": (
+        "identity_integrity() over IDENTITY_PROOF_FIELDS — tamper-evidence only, "
+        "not origin"
+    ),
+    "not_provided": (
+        "no signature, no key material, no remote attestation, no out-of-band "
+        "producer identity.  A future integration that needs real origin proof "
+        "must add it at this boundary and say so explicitly"
+    ),
+}
 
 
 class BackendIdentityProof(BaseModel):
@@ -1227,6 +1438,13 @@ class BackendIdentityProof(BaseModel):
       unknown / ambiguous / multi-claim principal can never re-attach;
     * ``integrity_sha256`` binds the claim to the resolved facts, so a mutated or
       replayed claim is detectable (:func:`verify_identity_proof`).
+
+    LIMIT — this DTO is field integrity, not origin proof.  The digest is public
+    and recomputable, so it cannot establish that a backend produced the claim;
+    see :data:`BACKEND_IDENTITY_PROOF_CONSTRUCTION_BOUNDARY` for the exact
+    boundary at which a real backend must construct it and for what a future
+    integration would have to add.  Integration must not claim this is already
+    wired up.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)

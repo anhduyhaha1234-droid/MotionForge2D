@@ -110,7 +110,13 @@ pair is all-or-nothing (half a rational raises). `SourceLock` also validates, in
 - **range/count** — `decoded_frame_count`, when declared, must equal
   `shot_range.frame_count`, and the PTS span must be able to hold that many frames at
   `fps × stream time_base` (exact rational arithmetic; a nonzero `pts_start_ticks` is allowed,
-  because PTS is a timeline position, not a zero-based offset).
+  because PTS is a timeline position, not a zero-based offset);
+- **no impossible timing, even without the optional count** (NR05.2) — the count used for the
+  capacity check is the locked range's own `shot_range.frame_count` whenever
+  `decoded_frame_count` is omitted, so an ABSENT optional count can no longer hide a broken
+  timeline: a multi-frame shot with a ZERO PTS span is refused (an ordered but zero-span range
+  is incomplete timing, not a point in time). A **single-frame** range
+  (`frame_count = 1`) may legitimately be a point in time.
 
 **Capability-aware required references.** `CAPABILITY_REFERENCE_REQUIREMENTS` states the
 normative minimum reference set per capability, and `MediaEngineRequest` enforces it at
@@ -119,6 +125,13 @@ construction: `source_video_motion_transfer` needs ≥ 1 bound role carrying ≥
 `image_edit_multi_reference` needs ≥ 2 references per bound role, while `video_edit_controlled`
 and `text_to_video` require none and are **not** forced to carry character references their
 profile does not need. A capability with no declared profile is refused rather than assumed.
+
+The minimum counts **INDEPENDENT** reference evidence (NR05.5): `independent_references()` is
+the ONE dedup authority, and two entries that resolve to the same reference pixels (`sha256`)
+are ONE reference, not two. Copying a tuple entry, repeating one `artifact_id`, or aliasing
+identical bytes under a second id therefore cannot satisfy `min_references_per_role`: a role
+needs ≥ 2 *distinct* reference images for `image_edit_multi_reference`. The refusal detail
+says `INDEPENDENT` and names how many supplied entries repeated pixels already counted.
 
 ### 3.1 Backend-managed artifacts are the authority
 
@@ -133,6 +146,29 @@ The same rule holds one level down: `ReferenceArtifact.path` exists only to be r
 (`client_artifact_path_refused`). A caller addresses bytes by managed `artifact_id` +
 `sha256`, never by filesystem path, never by a graph they composed client-side. This is the
 schema-level expression of `docs/architecture/MANAGED_ARTIFACT_CONTRACT.md`.
+
+### 3.2 A source-locked capability KEEPS the source's timeline (NR05.1)
+
+`SOURCE_LOCKED_CAPABILITIES` (`source_video_motion_transfer`, `video_edit_controlled`) own a
+locked source clip, and the product rule is that the action, camera, cuts, timeline and audio
+of that clip are PRESERVED. `MediaEngineRequest` therefore refuses any output contract that
+does not describe the same timeline, with the typed code `source_output_timeline_mismatch`:
+
+- `output.frame_count` must equal `source.shot_range.frame_count` (a 20-frame locked source
+  may not accept a 2-frame output — that was NR05.1);
+- `output.fps` must equal `source.fps` as an EXACT rational (`30/1` ≠ `30000/1001`);
+- when BOTH source and output declare a stream time_base they must be identical. An UNPROBED
+  output time_base (`None`) is unknown, not a mismatch.
+
+`OutputContract` exposes the two rate facts separately, exactly as `SourceLock` does:
+`OutputContract.fps` is the frame RATE, `OutputContract.stream_timebase` is the stream's
+rational time_base, and `OutputContract.timebase` is an ALIAS of `stream_timebase` — it never
+returns the frame rate (returning `30/1` for a `1/15360` stream was NR05.3) and it returns
+`None` when the output has not been probed. Half a rational raises.
+
+Capabilities that are NOT source-locked (`text_to_video`, `image_edit_multi_reference`) own
+their own timeline and are never constrained to the source's frame count, so single-frame /
+image rounds and free-length generation stay legal.
 
 Cast roles must be unique within a request (validated); a role maps to exactly one
 `CharacterID` + one immutable `PackVersion` (see `PACK_CAPABILITY_CONTRACT.md`).
@@ -227,6 +263,32 @@ the structural reason a replay cannot duplicate the POST.
 own digest (attempt, job, stage, workspace, owner, **server epoch**, workflow, input, output
 contract) — deliberately a different fact from the cache identity (§4.0).
 
+**LIMIT — recorded, not claimed as fixed: `BackendIdentityProof` is a pure DTO.** Its
+`integrity_sha256` is a deterministic, PUBLIC digest over `IDENTITY_PROOF_FIELDS`, so any party
+holding the field values can recompute it. It proves TAMPER-EVIDENCE (a mutated or replayed
+claim fails `verify_identity_proof`) and it proves that `resolution` was `resolved`; it does
+**not** prove that a backend produced the claim, and it does **not** authenticate a producer.
+No signing subsystem, key material, or remote attestation exists in this contract, and none is
+invented here.
+
+`BACKEND_IDENTITY_PROOF_CONSTRUCTION_BOUNDARY` pins the exact future backend-construction
+boundary, i.e. what the integration must produce and where:
+
+- **constructed at:** the backend's replay-resolution step, from the backend's OWN durable
+  records;
+- **produced by:** the generation runtime / E01 durable-job adapter that owns the
+  `InflightReservation` row (`app/persistence/jobs.py`; S13 T03B) — every replay-resolution
+  call site;
+- **facts read:** the reservation row, the attempt/lease record, and the upstream prompt id
+  already stored server-side — never a value echoed from the request;
+- **caller role:** an HTTP caller may never SUPPLY a proof; a proof arriving in a request body
+  is a client-supplied input and is refused;
+- **integrity scope:** `identity_integrity()` over `IDENTITY_PROOF_FIELDS` — tamper-evidence
+  only;
+- **not provided:** no signature, no key material, no remote attestation, no out-of-band
+  producer identity. A future integration that needs genuine origin proof must add it at this
+  boundary and say so explicitly. Integration must not claim it is already wired up.
+
 ---
 
 ## 6. Result DTO and lifecycle states
@@ -269,10 +331,13 @@ intermediate** and stays in the result, but marking one `publishable=True` raise
 `artifact_not_managed`.
 
 **The SERVER's node-output classification is the publication authority** (C-CONTRACT R7). Each
-`ManagedArtifact` now carries `server_output_type ∈ SERVER_OUTPUT_TYPES = (output, preview,
-intermediate, temp, input)` — the backend's own classification of the node output it came from.
-`assert_publishable_set(artifacts, publishable_types=...)` is the gate, and it refuses in this
-order:
+`ManagedArtifact` carries `server_output_type ∈ SERVER_OUTPUT_TYPES = (output, preview,
+intermediate, temp, input, unclassified)` — the backend's own classification of the node output
+it came from. **An OMITTED classification is recorded as `unclassified`, never defaulted to
+`"output"`** (NR05.4): `UNCLASSIFIED_SERVER_OUTPUT_TYPE` is a real vocabulary member, so
+"nobody classified this" stays visible as data and refuses publication at the gate below — a
+missing classification can no longer pass as an output. `assert_publishable_set(artifacts,
+publishable_types=...)` is the gate, and it refuses in this order:
 
 1. **an EMPTY `publishable_types` REFUSES** — `publishable_types=()` no longer returns whatever
    was staged; "publish nothing" and "publish everything the artifacts claim" are different acts;
@@ -281,9 +346,10 @@ order:
    (`OutputContract` enforces the same narrowing rule);
 3. no publishable artifact at all → `artifact_not_managed` (fail-closed, never an empty success);
 4. an artifact whose `server_output_type` does not survive the effective allow-list —
-   `temp`, `input`, `intermediate`, `preview` — refuses with `artifact_not_managed` **even when
-   its own `publishable` flag is `True`**, because that flag records what the producing node
-   staged, not what may be published;
+   `temp`, `input`, `intermediate`, `preview`, and `unclassified` — refuses with
+   `artifact_not_managed` **even when its own `publishable` flag is `True`**, because that flag
+   records what the producing node staged, not what may be published (NR05.4: an artifact with
+   no supplied classification is `unclassified` and lands here);
 5. a `mask` / `graph` / `pose_sheet` kind refuses as before.
 
 A valid `output` artifact still passes, unchanged. This mirrors the COMFY round's
