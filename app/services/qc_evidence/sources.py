@@ -526,6 +526,24 @@ def current_lock_manifest(
 #: the bytes of this slot — never a crop of the video's own source frames.
 REFERENCE_POSE_SLOT = "reference"
 
+#: EXPLICIT authoritative pose/reference mapping (round D / NR04).  Order is
+#: the resolution precedence: the dedicated REFERENCE slot when the pack
+#: publishes one, otherwise the FIRST CORE POSE slot — which every published
+#: pack is REQUIRED to carry (``CORE_POSE_SLOTS``, enforced by the pack
+#: validator and by ``evaluate_compatibility``).  Declaring the mapping here is
+#: what makes a six-slot LEGACY pack measurable: before round D the identity
+#: path demanded a seventh, fixture-only ``reference`` asset that the real pack
+#: publication never creates, so every legacy pack was an unconditional
+#: ``QC_EVIDENCE_DEPENDENCY``.  No video source frame is ever in this mapping
+#: and no slot outside it is used.
+IDENTITY_REFERENCE_POSE_SLOTS: tuple[str, ...] = (REFERENCE_POSE_SLOT, "front")
+
+#: Where a resolved identity reference came from (persisted with the pin).
+REFERENCE_SLOT_SOURCES: dict[str, str] = {
+    REFERENCE_POSE_SLOT: "dedicated_reference_slot",
+    "front": "declared_core_pose_mapping",
+}
+
 
 def _compatibility_verdict(
     session: Session, scope: VideoScope, row: ProjectCastMapping, detector: str
@@ -604,6 +622,14 @@ def cast_pin_for_role(
     bytes (``QC_EVIDENCE_TAMPERED``, raised by :func:`read_artifact`) and an
     evaluator that cannot produce a verdict (``QC_EVIDENCE_DEPENDENCY``) each
     refuse.  The verdict is NEVER coerced to ``compatible=True``.
+
+    The reference PIXELS are resolved through the explicit, declared
+    :data:`IDENTITY_REFERENCE_POSE_SLOTS` mapping (round D / NR04): a six-slot
+    legacy pack that publishes only ``CORE_POSE_SLOTS`` is measured against its
+    own published core pose asset instead of demanding a seventh, fixture-only
+    ``reference`` asset.  Which slot supplied the pixels is persisted with the
+    pin (``reference_slot_source``), and a pack carrying NO slot of the mapping
+    still refuses by name.
     """
     row = session.scalar(
         select(ProjectCastMapping).where(
@@ -660,25 +686,36 @@ def cast_pin_for_role(
             f"{character.workspace_id!r}, outside the requested scope",
             mapping_id=str(row.id),
         )
-    asset = session.scalars(
-        select(CharacterAsset)
-        .where(
-            CharacterAsset.pack_version_id == str(row.pack_version_id),
-            CharacterAsset.pose_slot == REFERENCE_POSE_SLOT,
-        )
-        .order_by(CharacterAsset.id)
-    ).first()
-    if asset is None:
+    asset = None
+    resolved_slot: str | None = None
+    for slot in IDENTITY_REFERENCE_POSE_SLOTS:
+        asset = session.scalars(
+            select(CharacterAsset)
+            .where(
+                CharacterAsset.pack_version_id == str(row.pack_version_id),
+                CharacterAsset.pose_slot == slot,
+            )
+            .order_by(CharacterAsset.id)
+        ).first()
+        if asset is not None:
+            resolved_slot = slot
+            break
+    if asset is None or resolved_slot is None:
         raise dependency(
             detector,
-            f"pinned pack version {row.pack_version_id!r} carries no "
-            f"{REFERENCE_POSE_SLOT!r} pose asset: the character library never "
-            "published the reference pixels of this target, and the video's "
-            "own source frames are not the identity authority",
-            fact="the pinned REFERENCE artifact of the selected PackVersion",
+            f"pinned pack version {row.pack_version_id!r} carries neither the "
+            f"{REFERENCE_POSE_SLOT!r} pose asset nor any slot of the declared "
+            f"identity mapping {list(IDENTITY_REFERENCE_POSE_SLOTS)}: the "
+            "character library never published the reference pixels of this "
+            "target, and the video's own source frames are not the identity "
+            "authority",
+            fact="the pinned REFERENCE artifact of the selected PackVersion "
+            f"(pose_slot in {list(IDENTITY_REFERENCE_POSE_SLOTS)})",
             producer="character pack publication (CharacterAsset pose_slot="
-            f"{REFERENCE_POSE_SLOT!r})",
+            f"{REFERENCE_POSE_SLOT!r} or a declared core pose slot "
+            f"{list(IDENTITY_REFERENCE_POSE_SLOTS[1:])})",
             persistence="character_asset.artifact_id",
+            identity_reference_slots=list(IDENTITY_REFERENCE_POSE_SLOTS),
         )
     reference = read_artifact(
         session, managed_root, scope, str(asset.artifact_id), detector=detector
@@ -701,6 +738,12 @@ def cast_pin_for_role(
         "pose_slot": str(asset.pose_slot),
         "reference_asset_id": str(asset.id),
         "reference_artifact": reference.provenance(),
+        # provenance of the DECLARED mapping that resolved the reference: the
+        # reviewer sees which authority produced the identity pixels
+        "reference_slot_source": REFERENCE_SLOT_SOURCES.get(
+            str(asset.pose_slot), "declared_core_pose_mapping"
+        ),
+        "reference_slot_mapping": list(IDENTITY_REFERENCE_POSE_SLOTS),
         "compatible": bool(verdict.get("compatible")),
         "reasons": list(verdict.get("reasons") or []),
         "compatibility": verdict,
