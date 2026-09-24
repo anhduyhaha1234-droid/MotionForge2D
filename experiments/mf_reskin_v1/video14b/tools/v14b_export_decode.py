@@ -95,6 +95,126 @@ def sha256_file(path: Path) -> str:
 
 # ------------------------------------------------------------------ pure logic
 
+# R9 (reviewer row P2): the raw render carries explicit colour metadata -- limited
+# range, bt709 matrix/primaries, iec61966-2-1 transfer -- and this path used to route
+# through FFV1/NUT and re-encode WITHOUT re-stating it, so the delivered clip came out
+# with an unspecified colour description and every RGB consumer had to guess.  Measured
+# on the M1 clip: RGB decoded with its own (absent) tags vs the raw gave MAE mean 2.1182
+# / max 18, and forcing these four tags back on decode made RGB identical (120/120).
+# The tags are now carried explicitly, and --no-color-tags builds the tag-less control
+# that the detector must catch.
+COLOR_TAG_KEYS = ("color_range", "color_space", "color_primaries", "color_transfer")
+COLOR_TAGS = {"color_range": "tv", "color_space": "bt709",
+              "color_primaries": "bt709", "color_transfer": "iec61966-2-1"}
+# the same four tags expressed decoder-side, for the RGB comparison in color_roundtrip
+SETPARAMS = ("setparams=range=limited:colorspace=bt709:color_primaries=bt709:"
+             "color_trc=iec61966-2-1")
+
+
+assert SETPARAMS == ("setparams=range=%s:colorspace=%s:color_primaries=%s:color_trc=%s" % (
+    "limited" if COLOR_TAGS["color_range"] == "tv" else "full",
+    COLOR_TAGS["color_space"], COLOR_TAGS["color_primaries"],
+    COLOR_TAGS["color_transfer"])), "SETPARAMS must mirror COLOR_TAGS"
+
+
+def color_filter_args(tags: dict | None = None) -> list[str]:
+    """The same four fields as an ffmpeg FILTER argument, never as encoder options.
+
+    Measured on this pipeline: `-color_range tv -colorspace bt709 ...` as ENCODER
+    options makes ffmpeg insert a range conversion on the "unspecified" FFV1/NUT
+    input -- the clip kept only tv/bt709 and its native planes shifted by up to 32
+    (RGB MAE 6.3725 with the tags forced back on decode), which is WORSE than the
+    tag loss.  `setparams` only marks the frames: all four fields land in the VUI /
+    mp4 colr atom and the native planes stay byte-identical (max_abs_diff 0).
+    """
+    if not tags:
+        return []
+    return ["-vf", SETPARAMS]
+
+
+def color_tag_state(probe: dict) -> dict:
+    """The four colour fields of an ffprobe stream dict, verbatim (None == absent)."""
+    return {k: probe.get(k) for k in COLOR_TAG_KEYS}
+
+
+def rgb_frame_diff(a: list[Path], b: list[Path]) -> dict:
+    """Per-frame MAE / max-abs between two equal-length PNG sequences, in RGB."""
+    import numpy as np
+    from PIL import Image
+    n = min(len(a), len(b))
+    maes: list[float] = []
+    maxabs: list[int] = []
+    for i in range(n):
+        x = np.asarray(Image.open(a[i]).convert("RGB"), dtype=np.int16)
+        y = np.asarray(Image.open(b[i]).convert("RGB"), dtype=np.int16)
+        d = np.abs(x - y)
+        maes.append(float(d.mean()))
+        maxabs.append(int(d.max()))
+    return {"frames": n, "comparable": len(a) == len(b),
+            "mae_mean": round(sum(maes) / len(maes), 6) if maes else None,
+            "mae_max": round(max(maes), 6) if maes else None,
+            "maxabs_max": max(maxabs) if maxabs else None,
+            "identical_frames": sum(1 for m in maes if m == 0.0)}
+
+
+def png_frames(src: Path, out_dir: Path, log: list[dict], vf: str | None = None) -> list[Path]:
+    """extract_pngs(...) but returning the PNG paths, with an optional extra filter."""
+    extract_pngs(src, out_dir, log, vf=vf)
+    files = sorted(out_dir.glob("f*.png"))
+    if not files:
+        raise SystemExit(f"no PNG decoded from {src} (0-byte artifact guard)")
+    return files
+
+
+def color_roundtrip(raw: Path, clip: Path, crop_ffmpeg: str | None, log: list[dict]) -> dict:
+    """R9: prove the colour metadata survives, and that losing it is DETECTED.
+
+    Three independent measurements, in the reviewer's own order:
+      1. native planes  - rawvideo bytes of (raw cropped, decoded 0..119) vs the clip;
+      2. RGB, each side decoded with its OWN tags - identical once the tags are carried;
+         a tag-less clip makes this non-zero, which is the defect AND the detector's
+         positive control (measured pre-fix: MAE mean 2.1182 / max 18 on the M1 clip);
+      3. RGB with the source tags FORCED on both sides - must be identical in every mode
+         (measured pre-fix: identical, 120/120), so only the signalling was wrong.
+    """
+    import numpy as np
+    work = clip.parent / (clip.stem + "__color")
+    if work.exists():
+        shutil.rmtree(work)
+    work.mkdir(parents=True, exist_ok=True)
+    sel_vf = select_filter(N_SOURCE_FRAMES, crop_ffmpeg)
+
+    def rawvideo(source: Path, out: Path, vf: str | None) -> np.ndarray:
+        argv = ["ffmpeg", "-v", "error", "-y", "-i", str(source)]
+        if vf:
+            argv += ["-vf", vf]
+        argv += ["-f", "rawvideo", "-pix_fmt", "yuv420p", str(out)]
+        run(argv, log)
+        if not out.is_file() or out.stat().st_size == 0:
+            raise SystemExit(f"rawvideo extraction produced nothing: {out}")
+        return np.frombuffer(out.read_bytes(), dtype=np.uint8).astype(np.int16)
+
+    a = rawvideo(raw, work / "raw_cropped_119.yuv", sel_vf)
+    b = rawvideo(clip, work / "clip_120.yuv", None)
+    n = min(len(a), len(b))
+    same_len = len(a) == len(b)
+    d = np.abs(a[:n] - b[:n])
+    native = {"raw_bytes": int(len(a)), "clip_bytes": int(len(b)), "comparable": same_len,
+              "max_abs_diff": int(d.max()) if d.size else None,
+              "identical": bool(same_len and d.size and int(d.max()) == 0)}
+
+    own = rgb_frame_diff(png_frames(raw, work / "png_raw_own", log, vf=sel_vf),
+                         png_frames(clip, work / "png_clip_own", log))
+    forced = rgb_frame_diff(
+        png_frames(raw, work / "png_raw_forced", log, vf=f"{sel_vf},{SETPARAMS}"),
+        png_frames(clip, work / "png_clip_forced", log, vf=SETPARAMS))
+    shutil.rmtree(work, ignore_errors=True)
+    return {"native_planes": native,
+            "rgb_each_side_own_tags": own,
+            "rgb_source_tags_forced_both_sides": forced,
+            "note": ("(2) is the detector: a clip that lost the tags decodes with a different "
+                     "matrix/transfer, so the RGB difference is non-zero; (3) is identical in "
+                     "both modes, proving the pixels themselves never changed")}
 def presentation_indices(n_total: int, keep: int) -> list[int]:
     """Decoded presentation indices to keep: 0..keep-1, never a packet count."""
     if keep <= 0 or keep > n_total:
@@ -164,14 +284,21 @@ def run(argv: list[str], log: list[dict], cwd: Path | None = None) -> str:
     return r.stderr or ""
 
 
-def extract_pngs(src: Path, out_dir: Path, log: list[dict]) -> list[dict]:
-    """Decode every frame to PNG in presentation order; return [{index, sha256, bytes}]."""
+def extract_pngs(src: Path, out_dir: Path, log: list[dict],
+                 vf: str | None = None) -> list[dict]:
+    """Decode every frame to PNG in presentation order; return [{index, sha256, bytes}].
+
+    `vf` is an optional extra filter chain (used by the R9 colour proof, which must
+    decode with an explicit tag set as well as with the stream's own)."""
     if out_dir.exists():
         shutil.rmtree(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    run(["ffmpeg", "-v", "error", "-y", "-i", str(src),
-         "-fps_mode", "passthrough", "-f", "image2", "-start_number", "0",
-         str(out_dir / "f%03d.png")], log)
+    argv = ["ffmpeg", "-v", "error", "-y", "-i", str(src)]
+    if vf:
+        argv += ["-vf", vf]
+    argv += ["-fps_mode", "passthrough", "-f", "image2", "-start_number", "0",
+             str(out_dir / "f%03d.png")]
+    run(argv, log)
     rows = []
     for png in sorted(out_dir.glob("f*.png")):
         rows.append({"index": int(png.stem[1:]), "sha256": sha256_file(png),
@@ -181,16 +308,19 @@ def extract_pngs(src: Path, out_dir: Path, log: list[dict]) -> list[dict]:
     return rows
 
 
-def frame_stats(a: Path, b: Path, log: list[dict]) -> dict:
-    """Per-frame MAE / max-abs between two videos of equal length, in RGB."""
+def frame_stats(a: Path, b: Path, log: list[dict], vf: str | None = None) -> dict:
+    """Per-frame MAE / max-abs between two videos of equal length, in RGB.
+
+    `vf` is passed to BOTH extractions so a comparison is never decided by two
+    different colour descriptions (see the SETPARAMS note in main())."""
     import numpy as np
     from PIL import Image
     tmp = a.parent / (a.stem + "__vs__" + b.stem)
     if tmp.exists():
         shutil.rmtree(tmp)
     da, db = tmp / "a", tmp / "b"
-    extract_pngs(a, da, log)
-    extract_pngs(b, db, log)
+    extract_pngs(a, da, log, vf=vf)
+    extract_pngs(b, db, log, vf=vf)
     fa, fb = sorted(da.glob("f*.png")), sorted(db.glob("f*.png"))
     if len(fa) != len(fb):
         return {"frames_a": len(fa), "frames_b": len(fb), "comparable": False}
@@ -224,6 +354,11 @@ def probe_video(path: Path, log: list[dict]) -> dict:
             "avg_frame_rate": s.get("avg_frame_rate"), "time_base": s.get("time_base"),
             "nb_frames": s.get("nb_frames"), "duration": s.get("duration"),
             "start_time": s.get("start_time"),
+            # R9: the colour description is part of the artifact contract, so the probe
+            # carries it -- a projection that drops it cannot tell a tag loss from a fix.
+            "color_range": s.get("color_range"), "color_space": s.get("color_space"),
+            "color_primaries": s.get("color_primaries"),
+            "color_transfer": s.get("color_transfer"),
             "presentation_pts_first": pts[0] if pts else None,
             "presentation_pts_last": pts[-1] if pts else None,
             "presentation_delta_set": deltas,
@@ -240,6 +375,13 @@ def main() -> int:
     work = _p(sys.argv[5]) if len(sys.argv) > 5 else out_dir / "work"
     for d in (out_dir, ev, work):
         d.mkdir(parents=True, exist_ok=True)
+    # R9: the round names its own record instead of overwriting the F06 record.
+    record_name = "f06_export_record.json"
+    if "--record-name" in sys.argv:
+        record_name = Path(sys.argv[sys.argv.index("--record-name") + 1]).name
+    record_prefix = "f06"
+    if "--record-prefix" in sys.argv:
+        record_prefix = sys.argv[sys.argv.index("--record-prefix") + 1]
 
     log: list[dict] = []
     nut = work / "raw_121f_lossless.ffv1.nut"
@@ -247,6 +389,13 @@ def main() -> int:
     a_win = work / "audio_window_55_59.m4a"
 
     raw_probe = probe_video(raw, log)
+    # R9: carry the source colour metadata EXPLICITLY through every encode.  The raw's
+    # tags are pinned: a raw whose tags changed must be re-pinned, not silently exported.
+    raw_color_tags = color_tag_state(raw_probe)
+    color_tags_disabled = "--no-color-tags" in sys.argv
+    tag_args = [] if color_tags_disabled else color_filter_args(COLOR_TAGS)
+    if tag_args and raw_color_tags != COLOR_TAGS:
+        raise SystemExit(f"raw colour tags {raw_color_tags} != pinned {COLOR_TAGS}")
     crop = crop_back_filter(raw_probe["width"], raw_probe["height"])
     # escape hatch: wave A's frozen record delivered 640x368 and is reproduced
     # byte-for-byte with --no-crop.  Wave B deliberately CHANGES the default to the
@@ -264,8 +413,10 @@ def main() -> int:
 
     # 1. lossless intermediate: the 121 decoded frames, exact hashes.
     run(["ffmpeg", "-v", "error", "-y", "-i", str(raw), "-map", "0:v:0",
+         # FFV1/NUT does not persist colour tags (probed: all four null), so they are
+         # re-stated on the frames at the encode step instead of faked here.
          *ffv1_args(), "-f", "nut", str(nut)], log)
-    raw_pngs = extract_pngs(nut, work / "png_raw121", log)
+    raw_pngs = extract_pngs(nut, work / "png_raw121", log, vf=SETPARAMS)
 
     # 2. index selection on DECODED presentation frames (not packets), plus the
     #    crop back to the 640x360 content rect when the raw is the 640x368 canvas.
@@ -275,16 +426,18 @@ def main() -> int:
     run(["ffmpeg", "-v", "error", "-y", "-i", str(nut), "-map", "0:v:0",
          "-vf", select_filter(keep, crop_ffmpeg), "-fps_mode", "cfr", "-r", str(FPS),
          *ffv1_args(), "-f", "nut", str(sel)], log)
-    sel_pngs = extract_pngs(sel, work / "png_sel120", log)
+    sel_pngs = extract_pngs(sel, work / "png_sel120", log, vf=SETPARAMS)
 
     # 2b. crop evidence: the cropped intermediate is the reference the delivered
     #     clip is compared against, so the pixel map stays at the DELIVERED
     #     geometry instead of comparing 640x360 output against 640x368 raw.
     if crop:
         run(["ffmpeg", "-v", "error", "-y", "-i", str(nut), "-map", "0:v:0",
-             "-vf", crop["ffmpeg"], *ffv1_args(), "-f", "nut", str(work / "raw_121f_cropped.nut")],
+             "-vf", crop["ffmpeg"], *ffv1_args(),
+             "-f", "nut", str(work / "raw_121f_cropped.nut")],
             log)
-        compare_pngs = extract_pngs(work / "raw_121f_cropped.nut", work / "png_raw121_cropped", log)
+        compare_pngs = extract_pngs(work / "raw_121f_cropped.nut",
+                                    work / "png_raw121_cropped", log, vf=SETPARAMS)
         # extract_pngs returns hash rows; the pixel-level proof needs the PNG paths
         crop_proof = content_rect_diff(sorted((work / "png_raw121").glob("f*.png")),
                                        sorted((work / "png_raw121_cropped").glob("f*.png")),
@@ -301,13 +454,13 @@ def main() -> int:
 
     # 4. ONE video re-encode (crf 0 = lossless in yuv420p) + audio stream copy.
     run(["ffmpeg", "-v", "error", "-y", "-i", str(sel), "-i", str(a_win),
-         "-map", "0:v:0", "-map", "1:a:0", *lossless_h264_args(),
+         "-map", "0:v:0", "-map", "1:a:0", *lossless_h264_args(), *tag_args,
          "-video_track_timescale", str(TB_TIMESCALE),
          "-c:a", "copy", "-movflags", "+faststart", str(clip)], log)
 
     # 5. prove it: decode the delivered clip and SHA-match against the raw frames
     #    AT THE DELIVERED GEOMETRY (cropped raw when the crop back was applied).
-    out_pngs = extract_pngs(clip, work / "png_out120", log)
+    out_pngs = extract_pngs(clip, work / "png_out120", log, vf=SETPARAMS)
     raw_sha = {r["index"]: r["sha256"] for r in raw_pngs_compare}
     out_sha = {r["index"]: r["sha256"] for r in out_pngs}
     pixel_map = [{"output_frame": i,
@@ -322,9 +475,16 @@ def main() -> int:
 
     # 6. selection-level identity (intermediate vs cropped raw) + encode loss.
     sel_identity = all(sel_pngs[i]["sha256"] == raw_pngs_compare[i]["sha256"] for i in idx)
-    enc_loss = frame_stats(sel, clip, log)
+    enc_loss = frame_stats(sel, clip, log, vf=SETPARAMS)
     clip_pr = probe_video(clip, log)
+    color_proof = color_roundtrip(raw, clip, crop_ffmpeg, log)
     pts_expect = [i * (TB_TIMESCALE // FPS) for i in range(N_SOURCE_FRAMES)]
+    clip_color_tags = color_tag_state(clip_pr)
+    tag_loss_present = clip_color_tags != raw_color_tags
+    detector_fired = bool(
+        tag_loss_present
+        and color_proof["rgb_each_side_own_tags"]["maxabs_max"] not in (None, 0)
+        and color_proof["rgb_source_tags_forced_both_sides"]["maxabs_max"] == 0)
     contract = {
         "clip_is_640x360": clip_pr["width"] == 640 and clip_pr["height"] == 360,
         "r_frame_rate_is_30_1": clip_pr["r_frame_rate"] == "30/1",
@@ -338,9 +498,10 @@ def main() -> int:
     }
 
     rec = {
-        "artifact": "f06_export_record.json",
+        "artifact": record_name,
         "task_id": "MF-V1-VIDEO14B",
-        "row": "F06",
+        "row": ("F06" if record_name == "f06_export_record.json"
+                else "F06+R9 (round C row V00)"),
         "rule": ("select DECODED presentation indices 0..119 out of 121 and drop decoded "
                  "index 120 (the held pad); packet counting is not equivalent"),
         "inputs": {"raw_121f": str(raw), "film": str(film),
@@ -353,6 +514,16 @@ def main() -> int:
                     "selected_intermediate_sha256": sha256_file(sel),
                     "audio_window": str(a_win), "audio_window_sha256": sha256_file(a_win)},
         "raw_render_probe": raw_probe,
+        "color_tags": {"expected_from_raw": raw_color_tags,
+                        "clip": color_tag_state(clip_pr),
+                        "disabled_by_flag": color_tags_disabled,
+                        "frame_filter_args": tag_args,
+                        "nut_persists_tags": False,
+                        "encoder_options_rejected": (
+                            "measured: -color_* encoder options insert a range conversion on "
+                            "the unspecified NUT input (native planes shifted up to 32, RGB "
+                            "MAE 6.3725) and wrote only tv/bt709")},
+        "color_roundtrip": color_proof,
         "crop_back": crop,
         "crop_back_applied": bool(crop),
         "crop_disabled_by_flag": crop_disabled,
@@ -363,6 +534,7 @@ def main() -> int:
         "selected_decoded_indices": idx,
         "dropped_decoded_indices": dropped,
         "select_filter": select_filter(keep, crop_ffmpeg),
+        "png_decode_tags": SETPARAMS,
         "raw_decoded_frame_sha256": raw_sha,
         "output_decoded_frame_sha256": out_sha,
         "pixel_map": pixel_map,
@@ -376,18 +548,30 @@ def main() -> int:
             "crop_back_applied": bool(crop),
             "crop_is_pure_translation": crop_proof.get("pure_translation"),
             "contract": contract,
+            "color_tags_preserved": clip_color_tags == raw_color_tags,
+            "native_yuv_identical_0_to_119": color_proof["native_planes"]["identical"],
+            "rgb_identical_with_matching_tags":
+                color_proof["rgb_source_tags_forced_both_sides"]["maxabs_max"] == 0,
+            "rgb_identical_with_own_tags":
+                color_proof["rgb_each_side_own_tags"]["maxabs_max"] == 0,
+            "detector_fired_on_tag_loss": detector_fired,
         },
         "clip_probe": probe_video(clip, log),
         "encode_loss_vs_intermediate": enc_loss,
         "commands": log,
     }
-    (ev / "f06_export_record.json").write_text(json.dumps(rec, indent=1, ensure_ascii=False) + "\n",
-                                               encoding="utf-8")
-    (ev / "f06_pixel_map.json").write_text(
+    (ev / record_name).write_text(json.dumps(rec, indent=1, ensure_ascii=False) + "\n",
+                                  encoding="utf-8")
+    (ev / f"{record_prefix}_pixel_map.json").write_text(
         json.dumps(pixel_map, indent=1) + "\n", encoding="utf-8")
-    (ev / "f06_decoded_frame_hashes.json").write_text(
+    (ev / f"{record_prefix}_decoded_frame_hashes.json").write_text(
         json.dumps({"raw": raw_sha, "output": out_sha}, indent=1) + "\n", encoding="utf-8")
     summary = {k: rec["checks"][k] for k in rec["checks"]}
+    summary["color_tags"] = rec["color_tags"]
+    summary["color_roundtrip"] = rec["color_roundtrip"]
+    if color_tags_disabled:
+        summary["negative_control"] = ("tag-less by design: the detector must report "
+                                       "tag_loss_present=True and exit non-zero")
     summary.update({"clip_sha256": rec["outputs"]["clip_sha256"],
                     "clip_bytes": rec["outputs"]["clip_bytes"],
                     "clip_probe": rec["clip_probe"],
@@ -395,7 +579,12 @@ def main() -> int:
                     "encode_loss": enc_loss,
                     "cmd_count": len(log)})
     print(json.dumps(summary, indent=1, ensure_ascii=False))
-    ok = (rec["checks"]["output_frame_count_is_120"]
+    ok = (rec["checks"]["color_tags_preserved"]
+          and rec["checks"]["native_yuv_identical_0_to_119"]
+          and rec["checks"]["rgb_identical_with_matching_tags"]
+          and rec["checks"]["rgb_identical_with_own_tags"]
+          and (detector_fired if color_tags_disabled else not tag_loss_present)
+          and rec["checks"]["output_frame_count_is_120"]
           and rec["checks"]["pixel_map_is_identity_0_to_119"]
           and rec["checks"]["dropped_frame_absent_from_output"]
           and rec["checks"]["lossless_intermediate_matches_raw_0_to_119"]
