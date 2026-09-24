@@ -1,4 +1,9 @@
 # S12INT transport ledger — S12-LC3-INT (wave base `2594de06`)
+> **ROUND D (2026-09-25) — read this first.** The current frozen integrated candidate is
+> **`04541443ff6dada4fe464e315888ac58a0dbfcd9`** (round D). Round C's candidate `f991e243f5dfa7e42a04948504af0863cc92fa43`
+> is **superseded but preserved**: its record is in **SS8** below (history) and everything from SS1-SS7 below is round C's
+> own ledger, kept verbatim. Round D's transport rows are in **SS9**.
+
 
 Transport provenance only. This ledger does not approve, accept or close anything; Codex reviews the candidate.
 
@@ -156,3 +161,124 @@ run it.
   intact (`rev-parse`, parents, `--stat` all measured after the fact). Not "fixed" — refs outside this task were not touched.
 - Nothing was pushed. `origin` was not contacted. MAIN/master was not touched.
 - No range was reported blocked; no conflict occurred, so nothing had to be routed back to a lane owner.
+
+## 8. History - superseded candidates (kept, not deleted)
+
+| Round | Candidate SHA | HEAD^ | Frozen / created (UTC) | Delta transported | Evidence root |
+|---|---|---|---|---|---|
+| C | `f991e243f5dfa7e42a04948504af0863cc92fa43` | `6871745dfed1f6c113cb5daeb095ba3342c4a338` | frozen `2026-09-24T15:04:34Z` | QC `2594de06..2809f9c8` + UI `2594de06..bd16c6db` + QA `13fa732d..22815ed4` | `.../mf-core-tool-delivery-20260924/20260924T1055Z/S12INT` |
+| **D (current)** | **`04541443ff6dada4fe464e315888ac58a0dbfcd9`** | `ccd0aba6cdba1e58ce7436c89ecc17450c79a50e` | created `2026-09-24T19:21:36Z`, freeze recorded `2026-09-24T19:27:22Z` | QC `2809f9c8..5ea5928a` + QA `f991e243..bf40b76e` | `.../mf-core-tool-delivery-20260924/20260924T1557Z/S12INT` |
+
+`f991e243...` was NOT rewritten and NOT removed: it is an ancestor of the round-D candidate (it was the QA range's start).
+Round C's ledger (`SS1`-`SS7` of this file, 158 lines, unchanged) stays readable as the record of that round; its
+`FROZEN_CANDIDATE.md` text was superseded in place, as the round-D packet instructed.
+
+## 9. ROUND D (2026-09-25) - transport rows, proofs and freeze
+
+### 9.1 Identity and boundary
+
+- Task: `S12-LC3-INT`, round D (transport of two Manager-verified ranges on top of the round-C candidate).
+- Route: `ocg/deepseek-v4.1-flash`, provider `custom` (`http://127.0.0.1:20128/v1`, `chat_completions`), thinking ON, fallback OFF.
+- Candidate tree: `C:/Users/Admin/MotionForge2D-worktrees/s12-lc3-luna-integration`, branch `codex/s12-lc3-luna-integration`.
+- Baseline HEAD (measured fresh at recon): `0ccbee343ed48a18737863427793f46fb9694411`; `git status --porcelain` = 0 before and after.
+- Method: serial local `git merge --no-ff -m ...`, **Git-only**: no rebase / reset / stash / restore / clean / amend, no
+  push, no hand edit of any code or test, no conflict resolution by editing. Merging (not cherry-picking) keeps each
+  Manager-verified source SHA itself an **ancestor** of the candidate, and the introduced delta is proven byte-identical
+  to the source range delta (SS9.3).
+- Evidence root: `C:/Users/Admin/Documents/Codex/2026-09-22/tr-ng-th-i-terminal-gi/outputs/mf-core-tool-delivery-20260924/20260924T1557Z/S12INT`
+  (raw transcript `raw/proofs_transport.txt`, command ledger `raw/commands_ledger.jsonl`).
+
+### 9.2 Rows - one per transported range
+
+| # | Lane | Source range (full) | Commits | Method | Result SHA in PRODUCT | Conflicts | Merge-introduced delta (measured) |
+|---|---|---|---|---|---|---|---|
+| 1 | MF-P1-QC-EVIDENCE | `2809f9c8dd5cca5a2be86e80a2f190a11a0fff11..5ea5928a216ec33f8598bab9669d873ad9d37e53` | 1 (`5ea5928a...`) | `git merge --no-ff` | `ccd0aba6cdba1e58ce7436c89ecc17450c79a50e` | none | 5 files, +2123/-199 |
+| 2 | S12-LC3-QA | `f991e243f5dfa7e42a04948504af0863cc92fa43..bf40b76e7b3bdf6d80b4e12cb34adcaa21a5c628` | 1 (`bf40b76e...`) | `git merge --no-ff` | `04541443ff6dada4fe464e315888ac58a0dbfcd9` | none | 1 file, +1619/-353 |
+
+Both ranges are single-commit and their own merge-base with the pre-merge HEAD equals the range START
+(`git merge-base 0ccbee34 5ea5928a` = `2809f9c8`; `git merge-base ccd0aba6 bf40b76e` = `f991e243`), which is why one merge
+per range introduces exactly the tip delta (no replay of earlier commits).
+
+**Exact commands (verbatim, run from the candidate worktree):**
+
+```
+git merge --no-ff 5ea5928a216ec33f8598bab9669d873ad9d37e53 -m "Merge MF-P1-QC-EVIDENCE 5ea5928a216ec33f8598bab9669d873ad9d37e53 (NR03/NR04 per-role identity + bounded payload; fixes WinError-206 regression; Manager VERIFIED)"
+git merge --no-ff bf40b76e7b3bdf6d80b4e12cb34adcaa21a5c628 -m "Merge S12-LC3-QA bf40b76e7b3bdf6d80b4e12cb34adcaa21a5c628 (NR07 qc-items route tolerance + authoritative zero-item/eligibility facts; failure persistence proven; path-class guard scans chain body; S12 readiness gate asserted BLOCKED_EXACT; Manager VERIFIED)"
+```
+
+Measured: M1 = `ccd0aba6...` parents `0ccbee34... + 5ea5928a...`, rc 0, porcelain 0; M2 = `04541443...` parents
+`ccd0aba6... + bf40b76e...`, rc 0, porcelain 0. Zero conflicts; no `git merge --abort` needed.
+
+### 9.3 Provenance and integrity proofs (all measured, raw in `raw/proofs_transport.txt`)
+
+- **Ancestry** (`git merge-base --is-ancestor <sha> HEAD`): `5ea5928a...` = YES (rc 0), `bf40b76e...` = YES (rc 0) - the
+  Manager-verified SHAs themselves are ancestors, so a reviewer can re-run the predicate without trusting this file.
+- **Range-tip existence**: both checked with `git rev-parse --verify <sha>^{commit}` (rc 0) - never a bare `rev-parse`
+  echo, which returns a syntactically valid 40-hex string for a non-existent object.
+- **Real 2-parent merges**: `git rev-list --parents -n 1` -> `ccd0aba6... 0ccbee34... 5ea5928a...` and
+  `04541443... ccd0aba6... bf40b76e...`.
+- **Delta equivalence** (sha256 of `git diff --no-color --binary`, source range delta vs merge-introduced delta):
+
+| Lane | source delta | merge delta | sha256 (both) | identical |
+|---|---|---|---|---|
+| QC | `git diff 2809f9c8 5ea5928a` (128,188 B) | `git diff ccd0aba6^1 ccd0aba6` (128,188 B) | `44b41776b6a9ecf351ba094cd17554533b2a56546699b6d5876ec1131484342e` | YES |
+| QA | `git diff f991e243 bf40b76e` (102,648 B) | `git diff 04541443^1 04541443` (102,648 B) | `8c88b36d28a34fe67b7b77715afc384fb95091461e584e8e89dd4a1889825288` | YES |
+
+- **Per-path byte equality vs the source trees**, scoped to the paths each lane itself touched (NOT to a shared parent
+  directory - that mistake produced 5 phantom differences in round C):
+  `git diff --name-only <lane-source-sha> HEAD -- <lane's own paths>` -> **QC 0 differences, QA 0 differences**.
+  Blob ids (`git rev-parse <src>:<path>` vs `HEAD:<path>`) all IDENTICAL: `compose.py 9452c669`,
+  `observe.py 4cb72abc`, `sources.py 0a331e1d`, `test_correction_round_c.py 23bf5caf`,
+  `test_correction_round_d.py ffe47792`, `test_public_chain_frozen_candidate.py 36990043`.
+  Worktree bytes are deliberately NOT compared across trees: with `core.autocrlf=true` the same blob checks out with
+  different byte counts, which reads as a false difference.
+- **Union delta** `0ccbee34...HEAD`: 6 paths, +3742 / -552 (numstat in the raw transcript).
+- `git status --porcelain` = 0 after every merge, after the checks, and at freeze.
+
+### 9.4 Checks at the frozen HEAD (no running server)
+
+| Check (at `04541443...`) | Real result |
+|---|---|
+| import smoke: `app`, `app.services.qc_evidence.{compose,observe,sources}`, `app.workflow.qc_checks_handler`, `app.main` | `IMPORT_SMOKE_OK`, rc 0 |
+| `python -m compileall -q app/services/qc_evidence tests/product_p1/qc_evidence tests/product_p1/public_chain` | rc 0 |
+| `python -m pytest tests/product_p1/qc_evidence -q` | **82 passed, 153 warnings in 244.30 s** (rc 0; wall 247 s) |
+| `python -m pytest tests/product_p1/public_chain -q` | **29 passed, 2 skipped, 15 warnings in 12.03 s** (rc 0; wall 13 s) |
+| `git status --porcelain` | 0 |
+
+`qc_evidence` moved 68 -> 82 because the QC range adds `test_correction_round_d.py` (+1146 lines) and +35/-1 to
+`test_correction_round_c.py`. Both suites ran in the background with a window large enough for their real duration (a
+180 s window CUTS this suite at ~66 dots; that is a timeout, not a failure).
+
+### 9.5 QA-tree advance (step 4) - only after measured quiescence
+
+Pre-flight quiescence, measured not assumed: receipt `manager/receipts/S12-LC3-QA-roundD-finish.json`
+`exit_code=0`, `ended_at_utc=2026-09-24T19:18:15.394504+00:00`, `pid=25928` (main round-D receipt: rc 0,
+`ended_at_utc=2026-09-24T18:49:26Z`, `pid=33108`); both pids absent from the live process table; QA worktree
+`git status --porcelain` = 0; two snapshots 43 s apart (`19:23:23Z` / `19:24:06Z`) identical in HEAD, porcelain and
+newest-file mtime; the newest write in the tree (`19:15:54Z`) predates the receipt end.
+
+```
+git merge --ff-only 04541443ff6dada4fe464e315888ac58a0dbfcd9
+```
+
+Measured: `Updating bf40b76..0454144` / `Fast-forward`, rc 0, conflict-free, porcelain 0, `git diff --check` rc 0,
+`git merge-base --is-ancestor bf40b76... HEAD` = **YES**. **QA HEAD: `bf40b76e7b3bdf6d80b4e12cb34adcaa21a5c628` ->
+`04541443ff6dada4fe464e315888ac58a0dbfcd9`.** Running the QA public chain remains the QA owner's step; INT did not run it.
+
+### 9.6 Freeze
+
+- **Frozen integrated HEAD (candidate): `04541443ff6dada4fe464e315888ac58a0dbfcd9`**; `HEAD^` = `ccd0aba6cdba1e58ce7436c89ecc17450c79a50e`.
+- Candidate created `2026-09-24T19:21:36Z`; freeze recorded `2026-09-24T19:27:22Z` (local `2026-09-25 02:27:22 +07`).
+- `docs/pm/sessions/S12-INT01/FROZEN_CANDIDATE.md` (overwritten for this round) and `raw/frozen_candidate.json` carry the same SHA.
+
+### 9.7 Disclosed conditions (not waived) and out-of-scope
+
+- Both merges printed `fatal: bad object refs/codex/turn-diffs/captures/.../base` + `error: failed to perform geometric
+  repack` and still succeeded (rc 0; verified after the fact). Pre-existing broken ref in another tool's namespace; not "fixed".
+- Nothing pushed (`git branch -r --contains HEAD` = 0); `origin` not contacted; MAIN/`master` untouched (`a40e368`).
+- Not transported, per standing scope: `MF-TOOL-CONTRACT 542570d..f0b918b` (C-CONTRACT, stays `BLOCKED_DEPENDENCY`), the
+  CORE experiment trees (COMFY / VIDEO14B / BENCH), UI (no new commit this round).
+- **Out of scope, not fixed by INT (by instruction):** the product-level finding QA measured - S12 export readiness is
+  unreachable through public APIs (readiness needs a completed *current-scope full* QC run, while the full run is refused
+  for the fixture's single segment). Product gap for the code branches / Codex to route; QA recorded it as an asserted
+  `BLOCKED_EXACT` control. INT did transport + freeze only.
