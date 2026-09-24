@@ -375,6 +375,63 @@ RETAINED_CONTROLS: tuple[dict[str, str], ...] = (
 )
 
 
+#: QA3 (packet §2): engine availability is a HOST fact, never a product result.
+#: When the real engine is unavailable the two things stay SEPARATE:
+#:   * ``engineering_case`` -- a QA/host row: what could not be executed, why, and
+#:     the measured probe that backs it.  It claims no product result at all.
+#:   * ``typed_real_case`` -- a PRODUCT row for an engine-dependent chain leg, typed
+#:     with its real disposition.  Never reported as "product complete".
+#: They are disjoint by construction; the split is asserted in
+#: test_public_chain_engine_cases.py.
+ENGINE_PRODUCT_LEGS: tuple[str, ...] = ("s10_full_apply", "worker")
+
+#: dispositions a typed real-case row may carry (never a pass).
+TYPED_ENGINE_DISPOSITIONS: tuple[str, ...] = (
+    "NOT_EXECUTED_ENGINE_UNAVAILABLE",
+    "PENDING_FROZEN_CANDIDATE",
+    "BLOCKED_DEPENDENCY",
+)
+
+ENGINE_CASES: tuple[dict[str, Any], ...] = (
+    {
+        "id": "E-ENG-01",
+        "kind": "engineering_case",
+        "title": "real render/encode engine unavailable on the CPU prep host",
+        "claimed_product_result": None,
+        "blocked_node": PKG + "/test_public_chain_frozen_candidate.py::"
+        "test_public_chain_end_to_end_on_frozen_candidate",
+        "why": "the executed chain renders (S10 Full Apply) and encodes (durable"
+        " s12_export worker); without a reachable engine those legs cannot produce"
+        " real media, so the chain cannot complete and no product row may be typed"
+        " from it",
+        "probe_env": "S12QA_EVIDENCE_OUT",
+        "probe_artifact": "raw/qa3_engine_probe.json",
+        "probe_command": "the QA evidence driver probes the engine endpoint/binaries"
+        " and records the artifact",
+        "cannot_claim": "product complete; chain green; engine render verified",
+    },
+    {
+        "id": "E-REAL-01",
+        "kind": "typed_real_case",
+        "step": "s10_full_apply",
+        "disposition": "NOT_EXECUTED_ENGINE_UNAVAILABLE",
+        "title": "S10 Full Apply render on the frozen integrated candidate",
+        "why": "renders source frames through the real engine; with the engine"
+        " unavailable this leg is UNTESTED",
+        "must_not_claim": "rendered output; quality acceptance",
+    },
+    {
+        "id": "E-REAL-02",
+        "kind": "typed_real_case",
+        "step": "worker",
+        "disposition": "NOT_EXECUTED_ENGINE_UNAVAILABLE",
+        "title": "durable s12_export worker render/stitch",
+        "why": "the worker encodes the export; without the engine the encode leg"
+        " is UNTESTED",
+        "must_not_claim": "encoded media; publisher result",
+    },
+)
+
 def steps() -> list[dict[str, Any]]:
     return [dict(step) for step in CHAIN_STEPS]
 
@@ -396,6 +453,11 @@ def cases(status: str | None = None) -> list[dict[str, Any]]:
 
 def cases_for_step(step_id: str) -> list[dict[str, Any]]:
     return [dict(case) for case in CHAIN_CASES if case["step"] == step_id]
+
+
+def engine_cases(kind: str | None = None) -> list[dict[str, Any]]:
+    """QA3 blocks: ``engineering_case`` rows and ``typed_real_case`` rows."""
+    return [dict(row) for row in ENGINE_CASES if kind is None or row["kind"] == kind]
 
 
 def pending_steps() -> list[str]:
@@ -454,7 +516,17 @@ def document() -> dict[str, Any]:
             "cases": len(CHAIN_CASES),
             "runnable_now": len(cases(RUNNABLE_NOW)),
             "pending_frozen_candidate": len(cases(PENDING_FROZEN_CANDIDATE)),
+            "engine_engineering_cases": len(engine_cases("engineering_case")),
+            "engine_typed_real_cases": len(engine_cases("typed_real_case")),
         },
+        "engine_legend": {
+            "engineering_case": "a QA/host row: what the unavailable engine blocked, and"
+            " the measured probe that backs it; carries no product claim",
+            "typed_real_case": "a PRODUCT row for an engine-dependent leg, typed with its"
+            " real disposition; never a product-complete claim",
+        },
+        "engine_cases": [dict(row) for row in ENGINE_CASES],
+        "engine_product_legs": list(ENGINE_PRODUCT_LEGS),
         "pending_freeze_steps": pending_steps(),
         "retained_controls": [dict(control) for control in RETAINED_CONTROLS],
     }
