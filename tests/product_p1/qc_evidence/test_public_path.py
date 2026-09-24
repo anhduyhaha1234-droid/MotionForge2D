@@ -13,10 +13,12 @@ whose evidence changed after submission refuses instead of going green.
 
 from __future__ import annotations
 
+import contextlib
 import json
 from pathlib import Path
 
 import pytest
+from conftest import GEN, WS, _no_audio_attempt_result
 from sqlalchemy import select, update
 
 from app.persistence.models import (
@@ -32,8 +34,6 @@ from app.workflow.qc_checks_handler import (
     JOB_TYPE_RUN_QC_CHECKS,
     policy_bundle,
 )
-
-from conftest import GEN, WS, _no_audio_attempt_result
 
 
 def _bind_worker(service) -> None:  # noqa: ANN001
@@ -51,10 +51,8 @@ def _bind_worker(service) -> None:  # noqa: ANN001
 
 def _run_to_terminal(service, *, rounds: int = 4) -> None:  # noqa: ANN001
     for _ in range(rounds):
-        try:
+        with contextlib.suppress(Exception):  # the job row is the authority
             service.worker.run_once()
-        except Exception:  # noqa: BLE001 - the job row is the authority
-            pass
         with service.session_factory() as session:
             states = session.scalars(select(Job.state)).all()
         if "running" not in states:
@@ -152,7 +150,7 @@ def test_public_full_scope_submits_and_completes(completed_full_run) -> None:  #
 
 
 def test_public_full_scope_persists_real_qc_items(completed_full_run) -> None:  # noqa: ANN001
-    _client, service, ids, _job_id, _manifest = completed_full_run
+    _client, service, ids, _job_id, manifest = completed_full_run
     with service.session_factory() as session:
         items = list(
             session.scalars(
@@ -180,7 +178,26 @@ def test_public_full_scope_persists_real_qc_items(completed_full_run) -> None:  
         live_evidence = json.loads(live_evidence)
     frame_ids = {frame["artifact_id"] for frame in live_evidence["frames"]}
     assert frame_ids == {ids.render_artifact_id}
-    assert live_evidence["pinned_reference"]["artifact_id"] == ids.source_artifact_id
+    # correction round C / R4: the persisted target identity is the pinned
+    # LIBRARY reference of the selected CharacterID + PackVersion, not a crop
+    # of the source video.
+    assert (
+        live_evidence["pinned_reference"]["artifact_id"]
+        == ids.reference_artifact_ids["Character"]
+    )
+    assert live_evidence["pinned_reference"]["artifact_id"] != ids.source_artifact_id
+    composed = manifest["detector_args"]["identity_drift"]
+    assert composed["render_observation"]["artifact"]["artifact_id"] == (
+        ids.render_artifact_id
+    )
+    assert composed["render_observation"]["pts_ms"]["timebase"] == {
+        "fps_num": 30,
+        "fps_den": 1,
+    }
+    assert composed["pinned_reference"]["artifact_id"] == (
+        ids.reference_artifact_ids["Character"]
+    )
+    assert composed["cast_pin"]["roles_total"] == len(ids.role_ids)
 
 
 def test_completion_block_records_all_ten_checks_and_frozen_policy(completed_full_run) -> None:  # noqa: ANN001, E501

@@ -161,11 +161,28 @@ def test_geometry_detectors_read_the_persisted_masks(evidence_db) -> None:  # no
     assert flicker_out["items"] == []
 
 
-def test_identity_drift_crops_come_from_the_persisted_render(evidence_db) -> None:  # noqa: ANN001
+def test_identity_reference_is_the_pinned_library_target_and_frames_the_render(evidence_db) -> None:  # noqa: ANN001, E501
+    """Correction round C / R4: target identity from the LIBRARY, observation
+    from the RENDER — the source video is the motion authority, never the
+    identity reference."""
     session_factory, managed_root, ids = evidence_db
     composed = _compose(session_factory, managed_root, ids)
     args = composed["identity_drift"]
-    assert args["pinned_reference"]["artifact_id"] == ids.source_artifact_id
+    reference_id = ids.reference_artifact_ids["Character"]
+    assert args["pinned_reference"]["artifact_id"] == reference_id
+    assert args["pinned_reference"]["artifact_id"] != ids.source_artifact_id
+    assert args["pinned_reference"]["artifact_sha256"]
+    assert args["pinned_reference"]["identity"]["character_id"] == (
+        ids.character_ids["Character"]
+    )
+    assert args["pinned_reference"]["identity"]["pack_version_id"] == (
+        ids.pack_version_ids["Character"]
+    )
+    assert args["cast_pin"]["coverage_scope"] == "single_role"
+    assert args["cast_pin"]["roles_total"] == 3
+    assert {row["object_role_id"] for row in args["cast_pin"]["cast_coverage"]} == set(
+        ids.role_ids.values()
+    )
     assert {frame["artifact_id"] for frame in args["frames"]} == {ids.render_artifact_id}
     out = identity_drift.detect(args)
     # a REAL measured difference between the source and the rendered artifact
@@ -339,10 +356,18 @@ def test_missing_route_producer_is_an_exact_dependency_report(evidence_db) -> No
 
 
 def test_missing_rendered_side_mask_is_a_dependency_not_a_self_comparison(evidence_db) -> None:  # noqa: ANN001, E501
+    """Correction round C: the render side of edge_halo is the RENDERED-side
+    published mask.  With every rendered-side mask candidate gone the check
+    refuses with an exact dependency report — it never falls back to comparing
+    the expected annotation with itself."""
     session_factory, managed_root, ids = evidence_db
     with session_factory() as session:
         session.execute(
-            delete(ArtifactOwner).where(ArtifactOwner.artifact_id == ids.mask_rendered)
+            delete(ArtifactOwner).where(
+                ArtifactOwner.artifact_id.in_(
+                    [ids.mask_rendered, ids.mask_b, ids.mask_c]
+                )
+            )
         )
         session.execute(delete(Artifact).where(Artifact.id == ids.mask_rendered))
         session.commit()

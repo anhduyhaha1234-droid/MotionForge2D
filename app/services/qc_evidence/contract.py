@@ -98,7 +98,10 @@ _ALL_REFUSALS = (
 _CONTRACTS: tuple[DetectorInputContract, ...] = (
     DetectorInputContract(
         detector="trajectory_drift",
-        required_input="reference_x[] (intended placement) + observed_x[] (rendered placement) + frame_start",
+        required_input=(
+            "reference_x[] (intended placement) + observed_x[] "
+            "(rendered placement) + frame_start"
+        ),
         families=("annotation", "artifact"),
         producers=(
             "S09 structural-lock render route (anchor_x anchor_y)",
@@ -123,25 +126,29 @@ _CONTRACTS: tuple[DetectorInputContract, ...] = (
     DetectorInputContract(
         detector="cut_drift",
         required_input="scene_boundaries[{position,start_frame}] + render_cuts_ms[] + timebase",
-        families=("annotation", "result"),
+        families=("annotation", "result", "artifact"),
         producers=(
-            "scene detector (scene rows)",
-            "structural-evidence segment rows (persisted start_time_ms of the "
-            "segment that starts each scene)",
+            "scene detector (scene rows — the INTENDED boundary ground truth)",
+            "S10 full-apply publication / render-side artifact publication "
+            "(the rendered output the cut is observed in)",
         ),
         persistence=(
             "scene.position / scene.start_frame",
-            "occurrence_segment.start_time_ms / start_frame",
+            "artifact.sha256 + managed media bytes of the RENDER artifact",
+            "occurrence_segment.start_time_ms (recorded as planned_cuts_ms only)",
             "video_item.fps_num / fps_den (canonical timebase)",
         ),
         provenance=(
-            "scene row ids + positions, segment ids + persisted start_time_ms, "
-            "exact-rational timebase payload (fps_num/fps_den)"
+            "scene row ids + positions, render artifact id + re-verified sha256, "
+            "window + exact PTS (canonical timebase), producer identity, "
+            "per-boundary measured deltas, planned_cuts_ms for comparison"
         ),
         derivations=(
-            "render_cuts_ms[i] = the persisted occurrence_segment.start_time_ms of the "
-            "current segment whose start_frame == scene[i].start_frame — the renderer's "
-            "OWN millisecond value, never the detector's conversion of the scene frame"
+            "render_cuts_ms[i] = exact millisecond of the frame whose "
+            "|render(f) - render(f-1)| is maximal inside boundary i's neighbourhood "
+            "(deterministic tie-break), measured on the decoded RENDER artifact; a "
+            "boundary whose neighbourhood shows no measurable change refuses — the "
+            "planned occurrence_segment.start_time_ms is never reported as observed"
         ),
         refusals=_ALL_REFUSALS + (QC_EVIDENCE_DEPENDENCY,),
     ),
@@ -150,44 +157,61 @@ _CONTRACTS: tuple[DetectorInputContract, ...] = (
         required_input="analysis_window + contacts[] + segments[] with bbox_per_frame",
         families=("annotation", "result", "artifact"),
         producers=(
-            "scene-graph contact edges (scene_graph_contact rows)",
-            "extraction segments (occurrence_segment rows)",
-            "segment mask artifacts (managed PNG bytes)",
+            "scene-graph contact edges (scene_graph_contact rows) + segment mask "
+            "artifacts (the ANNOTATED region the observation is measured inside)",
+            "S10 full-apply publication / render-side artifact publication "
+            "(the rendered output the contact geometry is observed in)",
         ),
         persistence=(
-            "scene_graph_contact.* / occurrence_segment.* / artifact.sha256",
+            "scene_graph_contact.* / occurrence_segment.mask_artifact_id",
+            "artifact.sha256 + managed media bytes of the RENDER artifact",
         ),
         provenance=(
-            "contact ids + ranges, segment ids + revisions, mask artifact ids + "
-            "re-verified sha256, measured bbox per segment, window digest"
+            "contact ids + ranges, segment ids + revisions, annotated mask bbox per "
+            "segment (expected_bbox_per_frame), render artifact id + re-verified "
+            "sha256 + window/PTS, measured observed bbox per frame"
         ),
         derivations=(
-            "bbox = measured bounding box of the segment's persisted mask bytes, "
-            "held constant per frame across the bounded window (the producer publishes "
-            "one full-frame mask per segment and no per-frame bbox)"
+            "bbox_per_frame = measured bbox of the source-to-render changed pixels "
+            "INSIDE the segment's annotated mask region, per decoded RENDER frame "
+            "(null where the output paints nothing there); the annotation is carried "
+            "separately as expected_bbox_per_frame and is never reported as observed"
         ),
         refusals=_ALL_REFUSALS + (QC_EVIDENCE_DEPENDENCY,),
     ),
     DetectorInputContract(
         detector="z_order_error",
-        required_input="analysis_window + segments[z_order] + occlusion_edges[] (+ optional lock_manifest)",
-        families=("result", "annotation"),
+        required_input="analysis_window + segments[z_order] + occlusion_edges[] + render_order",
+        families=("result", "annotation", "artifact"),
         producers=(
-            "extraction segments (occurrence_segment.z_order)",
-            "scene-graph occlusion edges (scene_graph_occlusion rows)",
-            "S09 structural-lock manifest when a current active version exists",
+            "scene-graph occlusion edges + segment masks (the ANNOTATION the stacking "
+            "is judged against)",
+            "extraction segments (occurrence_segment.z_order — recorded for comparison "
+            "only)",
+            "S09 structural-lock manifest when a current active version exists "
+            "(validated through the public S09 contract, recorded as "
+            "lock_manifest_expected, never as the observed order)",
+            "S10 full-apply publication / render-side artifact publication (the "
+            "rendered output the stacking is observed in)",
         ),
         persistence=(
-            "occurrence_segment.z_order / start_frame / end_frame",
-            "scene_graph_occlusion.* / structural_lock_manifest.manifest_json",
+            "scene_graph_occlusion.* / occurrence_segment.mask_artifact_id",
+            "structural_lock_manifest.manifest_json",
+            "artifact.sha256 + managed media bytes of the RENDER artifact",
         ),
         provenance=(
             "segment ids + z_order + revisions, occlusion ids + ranges, manifest id + "
-            "manifest_hash_hex when supplied"
+            "manifest_hash_hex + validated order when supplied, render artifact id + "
+            "re-verified sha256 + window/PTS, per-pair measured stackings"
         ),
         derivations=(
-            "observed order prefers the validated S09 manifest order, else the persisted "
-            "scene-graph z_order ascending (the detector's own documented precedence)"
+            "render_order = bottom-to-top order implied by the MEASURED stacking of "
+            "every occlusion pair: the region where the two annotated masks overlap is "
+            "attributed to whichever segment's exclusive rendered appearance it "
+            "matches, measured on the decoded RENDER artifact; a pair whose regions do "
+            "not overlap, or whose appearance is indistinguishable, refuses — the "
+            "persisted z_order and the planned manifest order are never reported as "
+            "observed"
         ),
         refusals=_ALL_REFUSALS + (QC_EVIDENCE_DEPENDENCY,),
     ),
@@ -197,42 +221,59 @@ _CONTRACTS: tuple[DetectorInputContract, ...] = (
         families=("result", "artifact", "source"),
         producers=(
             "video item canvas (video_item.width/height, probed at import)",
-            "extraction segments + their mask artifacts",
+            "extraction segments + their mask artifacts (the ANNOTATED region)",
+            "S10 full-apply publication / render-side artifact publication (the "
+            "rendered output the silhouette is observed in)",
         ),
         persistence=(
             "video_item.width / height",
             "occurrence_segment.mask_artifact_id + artifact.sha256",
+            "artifact.sha256 + managed media bytes of the RENDER artifact",
         ),
         provenance=(
             "canvas dims + their persisted source, segment ids, mask artifact ids + "
-            "re-verified sha256, measured bbox per segment"
+            "re-verified sha256, annotated bbox per segment (expected_bbox), render "
+            "artifact id + re-verified sha256 + window/PTS, measured observed bbox"
         ),
         derivations=(
-            "bbox = measured bounding box of the persisted mask bytes (no client value)"
+            "bbox = union of the per-frame measured bboxes of the source-to-render "
+            "changed pixels INSIDE the segment's annotated mask region, measured on "
+            "the decoded RENDER artifact frames of that segment's window; a segment "
+            "whose rendered silhouette is not observable refuses — the annotation is "
+            "carried separately as expected_bbox and is never reported as observed"
         ),
         refusals=_ALL_REFUSALS + (QC_EVIDENCE_DEPENDENCY,),
     ),
     DetectorInputContract(
         detector="identity_drift",
-        required_input="pinned_reference{artifact_id,sha256,crop} + frames[] + cast_pin",
+        required_input="pinned_reference{artifact_id,sha256,crop} + frames[] + cast_pin(coverage)",
         families=("artifact", "annotation"),
         producers=(
-            "project cast mapping (project_cast_mapping + character pack asset)",
-            "video item source artifact (pinned reference crops)",
+            "character library target identity: project cast mapping "
+            "(project_cast_mapping.character_id + immutable pack_version_id) + the "
+            "pinned REFERENCE asset of that PackVersion (character_asset pose_slot "
+            "'reference')",
             "render result artifact (observed frame crops)",
         ),
         persistence=(
-            "project_cast_mapping.* / character_asset.artifact_id",
-            "artifact.sha256 + managed bytes",
+            "project_cast_mapping.* / character_asset.artifact_id / artifact.sha256 + "
+            "managed bytes of the library reference",
+            "artifact.sha256 + managed bytes of the RENDER",
         ),
         provenance=(
-            "cast mapping id/revision + compatibility verdict, both artifact ids + "
-            "re-verified sha256, per-crop content digest, frame indices"
+            "per-role coverage (role, mapping id/revision, character id/revision, pack "
+            "version + revision + status, reference artifact id + re-verified sha256, "
+            "workspace, generation), the compatibility verdict (a typed refusal, never "
+            "coerced) and the render artifact id + re-verified sha256 + window/PTS"
         ),
         derivations=(
-            "crops are decoded from the persisted source/render artifacts inside the "
-            "segment mask bbox; the pinned reference crop is the SOURCE side of the same "
-            "region (never the observed side — no self-comparison)"
+            "pinned_reference = crop of the pinned LIBRARY REFERENCE artifact of the "
+            "selected CharacterID + PackVersion inside the measured segment window; "
+            "frames = crops of the RENDER artifact inside the same window. The video's "
+            "own source frames are the MOTION authority and are never the identity "
+            "reference (finding R4). Coverage is enumerated per rendered role and the "
+            "measurement scope is declared — a first-segment-only identity is never "
+            "reported as the entire cast"
         ),
         refusals=_ALL_REFUSALS + (QC_EVIDENCE_DEPENDENCY,),
     ),
@@ -266,16 +307,18 @@ _CONTRACTS: tuple[DetectorInputContract, ...] = (
         required_input="window{start_frame,end_frame} + luminance[]",
         families=("artifact",),
         producers=(
-            "S10 full-apply publication artifact (rendered frames), source artifact fallback",
+            "S10 full-apply publication / render-side artifact publication "
+            "(rendered frames) — a video with no rendered output distinct from its "
+            "imported source refuses instead of measuring the source",
         ),
-        persistence="artifact.sha256 + managed media bytes",
+        persistence="artifact.sha256 + managed media bytes of the RENDER artifact",
         provenance=(
             "artifact id + re-verified sha256/size, per-frame luminance digest, "
             "decode revision, bounded window"
         ),
         derivations=(
-            "luminance[f] = mean grayscale of the decoded persisted frame f (bounded "
-            "window, deterministic decode)"
+            "luminance[f] = mean grayscale of the decoded RENDER artifact frame f "
+            "(bounded window, deterministic decode)"
         ),
         refusals=_ALL_REFUSALS + (QC_EVIDENCE_DEPENDENCY,),
     ),

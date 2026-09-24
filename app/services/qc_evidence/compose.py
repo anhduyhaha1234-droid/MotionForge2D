@@ -27,12 +27,15 @@ existing T03E attach-envelope composition path in the workflow handler.
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from fractions import Fraction
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.services.qc_evidence import observe as obs
 from app.services.qc_evidence import sources as src
 from app.services.qc_evidence.contract import FULL_BAND
 from app.services.qc_evidence.errors import (
@@ -40,12 +43,14 @@ from app.services.qc_evidence.errors import (
     dependency,
     malformed,
     missing,
+    stale,
 )
 from app.services.qc_evidence.measure import (
     MAX_WINDOW_FRAMES,
     MEASURE_REVISION,
     changed_centroid_x,
     content_digest,
+    crop_region,
     crop_revision,
     crop_sha256,
     decode_png_gray,
@@ -305,6 +310,121 @@ def _provenance_env(
     return payload
 
 
+#: Exact producer identity of the RENDERED observation side, by the role the
+#: render resolver reported (``source_fallback_no_render`` is NOT listed: a
+#: source substituted for the rendered output is refused, never measured).
+_OBSERVATION_PRODUCERS: dict[str, tuple[str, str]] = {
+    "publication": (
+        "S10 full-apply (stitch + publication) job",
+        "s10_full_apply_publication.artifact_id",
+    ),
+    "owned_result_artifact": (
+        "render-side artifact publication owned by the video item "
+        "(artifact purpose 'result' / 'render' / 'publication')",
+        "artifact(purpose in ('result','render','publication'), "
+        "owner_type='video_item', owner_id=video_item_id)",
+    ),
+}
+
+
+def _rendered_output(
+    ctx: _Context, detector: str
+) -> tuple[src.ArtifactEvidence, str, dict[str, Any]]:
+    """Resolve the RENDER artifact the observation side must be measured on.
+
+    The observed side of a QC check is what the OUTPUT contains.  When the
+    video has no rendered output distinct from its imported source there is
+    nothing to observe — measuring the source against itself would report the
+    render as perfect by construction — so this refuses with an exact
+    dependency report instead of falling back to the source.
+    """
+    evidence, role, facts = ctx.render(detector)
+    if role not in _OBSERVATION_PRODUCERS:
+        raise dependency(
+            detector,
+            "the video has no rendered output artifact distinct from its "
+            "imported source, so the observation side of this check would be "
+            "the source itself (a self-comparison against the input), not the "
+            "output",
+            fact="a rendered output artifact (a completed full-apply "
+            "publication, or a published render-side artifact owned by the "
+            "video item)",
+            producer="S10 full-apply (stitch + publication) job / render-side "
+            "artifact publication",
+            persistence="s10_full_apply_publication.artifact_id or "
+            "artifact(purpose in ('result','render','publication'))",
+            video_item_id=ctx.scope.video_item_id,
+            resolved_role=role,
+        )
+    return evidence, role, facts
+
+
+def _round_half_up(value: Fraction) -> int:
+    """Nearest integer of an exact ``Fraction`` (round half up)."""
+    if value.numerator < 0:
+        return -((2 * -value.numerator + value.denominator) // (2 * value.denominator))
+    return (2 * value.numerator + value.denominator) // (2 * value.denominator)
+
+
+def _frame_ms(ctx: _Context, detector: str) -> Callable[[int], int]:
+    """Exact frame → integer-millisecond converter of the canonical timebase."""
+    fps_num, fps_den = ctx.scope.fps_num, ctx.scope.fps_den
+    if not fps_num or not fps_den:
+        raise missing(
+            detector,
+            "the video item has no persisted canonical timebase "
+            "(video_item.fps_num/fps_den are NULL), so a rendered frame "
+            "cannot be given an exact presentation timestamp",
+            video_item_id=ctx.scope.video_item_id,
+        )
+    from app.services.timebase import CanonicalTimebase
+
+    timebase = CanonicalTimebase.from_rational(int(fps_num), int(fps_den), classification="CFR")
+
+    def _to_ms(frame: int) -> int:
+        return _round_half_up(timebase.frame_to_time(int(frame)) * 1000)
+
+    return _to_ms
+
+
+def _observation_envelope(
+    ctx: _Context,
+    detector: str,
+    *,
+    evidence: src.ArtifactEvidence,
+    role: str,
+    facts: Mapping[str, Any],
+    window: tuple[int, int],
+    measure: str,
+) -> dict[str, Any]:
+    """Provenance of the OBSERVED side: output artifact SHA + range/PTS + producer.
+
+    Carried with every composed argument set whose "observed" values were
+    measured on rendered bytes, so a reviewer can trace each observed value to
+    the exact output artifact and its frame range / presentation timestamps —
+    and cannot mistake a source-side row for an observation.
+    """
+    producer, persistence = _OBSERVATION_PRODUCERS[role]
+    to_ms = _frame_ms(ctx, detector)
+    return {
+        "schema_version": 1,
+        "detector": detector,
+        "observation_revision": obs.OBSERVATION_REVISION,
+        "artifact": evidence.provenance(),
+        "render_role": role,
+        "producer": producer,
+        "producer_persistence": persistence,
+        "producer_facts": dict(facts),
+        "window": {"start_frame": int(window[0]), "end_frame": int(window[1])},
+        "pts_ms": {
+            "start_ms": to_ms(int(window[0])),
+            "end_ms": to_ms(int(window[1])),
+            "timebase": {"fps_num": int(ctx.scope.fps_num), "fps_den": int(ctx.scope.fps_den)},
+        },
+        "measure": measure,
+    }
+
+
 # ── per-detector composers ───────────────────────────────────────────────────
 
 
@@ -323,7 +443,7 @@ def _trajectory_drift(ctx: _Context) -> dict[str, Any]:
         int(route.start_frame), int(route.end_frame), limit=min(ctx.max_frames, 16)
     )
     source = ctx.source(detector)
-    render, render_role, render_meta = ctx.render(detector)
+    render, render_role, render_meta = _rendered_output(ctx, detector)
     source_frames = ctx.frames(source, indices, detector)
     render_frames = ctx.frames(render, indices, detector)
     observed: list[float] = []
@@ -357,6 +477,17 @@ def _trajectory_drift(ctx: _Context) -> dict[str, Any]:
         "segment_row_id": str(segment.id),
         "segment_logical_id": str(segment.logical_id),
     }
+    args["render_observation"] = _observation_envelope(
+        ctx,
+        detector,
+        evidence=render,
+        role=render_role,
+        facts=render_meta,
+        window=(measured_frames[0], measured_frames[-1]),
+        measure="observed_x = column centroid of the source to render changed "
+        "pixels (|delta| > 0), measured on the decoded RENDER artifact frames; "
+        "the source frames are only the change baseline",
+    )
     args["evidence_provenance"] = _provenance_env(
         ctx,
         detector,
@@ -385,11 +516,13 @@ def _trajectory_drift(ctx: _Context) -> dict[str, Any]:
         },
         derivations={
             "reference_x": "round(route.anchor_x * frame_width) per measured frame",
-            "observed_x": "column centroid of source↔render changed pixels "
-            "(|Δ| >= 8 gray levels) per measured frame",
+            "observed_x": "column centroid of source to render changed pixels "
+            "(|delta| >= 8 gray levels) per measured frame",
             "measured_frames": measured_frames,
             "reference_digest": content_digest(reference),
             "observed_digest": content_digest(observed),
+            "render_observation": "traced to the resolved render artifact "
+            "sha256 + frame range/PTS + producer (never to a source-side row)",
         },
     )
     return args
@@ -397,6 +530,10 @@ def _trajectory_drift(ctx: _Context) -> dict[str, Any]:
 
 def _cut_drift(ctx: _Context) -> dict[str, Any]:
     detector = "cut_drift"
+    # Order matters for the refusal code a caller sees first: when the video
+    # has no persisted structural evidence at all, the truthful answer is
+    # QC_EVIDENCE_MISSING (no scene rows were ever published), not a
+    # dependency on a render the producer was never asked to record.
     scenes = ctx.scenes(detector)
     segments = ctx.segments(detector)
     fps_num, fps_den = ctx.scope.fps_num, ctx.scope.fps_den
@@ -404,7 +541,7 @@ def _cut_drift(ctx: _Context) -> dict[str, Any]:
         raise missing(
             detector,
             "the video item has no persisted canonical timebase "
-            "(video_item.fps_num/fps_den are NULL), so frame↔ms conversion "
+            "(video_item.fps_num/fps_den are NULL), so frame to ms conversion "
             "cannot be exact",
             video_item_id=ctx.scope.video_item_id,
         )
@@ -412,7 +549,7 @@ def _cut_drift(ctx: _Context) -> dict[str, Any]:
 
     timebase = CanonicalTimebase.from_rational(int(fps_num), int(fps_den), classification="CFR")
     boundaries: list[dict[str, int]] = []
-    render_cuts: list[int] = []
+    planned_cuts: list[int] = []
     for scene in scenes:
         start_frame = int(scene.start_frame)
         matches = [s for s in segments if int(s.start_frame) == start_frame]
@@ -434,13 +571,79 @@ def _cut_drift(ctx: _Context) -> dict[str, Any]:
                 segment_id=str(matches[0].id),
             )
         boundaries.append({"position": int(scene.position), "start_frame": start_frame})
-        render_cuts.append(int(start_time_ms))
+        planned_cuts.append(int(start_time_ms))
+    # ── OBSERVED side: the cut points the RENDER itself carries ───────────
+    # The renderer's planned segment start_time_ms is a PLAN (a source-side
+    # row).  The observed cut is measured instead: inside each boundary's
+    # neighbourhood the decoded RENDER frames expose the inter-frame delta
+    # |render(f) - render(f-1)|, and the frame carrying the largest delta is
+    # the cut the output actually shows.
+    render, render_role, render_meta = _rendered_output(ctx, detector)
+    boundary_frames = [int(row["start_frame"]) for row in boundaries]
+    wanted: set[int] = set()
+    for frame in boundary_frames:
+        wanted.update(range(max(0, frame - 2), frame + 2))
+    indices = sorted(wanted)[:MAX_WINDOW_FRAMES]
+    render_frames = ctx.frames(render, indices, detector)
+    to_ms = _frame_ms(ctx, detector)
+    observed_cuts: list[int] = []
+    cut_observations: list[dict[str, Any]] = []
+    for frame in boundary_frames:
+        if frame <= 0:
+            detail: dict[str, Any] = {
+                "frame": 0,
+                "delta": None,
+                "deltas": {},
+                "basis": "video start: the rendered output holds no earlier "
+                "frame to measure a cut against",
+            }
+            observed_frame = 0
+        else:
+            measured = obs.observed_boundary(render_frames, frame, detector=detector)
+            if measured is None or float(measured.get("delta") or 0.0) <= 0.0:
+                raise missing(
+                    detector,
+                    "the decoded rendered output shows no measurable content "
+                    f"change around scene boundary frame {frame}, so the cut "
+                    "the output actually carries there cannot be observed (the "
+                    "planned timecode is never reported as the observed cut)",
+                    boundary_frame=frame,
+                    render_artifact_id=render.artifact_id,
+                    decoded_frames=indices,
+                    render_role=render_role,
+                    measured=measured,
+                )
+            detail = dict(measured)
+            observed_frame = int(measured["frame"])
+        observed_cuts.append(to_ms(observed_frame))
+        cut_observations.append(
+            {
+                "boundary_frame": frame,
+                "observed_frame": observed_frame,
+                "observed_cut_ms": to_ms(observed_frame),
+                **detail,
+            }
+        )
     args: dict[str, Any] = {
         **_identity(ctx.scope, detector),
         "scene_boundaries": boundaries,
-        "render_cuts_ms": render_cuts,
+        "render_cuts_ms": observed_cuts,
         "timebase": timebase.to_json(),
+        "planned_cuts_ms": planned_cuts,
+        "cut_observations": cut_observations,
     }
+    args["render_observation"] = _observation_envelope(
+        ctx,
+        detector,
+        evidence=render,
+        role=render_role,
+        facts=render_meta,
+        window=(boundary_frames[0], boundary_frames[-1]),
+        measure="render_cuts_ms = exact millisecond of the frame whose "
+        "|render(f) - render(f-1)| is maximal inside the boundary "
+        "neighbourhood (deterministic tie-break), measured on the decoded "
+        "RENDER artifact",
+    )
     args["evidence_provenance"] = _provenance_env(
         ctx,
         detector,
@@ -455,23 +658,28 @@ def _cut_drift(ctx: _Context) -> dict[str, Any]:
                     }
                     for scene in scenes
                 ],
+                "scene_boundaries": "scene-detector ground truth (the INTENDED "
+                "cut positions this check judges the output against)",
             },
             "result": {
-                "render_cut_segments": [
+                "planned_cut_segments": [
                     {"segment_id": str(m.id), "start_frame": int(m.start_frame),
                      "start_time_ms": int(m.start_time_ms)}
                     for m in segments
-                    if int(m.start_frame) in [b["start_frame"] for b in boundaries]
+                    if int(m.start_frame) in boundary_frames
                 ],
                 "timebase": {"fps_num": int(fps_num), "fps_den": int(fps_den),
                              "source": "video_item.fps_num/fps_den"},
             },
         },
         derivations={
-            "render_cuts_ms": "the persisted occurrence_segment.start_time_ms of the "
-            "current segment that starts at each scene boundary frame — the "
-            "renderer's own millisecond value, never a re-conversion of the "
-            "scene frame",
+            "render_cuts_ms": "OBSERVED cut timecodes: the frame of maximal "
+            "|render(f) - render(f-1)| inside each boundary neighbourhood, on "
+            "the decoded RENDER artifact",
+            "planned_cuts_ms": "the renderer's PLANNED occurrence_segment."
+            "start_time_ms — recorded for comparison only; a planned value is "
+            "never reported as an observed cut",
+            "cut_observations": cut_observations,
         },
     )
     return args
@@ -493,13 +701,47 @@ def _contact_break(ctx: _Context) -> dict[str, Any]:
             contact_id=str(contact.id),
         )
     indices = window_indices(window_start, window_end, limit=min(ctx.max_frames, 16))
+    # ── OBSERVED side: where the RENDER actually paints the two segments ──
+    # The annotated mask region says WHERE to look; the geometry that is
+    # judged is measured on the decoded rendered output inside that region.
+    render, render_role, render_meta = _rendered_output(ctx, detector)
+    source = ctx.source(detector)
+    source_frames = ctx.frames(source, indices, detector)
+    render_frames = ctx.frames(render, indices, detector)
+    if not render_frames:
+        raise missing(
+            detector,
+            "no rendered frame decodes inside the contact analysis window, so "
+            "the rendered contact geometry cannot be observed",
+            frames_examined=indices,
+            render_artifact_id=render.artifact_id,
+            render_role=render_role,
+        )
     segments_payload: list[dict[str, Any]] = []
     mask_provenance: list[dict[str, Any]] = []
+    observed_total = 0
     for segment in (left, right):
         evidence, _matrix, _width, _height, bbox = ctx.mask(
             segment.mask_artifact_id, detector
         )
         mask_provenance.append(evidence.provenance())
+        expected_bbox = [int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])]
+        observed_frames: list[list[int] | None] = []
+        for index in indices:
+            source_frame = source_frames.get(index)
+            render_frame = render_frames.get(index)
+            if source_frame is None or render_frame is None:
+                observed_frames.append(None)
+                continue
+            measured = obs.changed_bbox(
+                source_frame, render_frame, region=bbox, detector=detector
+            )
+            observed_frames.append(
+                [int(measured[0]), int(measured[1]), int(measured[2]), int(measured[3])]
+                if measured is not None
+                else None
+            )
+        observed_total += sum(1 for row in observed_frames if row is not None)
         segments_payload.append(
             {
                 "id": str(segment.id),
@@ -508,11 +750,23 @@ def _contact_break(ctx: _Context) -> dict[str, Any]:
                 "start_frame": int(segment.start_frame),
                 "end_frame": int(segment.end_frame),
                 "mask_artifact_id": evidence.artifact_id,
-                "bbox_per_frame": [
-                    [int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])]
-                    for _ in indices
-                ],
+                "bbox_per_frame": observed_frames,
+                "expected_bbox_per_frame": [list(expected_bbox) for _ in indices],
             }
+        )
+    if observed_total == 0:
+        raise dependency(
+            detector,
+            "the rendered output paints no observable change inside the "
+            "annotated contact regions over the analysis window, so the "
+            "contact geometry of the output cannot be observed",
+            fact="rendered pixels (the composited output) inside the annotated "
+            "contact regions of the two segments",
+            producer="S10 full-apply (stitch + publication) job / render-side "
+            "artifact publication",
+            persistence="artifact bytes of the video's rendered result",
+            window={"start_frame": indices[0], "end_frame": indices[-1]},
+            render_role=render_role,
         )
     args: dict[str, Any] = {
         **_identity(ctx.scope, detector),
@@ -531,6 +785,17 @@ def _contact_break(ctx: _Context) -> dict[str, Any]:
         ],
         "segments": segments_payload,
     }
+    args["render_observation"] = _observation_envelope(
+        ctx,
+        detector,
+        evidence=render,
+        role=render_role,
+        facts=render_meta,
+        window=(indices[0], indices[-1]),
+        measure="bbox_per_frame = measured bbox of the source to render changed "
+        "pixels INSIDE the segment's annotated mask region, per decoded RENDER "
+        "frame (null where the output paints nothing there)",
+    )
     args["evidence_provenance"] = _provenance_env(
         ctx,
         detector,
@@ -541,6 +806,9 @@ def _contact_break(ctx: _Context) -> dict[str, Any]:
                 "contact_kind": str(contact.contact_kind),
                 "contact_range": [int(contact.start_frame), int(contact.end_frame)],
                 "contacts_available": len(contacts),
+                "expected_bbox_per_frame": "the persisted mask bbox of each "
+                "segment (the ANNOTATED region the observation is measured "
+                "inside — never reported as the observed geometry)",
             },
             "result": {
                 "segments": [
@@ -552,11 +820,11 @@ def _contact_break(ctx: _Context) -> dict[str, Any]:
             "artifact": {"masks": mask_provenance},
         },
         derivations={
-            "analysis_window": f"contact ∩ both segment windows, bounded to "
-            f"{len(indices)} frames",
-            "bbox_per_frame": "measured bounding box of the persisted mask bytes, "
-            "held constant per frame (the producer publishes one full-frame mask "
-            "per segment and no per-frame bbox)",
+            "analysis_window": f"contact intersected with both segment windows, "
+            f"bounded to {len(indices)} frames",
+            "bbox_per_frame": "OBSERVED rendered geometry per frame (measured on "
+            "the render artifact bytes); the annotated mask bbox is recorded "
+            "separately as expected_bbox_per_frame",
         },
     )
     return args
@@ -572,6 +840,61 @@ def _z_order_error(ctx: _Context) -> dict[str, Any]:
     window_start = min(int(edge.start_frame) for edge in edges)
     window_end = max(int(edge.end_frame) for edge in edges)
     manifest = src.current_lock_manifest(ctx.session, ctx.scope)
+    manifest_expected: dict[str, Any] | None = None
+    if manifest is not None:
+        from app.persistence.structural_lock import validate_manifest
+
+        try:
+            validated = validate_manifest(dict(manifest.manifest))
+        except Exception as exc:
+            raise malformed(
+                detector,
+                f"the current S09 structural lock manifest {manifest.id!r} does "
+                f"not validate through the public S09 contract: {exc}",
+                manifest_id=str(manifest.id),
+            ) from exc
+        manifest_expected = {
+            "manifest_id": str(manifest.id),
+            "version": int(manifest.version),
+            "manifest_hash_hex": str(manifest.manifest_hash_hex),
+            "status": str(manifest.status),
+            "validated_order": [
+                str(seg["occurrence_segment_id"]) for seg in validated["segments"]
+            ],
+            "authority": "PLANNED lock manifest (annotation) — recorded for "
+            "comparison; the observed render order is measured from the output "
+            "bytes and is what the detector judges",
+        }
+    # ── OBSERVED side: the stacking the RENDER actually paints ────────────
+    render, render_role, render_meta = _rendered_output(ctx, detector)
+    source = ctx.source(detector)
+    indices = window_indices(window_start, window_end, limit=min(ctx.max_frames, 16))
+    source_frames = ctx.frames(source, indices, detector)
+    render_frames = ctx.frames(render, indices, detector)
+    by_id = {str(segment.id): segment for segment in segments}
+    masks: dict[str, Any] = {}
+    mask_provenance: list[dict[str, Any]] = []
+    pairs: list[tuple[str, str]] = []
+    for edge in edges:
+        occluder = str(edge.occluder_segment_id)
+        occludee = str(edge.occludee_segment_id)
+        for segment_id in (occluder, occludee):
+            if segment_id not in masks:
+                evidence, matrix, _mw, _mh, _mbbox = ctx.mask(
+                    by_id[segment_id].mask_artifact_id, detector
+                )
+                masks[segment_id] = matrix
+                mask_provenance.append(
+                    {**evidence.provenance(), "segment_id": segment_id}
+                )
+        if (occluder, occludee) not in pairs:
+            pairs.append((occluder, occludee))
+    measurements = obs.measured_stacking(
+        source_frames, render_frames, masks, pairs, detector=detector
+    )
+    render_order = obs.stacking_order(
+        measurements, others=[str(segment.id) for segment in segments], detector=detector
+    )
     args: dict[str, Any] = {
         **_identity(ctx.scope, detector),
         "analysis_window": {"start_frame": window_start, "end_frame": window_end},
@@ -596,9 +919,23 @@ def _z_order_error(ctx: _Context) -> dict[str, Any]:
             }
             for edge in edges
         ],
+        "render_order": render_order,
+        "render_stacking": measurements,
     }
-    if manifest is not None:
-        args["lock_manifest"] = dict(manifest.manifest)
+    if manifest_expected is not None:
+        args["lock_manifest_expected"] = manifest_expected
+    args["render_observation"] = _observation_envelope(
+        ctx,
+        detector,
+        evidence=render,
+        role=render_role,
+        facts=render_meta,
+        window=(window_start, window_end),
+        measure="render_order = bottom-to-top order implied by the MEASURED "
+        "stacking of every occlusion pair (the region where the two annotated "
+        "masks overlap is attributed to whichever segment's exclusive rendered "
+        "appearance it matches), measured on the decoded RENDER artifact",
+    )
     args["evidence_provenance"] = _provenance_env(
         ctx,
         detector,
@@ -616,22 +953,17 @@ def _z_order_error(ctx: _Context) -> dict[str, Any]:
                      "confidence_source": str(e.confidence_source)}
                     for e in edges
                 ],
-                "lock_manifest": (
-                    {
-                        "manifest_id": str(manifest.id),
-                        "version": int(manifest.version),
-                        "manifest_hash_hex": str(manifest.manifest_hash_hex),
-                        "status": str(manifest.status),
-                    }
-                    if manifest is not None
-                    else None
-                ),
+                "lock_manifest": manifest_expected,
+            },
+            "artifact": {
+                "pair_masks": mask_provenance,
             },
         },
         derivations={
-            "observed_order": "the validated S09 manifest order when supplied, "
-            "otherwise the persisted scene-graph z_order ascending (detector "
-            "precedence, unchanged)",
+            "render_order": "OBSERVED bottom-to-top order measured from the "
+            "rendered bytes (never the persisted scene-graph z_order and never "
+            "the planned S09 manifest)",
+            "render_stacking": measurements,
             "window": [window_start, window_end],
         },
     )
@@ -644,6 +976,9 @@ def _silhouette_clipping(ctx: _Context) -> dict[str, Any]:
     width, height = ctx.scope.canvas(detector)
     window_start = min(int(segment.start_frame) for segment in segments)
     window_end = max(int(segment.end_frame) for segment in segments)
+    # ── OBSERVED side: the silhouette the RENDER actually paints ──────────
+    render, render_role, render_meta = _rendered_output(ctx, detector)
+    source = ctx.source(detector)
     payload: list[dict[str, Any]] = []
     masks: list[dict[str, Any]] = []
     for segment in segments:
@@ -658,6 +993,53 @@ def _silhouette_clipping(ctx: _Context) -> dict[str, Any]:
                 segment_id=str(segment.id),
             )
         masks.append(evidence.provenance())
+        indices = window_indices(
+            int(segment.start_frame),
+            int(segment.end_frame),
+            limit=min(ctx.max_frames, 8),
+        )
+        source_frames = ctx.frames(source, indices, detector)
+        render_frames = ctx.frames(render, indices, detector)
+        observed: tuple[int, int, int, int] | None = None
+        observed_frames: list[int] = []
+        for index in indices:
+            source_frame = source_frames.get(index)
+            render_frame = render_frames.get(index)
+            if source_frame is None or render_frame is None:
+                continue
+            measured = obs.changed_bbox(
+                source_frame, render_frame, region=bbox, detector=detector
+            )
+            if measured is None:
+                continue
+            observed_frames.append(index)
+            if observed is None:
+                observed = measured
+            else:
+                observed = (
+                    min(observed[0], measured[0]),
+                    min(observed[1], measured[1]),
+                    max(observed[2], measured[2]),
+                    max(observed[3], measured[3]),
+                )
+        if observed is None:
+            raise dependency(
+                detector,
+                f"the rendered output paints no observable silhouette inside "
+                f"segment {segment.id!r}'s annotated region over the frames it "
+                "is present in; judging its clipping from the source mask alone "
+                "would substitute the annotation for the observation",
+                fact="rendered pixels inside the segment's annotated silhouette "
+                "region",
+                producer="S10 full-apply (stitch + publication) job / render-side "
+                "artifact publication",
+                persistence="artifact bytes of the video's rendered result",
+                segment_id=str(segment.id),
+                frame_window=[
+                    int(segment.start_frame),
+                    int(segment.end_frame),
+                ],
+            )
         payload.append(
             {
                 "id": str(segment.id),
@@ -665,7 +1047,9 @@ def _silhouette_clipping(ctx: _Context) -> dict[str, Any]:
                 "start_frame": int(segment.start_frame),
                 "end_frame": int(segment.end_frame),
                 "mask_artifact_id": evidence.artifact_id,
-                "bbox": [int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])],
+                "bbox": [int(v) for v in observed],
+                "expected_bbox": [int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])],
+                "observed_frames": observed_frames,
             }
         )
     args: dict[str, Any] = {
@@ -674,6 +1058,17 @@ def _silhouette_clipping(ctx: _Context) -> dict[str, Any]:
         "frame": {"width": int(width), "height": int(height)},
         "segments": payload,
     }
+    args["render_observation"] = _observation_envelope(
+        ctx,
+        detector,
+        evidence=render,
+        role=render_role,
+        facts=render_meta,
+        window=(window_start, window_end),
+        measure="bbox = union of the per-frame measured bboxes of the source to "
+        "render changed pixels INSIDE the segment's annotated mask region, "
+        "measured on the decoded RENDER artifact frames of that segment window",
+    )
     args["evidence_provenance"] = _provenance_env(
         ctx,
         detector,
@@ -692,8 +1087,11 @@ def _silhouette_clipping(ctx: _Context) -> dict[str, Any]:
             "artifact": {"masks": masks},
         },
         derivations={
-            "bbox": "bounding box of the non-zero pixels of the persisted mask "
-            "artifact bytes (measured, never client-supplied)",
+            "bbox": "OBSERVED silhouette geometry: the measured bbox of the "
+            "rendered change inside the annotated mask region (never the "
+            "annotation itself; expected_bbox records the annotation)",
+            "expected_bbox": "the persisted mask bbox (annotation of where the "
+            "object is, recorded for comparison only)",
         },
     )
     return args
@@ -702,35 +1100,71 @@ def _silhouette_clipping(ctx: _Context) -> dict[str, Any]:
 def _identity_drift(ctx: _Context) -> dict[str, Any]:
     detector = "identity_drift"
     segments = ctx.segments(detector)
-    segment = segments[0]
-    source = ctx.source(detector)
-    render, render_role, render_meta = ctx.render(detector)
-    if render.artifact_id == source.artifact_id:
-        raise dependency(
-            detector,
-            "the rendered side of this video is its own source artifact (no "
-            "full-apply publication exists); comparing it with itself would be "
-            "a self-comparison baseline, which is forbidden",
-            fact="a rendered result artifact distinct from the imported source",
-            producer="S10 full-apply (stitch + publication) job",
-            persistence="s10_full_apply_publication.artifact_id",
+    # ── TARGET IDENTITY (finding R4): the library pin, per role ───────────
+    # The video's own source frames are the MOTION authority.  The identity
+    # authority is the SELECTED library target of EVERY role the video renders:
+    # the project cast pin (CharacterID + immutable PackVersion) and that pack
+    # version's REFERENCE artifact bytes.  Coverage is enumerated per role —
+    # a first-segment-only identity is never reported as the entire cast, and
+    # a role whose pin is missing / incompatible refuses the whole composition.
+    identities: dict[str, dict[str, Any]] = {}
+    coverage: list[dict[str, Any]] = []
+    for row in segments:
+        role_id = str(row.role_id)
+        if role_id in identities:
+            continue
+        pin = src.cast_pin_for_role(
+            ctx.session, ctx.managed_root, ctx.scope, role_id, detector=detector
         )
+        if pin["compatible"] is not True:
+            raise stale(
+                detector,
+                f"the pinned cast target for object role {role_id!r} is not "
+                "compatible with this video's target "
+                f"({', '.join(pin['reasons']) or 'no reason reported'}), so the "
+                "rendered identity cannot be judged against it",
+                role_id=role_id,
+                mapping_id=str(pin["mapping_id"]),
+                reasons=list(pin["reasons"]),
+                compatibility=dict(pin["compatibility"]),
+            )
+        identities[role_id] = pin
+        entry = src.pin_identity(pin)
+        entry["segment_row_ids"] = [
+            str(s.id) for s in segments if str(s.role_id) == role_id
+        ]
+        coverage.append(entry)
+    segment = segments[0]
+    identity = identities[str(segment.role_id)]
+    reference = src.pin_reference(identity)
+    render, render_role, render_meta = _rendered_output(ctx, detector)
     evidence, _matrix, width, height, bbox = ctx.mask(segment.mask_artifact_id, detector)
     window = _bounded_window(bbox)
     indices = window_indices(
         int(segment.start_frame), int(segment.end_frame), limit=min(ctx.max_frames, 8)
     )
-    source_frames = ctx.frames(source, indices, detector)
+    reference_matrix, reference_w, reference_h = decode_png_gray(
+        reference.data, detector=detector
+    )
+    clamped = obs.clamp_region(window, (reference_h, reference_w))
+    if clamped != window:
+        raise malformed(
+            detector,
+            f"the pinned library reference artifact {reference.artifact_id!r} of "
+            f"the target ({reference_w}x{reference_h}) does not cover the "
+            f"measured segment window {list(window)}; the target identity "
+            "cannot be compared against the rendered crop (fail closed)",
+            artifact_id=reference.artifact_id,
+            reference_geometry=[int(reference_w), int(reference_h)],
+            window=[int(v) for v in window],
+        )
+    reference_crop = crop_region(reference_matrix, window)
     render_frames = ctx.frames(render, indices, detector)
-    reference_crop: list[list[float]] | None = None
     frames: list[dict[str, Any]] = []
     for index in indices:
-        source_frame = source_frames.get(index)
         render_frame = render_frames.get(index)
-        if source_frame is None or render_frame is None:
+        if render_frame is None:
             continue
-        if reference_crop is None:
-            reference_crop = _crop(source_frame, window)
         crop = _crop(render_frame, window)
         frames.append(
             {
@@ -741,28 +1175,55 @@ def _identity_drift(ctx: _Context) -> dict[str, Any]:
                 "metadata": {},
             }
         )
-    if reference_crop is None or not frames:
+    if not frames:
         raise missing(
             detector,
-            "no decodable frame pair inside the segment window; there is no "
+            "no decodable rendered frame inside the segment window; there is no "
             "rendered identity evidence to measure",
             frames_examined=indices,
+            render_artifact_id=render.artifact_id,
         )
-    cast_pin: dict[str, Any] = {}
-    pin = src.cast_pin_for_role(ctx.session, ctx.scope, str(segment.role_id))
-    if pin is not None:
-        cast_pin = {
-            "mapping_id": pin["mapping_id"],
-            "expected_metadata": {},
-            "compatible": bool(pin.get("compatible", True)),
-            "compatibility_reasons": list(pin.get("reasons") or []),
-        }
+    # per-role rendered observations: the coverage table is not a claim, every
+    # covered role also carries what the OUTPUT shows inside its own window
+    role_observations: list[dict[str, Any]] = []
+    for entry in coverage:
+        role_id = str(entry["object_role_id"])
+        first = next(s for s in segments if str(s.role_id) == role_id)
+        role_indices = window_indices(
+            int(first.start_frame), int(first.end_frame), limit=min(ctx.max_frames, 4)
+        )
+        role_frames = ctx.frames(render, role_indices, detector)
+        role_observations.append(
+            {
+                "object_role_id": role_id,
+                "segment_row_id": str(first.id),
+                "segment_logical_id": str(first.logical_id),
+                "reference_artifact_id": str(entry["reference_artifact"]["artifact_id"]),
+                "reference_sha256": str(entry["reference_artifact"]["sha256"]),
+                "rendered_frames": [
+                    {
+                        "frame_index": int(index),
+                        "artifact_id": render.artifact_id,
+                        "luma_mean": round(
+                            float(
+                                sum(sum(r) for r in role_frames[index])
+                                / (len(role_frames[index]) * len(role_frames[index][0]))
+                            ),
+                            9,
+                        ),
+                    }
+                    for index in sorted(role_frames)
+                ],
+                "measured_on": "the resolved render artifact bytes",
+            }
+        )
     args: dict[str, Any] = {
         **_identity(ctx.scope, detector),
         "segment_row_id": str(segment.id),
         "segment_logical_id": str(segment.logical_id),
         "pinned_reference": {
-            "artifact_id": source.artifact_id,
+            "artifact_id": reference.artifact_id,
+            "artifact_sha256": reference.sha256,
             "sha256": crop_sha256(reference_crop),
             "crop_revision": crop_revision(reference_crop),
             "crop": {
@@ -770,24 +1231,82 @@ def _identity_drift(ctx: _Context) -> dict[str, Any]:
                 "width": len(reference_crop[0]),
                 "height": len(reference_crop),
             },
+            "identity": {
+                "object_role_id": str(identity["object_role_id"]),
+                "role_id": str(segment.role_id),
+                "mapping_id": str(identity["mapping_id"]),
+                "mapping_revision": int(identity["mapping_revision"]),
+                "character_id": str(identity["character_id"]),
+                "character_revision": int(identity["character_revision"]),
+                "pack_version_id": str(identity["pack_version_id"]),
+                "pack_version": int(identity["pack_version"]),
+                "pack_version_revision": int(identity["pack_version_revision"]),
+                "pack_version_status": str(identity["pack_version_status"]),
+                "pose_slot": str(identity["pose_slot"]),
+                "reference_asset_id": str(identity["reference_asset_id"]),
+                "workspace_id": str(identity["workspace_id"]),
+                "source_generation": str(identity["source_generation"]),
+            },
+            "crop_geometry": {
+                "reference": [int(reference_w), int(reference_h)],
+                "window": [int(v) for v in window],
+            },
+            "compatibility": dict(identity["compatibility"]),
         },
         "frames": frames,
-        "cast_pin": cast_pin,
+        "cast_pin": {
+            "expected_metadata": {},
+            "compatible": True,
+            "compatibility_reasons": list(identity["reasons"]),
+            "coverage_scope": "single_role",
+            "measured_role_id": str(segment.role_id),
+            "roles_total": len(coverage),
+            "roles_covered": len(coverage),
+            "uncovered_role_ids": [],
+            "measurement_note": "the visual identity observation is measured for "
+            "the role of the first current segment (measured_role_id); "
+            "cast_coverage enumerates the library target identity of EVERY role "
+            "the video renders, and role_observations carries the rendered "
+            "evidence of each of them — a partial coverage is never reported as "
+            "the entire cast",
+            "cast_coverage": coverage,
+            "role_observations": role_observations,
+        },
     }
+    args["render_observation"] = _observation_envelope(
+        ctx,
+        detector,
+        evidence=render,
+        role=render_role,
+        facts=render_meta,
+        window=(indices[0], indices[-1]),
+        measure="frames = crops of the decoded RENDER artifact inside the "
+        "measured segment window; pinned_reference = crop of the pinned LIBRARY "
+        "reference artifact of the target identity inside the same window",
+    )
     args["evidence_provenance"] = _provenance_env(
         ctx,
         detector,
         families={
             "artifact": {
-                "source": source.provenance(),
+                "reference": reference.provenance(),
                 "render": render.provenance(),
                 "render_role": render_role,
                 "render_role_facts": render_meta,
                 "segment_mask": evidence.provenance(),
                 "crop_window_px": list(window),
                 "mask_dims": [int(width), int(height)],
+                "reference_geometry": [int(reference_w), int(reference_h)],
             },
-            "annotation": {"cast_pin": pin},
+            "annotation": {
+                "cast_coverage": coverage,
+                "role_observations": role_observations,
+                "coverage_scope": "single_role",
+                "measured_role_id": str(segment.role_id),
+                "source_is_not_the_identity_authority": "the video's own source "
+                "frames are the MOTION authority for this reskin and are never "
+                "used as the identity reference",
+            },
             "result": {
                 "segment_id": str(segment.id),
                 "segment_revision": int(segment.revision),
@@ -795,10 +1314,16 @@ def _identity_drift(ctx: _Context) -> dict[str, Any]:
             },
         },
         derivations={
-            "pinned_reference": "crop of the SOURCE artifact inside the measured "
-            "segment bbox (the reference side is never the observed side)",
+            "pinned_reference": "crop of the PINNED LIBRARY REFERENCE artifact "
+            "(selected CharacterID + immutable PackVersion, re-hashed on read) "
+            "inside the measured segment window",
             "frames": "crops of the RENDER artifact inside the same bbox window",
             "crop_payload": f"bounded to <= {CROP_WINDOW_PX}x{CROP_WINDOW_PX} px",
+            "cast_pin": "the library target identity per role (mapping / "
+            "character / pack version + revision + reference artifact sha256 + "
+            "workspace + generation) with the compatibility verdict of the "
+            "public cast contract; an evaluator that cannot produce a verdict "
+            "is a typed refusal, never compatible=True",
         },
     )
     return args
@@ -894,6 +1419,29 @@ def _edge_halo(ctx: _Context) -> dict[str, Any]:
             },
         },
     }
+    to_ms = _frame_ms(ctx, detector)
+    args["rendered_observation"] = {
+        "schema_version": 1,
+        "detector": detector,
+        "observation_revision": obs.OBSERVATION_REVISION,
+        "artifact": rendered_evidence.provenance(),
+        "render_role": "rendered_side_mask_publication",
+        "producer": "object-correction mask publication",
+        "producer_persistence": "artifact(kind='image', purpose='mask', "
+        "owner_type='video_item')",
+        "window": {"start_frame": int(segment.start_frame),
+                   "end_frame": int(segment.end_frame)},
+        "pts_ms": {
+            "start_ms": to_ms(int(segment.start_frame)),
+            "end_ms": to_ms(int(segment.end_frame)),
+            "timebase": {"fps_num": int(ctx.scope.fps_num),
+                         "fps_den": int(ctx.scope.fps_den)},
+        },
+        "measure": "halo width measured between the RENDERED-side published "
+        "mask artifact and the pinned expected geometry, over the shared "
+        "window cropped from the persisted bytes; a byte-identical candidate is "
+        "refused as a self-comparison",
+    }
     args["evidence_provenance"] = _provenance_env(
         ctx,
         detector,
@@ -933,7 +1481,7 @@ def _temporal_flicker(ctx: _Context) -> dict[str, Any]:
     detector = "temporal_flicker"
     segments = ctx.segments(detector)
     segment = segments[0]
-    render, render_role, render_meta = ctx.render(detector)
+    render, render_role, render_meta = _rendered_output(ctx, detector)
     indices = window_indices(
         int(segment.start_frame), int(segment.end_frame), limit=min(ctx.max_frames, 16)
     )
@@ -954,6 +1502,16 @@ def _temporal_flicker(ctx: _Context) -> dict[str, Any]:
         "window": {"start_frame": min(luminance), "end_frame": max(luminance)},
         "luminance": [luminance[index] for index in sorted(luminance)],
     }
+    args["render_observation"] = _observation_envelope(
+        ctx,
+        detector,
+        evidence=render,
+        role=render_role,
+        facts=render_meta,
+        window=(min(luminance), max(luminance)),
+        measure="luminance = mean grayscale of each decoded RENDER artifact "
+        "frame (the source is never substituted for the output)",
+    )
     args["evidence_provenance"] = _provenance_env(
         ctx,
         detector,
@@ -1046,7 +1604,7 @@ def compose_visual_band(
                 name: exc.code for name, exc in failures.items()
             },
         ) from first
-    for name, args in composed.items():
+    for _name, args in composed.items():
         args["evidence_provenance"]["composed_digest"] = hashlib.sha256(
             content_digest({k: v for k, v in args.items() if k != "evidence_provenance"})
             .encode("utf-8")

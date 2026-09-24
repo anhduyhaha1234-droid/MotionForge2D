@@ -10,6 +10,12 @@ The fixture builds a REAL persisted world for one video item:
 - a distinct rendered-side mask artifact (object-correction style publication);
 - scene rows (scene-detector ground truth), render routes (S09), and the
   scene-graph contact/occlusion annotations;
+- the CHARACTER LIBRARY target identity of every rendered role (correction
+  round C / R4): a workspace Character + a PUBLISHED immutable
+  CharacterPackVersion carrying all CORE_POSE_SLOTS plus the ``reference``
+  slot, and the project cast pin (ProjectCastMapping) that selects it; the
+  rendered output actually paints every segment, so the four output-side
+  detectors have a real observation to measure (R5);
 - a completed ATTACH_ORIGINAL_AUDIO attempt carrying the T03E envelope.
 
 Disclosure (no green-by-fabrication anywhere): the fixture writes the media
@@ -37,12 +43,17 @@ from alembic.config import Config
 from app.persistence import create_engine_for_path, create_session_factory
 from app.persistence.artifacts import ManagedRoot
 from app.persistence.models import (
+    CORE_POSE_SLOTS,
     Artifact,
     ArtifactOwner,
+    Character,
+    CharacterAsset,
+    CharacterPackVersion,
     Job,
     JobAttempt,
     ObjectRole,
     Project,
+    ProjectCastMapping,
     Scene,
     VideoItem,
     Workspace,
@@ -90,8 +101,19 @@ ANCHOR_X = DELTA_CENTRE_X / float(CANVAS_W)
 #: inside the composer's halo-window bound.
 MASK_A_RECT = (100, 160, 116, 176)
 MASK_B_RECT = (300, 160, 340, 200)
-MASK_C_RECT = (400, 160, 440, 200)
+#: The occlusion pair (segment A occludes segment C) must be OBSERVABLE in the
+#: rendered pixels: the two annotated mask regions overlap, so the rendered
+#: appearance of their overlap can be attributed to whichever segment paints
+#: it.  Segment C's own rendered layer covers exactly this region.
+MASK_C_RECT = (110, 160, 150, 200)
 MASK_RENDERED_RECT = (98, 158, 118, 178)
+
+#: Gray levels of the library REFERENCE pattern.  The identity metric is an
+#: RMS pixel distance with a sanity bound of 8.0 px, so the reference must stay
+#: measurable against the rendered crop (level 8) while crossing the warning
+#: boundary (2.0 px): a 5/11 checkerboard sits at exactly 3.0 px from 8.0.
+REFERENCE_LOW = 5
+REFERENCE_HIGH = 11
 
 
 def _new_id() -> str:
@@ -103,6 +125,25 @@ def _alembic_config(database_path: Path) -> Config:
     cfg.set_main_option("script_location", str(PROJECT_ROOT / "migrations"))
     cfg.set_main_option("sqlalchemy.url", f"sqlite:///{database_path.as_posix()}")
     return cfg
+
+
+def _reference_png_bytes() -> bytes:
+    """A real canvas-sized library REFERENCE image (checkerboard pattern).
+
+    The pinned target identity of a reskin is the character library's
+    reference asset, never a crop of the video's source frames — this fixture
+    publishes genuine bytes at the video canvas geometry so the reference crop
+    is comparable with the rendered crop under the same window.
+    """
+    from PIL import Image
+
+    array = np.zeros((CANVAS_H, CANVAS_W), dtype=np.uint8)
+    array[:, :] = REFERENCE_LOW
+    array[::2, ::2] = REFERENCE_HIGH
+    array[1::2, 1::2] = REFERENCE_HIGH
+    buffer = io.BytesIO()
+    Image.fromarray(array, mode="L").save(buffer, format="PNG")
+    return buffer.getvalue()
 
 
 def _png_bytes(rect: tuple[int, int, int, int]) -> bytes:
@@ -117,9 +158,19 @@ def _png_bytes(rect: tuple[int, int, int, int]) -> bytes:
     return buffer.getvalue()
 
 
-def _video_bytes(path: Path, *, square_rect: tuple[int, int, int, int] | None,
-                 lit_frames: range, level: int = 255) -> bytes:
-    """Write a REAL lossless (FFV1) clip so frame measurements are exact."""
+def _video_bytes(
+    path: Path,
+    *,
+    square_rect: tuple[int, int, int, int] | None,
+    lit_frames: range,
+    level: int = 255,
+    extra_layers: tuple[tuple[tuple[int, int, int, int], range], ...] = (),
+) -> bytes:
+    """Write a REAL lossless (FFV1) clip so frame measurements are exact.
+
+    ``extra_layers`` paints further composited layers (rect, frame range) so
+    the rendered output carries one observable layer per rendered segment.
+    """
     import cv2
 
     fourcc = cv2.VideoWriter_fourcc(*"FFV1")
@@ -130,6 +181,10 @@ def _video_bytes(path: Path, *, square_rect: tuple[int, int, int, int] | None,
         if square_rect is not None and index in lit_frames:
             x0, y0, x1, y1 = square_rect
             frame[y0:y1, x0:x1] = int(level)
+        for rect, frames in extra_layers:
+            if index in frames:
+                x0, y0, x1, y1 = rect
+                frame[y0:y1, x0:x1] = int(level)
         writer.write(frame)
     writer.release()
     data = path.read_bytes()
@@ -149,10 +204,17 @@ class EvidenceIds:
     segment_b: str
     segment_c: str
     mask_a: str
+    mask_b: str
+    mask_c: str
     mask_rendered: str
     route_a: str
     contact_id: str
     occlusion_id: str
+    role_ids: dict[str, str]
+    character_ids: dict[str, str]
+    pack_version_ids: dict[str, str]
+    cast_mapping_ids: dict[str, str]
+    reference_artifact_ids: dict[str, str]
 
 
 def _publish(
@@ -201,11 +263,19 @@ def seed_qc_evidence(session_factory: Any, managed_root: Path) -> EvidenceIds:
     source_bytes = _video_bytes(
         media_dir / "source.avi", square_rect=None, lit_frames=range(0)
     )
+    # The rendered output paints one layer per segment (A over frames 0..9,
+    # B and C over frames 10..19) so the output-side detectors have a real
+    # observation to measure — a render that paints nothing would have to be
+    # refused by them, never passed from the source-side annotation.
     render_bytes = _video_bytes(
         media_dir / "render.avi",
         square_rect=DELTA_RECT,
         lit_frames=range(0, 10),
         level=RENDER_LEVEL,
+        extra_layers=(
+            (MASK_B_RECT, range(10, TOTAL_FRAMES)),
+            (MASK_C_RECT, range(10, TOTAL_FRAMES)),
+        ),
     )
 
     with session_factory() as session:
@@ -288,6 +358,8 @@ def seed_qc_evidence(session_factory: Any, managed_root: Path) -> EvidenceIds:
             session.add(role)
             session.flush()
             roles[name] = role
+
+        cast = _seed_cast(session, root, project, roles)
 
         mask_a = _publish(
             session, root, rel="media/mask_a.png", data=_png_bytes(MASK_A_RECT),
@@ -449,11 +521,109 @@ def seed_qc_evidence(session_factory: Any, managed_root: Path) -> EvidenceIds:
             segment_b=str(seg_b.id),
             segment_c=str(seg_c.id),
             mask_a=str(mask_a.id),
+            mask_b=str(mask_b.id),
+            mask_c=str(mask_c.id),
             mask_rendered=str(mask_rendered.id),
             route_a=str(route.id),
             contact_id=str(contact.id),
             occlusion_id=str(occlusion.id),
+            role_ids={name: str(role.id) for name, role in roles.items()},
+            character_ids={name: row["character_id"] for name, row in cast.items()},
+            pack_version_ids={name: row["pack_version_id"] for name, row in cast.items()},
+            cast_mapping_ids={name: row["mapping_id"] for name, row in cast.items()},
+            reference_artifact_ids={
+                name: row["reference_artifact_id"] for name, row in cast.items()
+            },
         )
+
+
+def _seed_cast(
+    session: Any, root: ManagedRoot, project: Project, roles: dict[str, ObjectRole]
+) -> dict[str, dict[str, str]]:
+    """Seed the CHARACTER LIBRARY target identity of every rendered role.
+
+    For each object role: a workspace Character, a PUBLISHED immutable
+    CharacterPackVersion carrying every CORE_POSE_SLOT plus the ``reference``
+    slot (the pinned identity pixels), and the project cast pin that selects
+    it.  This is what the identity check compares the rendered output against
+    (finding R4) — the video's own source frames are the motion authority and
+    are never the identity reference.
+    """
+    out: dict[str, dict[str, str]] = {}
+    for name, role in roles.items():
+        character_type = role.kind if role.kind in ("character", "prop") else "prop"
+        character = Character(
+            workspace_id=WS,
+            name=f"{name} library character",
+            code=f"LIB-{name}",
+            character_type=character_type,
+            status="ready",
+            revision=1,
+        )
+        session.add(character)
+        session.flush()
+        pack = CharacterPackVersion(
+            character_id=character.id,
+            workspace_id=WS,
+            version=1,
+            status="published",
+            revision=1,
+        )
+        session.add(pack)
+        session.flush()
+        reference = _publish(
+            session,
+            root,
+            rel=f"media/reference_{name}.png",
+            data=_reference_png_bytes(),
+            kind="image",
+            mime_type="image/png",
+            purposes=(("project", project.id, "reference"),),
+        )
+        session.add(
+            CharacterAsset(
+                pack_version_id=pack.id,
+                workspace_id=WS,
+                pose_slot="reference",
+                artifact_id=reference.id,
+            )
+        )
+        for slot in CORE_POSE_SLOTS:
+            pose = _publish(
+                session,
+                root,
+                rel=f"media/pose_{name}_{slot}.png",
+                data=_png_bytes(MASK_A_RECT if slot == "front" else MASK_B_RECT),
+                kind="image",
+                mime_type="image/png",
+                purposes=(("project", project.id, "pose"),),
+            )
+            session.add(
+                CharacterAsset(
+                    pack_version_id=pack.id,
+                    workspace_id=WS,
+                    pose_slot=slot,
+                    artifact_id=pose.id,
+                )
+            )
+        session.flush()
+        mapping = ProjectCastMapping(
+            workspace_id=WS,
+            project_id=project.id,
+            object_role_id=role.id,
+            character_id=character.id,
+            pack_version_id=pack.id,
+            revision=1,
+        )
+        session.add(mapping)
+        session.flush()
+        out[name] = {
+            "character_id": str(character.id),
+            "pack_version_id": str(pack.id),
+            "mapping_id": str(mapping.id),
+            "reference_artifact_id": str(reference.id),
+        }
+    return out
 
 
 def _no_audio_attempt_result() -> dict[str, Any]:

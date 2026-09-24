@@ -27,8 +27,16 @@ from app.services.qc_evidence import (
     table_payload,
 )
 
-#: The digest frozen when the table was committed (any drift fails).
-FROZEN_TABLE_DIGEST = "db8fd80bb31b627e53d474c77e14baf1685f1d32cea824d7d35783b506a2c032"
+#: The digest of the table as RE-FROZEN in correction round C (finding R4/R5):
+#: the observed side of cut_drift / contact_break / z_order_error /
+#: silhouette_clipping is measured on the RENDER artifact bytes and the
+#: identity target is the pinned LIBRARY reference of the selected CharacterID
+#: + immutable PackVersion, so those rows were corrected.  The previous freeze
+#: (db8fd80bb31b627e53d474c77e14baf1685f1d32cea824d7d35783b506a2c032) declared
+#: the source-side observation this round removes — it is recorded here so the
+#: drift between the two freezes is auditable, and any FURTHER drift still
+#: fails this test.
+FROZEN_TABLE_DIGEST = "76aebd7bb9a19f9602ab95279ad5aa527e82b0e22d5c6086ea2b26610135793f"
 
 REQUIRED_CORE_REFUSALS = (
     QC_EVIDENCE_MISSING,
@@ -43,7 +51,7 @@ def test_frozen_band_matches_the_ten_detectors() -> None:
     assert tuple(row.detector for row in CONTRACTS) == FULL_BAND
     assert len(CONTRACTS) == 10
     assert len(set(FULL_BAND)) == 10
-    assert VISUAL_DETECTORS == FULL_BAND[:8]
+    assert FULL_BAND[:8] == VISUAL_DETECTORS
 
 
 def test_frozen_table_digest_is_unchanged() -> None:

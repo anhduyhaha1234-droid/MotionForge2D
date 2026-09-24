@@ -111,6 +111,7 @@ def dependency(
     fact: str,
     producer: str,
     persistence: str,
+    **details: Any,
 ) -> QcEvidenceError:
     """Exact dependency report for a fact that has NO producer today."""
     return QcEvidenceError(
@@ -125,4 +126,5 @@ def dependency(
         fact=fact,
         producer=producer,
         persistence=persistence,
+        **details,
     )

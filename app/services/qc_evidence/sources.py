@@ -16,6 +16,7 @@ does not match is ``QC_EVIDENCE_TAMPERED`` — never a silent pass.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,10 @@ from app.persistence.artifacts import hash_file, is_within
 from app.persistence.models import (
     Artifact,
     ArtifactOwner,
+    Character,
+    CharacterAsset,
+    CharacterPackVersion,
+    ProjectCastMapping,
     Scene,
     VideoItem,
 )
@@ -43,6 +48,7 @@ from app.persistence.structural_lock import (
     StructuralLockRepository,
 )
 from app.services.qc_evidence.errors import (
+    dependency,
     foreign,
     malformed,
     missing,
@@ -515,24 +521,25 @@ def current_lock_manifest(
         return None
 
 
-def cast_pin_for_role(
-    session: Session, scope: VideoScope, role_id: str
-) -> dict[str, Any] | None:
-    """The project's cast pin for one object role, with its compatibility
-    verdict evaluated through the public cast contract."""
-    from app.persistence.models import ProjectCastMapping
+#: The pose slot that carries the character library's REFERENCE pixels.  The
+#: identity authority of a reskin is the pinned CharacterID + PackVersion and
+#: the bytes of this slot — never a crop of the video's own source frames.
+REFERENCE_POSE_SLOT = "reference"
+
+
+def _compatibility_verdict(
+    session: Session, scope: VideoScope, row: ProjectCastMapping, detector: str
+) -> dict[str, Any]:
+    """The pinned cast mapping's compatibility verdict, or a typed refusal.
+
+    There is deliberately NO fail-open branch: when the evaluator raises (a
+    query failure, a timeout, an authority outage) the pin has NO verdict, and
+    reporting ``compatible=True`` would fabricate the one fact the identity
+    check is built on.  The refusal names the evaluator as the missing
+    producer and carries the evaluator error verbatim.
+    """
     from app.persistence.project_cast import evaluate_compatibility
 
-    row = session.scalar(
-        select(ProjectCastMapping).where(
-            ProjectCastMapping.workspace_id == scope.workspace_id,
-            ProjectCastMapping.project_id == scope.project_id,
-            ProjectCastMapping.object_role_id == role_id,
-        )
-    )
-    if row is None:
-        return None
-    verdict: dict[str, Any] = {"compatible": True, "reasons": []}
     try:
         result = evaluate_compatibility(
             session,
@@ -541,23 +548,183 @@ def cast_pin_for_role(
             str(row.object_role_id),
             str(row.character_id),
             str(row.pack_version_id),
-            None,
+            int(row.revision),
             str(row.id),
         )
-        verdict = {
-            "compatible": bool(getattr(result, "compatible", True)),
-            "reasons": list(getattr(result, "reasons", []) or []),
-        }
-    except Exception as exc:  # pragma: no cover - verdict stays fail-open-free
-        verdict = {"compatible": True, "reasons": [f"unavailable: {exc}"]}
+    except Exception as exc:
+        raise dependency(
+            detector,
+            "the cast compatibility evaluator raised for the pinned target "
+            "identity, so no compatibility verdict exists for it; a "
+            "fail-open 'compatible' would be a fabricated verdict",
+            fact="the compatibility verdict of the project cast pin",
+            producer="app.persistence.project_cast.evaluate_compatibility",
+            persistence="project_cast_mapping revision + "
+            "character_pack_version.status/revision + character_asset pose slots",
+            mapping_id=str(row.id),
+            object_role_id=str(row.object_role_id),
+            evaluator_error_type=type(exc).__name__,
+            evaluator_error=str(exc)[:500],
+        ) from exc
+    return {
+        "compatible": bool(result.compatible),
+        "reasons": [str(reason) for reason in (result.reasons or [])],
+        "blocked": bool(getattr(result, "blocked", False)),
+        "fallback_allowed": bool(getattr(result, "fallback_allowed", False)),
+        "pinned_version_id": (
+            str(result.pinned_version_id)
+            if getattr(result, "pinned_version_id", None) is not None
+            else None
+        ),
+        "current_revision": getattr(result, "current_revision", None),
+        "evaluator": "app.persistence.project_cast.evaluate_compatibility",
+    }
+
+
+def cast_pin_for_role(
+    session: Session,
+    managed_root: Path,
+    scope: VideoScope,
+    role_id: str,
+    *,
+    detector: str,
+) -> dict[str, Any]:
+    """The TARGET IDENTITY of one object role (finding R4).
+
+    For a reskin the video's source is the MOTION authority; the identity
+    authority is the SELECTED library pin — the project cast mapping's
+    ``character_id`` + immutable ``pack_version_id`` plus that pack version's
+    REFERENCE artifact, whose bytes are re-hashed on read.  Every fact carries
+    its provenance (role, mapping revision, character/pack version + revision,
+    workspace, source generation, artifact sha256/size).
+
+    Fail-closed: a missing pin (``QC_EVIDENCE_MISSING``), a foreign pin
+    (``QC_EVIDENCE_FOREIGN``), an unpublished/mismatched reference asset
+    (``QC_EVIDENCE_DEPENDENCY`` with the exact producer), tampered reference
+    bytes (``QC_EVIDENCE_TAMPERED``, raised by :func:`read_artifact`) and an
+    evaluator that cannot produce a verdict (``QC_EVIDENCE_DEPENDENCY``) each
+    refuse.  The verdict is NEVER coerced to ``compatible=True``.
+    """
+    row = session.scalar(
+        select(ProjectCastMapping).where(
+            ProjectCastMapping.workspace_id == scope.workspace_id,
+            ProjectCastMapping.project_id == scope.project_id,
+            ProjectCastMapping.object_role_id == role_id,
+        )
+    )
+    if row is None:
+        raise missing(
+            detector,
+            f"the project holds no cast pin for object role {role_id!r}: the "
+            "reskin target identity (CharacterID + PackVersion) was never "
+            "selected, so no library target exists to judge the rendered "
+            "identity against",
+            role_id=role_id,
+            project_id=scope.project_id,
+        )
+    if str(row.workspace_id) != scope.workspace_id or str(row.project_id) != scope.project_id:
+        raise foreign(
+            detector,
+            f"cast pin {row.id!r} belongs to "
+            f"{row.workspace_id!r}/{row.project_id!r}, outside the requested "
+            "scope",
+            mapping_id=str(row.id),
+            role_id=role_id,
+        )
+    character = session.get(Character, str(row.character_id))
+    pack = session.get(CharacterPackVersion, str(row.pack_version_id))
+    if character is None or pack is None:
+        raise missing(
+            detector,
+            "the pinned target identity is dangling: the cast pin references "
+            "a character / pack version row that does not exist",
+            mapping_id=str(row.id),
+            character_id=str(row.character_id),
+            pack_version_id=str(row.pack_version_id),
+        )
+    if (
+        str(pack.character_id) != str(row.character_id)
+        or str(pack.workspace_id) != scope.workspace_id
+    ):
+        raise foreign(
+            detector,
+            f"pinned pack version {row.pack_version_id!r} does not belong to "
+            f"character {row.character_id!r} in workspace "
+            f"{scope.workspace_id!r}; the pin is not admissible for this video",
+            mapping_id=str(row.id),
+        )
+    if str(character.workspace_id) != scope.workspace_id:
+        raise foreign(
+            detector,
+            f"pinned character {row.character_id!r} belongs to workspace "
+            f"{character.workspace_id!r}, outside the requested scope",
+            mapping_id=str(row.id),
+        )
+    asset = session.scalars(
+        select(CharacterAsset)
+        .where(
+            CharacterAsset.pack_version_id == str(row.pack_version_id),
+            CharacterAsset.pose_slot == REFERENCE_POSE_SLOT,
+        )
+        .order_by(CharacterAsset.id)
+    ).first()
+    if asset is None:
+        raise dependency(
+            detector,
+            f"pinned pack version {row.pack_version_id!r} carries no "
+            f"{REFERENCE_POSE_SLOT!r} pose asset: the character library never "
+            "published the reference pixels of this target, and the video's "
+            "own source frames are not the identity authority",
+            fact="the pinned REFERENCE artifact of the selected PackVersion",
+            producer="character pack publication (CharacterAsset pose_slot="
+            f"{REFERENCE_POSE_SLOT!r})",
+            persistence="character_asset.artifact_id",
+        )
+    reference = read_artifact(
+        session, managed_root, scope, str(asset.artifact_id), detector=detector
+    )
+    verdict = _compatibility_verdict(session, scope, row, detector)
     return {
         "mapping_id": str(row.id),
-        "revision": int(row.revision),
+        "mapping_revision": int(row.revision),
         "object_role_id": str(row.object_role_id),
         "character_id": str(row.character_id),
+        "character_revision": int(character.revision),
+        "character_status": str(character.status),
         "pack_version_id": str(row.pack_version_id),
-        **verdict,
+        "pack_version": int(pack.version),
+        "pack_version_revision": int(pack.revision),
+        "pack_version_status": str(pack.status),
+        "workspace_id": scope.workspace_id,
+        "project_id": scope.project_id,
+        "source_generation": scope.source_generation,
+        "pose_slot": str(asset.pose_slot),
+        "reference_asset_id": str(asset.id),
+        "reference_artifact": reference.provenance(),
+        "compatible": bool(verdict.get("compatible")),
+        "reasons": list(verdict.get("reasons") or []),
+        "compatibility": verdict,
+        # internal (JSON-unsafe) handle for the reference bytes; never
+        # serialized — compose reads it through ``pin_identity``/``pin_reference``
+        "reference_evidence": reference,
     }
+
+
+def pin_identity(pin: Mapping[str, Any]) -> dict[str, Any]:
+    """JSON-safe identity view of a cast pin (drops the byte-level handle)."""
+    return {key: value for key, value in pin.items() if key != "reference_evidence"}
+
+
+def pin_reference(pin: Mapping[str, Any]) -> ArtifactEvidence:
+    """The pinned library reference bytes of a cast pin (re-verified on read)."""
+    evidence = pin.get("reference_evidence")
+    if not isinstance(evidence, ArtifactEvidence):  # pragma: no cover - defensive
+        raise malformed(
+            "qc_evidence",
+            "cast pin carries no verified reference artifact handle",
+        )
+    return evidence
+
 
 
 def manifest_segments(manifest: LockManifestRecord) -> list[dict[str, Any]]:
