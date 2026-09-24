@@ -44,3 +44,35 @@
 6. **Nothing is re-tuned to make an old artifact pass.** A red row on a frozen artifact stays red in the report.
 7. **No cross-owner metric is reused as truth.** If a shape/liveness idea comes from another task's harness (e.g.
    PROPAGATE `measure.py`), it must be re-derived here with its own negative control, and the report must say so.
+
+## 4. Reporting rules (correction round C, Codex R11) - enforced in `reporting.py`
+
+These are not style preferences: every one of them was a real reporting defect.
+
+1. **Artifact identity is per-sha256.** A geometry statement belongs to exactly one artifact.
+   The raw render is **640x368** (121 f) and the cropped export of it is **640x360** (120 f);
+   attributing the raw's +8-row vertical defect (+2.2222 %) to the cropped candidate's hash is a
+   reporting error. `reporting.identity()` prints the sha next to every geometry number and
+   `identity_table()` refuses an unbound geometry.
+2. **Four time scales, never one.** `wall_s` (client process) / `wait_s` (adapter wait for the
+   server) / `server_s` (the engine's own "Prompt executed") / `load_s` (cold model load) are
+   four different measurements. Each carries its own source locator; a field that was not
+   measured stays `None` with a reason and is never filled in from another field.
+3. **Generated seconds are not accepted seconds.** `generated_seconds` is what the render
+   produced; `accepted_seconds` is what a reviewer accepted. With `accepted_seconds = 0` the cost
+   per accepted second is **`undefined (accepted_seconds = 0)`** - the report says the word, never
+   a number, and any arithmetic shown is labelled arithmetic only.
+4. **G / I / V are separate verdict families.** `G` = deterministic generation/artifact facts
+   (machine rows) · `I` = identity (needs target-library pixels) · `V` = visual quality (needs a
+   viewer). A `G` PASS is never an `I` pass and never a `V` pass.
+5. **The semantic axis is separate from the families**: `pass` / `fail` / `notmeasured` /
+   `not_reviewed` / `not_applicable`. Both harness spellings of "the measurement cannot decide"
+   (`UNMEASURED` and `UNKNOWN`) map to **`notmeasured`**. It is never rendered as PASS, and it is
+   never rendered as a failure either: the derived verdict is
+   `TECHNICAL_PASS` (all PASS/NOT_APPLICABLE), `TECHNICAL_FAIL` (at least one FAIL) or
+   `TECHNICAL_NOTMEASURED` (no FAIL, at least one `notmeasured`) - measured, not asserted.
+6. **Provenance is explicit.** Every review artifact records the sha256 it belongs to, the frames
+   it covers and who (if anyone) looked at it. No viewer => `NOT_REVIEWED` and
+   `promotes_to_visual` stays False: a technical PASS is never reported as a visual PASS.
+
+`QUALITY_ACCEPTED` remains **0** until a viewer answers the visual rows.

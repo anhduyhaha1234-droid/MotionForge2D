@@ -523,3 +523,141 @@ def test_delta_facts_is_zero_only_for_identical_input():
     assert d["measured"] and d["mae_median"] == 0.0 and d["identical_frames"] == 3
     d2 = CMP.delta_facts(np.full((3, 8, 8), 10, dtype=np.uint8), a)
     assert d2["mae_median"] == 10.0 and d2["identical_frames"] == 0
+# --------------------------------------------------------------------------- #
+# reporting layer - correction round C (rows B2/B3)
+# The rules here were each a real reporting defect (Codex R11), not a theory:
+# geometry belongs to ONE sha, wall/wait/server/load are four measurements,
+# generated != accepted seconds, G/I/V are separate from semantic fail/notmeasured,
+# and a technical PASS is never a visual PASS.
+#
+# `run_dryrun` is deliberately NOT imported at module scope: it calls
+# C.set_ledger_path(<submitted packet ledger>) at import, and set_ledger_path() outranks
+# MF_BENCH_LEDGER, so importing it here could re-open the F10 leak. The pin test parses
+# SPEC_BASE out of the source instead.
+# --------------------------------------------------------------------------- #
+
+import ast
+
+import reporting as R
+
+
+def _spec_base_from_source():
+    src = (BENCH_DIR / "run_dryrun.py").read_text(encoding="utf-8")
+    m = re.search(r"^SPEC_BASE = (\{)", src, re.M)
+    assert m, "SPEC_BASE not found in run_dryrun.py"
+    i, depth = m.start(1), 0
+    for j in range(i, len(src)):
+        if src[j] == "{":
+            depth += 1
+        elif src[j] == "}":
+            depth -= 1
+            if depth == 0:
+                return ast.literal_eval(src[i:j + 1])
+    raise AssertionError("unterminated SPEC_BASE")
+
+
+def test_geometry_is_bound_to_one_sha_and_never_shared_across_artifacts():
+    raw = R.identity("raw_render", "raw.mp4", "raw_render", "aa" * 32, 10, 640, 368)
+    crop = R.identity("cropped", "clip.mp4", "cropped_export", "bb" * 32, 10, 640, 360)
+    t = R.identity_table([raw, crop])
+    assert t["all_geometry_bound"] is True
+    assert raw["geometry_statement"] != crop["geometry_statement"], (
+        "640x368 (raw) and 640x360 (cropped) must not share a geometry statement")
+    assert raw["sha256"] in raw["geometry_statement"]
+    assert t["distinct_shas"] == ["aa" * 32, "bb" * 32]
+    assert t["shas_with_several_roles"] == {}
+
+
+def test_geometry_without_a_sha_is_a_violation():
+    bad = R.identity("unbound", "z.mp4", "raw_render", None, None, 640, 368)
+    chk = R.self_check(identity_block=R.identity_table([bad]))
+    assert chk["clean"] is False and any("without a sha" in v for v in chk["violations"])
+
+
+def test_timings_are_four_fields_with_sources_and_never_one_number():
+    t = R.split_timings(wall_s=164.673, wait_s=163.734, server_s=162.14, load_s=25.82,
+                        sources={"wall_s": "run_record.json:wall_s",
+                                 "wait_s": "run_record.json:result.timing.wait_s",
+                                 "server_s": "server log: Prompt executed",
+                                 "load_s": "M1_REPORT: cold load"})
+    assert t["collapsed_into_one_number"] is False
+    assert t["fields"]["wall_s"]["value"] == 164.673
+    assert t["fields"]["wait_s"]["value"] == 163.734
+    assert t["fields"]["wait_s"]["value"] != t["fields"]["wall_s"]["value"], (
+        "the packet's wait=164.673 was the wall - the two are different measurements")
+    assert t["sources_complete"] is True and R.self_check(timings_block=t)["clean"] is True
+    bad = R.split_timings(wall_s=1.0, reasons={"wait_s": "not measured"})
+    assert bad["fields"]["wait_s"]["value"] is None, "an unmeasured field is never filled in"
+    assert R.self_check(timings_block=bad)["clean"] is False
+
+
+def test_cost_per_accepted_second_is_undefined_when_accepted_is_zero():
+    s = R.seconds_split(generated_seconds=4.0, accepted_seconds=0, wall_s=164.673)
+    assert s["cost_per_accepted_second"] == "undefined (accepted_seconds = 0)"
+    assert isinstance(s["cost_per_accepted_second"], str)
+    assert s["cost_undefined"] is True
+    assert "164.673" in (s["cost_arithmetic"] or "")
+    assert R.self_check(seconds_block=s)["clean"] is True
+
+
+def test_semantic_axis_keeps_notmeasured_apart_from_fail_and_pass():
+    rows = [R.row_record("frame_count_exact", "PASS"), R.row_record("cut_timeline", "UNMEASURED"),
+            R.row_record("frame_pairing", "UNKNOWN"), R.row_record("audio_contract", "FAIL")]
+    sem = {r["row"]: r["semantic"] for r in rows}
+    assert sem == {"frame_count_exact": "pass", "cut_timeline": "notmeasured",
+                   "frame_pairing": "notmeasured", "audio_contract": "fail"}
+
+
+def test_technical_verdict_keeps_fail_and_notmeasured_apart():
+    eight_pass = [{"verdict": "PASS"}] * 8
+    two_unmeasured = eight_pass + [{"verdict": "UNMEASURED"}] * 2
+    verdict, counts = A.technical_disposition(two_unmeasured)
+    assert verdict == "TECHNICAL_NOTMEASURED", "no row failed - this is not a technical failure"
+    assert counts["fail"] == 0 and counts["notmeasured"] == 2
+    assert A.technical_disposition(eight_pass)[0] == "TECHNICAL_PASS"
+    assert A.technical_disposition(eight_pass + [{"verdict": "FAIL"}])[0] == "TECHNICAL_FAIL"
+    assert A.technical_disposition(eight_pass + [{"verdict": "NOT_APPLICABLE"}])[0] == "TECHNICAL_PASS"
+
+
+def test_families_keep_a_technical_pass_away_from_a_visual_pass():
+    rows = [R.row_record("pts_contract", "PASS"), R.row_record("cut_timeline", "UNMEASURED"),
+            R.row_record("character_and_hands_present", "NOT_REVIEWED"),
+            R.row_record("role_identity_proof", "NOT_REVIEWED")]
+    f = R.verdict_families(rows)
+    assert f["families"]["G"]["pass"] == 1
+    assert f["families"]["V"]["pass"] == 0 and f["families"]["I"]["pass"] == 0
+    assert f["visual_pass_count"] == 0 and f["derived_visual_pass_from_technical"] is False
+    assert f["notmeasured_rows"] is not None if "notmeasured_rows" in f else True
+    bad = R.verdict_families([R.row_record("character_and_hands_present", "PASS")])
+    assert R.self_check(families_block=bad)["clean"] is False, (
+        "a visual PASS without a viewer must be a violation")
+
+
+def test_provenance_requires_sha_frames_and_a_named_viewer():
+    entries = [{"artifact": "sheet_A", "sha256": "cc" * 32, "frames_covered": "000-059",
+                "frames_total": 120, "viewer": None, "verdict_scope": "visual"},
+               {"artifact": "comparison-076.png", "sha256": "dd" * 32, "frames_covered": "076",
+                "frames_total": 120, "viewer": "Manager 20260924_175139_7a53d1",
+                "verdict_scope": "visual"}]
+    p = R.provenance(entries)
+    assert p["entries"][0]["state"] == "NOT_REVIEWED"
+    assert p["entries"][0]["promotes_to_visual"] is False
+    assert p["entries"][1]["state"] == "REVIEWED"
+    assert p["unviewed_count"] == 1 and p["viewed_count"] == 1
+    bad = R.provenance([{"artifact": "x.png", "viewer": "someone", "verdict_scope": "visual"}])
+    assert R.self_check(provenance_block=bad)["clean"] is False
+
+
+def test_thresholds_are_pinned_and_may_not_move_to_go_green():
+    assert _spec_base_from_source() == {
+        "expected_frames": 120, "pts_duration": 4.0,
+        "video": {"codec": "h264", "width": 640, "height": 360, "pix_fmt": "yuv420p"},
+        "audio": {"codec": "aac", "sample_rate": 44100, "channels": 2},
+        "audio_optional": True, "min_change_mae": 2.0, "max_identical_run": 2,
+        "pairing_radius": 5, "pairing_min_fraction": 0.98, "pairing_margin_floor": 0.01,
+        "window_start_frame": 0, "window_frame_count": 120}, (
+        "a threshold moved - thresholds are never changed to make a row go green")
+    src = (BENCH_DIR / "assertions.py").read_text(encoding="utf-8")
+    assert re.search(r"def _cuts\(arr,\s*thresh=40\.0\)", src)
+    assert "min_std >= 1.0" in src and "min_uniq >= 4" in src
+

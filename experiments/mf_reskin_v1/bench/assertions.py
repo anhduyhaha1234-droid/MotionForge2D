@@ -270,12 +270,44 @@ TECHNICAL_ROWS = {"frame_count_exact": 8, "pts_contract": 8, "duration_contract"
                   "cut_timeline": 8, "frame_pairing": 8}
 
 
+
+def technical_disposition(rows):
+    """The technical verdict, with `fail` and `notmeasured` kept APART (R11 reporting rule).
+
+    * any FAIL                                        -> TECHNICAL_FAIL
+    * all PASS / NOT_APPLICABLE                       -> TECHNICAL_PASS
+    * no FAIL, at least one row with no discriminating power -> TECHNICAL_NOTMEASURED
+
+    A row whose measurement cannot decide anything is `notmeasured` (harness spelling UNMEASURED
+    or UNKNOWN). It is not a failure and must never be reported as one, exactly as it must never
+    be reported as a pass.
+    """
+    verdicts = [r["verdict"] for r in rows]
+    counts = {"pass": verdicts.count("PASS"), "fail": verdicts.count("FAIL"),
+              "notmeasured": sum(1 for v in verdicts if v in ("UNMEASURED", "UNKNOWN")),
+              "not_applicable": verdicts.count("NOT_APPLICABLE"),
+              "total": len(verdicts)}
+    if counts["fail"]:
+        verdict = "TECHNICAL_FAIL"
+    elif counts["notmeasured"]:
+        verdict = "TECHNICAL_NOTMEASURED"
+    elif counts["pass"] or counts["not_applicable"]:
+        verdict = "TECHNICAL_PASS"
+    else:
+        verdict = "TECHNICAL_NOTMEASURED"
+    return verdict, counts
+
+
 def evaluate(path, spec):
     rows = []
     for fn in ASSERTIONS:
         rows.append(fn(path, spec))
+    verdict, counts = technical_disposition(rows)
     return {"path": str(path), "assertions": rows,
-            "derived": {"technical_verdict": "TECHNICAL_PASS" if all(r["verdict"] in ("PASS", "NOT_APPLICABLE") for r in rows) else "TECHNICAL_FAIL",
+            "derived": {"technical_verdict": verdict,
+                        "technical_counts": counts,
+                        "notmeasured_rows": [r["assertion"] for r in rows
+                                             if r["verdict"] in ("UNMEASURED", "UNKNOWN")],
                         "visual_verdict": "VISUAL_NOT_REVIEWED"}}
 
 

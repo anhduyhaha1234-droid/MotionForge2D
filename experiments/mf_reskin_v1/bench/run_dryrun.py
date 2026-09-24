@@ -462,12 +462,15 @@ def step_report():
             continue
         for r in c["assertions"]:
             agg.setdefault(r["assertion"], []).append(r["verdict"])
+    # `fail` and `notmeasured` are kept apart here (R11): a row whose measurement has no
+    # discriminating power is not a failure, so this cell reads TECHNICAL_NOTMEASURED when no row
+    # actually failed. It is never rendered as PASS either.
     for name, verdicts in sorted(agg.items()):
         L.append("| %s (harness row) | %s | %s | %s |" % (
             name, "/".join(verdicts),
             json.dumps(next((r["measured"] for c in prop.get("clips", []) if "assertions" in c
                              for r in c["assertions"] if r["assertion"] == name), {}), ensure_ascii=False)[:220],
-            "TECHNICAL_PASS" if all(v in ("PASS", "NOT_APPLICABLE") for v in verdicts) else "TECHNICAL_FAIL"))
+            A.technical_disposition([{"verdict": v} for v in verdicts])[0]))
     L.append("\nRows 1-4 and 6 are `VISUAL_NOT_REVIEWED` by construction on this route (no vision): "
              "character/hands presence, hand attachment, grip timing, second-person occlusion, identity/style flip. "
              "Row 7 has measured proxies (`non_degenerate_frames`, `not_frozen`, `cut_timeline`) but the semantic "
