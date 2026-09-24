@@ -77,6 +77,25 @@ and at the wave base `2594de06…` — `tests/s12/s12-lc3-qa-r6/test_r6_b01i_pub
 | QA | `git diff 5947088e 22815ed4…` | `git diff f991e243^1 f991e243` | `80417aa10887de94babe69f57b310046fbcece7e9bcbb96e605f2de09b5f0276` | YES |
 
 - **Union delta** `2594de06…HEAD`: 31 paths, 8763 insertions(+), 13 deletions(-) (name-status in raw transcript).
+- **Per-path byte equality vs the source trees** — stronger than a range delta, because it proves no path was silently
+  rewritten and no conflict resolution was applied. Command shape:
+  `git diff --name-only <lane-source-sha> HEAD -- <the paths that lane itself touched>`:
+
+| Lane | Paths checked | Result |
+|---|---|---|
+| QC | `app/services/qc_evidence`, `app/workflow/qc_checks_handler.py`, `tests/product_p1/qc_evidence`, `docs/pm/sessions/MF-P1-QC-EVIDENCE` | 0 differences |
+| UI | `frontend/src/components/layout/AppNav.tsx`, `frontend/src/__tests__/product_p1`, `docs/pm/sessions/MF-P1-UI-BUILD` | 0 differences |
+| QA | `tests/product_p1/__init__.py`, `tests/product_p1/public_chain`, `tests/s12/s12-lc3-qa-r6`, `tests/test_s09_t06_backend_authority.py` | 0 differences |
+
+  Blob spot-check for the QA lane (`git rev-parse <src>:<path>` vs `git rev-parse HEAD:<path>`): `public_chain_cases.py`,
+  `test_public_chain_frozen_candidate.py`, `test_r6_b01i_public_chain.py`, `test_s09_t06_backend_authority.py` — all IDENTICAL.
+
+  **Scoping note (measured — read it before judging the raw transcript).** A first pass used the parent filter
+  `tests/product_p1` for the QA lane and reported **5** differing paths. Those five are `A` (added) entries under
+  `tests/product_p1/qc_evidence/**` — the **QC** lane's files, which the QA source tree never had, so they differ from the
+  QA side by definition. They are not QA paths and not a transport defect: the QA range's own paths (row above) show 0
+  differences, and all QA-touched files are blob-identical at source and at HEAD. Rule: scope the equality filter to the
+  paths the lane actually touched, never to a parent directory that two lanes share.
 - **Commit list** `git log --oneline 2594de06..f991e243…` — 9 lines (3 merge commits + 6 transported source commits).
 - `git status --porcelain` = 0 after every merge and at freeze (only git-ignored `.pytest_cache/`, `.ruff_cache/` and
   `__pycache__/` are ever produced by the checks; `git check-ignore` confirms they are ignored, so they are not strays).

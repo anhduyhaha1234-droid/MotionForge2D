@@ -57,6 +57,14 @@ range shares with the wave base had identical blob ids at `5947088e…` and `259
 | `python -m pytest tests/product_p1/qc_evidence -q -p no:cacheprovider` | **68 passed, 125 warnings in 184.61 s**, rc 0 (`raw/pytest_qc_evidence.txt`) |
 | `git status --porcelain` | 0 (after every merge, after the suites, at freeze) |
 
+Per-path byte equality vs the source trees (addendum, measured): `git diff --name-only <lane-source> HEAD -- <that lane's
+own paths>` returns **0 differences** for all three lanes, and each QA-touched file (`tests/product_p1/__init__.py`,
+`tests/product_p1/public_chain/*`, `tests/s12/s12-lc3-qa-r6/test_r6_b01i_public_chain.py`,
+`tests/test_s09_t06_backend_authority.py`) has an **identical blob id** at the QA source and at HEAD. A first pass that
+filtered on the parent directory `tests/product_p1` reported 5 differing paths; those are `A`-entries belonging to the QC
+lane (`tests/product_p1/qc_evidence/**`), absent from the QA source tree — a filter-scoping artefact, not a transport
+defect. Detail: `S12INT_TRANSPORT_LEDGER.md` §3.
+
 The QC module suite result reproduces the Manager's own measured 68 passed at `2809f9c`. The QA `public_chain` suite and
 the S09 authority module were **not** run by INT (they are the QA lane's chain, and QA2 is defined against the frozen
 candidate after this freeze) — not attempted, not claimed.

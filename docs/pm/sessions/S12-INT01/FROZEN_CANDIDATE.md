@@ -61,10 +61,13 @@ QA2's dependency is therefore satisfied on disk; **running** the public chain re
 
 ## 6. Bookkeeping commit (disclosed, no code impact)
 
-A docs-only commit is recorded on top of the frozen SHA above, scoped to `docs/pm/sessions/S12-INT01/**` (this lane's
-declared write set in `manager/DAG_WRITESET_WAVES.md`): `S12INT_TRANSPORT_LEDGER.md`, `S12INT_REPORT.md`,
-`FROZEN_CANDIDATE.md` (this file) and a `LOG.md` §13 entry. It changes no code, no test, no other path — the tree it
-produces is byte-identical to `f991e243…` outside `docs/pm/sessions/S12-INT01/**`. The SHA in §0 is the candidate.
+Docs-only commit(s) are recorded on top of the frozen SHA above, scoped to `docs/pm/sessions/S12-INT01/**` (this lane's
+declared write set in `manager/DAG_WRITESET_WAVES.md`): the bookkeeping commit (`S12INT_TRANSPORT_LEDGER.md`,
+`S12INT_REPORT.md`, `FROZEN_CANDIDATE.md` (this file), `LOG.md` §13) and a second **verification addendum** commit that
+adds the per-path byte-equality proof vs the source trees (§3 of the ledger; §4 of the report). Neither commit changes
+any path outside `docs/pm/sessions/S12-INT01/**` — no code, no test — so the tree stays byte-identical to `f991e243…`
+everywhere else. **The SHA in the header above is still the candidate QA must test**; the docs commits are bookkeeping
+on top of it and do not alter the transported content.
 
 ## 7. Terminal
 
