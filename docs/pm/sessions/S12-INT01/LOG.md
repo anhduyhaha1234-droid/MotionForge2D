@@ -145,3 +145,24 @@ Full-SHA pin list: `C:/Users/Admin/MotionForge2D-evidence/s12/20260907-083200-s1
 - Docs (write set `docs/pm/sessions/S12-INT01/**`): `FROZEN_CANDIDATE.md` (overwrite cho round này), `S12INT_TRANSPORT_LEDGER.md` (§8 history + §9 rows round D, phần round C giữ nguyên byte), `S12INT_REPORT.md` (§10), mục LOG này. KHÔNG push (`git branch -r --contains HEAD` = 0), KHÔNG merge MAIN, không rebase/reset/stash/restore/clean/amend, không sửa code/test bằng tay.
 - Disclosure: cả hai merge in `fatal: bad object refs/codex/turn-diffs/…` + `error: failed to perform geometric repack` nhưng vẫn thành công (maintenance `gc --auto` gặp broken ref có sẵn của tool khác — không "sửa" vì không thuộc task). Bộ verify ledger tự phát hiện 1 lỗi ở CHÍNH script kiểm (đếm dòng bảng trùng prefix với bảng round C) — đã scope lại theo full row string, không sửa số liệu cho khớp.
 - Evidence: `outputs/mf-core-tool-delivery-20260924/20260924T1557Z/S12INT/` (REPORT.md, TRANSPORT_LEDGER.md, raw/proofs_transport.txt, raw/check_candidate.log, raw/pytest_*.txt, raw/frozen_candidate.json, raw/commands_ledger.jsonl, raw/sha256_manifest.txt). Terminal `TASK_SUBMITTED`; không APPROVED/CLOSED.
+
+## 15. S12-LC3-INT - transport round D2 (S12-LC3-QA `641b83d`), Hermes INT, 2026-09-26
+
+- Base `b077da0` (round-D docs commit), porcelain 0. ONE range transported by ONE `git merge --no-ff`, ZERO conflicts,
+  ZERO hand edits: S12-LC3-QA `04541443..641b83d` (1 commit) -> `09489bab2c5513b731d92ade492a6017780f9373`
+  (1 file +157/-17, byte-equal to the Manager scope check). `merge-base b077da0 641b83d` = `04541443` = range start.
+- NEW FROZEN CANDIDATE #2 `09489bab2c5513b731d92ade492a6017780f9373` (`HEAD^` b077da0, `HEAD^2` 641b83d). Round C and round D
+  candidates kept in the history (FROZEN_CANDIDATE.md SS7 + ledger SS8/SS9; round-D freeze JSON kept as
+  `raw/frozen_candidate_roundD.json`).
+- Proofs: ancestry YES (both SHAs); delta sha256 `6e9ab1ae...` identical on source and merge deltas (11,597 B both);
+  scoped per-path diff 0; blob `f67e8227` identical source/HEAD. Checks at the candidate: import smoke rc 0, compileall rc 0,
+  pytest `tests/product_p1/qc_evidence` 82 passed rc 0 251.37 s, pytest `tests/product_p1/public_chain` 30 passed 2 skipped
+  rc 0 12.18 s, porcelain 0. QA tree advance after MEASURED quiescence (receipt S12-LC3-QA-roundD2 rc 0 ended
+  2026-09-26T10:59:37Z pid 6136 absent + two snapshots 60 s apart identical): `git merge --ff-only 09489bab` ->
+  Fast-forward `641b83d..09489ba`, QA HEAD -> `09489bab...`, ancestry of `641b83d` in QA HEAD YES, porcelain 0.
+- Evidence root `20260924T1557Z/S12INT` refreshed: `raw/proofs_transport_d2.{sh,txt}`, `raw/delta_qa_d2_{source,merged}.patch`,
+  `raw/check_candidate_d2.{sh,log}`, `raw/pytest_{qc_evidence,public_chain}_d2.txt`, `raw/qa_quiescence_d2.{py,txt}`,
+  `raw/qa_advance_d2.txt`, `raw/frozen_candidate.json` (+ round-D snapshot), ledger/report copies and the sha256 manifest.
+- NOT fixed (by instruction): the product gap QA measured (3 of 8 visual detectors have no producer; S12 readiness stays
+  `BLOCKED_EXACT`) - routed as delta A -> S08-T02, delta B/chain leg -> S08-T05. Nothing pushed; MAIN `a40e368` untouched.
+  TASK_SUBMITTED; khong APPROVED/CLOSED.

@@ -194,3 +194,65 @@ tree write (`19:15:54Z`) predates the receipt end. Then `git merge --ff-only 045
 
 `TASK_SUBMITTED` — both ranges transported, the candidate frozen and recorded, the PRODUCT tree clean. INT does not emit
 `APPROVED` / `CLOSED`.
+
+## 11. ROUND D2 (2026-09-26) — transport round D2 + freeze `09489bab2c5513b731d92ade492a6017780f9373`
+
+### 11.1 Transported (Git-only, zero conflicts, zero hand edits)
+
+| Lane | Source range (full) | Commits | Method | Result SHA in PRODUCT | delta |
+|---|---|---|---|---|---|
+| S12-LC3-QA | `04541443ff6dada4fe464e315888ac58a0dbfcd9..641b83df49d79b0b6fb02baab094a4bfddb03aa5` | 1 (`641b83df…`) | `git merge --no-ff` | `09489bab2c5513b731d92ade492a6017780f9373` | 1 file, +157/−17 |
+
+Baseline `b077da0c8f8a96422d887b5877231bbd70e66324` (round-D docs commit), porcelain 0 before and after. The range is single-commit and
+`git merge-base b077da0c 641b83df` = `04541443ff6dada4fe464e315888ac58a0dbfcd9` = the range START, so exactly the tip delta is introduced.
+The measured delta matches the Manager scope check.
+
+### 11.2 Provenance proofs (measured; raw `raw/proofs_transport_d2.txt`)
+
+- ancestry: `641b83df…` YES (rc 0), `04541443…` YES (rc 0) — `git merge-base --is-ancestor <sha> HEAD`.
+- real 2-parent merge: `09489bab… b077da0c… 641b83df…` (`git rev-list --parents -n 1`).
+- delta equivalence: sha256 `6e9ab1ae4503f49fef378c9fcfceae58ae9ec464c7ddf293a05b3e0a88555566` on BOTH `git diff --no-color --binary 04541443 641b83df` and
+  `git diff --no-color --binary 09489bab^1 09489bab`, 11,597 B each, identical YES.
+- per-path equality scoped to the lane's own path (never a shared parent dir): 0 differences; blob
+  `f67e822742cf25535dc0f25d9934882aa2a27473` identical at source tip and HEAD (range-start blob `369900436b9543bd20b71af07d53b877daedc81f`).
+- union delta `b077da0c..HEAD`: 1 path, +157 / −17. `git status --porcelain` = 0 at every checkpoint; `git diff --check` rc 0.
+
+### 11.3 Checks at the frozen candidate (real output)
+
+| Check (at `09489bab2c5513b731d92ade492a6017780f9373`) | Result |
+|---|---|
+| import smoke (`app`, `app.services.qc_evidence.{compose,observe,sources}`, `app.workflow.qc_checks_handler`, `app.main`) | `IMPORT_SMOKE_OK`, rc 0 |
+| `python -m compileall -q` on the touched scope | rc 0 |
+| `python -m pytest tests/product_p1/qc_evidence -q` | **82 passed, 153 warnings in 251.37 s** (rc 0; wall 254 s) |
+| `python -m pytest tests/product_p1/public_chain -q` | **30 passed, 2 skipped, 15 warnings in 12.18 s** (rc 0; wall 13 s) |
+| `git status --porcelain` | 0 (before checks and after the suites) |
+
+`public_chain` moved 29 → 30 passed (2 skipped unchanged): the transported commit's own new non-vacuity unit test
+(5xx on a probe stays `unexpected`); `qc_evidence` unchanged at 82.
+
+### 11.4 QA-tree advance (only after measured quiescence)
+
+Receipt `manager/receipts/S12-LC3-QA-roundD2.json`: `exit_code=0`, ended `2026-09-26T10:59:37.520661+00:00`, `pid=6136`,
+duration 1470.329 s; pid absent from the process table; QA worktree porcelain 0; two snapshots 60 s apart
+(`11:04:05Z` / `11:05:05Z`) identical; newest tree write `10:48:26Z` (95,917 B) predates the receipt end.
+
+```
+git merge --ff-only 09489bab2c5513b731d92ade492a6017780f9373
+```
+
+`Updating 641b83d..09489ba` / `Fast-forward`, rc 0, porcelain 0, `git diff --check` rc 0,
+`git merge-base --is-ancestor 641b83df… HEAD` = **YES**. **QA HEAD: `641b83df…` → `09489bab…`.**
+
+### 11.5 Not done (deliberately)
+
+- No push (`git branch -r --contains HEAD` = 0); `origin` not contacted; `MAIN` read-only and untouched (`a40e368`).
+- Not transported: `MF-TOOL-CONTRACT 542570d..f0b918b` (stays `BLOCKED_DEPENDENCY`), CORE experiment trees, UI.
+- **The product gap the QA lane measured is NOT fixed here** (by instruction): 3 of 8 visual QC detectors
+  (`contact_break`, `z_order_error` = `QC_EVIDENCE_MISSING`; `edge_halo` = `QC_EVIDENCE_DEPENDENCY`) have no producer on
+  this candidate, so S12 export readiness stays unreachable through public APIs. Routed finding — delta A → `S08-T02`,
+  delta B / chain leg → `S08-T05`.
+- No visual verdict, no `APPROVED` / `CLOSED`, no gate loosened.
+
+### 11.6 Terminal
+
+`TASK_SUBMITTED` — INT transports and freezes; it does not approve, accept or close.
