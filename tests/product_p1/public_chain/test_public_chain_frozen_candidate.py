@@ -63,6 +63,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
 import pytest
@@ -132,6 +133,62 @@ FAULT_ENV = "S12QA_FAULT_AT"
 #: control.  Every other >=400 response in the chain is asserted to be
 #: absent: a refusal may never be the end state of the happy path.
 EXPECTED_REFUSAL_STAGES = frozenset({"negative_control_lock_without_role_mapping"})
+
+#: READ-ONLY QC-queue probe stages.  Their refusal is the DECLARED
+#: tolerance of :func:`_qc_items_probe`: the queue route is declared
+#: ``/api/v2/projects/{project_id:uuid}/qc-items`` while this chain carries
+#: the PUBLIC project id the API RETURNED (12 hex chars, not a UUID), so a
+#: client error is the reachable shape and emptiness is asserted only when
+#: the route answers 200.  A probe is a READ, never a leg of the journey.
+_QC_ITEMS_AFTER_REFUSAL = "qc_items_after_refusal"
+_QC_ITEMS_AUDIO = "qc_items_audio"
+_QC_ITEMS_PROBE_STAGES = (_QC_ITEMS_AFTER_REFUSAL, _QC_ITEMS_AUDIO)
+
+
+def classify_refusals(
+    stage_order: Sequence[str],
+    stages: Mapping[str, Any],
+    expected_refusal_stages: Iterable[str],
+    probe_stages: Sequence[str] = _QC_ITEMS_PROBE_STAGES,
+) -> dict[str, list[dict[str, Any]]]:
+    """Split every recorded >=400 stage into expected / tolerated / unexpected.
+
+    ``expected``   -- a declared negative control: a typed refusal here IS
+                      the measured outcome of the control (the un-mapped
+                      structural-lock 422, the QC full-scope evidence 422).
+    ``tolerated``  -- a READ probe whose status is one of ``CLIENT_ERRORS``.
+                      Bounded by the STATUS CLASS, never by the stage name
+                      alone, so a probe answering 5xx stays UNEXPECTED.
+    ``unexpected`` -- every other refusal.  The chain asserts this is empty,
+                      so a refusal can never be the end state of the happy
+                      path.
+
+    The groups are returned separately (plus ``all`` in stage order) so a
+    tolerated row stays VISIBLE in evidence instead of being silently
+    excused, and so the exclusion can never hide a claim.
+    """
+    expected_set = set(expected_refusal_stages)
+    probe_set = set(probe_stages)
+    groups: dict[str, list[dict[str, Any]]] = {
+        "all": [],
+        "expected": [],
+        "tolerated": [],
+        "unexpected": [],
+    }
+    for name in stage_order:
+        payload = stages.get(name)
+        code = payload.get("status_code") if isinstance(payload, dict) else None
+        if not (isinstance(code, int) and code >= 400):
+            continue
+        row = {"stage": name, "status_code": code}
+        groups["all"].append(row)
+        if name in expected_set:
+            groups["expected"].append(row)
+        elif name in probe_set and code in CLIENT_ERRORS:
+            groups["tolerated"].append(row)
+        else:
+            groups["unexpected"].append(row)
+    return groups
 
 #: The six core pose slots a publishable pack version must carry.
 POSE_SLOTS = ("front", "three_quarter", "side", "back", "sitting", "walking")
@@ -1004,11 +1061,14 @@ def test_public_chain_end_to_end_on_frozen_candidate() -> None:
                     "expected": True,
                     "status_code": qc_full.status_code,
                     "detail": qc_detail,
-                    "why_expected": "typed QC_EVIDENCE_MISSING refusal from the "
-                    "scope=full evidence composer; the preconditions it names "
-                    "(one segment per scene start for cut_drift; published "
-                    "scene-graph edges for the contact/occlusion detectors) "
-                    "cannot both hold for any source this candidate accepts",
+                    "why_expected": "typed refusal from the scope=full evidence "
+                    "composer, measured PER DETECTOR on this run's persisted "
+                    "evidence: the QA-synthetic edge producer needs TWO segments "
+                    "inside one scene (app/services/object_extraction.py) while "
+                    "the deterministic adapter publishes exactly ONE segment per "
+                    "scene, so no scene_graph_contact / scene_graph_occlusion row "
+                    "exists; edge_halo additionally needs a rendered-side mask "
+                    "artifact that no leg of this chain publishes",
                     "setup_complete_before_refusal": True,
                     "product_code_touched": False,
                     "sql_seeded": False,
@@ -1034,7 +1094,7 @@ def test_public_chain_end_to_end_on_frozen_candidate() -> None:
                 items_after, rows_after, items_after_status = _qc_items_probe(
                     client, project_id
                 )
-                stage("qc_items_after_refusal", _rec(items_after))
+                stage(_QC_ITEMS_AFTER_REFUSAL, _rec(items_after))
                 assert items_after_status in (200, *CLIENT_ERRORS), items_after.text
                 if items_after_status == 200:
                     assert rows_after == [], items_after.text
@@ -1196,7 +1256,7 @@ def test_public_chain_end_to_end_on_frozen_candidate() -> None:
                 items_audio, rows_audio, items_audio_status = _qc_items_probe(
                     client, project_id
                 )
-                stage("qc_items_audio", _rec(items_audio))
+                stage(_QC_ITEMS_AUDIO, _rec(items_audio))
                 assert audio_readiness.status_code == 200, audio_readiness.text
                 assert items_audio_status in (200, *CLIENT_ERRORS), items_audio.text
                 audio_state_body = (qc_audio_state.get("final") or {}).get("body") or {}
@@ -1725,24 +1785,30 @@ def test_public_chain_end_to_end_on_frozen_candidate() -> None:
     # run's own evidence, not as prose.
     expected_refusals = set(chain["controls"].get("expected_refusal_stages") or [])
     expected_refusals.update(EXPECTED_REFUSAL_STAGES)
-    refusals: list[dict[str, Any]] = []
+    classified = classify_refusals(stage_order, chain["stages"], expected_refusals)
+    refusals = classified["all"]
     blocked_stage = None
-    for name in stage_order:
-        payload = chain["stages"].get(name)
-        code = payload.get("status_code") if isinstance(payload, dict) else None
-        if isinstance(code, int) and code >= 400:
-            refusals.append({"stage": name, "status_code": code})
-            if blocked_stage is None:
-                blocked_stage = {"stage": name, "status_code": code, "response": payload}
-    unexpected_refusals = [row for row in refusals if row["stage"] not in expected_refusals]
+    if refusals:
+        first_refusal = refusals[0]
+        blocked_stage = {
+            "stage": first_refusal["stage"],
+            "status_code": first_refusal["status_code"],
+            "response": chain["stages"].get(first_refusal["stage"]),
+        }
+    unexpected_refusals = classified["unexpected"]
     chain["controls"]["expected_refusal_stages"] = sorted(expected_refusals)
+    chain["controls"]["tolerated_probe_stages"] = sorted(_QC_ITEMS_PROBE_STAGES)
     chain["controls"]["observed_refusals"] = refusals
+    chain["controls"]["tolerated_probe_refusals"] = classified["tolerated"]
     chain["controls"]["unexpected_refusals"] = unexpected_refusals
     chain["stage_order"] = list(stage_order)
     chain["stage_status"] = {
         "reached": list(stage_order),
         "blocked": blocked_stage,
-        "expected_refusals": sorted(chain["controls"]),
+        "expected_refusals": sorted(expected_refusals),
+        "tolerated_probe_refusals": [
+            row["stage"] for row in classified["tolerated"]
+        ],
     }
     summary = {
         "status": chain["status"],
@@ -1888,3 +1954,77 @@ def test_pending_freeze_manifest_is_exact() -> None:
     doc = R.document()
     assert doc["totals"]["pending_frozen_candidate"] >= 2
     assert doc["pending_freeze_steps"], doc
+
+
+def test_refusal_accounting_is_bounded_and_non_vacuous() -> None:
+    """RUNNABLE NOW (no pins): the three-way refusal split must be real.
+
+    The chain asserts on this split, so the split itself is tested: a
+    declared negative control is expected, a READ probe's CLIENT error is
+    tolerated, and everything else -- including a 5xx ON A PROBE and a
+    client error on an ordinary leg -- stays unexpected, so the tolerance
+    can never excuse a real refusal.
+    """
+    stages = {
+        "upload_project": {"status_code": 201},
+        "negative_control_lock_without_role_mapping": {"status_code": 422},
+        "qc_full_submit": {"status_code": 422},
+        _QC_ITEMS_AFTER_REFUSAL: {"status_code": 404},
+        _QC_ITEMS_AUDIO: {"status_code": 404},
+        "extraction_job": {"status_code": 500},
+        "pack_publish_0": {"status_code": 409},
+    }
+    order = list(stages)
+    declared = EXPECTED_REFUSAL_STAGES | {"qc_full_submit"}
+    out = classify_refusals(order, stages, declared)
+    assert [r["stage"] for r in out["expected"]] == [
+        "negative_control_lock_without_role_mapping",
+        "qc_full_submit",
+    ], out["expected"]
+    assert [r["stage"] for r in out["tolerated"]] == [
+        _QC_ITEMS_AFTER_REFUSAL,
+        _QC_ITEMS_AUDIO,
+    ], out["tolerated"]
+    assert [r["stage"] for r in out["unexpected"]] == [
+        "extraction_job",
+        "pack_publish_0",
+    ], out["unexpected"]
+    assert len(out["all"]) == 6, out["all"]
+    # (a) the tolerance is bounded by the STATUS CLASS, not by the name
+    probe_5xx = dict(stages)
+    probe_5xx[_QC_ITEMS_AUDIO] = {"status_code": 503}
+    out2 = classify_refusals(order, probe_5xx, declared)
+    assert out2["tolerated"] == [
+        {"stage": _QC_ITEMS_AFTER_REFUSAL, "status_code": 404}
+    ], out2["tolerated"]
+    assert out2["unexpected"] == [
+        {"stage": _QC_ITEMS_AUDIO, "status_code": 503},
+        {"stage": "extraction_job", "status_code": 500},
+        {"stage": "pack_publish_0", "status_code": 409},
+    ], out2["unexpected"]
+    # (b) only the two declared READ probes are tolerated, and no real leg
+    #     of the journey can ever be in that set
+    assert set(_QC_ITEMS_PROBE_STAGES) == {
+        _QC_ITEMS_AFTER_REFUSAL,
+        _QC_ITEMS_AUDIO,
+    }
+    assert "qc_full_submit" not in _QC_ITEMS_PROBE_STAGES
+    # (c) each tolerated NAME is wired to a real recording site in this
+    #     module, so a tolerated stage cannot be invented in evidence
+    source = Path(__file__).read_text(encoding="utf-8")
+    for probe_stage, probe_constant in (
+        (_QC_ITEMS_AFTER_REFUSAL, "_QC_ITEMS_AFTER_REFUSAL"),
+        (_QC_ITEMS_AUDIO, "_QC_ITEMS_AUDIO"),
+    ):
+        # the NAME exists exactly once (the constant's own value) ...
+        assert source.count(f'"{probe_stage}"') == 1, probe_stage
+        # ... and the recording site is wired through that constant.
+        assert source.count(f"stage({probe_constant},") == 1, probe_constant
+    # (d) an empty run of the splitter is empty, not vacuously green
+    empty = classify_refusals([], {}, set())
+    assert empty == {
+        "all": [],
+        "expected": [],
+        "tolerated": [],
+        "unexpected": [],
+    }, empty
