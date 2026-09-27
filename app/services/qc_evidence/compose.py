@@ -1054,6 +1054,49 @@ def _z_order_error(ctx: _Context) -> dict[str, Any]:
     return args
 
 
+def _rendered_role_extent(
+    ctx: _Context,
+    detector: str,
+    *,
+    expected: src.ArtifactEvidence,
+    role_bbox: tuple[int, int, int, int],
+    canvas: tuple[int, int],
+) -> tuple[int, int, int, int] | None:
+    """Measured extent of the role's RENDERED-side published mask, if any.
+
+    Candidate discovery is the SAME authority rule ``edge_halo`` already
+    consumes (``sources.rendered_minus_expected_masks``): a byte-DISTINCT
+    published mask artifact that bounds the role's own region.  ``None`` when
+    the video publishes no rendered-side mask for this role — the caller then
+    refuses instead of attributing the cut rendered object to the role.
+    """
+    width, height = int(canvas[0]), int(canvas[1])
+    for candidate in src.rendered_minus_expected_masks(
+        ctx.session, ctx.scope, expected_id=expected.artifact_id
+    ):
+        evidence = src.read_artifact(
+            ctx.session, ctx.managed_root, ctx.scope, candidate, detector=detector
+        )
+        if evidence.sha256 == expected.sha256:
+            continue
+        matrix, candidate_width, candidate_height = decode_png_gray(
+            evidence.data, detector=detector
+        )
+        if (candidate_width, candidate_height) != (width, height):
+            raise malformed(
+                detector,
+                f"rendered-side role mask {evidence.artifact_id!r} is "
+                f"{candidate_width}x{candidate_height} but the video canvas is "
+                f"{width}x{height}; geometry mismatch (fail closed)",
+                artifact_id=evidence.artifact_id,
+            )
+        candidate_bbox = mask_bbox(matrix)
+        if not _bbox_overlaps(candidate_bbox, role_bbox):
+            continue
+        return candidate_bbox
+    return None
+
+
 def _silhouette_clipping(ctx: _Context) -> dict[str, Any]:
     detector = "silhouette_clipping"
     segments = ctx.segments(detector)
@@ -1066,7 +1109,7 @@ def _silhouette_clipping(ctx: _Context) -> dict[str, Any]:
     payload: list[dict[str, Any]] = []
     masks: list[dict[str, Any]] = []
     for segment in segments:
-        evidence, _matrix, mask_w, mask_h, bbox = ctx.mask(
+        evidence, role_support, mask_w, mask_h, bbox = ctx.mask(
             segment.mask_artifact_id, detector
         )
         if (mask_w, mask_h) != (width, height):
@@ -1076,6 +1119,25 @@ def _silhouette_clipping(ctx: _Context) -> dict[str, Any]:
                 f"canvas is {width}x{height}; geometry mismatch (fail closed)",
                 segment_id=str(segment.id),
             )
+        # Role/segment/frame binding: the geometry this role is measured with
+        # must be THIS segment's own published mask.  A mask artifact that is
+        # another current segment's published geometry binds the role to a
+        # different role's region — the measurement would then report that
+        # other role's silhouette as this one's (refuse, never measure).
+        for other in segments:
+            if str(other.id) == str(segment.id):
+                continue
+            if str(other.mask_artifact_id) == str(evidence.artifact_id):
+                raise malformed(
+                    detector,
+                    f"segment {segment.id!r}'s mask artifact "
+                    f"{evidence.artifact_id!r} is the published mask of segment "
+                    f"{other.id!r}; the role/segment/frame binding is "
+                    "inconsistent, so this region is not this role's geometry",
+                    segment_id=str(segment.id),
+                    conflicting_segment_id=str(other.id),
+                    artifact_id=str(evidence.artifact_id),
+                )
         masks.append(evidence.provenance())
         indices = window_indices(
             int(segment.start_frame),
@@ -1098,8 +1160,16 @@ def _silhouette_clipping(ctx: _Context) -> dict[str, Any]:
             # annotation seeds WHERE to look, and the window grows over the
             # contiguous object so a silhouette the output clips at the frame
             # border carries its REAL extent (round D / NR03).
-            measured = obs.rendered_object_bbox(
-                render_frame, region=bbox, detector=detector
+            #
+            # R27-04: the object is measured only inside the ROLE'S OWN
+            # published support (segment mask), and `region` must BE that
+            # support's own measured extent — a region that is not this role's
+            # persisted geometry is refused instead of becoming "the object".
+            measured = obs.supported_object_bbox(
+                render_frame,
+                support=role_support,
+                region=bbox,
+                detector=detector,
             )
             if measured is None:
                 continue
@@ -1134,6 +1204,48 @@ def _silhouette_clipping(ctx: _Context) -> dict[str, Any]:
                 ],
                 background_levels=background_levels,
             )
+        contact = obs.border_contact(observed, (int(height), int(width)))
+        authority = obs.clipping_authority(
+            observed,
+            role_extent=bbox,
+            rendered_role_extent=(
+                None
+                if not contact
+                else _rendered_role_extent(
+                    ctx,
+                    detector,
+                    expected=evidence,
+                    role_bbox=bbox,
+                    canvas=(int(width), int(height)),
+                )
+            ),
+            shape=(int(height), int(width)),
+            detector=detector,
+        )
+        if authority["verdict"] == obs.GEOMETRY_UNATTRIBUTABLE:
+            raise dependency(
+                detector,
+                f"the rendered object inside segment {segment.id!r}'s region "
+                "reaches the frame side(s) "
+                f"{authority['sides_not_reached_by_role_extent']} that the role's "
+                "own published extent does NOT reach, and no rendered-side role "
+                "mask exists to attribute the cut content to this role: the "
+                "observation has no authority, and the frozen metric (bbox area "
+                "OUTSIDE the frame) would hand a frame-bounded bbox to the "
+                "detector as a measured clipped_ratio of 0 — a cut object read "
+                "as zero risk",
+                fact="a rendered-side role mask (object-correction publication) "
+                "attributing the cut rendered content to this role",
+                producer="object-correction mask publication (publishes a NEW "
+                "mask artifact per corrected role)",
+                persistence="artifact(kind='image', purpose='mask', "
+                "owner_type='video_item') + re-verified sha256/size",
+                segment_id=str(segment.id),
+                contact_sides=authority["contact_sides"],
+                observed_bbox=[int(v) for v in observed],
+                role_extent_bbox=[int(v) for v in bbox],
+                clipping_authority=authority,
+            )
         payload.append(
             {
                 "id": str(segment.id),
@@ -1145,7 +1257,8 @@ def _silhouette_clipping(ctx: _Context) -> dict[str, Any]:
                 "expected_bbox": [int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])],
                 "observed_frames": observed_frames,
                 "render_background_level_per_frame": background_levels,
-                "border_contact": obs.border_contact(observed, (int(height), int(width))),
+                "border_contact": contact,
+                "clipping_authority": authority,
                 "measured_on": "rendered_object_pixels: the bbox of the pixels "
                 "the RENDER paints over its OWN dominant level, seeded by the "
                 "annotated mask region and grown over the contiguous object "
@@ -1194,6 +1307,15 @@ def _silhouette_clipping(ctx: _Context) -> dict[str, Any]:
             },
         },
         derivations={
+            "clipping_authority": "per-segment geometry AUTHORITY: a frame side "
+            "the ROLE'S OWN published extent reaches is source-intended partial "
+            "visibility (the character is legitimately at/over that edge in the "
+            "source, so it is NOT new truncation); a side only the RENDER reaches "
+            "is newly introduced truncation and is FLAGGED here (the frozen "
+            "metric is bbox area OUTSIDE the frame and a pixel-measured bbox is "
+            "frame-bounded, so the ratio can never carry it); when nothing "
+            "attributes the cut content to the role the composer refuses with "
+            "QC_EVIDENCE_DEPENDENCY instead of reporting a 0 PASS",
             "bbox": "OBSERVED silhouette geometry: the measured bbox of the "
             "object the RENDER paints over its own dominant level inside the "
             "annotated mask region (never the annotation itself and never the "
@@ -1205,6 +1327,33 @@ def _silhouette_clipping(ctx: _Context) -> dict[str, Any]:
             "object is, recorded for comparison only)",
         },
     )
+    args["clipping_authority"] = {
+        "rule": "a frame side the ROLE'S OWN published extent reaches is "
+        "source-intended partial visibility and is not new truncation; a side "
+        "only the RENDER reaches is newly introduced truncation and is flagged "
+        "(the frozen metric is bbox area OUTSIDE the frame, so a frame-bounded "
+        "cut can never appear as a positive clipped_ratio); when nothing "
+        "attributes the cut content to the role the composer refuses "
+        "(QC_EVIDENCE_DEPENDENCY) instead of reporting 0",
+        "per_segment": [
+            {
+                "segment_id": row["id"],
+                "verdict": row["clipping_authority"]["verdict"],
+                "contact_sides": row["clipping_authority"]["contact_sides"],
+                "detector_clearance": row["clipping_authority"]["detector_clearance"],
+                "newly_introduced_truncation": row["clipping_authority"][
+                    "newly_introduced_truncation"
+                ],
+            }
+            for row in payload
+        ],
+        "newly_introduced_truncation": sorted(
+            row["id"]
+            for row in payload
+            if row["clipping_authority"]["newly_introduced_truncation"]
+        ),
+        "observation_revision": obs.OBSERVATION_REVISION,
+    }
     return args
 
 

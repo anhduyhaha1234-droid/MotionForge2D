@@ -37,14 +37,18 @@ from typing import Any
 
 import numpy as np
 
-from app.services.qc_evidence.errors import dependency, malformed
+from app.services.qc_evidence.errors import dependency, malformed, missing
 
 #: Revision of the observation definitions (bump when a definition changes).
 #: 1.1.0 (round D / NR03): the rendered-object measurement (render-own
 #: background) replaces "differs from the source" as the geometry authority,
 #: and the rendered cut is searched over the annotation's whole span and is
 #: reported only when it is a DOMINANT discontinuity.
-OBSERVATION_REVISION = "1.1.0"
+#: 1.2.0 (correction round R27-04): a rendered object is attributed to a role
+#: only through that role's OWN published support (its segmentation mask), and
+#: a measured extent that reaches a frame side carries the AUTHORITY verdict
+#: instead of being reported as a frame-bounded "clipped_ratio = 0" pass.
+OBSERVATION_REVISION = "1.2.0"
 
 #: Refusal scope used by the pure measurement helpers.
 _SCOPE = "qc_evidence_render_observation"
@@ -226,6 +230,159 @@ def rendered_object_bbox(
     if inner is None:
         return None
     return (gx0 + inner[0], gy0 + inner[1], gx0 + inner[2], gy0 + inner[3])
+
+
+#: Verdicts of the silhouette geometry AUTHORITY (correction round R27-04).
+#:
+#: The frozen detector's metric is bbox area OUTSIDE the frame, and a bbox
+#: measured from decoded pixels is frame-bounded by construction, so that ratio
+#: can never carry a cut the frame itself bounds.  A measurement therefore
+#: states WHICH of these it is, and the composer refuses when the observation
+#: has no authority to attribute the rendered object to the role at all:
+#:
+#: * ``in_frame_measured``            — the object lies fully inside the frame;
+#: * ``source_intended_edge_contact`` — the object reaches frame side(s) the
+#:   ROLE'S OWN published extent already reaches: the character is legitimately
+#:   at/over that edge in the source, so this is NOT new truncation;
+#: * ``newly_introduced_truncation``  — the object reaches frame side(s) the
+#:   role's own extent does NOT reach while a rendered-side role mask attributes
+#:   the cut content to this role: the OUTPUT cut the role;
+#: * ``unattributable_edge_contact``  — the object reaches frame side(s) the
+#:   role's extent does not reach and NO rendered-side role mask exists: nothing
+#:   attributes the cut content to this role, so nothing may be reported from
+#:   it (the caller refuses; it never reports a zero-risk PASS).
+GEOMETRY_IN_FRAME = "in_frame_measured"
+GEOMETRY_SOURCE_INTENDED_EDGE = "source_intended_edge_contact"
+GEOMETRY_NEW_TRUNCATION = "newly_introduced_truncation"
+GEOMETRY_UNATTRIBUTABLE = "unattributable_edge_contact"
+
+#: Verdicts that may travel to the detector as a MEASURED role geometry.
+GEOMETRY_ADMISSIBLE = (
+    GEOMETRY_IN_FRAME,
+    GEOMETRY_SOURCE_INTENDED_EDGE,
+    GEOMETRY_NEW_TRUNCATION,
+)
+
+#: Verdicts that clear the clipping question for a role (no item is expected).
+GEOMETRY_CLEARING = (GEOMETRY_IN_FRAME, GEOMETRY_SOURCE_INTENDED_EDGE)
+
+
+def support_mask(value: Any, *, detector: str = _SCOPE) -> np.ndarray:
+    """Boolean mask of a ROLE's own persisted support (its segmentation mask).
+
+    The support is what makes "this rendered content is this role" an
+    attributed fact: without it the rendered pixels are unrelated content and
+    must never become a role's measured geometry.
+    """
+    array = _gray(value, detector=detector)
+    mask = array > 0.0
+    if not mask.any():
+        raise missing(
+            detector,
+            "the role's published support mask bounds no pixels, so no rendered "
+            "object can be attributed to this role",
+        )
+    return mask
+
+
+def supported_object_bbox(
+    frame: Any,
+    *,
+    support: Any,
+    region: Region,
+    detector: str = _SCOPE,
+) -> Region | None:
+    """Measured bbox of the rendered object ATTRIBUTED to one role.
+
+    The object the render paints is measured only inside the role's OWN
+    published support: ``region`` must BE that support's measured bbox, so a
+    region that is not the role's geometry (an arbitrary box, an unrelated
+    textured area, another segment's mask) is refused instead of becoming "the
+    object".  ``None`` when the output paints nothing inside the support — the
+    caller must refuse, the source's pixels are never substituted.
+    """
+    mask = support_mask(support, detector=detector)
+    array = _gray(frame, detector=detector)
+    if mask.shape != array.shape:
+        raise malformed(
+            detector,
+            f"the role's support mask is {mask.shape} but the rendered frame is "
+            f"{array.shape}; the rendered geometry cannot be attributed to this "
+            "role (fail closed)",
+        )
+    bbox = bbox_of_mask(mask)
+    if bbox is None:  # pragma: no cover - support_mask already refused empty
+        raise missing(detector, "the role's support mask carries no geometry")
+    if tuple(int(v) for v in region) != tuple(int(v) for v in bbox):
+        raise malformed(
+            detector,
+            f"the measurement region {tuple(int(v) for v in region)} is not the "
+            f"role's own published extent {bbox}; a region that is not this "
+            "role's persisted geometry cannot be measured as its silhouette",
+        )
+    return rendered_object_bbox(array, region=bbox, detector=detector)
+
+
+def clipping_authority(
+    measured: Region,
+    *,
+    role_extent: Region | None,
+    rendered_role_extent: Region | None,
+    shape: tuple[int, int],
+    detector: str = _SCOPE,
+) -> dict[str, Any]:
+    """Classify a MEASURED silhouette extent against the frame and the authority.
+
+    Separates exactly the two sides the ratio cannot: a frame side the ROLE'S
+    OWN published extent already reaches (source-intended partial visibility —
+    the character is legitimately at/over the edge in the source) from a side
+    only the RENDER reaches (newly introduced truncation), and reports the
+    latter as ``unattributable`` when no rendered-side role mask exists to
+    attribute the cut content to this role.  No appearance heuristic is used:
+    the classification reads measured extents and persisted provenance only.
+    """
+    contact = border_contact(measured, shape)
+    role_sides = list(border_contact(role_extent, shape)) if role_extent else []
+    rendered_sides = (
+        list(border_contact(rendered_role_extent, shape))
+        if rendered_role_extent
+        else []
+    )
+    intended = [side for side in contact if side in role_sides]
+    uncovered = [side for side in contact if side not in role_sides]
+    if not contact:
+        verdict = GEOMETRY_IN_FRAME
+    elif not uncovered:
+        verdict = GEOMETRY_SOURCE_INTENDED_EDGE
+    elif rendered_role_extent is not None:
+        verdict = GEOMETRY_NEW_TRUNCATION
+    else:
+        verdict = GEOMETRY_UNATTRIBUTABLE
+    return {
+        "verdict": verdict,
+        "contact_sides": contact,
+        "role_extent_bbox": [int(v) for v in role_extent] if role_extent else None,
+        "role_extent_reaches_sides": role_sides,
+        "rendered_role_extent_bbox": (
+            [int(v) for v in rendered_role_extent] if rendered_role_extent else None
+        ),
+        "rendered_role_extent_reaches_sides": rendered_sides,
+        "sides_intended_by_source": intended,
+        "sides_not_reached_by_role_extent": uncovered,
+        "measure_authority": (
+            "role_mask"
+            if rendered_role_extent is None
+            else "role_mask + rendered_side_role_mask"
+        ),
+        "detector_clearance": verdict in GEOMETRY_CLEARING,
+        "newly_introduced_truncation": verdict == GEOMETRY_NEW_TRUNCATION,
+        "attributed_to_role": verdict != GEOMETRY_UNATTRIBUTABLE,
+        "metric_limit": "the frozen silhouette metric is bbox area OUTSIDE the "
+        "frame and a pixel-measured bbox is frame-bounded by construction, so a "
+        "cut the frame itself bounds is carried by THIS verdict, never by a "
+        "clipped_ratio of 0",
+        "measure_revision": OBSERVATION_REVISION,
+    }
 
 
 def border_contact(
@@ -527,6 +684,12 @@ def stacking_order(
 __all__ = [
     "CUT_DOMINANCE_FACTOR",
     "CUT_SUPPORT_FRAMES",
+    "GEOMETRY_ADMISSIBLE",
+    "GEOMETRY_CLEARING",
+    "GEOMETRY_IN_FRAME",
+    "GEOMETRY_NEW_TRUNCATION",
+    "GEOMETRY_SOURCE_INTENDED_EDGE",
+    "GEOMETRY_UNATTRIBUTABLE",
     "OBSERVATION_REVISION",
     "Region",
     "background_level",
@@ -536,6 +699,7 @@ __all__ = [
     "changed_count",
     "changed_mask",
     "clamp_region",
+    "clipping_authority",
     "frame_delta",
     "grown_region",
     "measured_stacking",
@@ -543,4 +707,6 @@ __all__ = [
     "rendered_object_bbox",
     "rendered_object_mask",
     "stacking_order",
+    "support_mask",
+    "supported_object_bbox",
 ]

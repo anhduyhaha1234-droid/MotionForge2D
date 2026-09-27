@@ -12,8 +12,13 @@ NR03  the numbers must MEASURE the intended visual facts
               a contact/silhouette verdict built from source data;
       Q03R-f  a missing actor is a refusal, never "present because a box
               differs";
-      Q03R-g  an actor the output clips at the frame border is detected, with
-              the observed side carrying the REAL measured geometry;
+      Q03R-g  an actor the output clips at the frame border: R27-04 replaced
+              the pre-fix MEASURED answer with the typed AUTHORITY verdict —
+              the measured extent still reaches the border, but with no
+              rendered-side role mask attributing the cut content to the role
+              the composer REFUSES (QC_EVIDENCE_DEPENDENCY) instead of handing
+              the frozen detector a frame-bounded bbox (a measured ratio of 0);
+              the delivered pre-fix value is recomputed in the row's raw file;
       Q03R-h  reversed stacking / broken contact: the affected detector
               fails or refuses.
 NR04  identity covers EVERY role, and legacy packs are supported
@@ -634,6 +639,82 @@ def _prefix_geometry_measurement_for(  # noqa: ANN001
 # ── Q03R-g: the actor is clipped at the frame border ───────────────────────
 
 
+def _prefix_border_geometry(session_factory, managed_root: Path, ids) -> dict:  # noqa: ANN001
+    """Reproduce the DELIVERED (pre-R27-04) answer for the same render bytes.
+
+    The pre-fix composer measured the rendered object with the unchanged
+    primitive ``obs.rendered_object_bbox`` and handed that frame-bounded bbox
+    straight to the frozen detector, which reports nothing for it (the T06A2
+    ratio is bbox area outside the frame = 0.0).  This recomputes exactly that
+    from the primitive, so the value below is the PRE-FIX VALUE, not a
+    description of it.
+    """
+    from app.services.qc_evidence import sources as src
+    from app.services.qc_evidence.measure import decode_video_frames
+
+    with session_factory() as session:
+        scope = src.load_scope(
+            session,
+            workspace_id=ids.workspace_id,
+            project_id=ids.project_id,
+            video_item_id=ids.video_item_id,
+            generation="1",
+        )
+        evidence, _role, _facts = src.render_result_artifact(
+            session, managed_root, scope, detector="silhouette_clipping"
+        )
+    path = Path(managed_root) / evidence.relative_path
+    indices = list(range(10, TOTAL_FRAMES))
+    frames = decode_video_frames(path, indices, detector="silhouette_clipping")
+    observed = None
+    for index in sorted(frames):
+        measured = obs.rendered_object_bbox(
+            frames[index], region=MASK_B_RECT, detector="silhouette_clipping"
+        )
+        if measured is None:
+            continue
+        observed = (
+            measured
+            if observed is None
+            else (
+                min(observed[0], measured[0]),
+                min(observed[1], measured[1]),
+                max(observed[2], measured[2]),
+                max(observed[3], measured[3]),
+            )
+        )
+    if observed is None:
+        return {"measured_bbox": None, "note": "the pre-fix primitive measured nothing"}
+    pre_fix_args = {
+        "analysis_window": {"start_frame": 10, "end_frame": TOTAL_FRAMES - 1},
+        "frame": {"width": CANVAS_W, "height": CANVAS_H},
+        "segments": [
+            {
+                "id": ids.segment_b,
+                "start_frame": 10,
+                "end_frame": TOTAL_FRAMES - 1,
+                "bbox": [float(v) for v in observed],
+                "mask_artifact_id": ids.mask_b,
+            }
+        ],
+    }
+    return {
+        "measured_bbox": [int(v) for v in observed],
+        "border_contact": obs.border_contact(observed, (CANVAS_H, CANVAS_W)),
+        "clipped_ratio_the_frozen_detector_derives": (
+            silhouette_clipping.measure_clipping_ratio(pre_fix_args)
+        ),
+        "detector_items_the_pre_fix_composer_handed_over": (
+            silhouette_clipping.detect_silhouette_clipping(pre_fix_args)
+        ),
+        "note": "the pre-fix composer measured the rendered object with the "
+        "unchanged primitive and handed the frame-bounded bbox to the frozen "
+        "detector, whose metric (area OUTSIDE the frame) reports 0.0 and emits "
+        "no item: a cut object read as zero risk — the defect R27-04 closes by "
+        "refusing without a rendered-side role mask",
+    }
+
+
 def test_q03r_g_border_clipped_actor_carries_real_geometry(evidence_db) -> None:  # noqa: ANN001
     session_factory, managed_root, ids = evidence_db
     clipped = (MASK_B_RECT[0], MASK_B_RECT[1], MASK_B_RECT[2], CANVAS_H)
@@ -648,35 +729,86 @@ def test_q03r_g_border_clipped_actor_carries_real_geometry(evidence_db) -> None:
         ),
     )
     render = _render_identity(session_factory, managed_root, ids)
-    args = _compose(session_factory, managed_root, ids)["silhouette_clipping"]
-    by_id = {row["id"]: row for row in args["segments"]}
-    observed = by_id[ids.segment_b]
+    prefix = _prefix_border_geometry(session_factory, managed_root, ids)
+    try:
+        args = _compose(session_factory, managed_root, ids)["silhouette_clipping"]
+        refusal: dict | None = None
+        failure: dict = {}
+        observed = {row["id"]: row for row in args["segments"]}[ids.segment_b]
+    except QcEvidenceError as exc:
+        args = {}
+        failure = dict(
+            (exc.details.get("failed_detectors") or {}).get("silhouette_clipping") or {}
+        )
+        refusal = {
+            "aggregate_code": exc.code,
+            "code": failure.get("code"),
+            "message": failure.get("message"),
+            "details": dict(failure.get("details") or {}),
+        }
+        observed = {}
     _raw(
         "q03r_g",
         {
             "subcase": "Q03R-g",
-            "expected": "detected, with the observed side carrying the real "
-            "geometry (not the annotation box)",
+            "expected": "R27-04: an actor the OUTPUT clips at the frame border, "
+            "with no rendered-side role mask attributing the cut content to the "
+            "role, is a typed refusal (QC_EVIDENCE_DEPENDENCY) — never a measured "
+            "clipped_ratio of 0 PASS; the measured extent still reaches the border "
+            "and the pre-fix value is recomputed below",
             "observed": {
-                "observed_bbox": observed["bbox"],
-                "expected_bbox": observed["expected_bbox"],
-                "border_contact": observed["border_contact"],
-                "measured_on": observed["measured_on"],
-                "clipped_ratio_the_frozen_detector_derives": (
-                    "0.0 — the T06A2 ratio is computed from the bbox vs the "
-                    "frame and a pixel-measured bbox can never lie outside the "
-                    "frame; the border contact above is the composable signal "
-                    "(see the report's typed block)"
+                "refusal": refusal,
+                "observed_bbox": observed.get("bbox"),
+                "expected_bbox": observed.get("expected_bbox"),
+                "border_contact": observed.get("border_contact"),
+                "measured_on": observed.get("measured_on"),
+                "clipping_authority": (refusal or {}).get("details", {}).get(
+                    "clipping_authority"
                 ),
             },
+            "pre_fix_equivalent": prefix,
             "render": render,
-            "disposition": "PASS",
+            "disposition": (
+                "TYPED_REFUSAL (the pre-fix measured answer is recorded above)"
+                if refusal
+                else "PASS (measured; no attributable truncation)"
+            ),
         },
     )
-    assert observed["bbox"] == [MASK_B_RECT[0], MASK_B_RECT[1], MASK_B_RECT[2], CANVAS_H]
-    assert observed["border_contact"] == ["bottom"]
-    assert observed["expected_bbox"] == list(MASK_B_RECT)
-    assert silhouette_clipping.detect_silhouette_clipping(args) == []
+    # the delivered pre-fix answer for the SAME bytes: a 0 ratio and no item
+    assert prefix["detector_items_the_pre_fix_composer_handed_over"] == []
+    assert prefix["clipped_ratio_the_frozen_detector_derives"] == 0.0
+    assert prefix["border_contact"] == ["bottom"]
+    assert prefix["measured_bbox"] == [MASK_B_RECT[0], MASK_B_RECT[1], MASK_B_RECT[2], CANVAS_H]
+    if refusal is None:
+        # legacy positive path (kept, so the row still proves the measurement)
+        assert observed["bbox"] == [MASK_B_RECT[0], MASK_B_RECT[1], MASK_B_RECT[2], CANVAS_H]
+        assert observed["border_contact"] == ["bottom"]
+        assert observed["expected_bbox"] == list(MASK_B_RECT)
+        assert silhouette_clipping.detect_silhouette_clipping(args) == []
+    else:
+        # R27-04: no authority -> typed refusal, and NOTHING reaches the detector
+        assert args == {}
+        assert failure["code"] == "QC_EVIDENCE_DEPENDENCY"
+        details = dict(failure.get("details") or {})
+        authority = dict(details.get("clipping_authority") or {})
+        assert authority["verdict"] == "unattributable_edge_contact"
+        assert authority["attributed_to_role"] is False
+        assert authority["detector_clearance"] is False
+        assert authority["measure_revision"] == "1.2.0"
+        assert details["contact_sides"] == ["bottom"]
+        assert details["observed_bbox"] == [
+            MASK_B_RECT[0],
+            MASK_B_RECT[1],
+            MASK_B_RECT[2],
+            CANVAS_H,
+        ]
+        assert details["role_extent_bbox"] == list(MASK_B_RECT)
+        dependency_report = dict(details.get("dependency") or {})
+        assert dependency_report["missing_fact"].startswith("a rendered-side role mask")
+        assert "object-correction" in dependency_report["missing_producer"]
+        assert "purpose='mask'" in dependency_report["expected_persistence"]
+
 
 
 # ── Q03R-h: reversed stacking; broken contact ──────────────────────────────
