@@ -721,6 +721,35 @@ class ComfyStageAdapter:
                               "reused_from": receipt.get("path")})
         return artifacts
 
+    def _durable_union_fingerprint(self, instance_epoch: dict | None = None) -> frozenset:
+        """What the durable ledger said when THIS caller took its decision.
+
+        R27-03: the resolve/claim decision is taken before the gate and REPEATED
+        inside the gate's critical section, because a caller holding the same
+        attempt identity can durably commit while this caller waits for the lock.
+        This fingerprint is the comparison the in-gate decision uses: the decision
+        is re-taken exactly when another caller changed the durable state, and
+        never re-triggered by the records THIS caller has already dispositioned
+        itself (its own `not_accepted` release, its own adopted marker) -- reading
+        those again would turn a legitimate requeue into a refusal of the very
+        attempt the release was meant to free.
+        """
+        if self.reservations is None:
+            return frozenset()
+        view = self.ledger_candidates(instance_epoch)
+        marks: set = set()
+        for bucket in ("markers", "receipts", "quarantined"):
+            for rec in view[bucket]:
+                marks.add((bucket, str(rec.get("path") or ""), str(rec.get("state") or ""),
+                           str(rec.get("outcome") or ""), str(rec.get("prompt_id") or "")))
+        for item in view["misnamed"]:
+            rec = item.get("record") or {}
+            marks.add(("misnamed", str(rec.get("path") or ""), str(rec.get("state") or ""),
+                       str(rec.get("outcome") or ""), str(rec.get("prompt_id") or "")))
+        for item in view["corrupt"]:
+            marks.add(("corrupt", str(item.get("path") or ""), "", "", ""))
+        return frozenset(marks)
+
     def resolve_durable_prior(self, claim: dict, instance_epoch: dict | None = None) -> dict | None:
         """Reconcile the durable UNION against this caller's declared identity.
 
@@ -1113,7 +1142,42 @@ class ComfyStageAdapter:
         if res.get("released") or res.get("already_released"):
             self.reservation_released = True
         self._record_event("close", {"outcome": outcome, "result": res})
+        self._report_unrecorded_outcome(outcome, res)
         return res
+
+    def _report_unrecorded_outcome(self, outcome: str, result: dict) -> None:
+        """A requested outcome the LEDGER did not record is never reported silently.
+
+        `PromptReservations.close()` writes ONE receipt per (instance, attempt) and
+        refuses a second write for that slot (exclusive create, first write wins).
+        A same-attempt requeue therefore asks for the SECOND write of one slot: the
+        orphan was already released as `not_accepted` before this caller re-POSTed
+        (F01: a POST that provably never started may be retried on the same
+        attempt), so the requeued run's own terminal outcome is dropped and the
+        durable ledger keeps the release. The run is real -- the artifact exists on
+        the wire and on disk -- but a later replay of this attempt reads a receipt
+        that carries no artifacts, so the validated evidence is NOT reusable.
+
+        The adapter cannot make that second write legal (the one-receipt slot is the
+        store's invariant), so the contradiction must not pass silently: it is
+        reported as a typed event plus a note carrying the requested outcome, the
+        recorded outcome, the release count and the receipt path.
+        """
+        if not result.get("already_released"):
+            return
+        recorded = result.get("outcome")
+        if recorded == outcome:
+            return
+        self._record_event("terminal_outcome_not_durably_recorded",
+                           {"requested_outcome": outcome, "recorded_outcome": recorded,
+                            "release_count": result.get("release_count"),
+                            "receipt": result.get("closed_path")})
+        self.notes.append(
+            f"the durable ledger did NOT record this attempt\'s {outcome!r}: this "
+            f"attempt\'s single receipt was already written by an earlier outcome "
+            f"({recorded!r}) and the store refuses a second write for the same attempt "
+            f"slot, so a later replay of this attempt cannot reuse the validated "
+            f"evidence ({result.get('closed_path')})")
 
     def reservation_state(self) -> dict:
         if self.reservations is None or self.reservation is None:
@@ -1470,6 +1534,10 @@ class ComfyStageAdapter:
             # unresolved (it keeps blocking the gate below).
             adopted = self.adopt_pending(instance_epoch, claim)
             adopt_key = self.reservation.get("key") if (adopted and self.reservation) else None
+            # R27-03: the durable state THIS caller has already decided on, taken
+            # after our own pre-gate commit (own marker adopted / own orphan
+            # released) and compared again inside the gate below.
+            durable_decided = self._durable_union_fingerprint(instance_epoch)
 
             if self.gate is not None:
                 # epoch + reconcile callback: while any OTHER unresolved
@@ -1478,6 +1546,24 @@ class ComfyStageAdapter:
                 self.gate.acquire(stage_label=spec.stage_id, epoch=instance_epoch,
                                   reconcile=self.gate_reconcile_hook, adopt_key=adopt_key)
                 self.gate_acquired = True
+                # R27-03 (class fix): the durable resolve/claim DECISION is re-taken
+                # inside the gate's critical section. Two callers of ONE attempt
+                # identity can both read an empty candidate union before the gate;
+                # the first then completes, closes its reservation and releases the
+                # lock while the second is still waiting, so the second would enter
+                # the gate holding a stale decision and POST a second prompt for an
+                # already-terminal attempt (reviewer probe: 2 POSTs for one attempt,
+                # duplicate artifact published, receipt keeps the first prompt).
+                # Re-resolving here means the caller entering the critical section
+                # either reuses the exact committed receipt/artifact or refuses with
+                # an existing typed error -- exactly one POST per attempt identity.
+                if self._durable_union_fingerprint(instance_epoch) != durable_decided:
+                    prior_in_gate = self.resolve_durable_prior(claim, instance_epoch)
+                    if prior_in_gate is not None:
+                        return self._replayed_output(spec, prior_in_gate, stage_input, base)
+                    adopted = self.adopt_pending(instance_epoch, claim)
+                    adopt_key = (self.reservation.get("key")
+                                 if (adopted and self.reservation) else None)
             if self.lease is not None:
                 self.lease.acquire(attempt_id=stage_input.attempt_id, prompt_id=None)
                 self.lease_acquired = True
