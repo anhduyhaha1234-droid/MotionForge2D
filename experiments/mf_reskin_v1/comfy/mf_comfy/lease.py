@@ -22,7 +22,13 @@ import uuid
 from contextlib import contextmanager
 from pathlib import Path
 
-from .errors import LeaseConflict, LeaseNotHeld
+from .errors import (
+    AttemptAlreadyTerminal,
+    CorruptReservation,
+    LeaseConflict,
+    LeaseNotHeld,
+    ReservationConflict,
+)
 
 STILL_ACTIVE = 259
 
@@ -41,6 +47,49 @@ SUBMIT_OPENING = "opening"
 SUBMIT_INFLIGHT = "inflight"
 SUBMIT_ACKED = "acked"
 SUBMIT_AMBIGUOUS = "ambiguous"
+
+# R28 (R27-6-F1): one receipt per (instance, attempt) slot is written once -- but
+# a LEGAL never-submitted release may be SUPERSEDED, at most once, by the
+# terminal outcome of the retry it authorised. Without that transition the
+# release consumed the slot, the retry's validated result could not be recorded
+# and every later replay was refused for an attempt that had in fact completed.
+# The predecessor shape is deliberately narrow: a release whose own durable
+# fields prove no POST ever started.
+SUPERSEDABLE_OUTCOME = "not_accepted"
+TRANSITION_LOCK_SUFFIX = ".transition.lock"
+
+
+def receipt_is_legal_predecessor(prev: dict | None, incoming: dict | None) -> tuple[bool, str]:
+    """May the terminal receipt `incoming` replace the recorded receipt `prev`?
+
+    Legal ONLY for the never-submitted release of the SAME work item on the SAME
+    server boot, whose recorded fields themselves prove that no POST started
+    (`not_accepted`, no `prompt_id`, `submit_count == 0`), replaced by a receipt
+    that carries the prompt of the retry that followed it. A release that was
+    superseded once may never be superseded again, and a receipt that records a
+    POST (any prompt id) is a finished attempt: it is never overwritten.
+    """
+    prev = prev if isinstance(prev, dict) else {}
+    inc = incoming if isinstance(incoming, dict) else {}
+    if prev.get("state") != RESERVATION_RELEASED:
+        return False, f"the recorded state is {prev.get('state')!r}, not a release"
+    if prev.get("outcome") != SUPERSEDABLE_OUTCOME:
+        return False, (f"the receipt records the outcome {prev.get('outcome')!r}; only a "
+                       f"never-submitted release ({SUPERSEDABLE_OUTCOME!r}) may be superseded")
+    if prev.get("prompt_id"):
+        return False, ("the receipt already carries a prompt "
+                       f"({prev.get('prompt_id')!r}): a POST did start")
+    if int(prev.get("submit_count") or 0) != 0:
+        return False, f"the receipt records submit_count {prev.get('submit_count')!r}"
+    if prev.get("superseded_by") or prev.get("transitions"):
+        return False, "the receipt was already superseded once"
+    if not str(inc.get("prompt_id") or ""):
+        return False, "the incoming record carries no prompt: it cannot prove a POST"
+    for field in ("instance_id", "host", *DURABLE_IDENTITY_FIELDS):
+        if str(prev.get(field) or "") != str(inc.get(field) or ""):
+            return False, (f"{field} differs: recorded {prev.get(field)!r} vs incoming "
+                           f"{inc.get(field)!r}")
+    return True, ""
 
 
 def same_boot_identity(a: dict | None, b: dict | None) -> bool:
@@ -399,6 +448,13 @@ class PromptReservations:
     Release claims the receipt with `O_CREAT|O_EXCL`, so a reservation can be
     released exactly once even if two processes race — the loser gets
     `already_released` and never writes a second release.
+
+    R28 (R27-6-F1): the exclusive create also meant the ONE receipt of a slot
+    was consumed by the release that authorised a retry, so the retry's own
+    terminal outcome could never be recorded. `close(..., attempt_supersession=
+    True)` therefore allows exactly ONE legal replacement: the terminal receipt
+    of the retry supersedes the release that provably never submitted. Every
+    other second write is still refused and the recorded bytes are kept.
     """
 
     SUFFIX = ".reservation.json"
@@ -568,7 +624,7 @@ class PromptReservations:
         return {"quarantined": True, "already_closed": False, "reason": reason, "path": str(dst)}
 
     def close(self, record: dict, outcome: str, *, evidence: dict | None = None,
-              closer: str = "") -> dict:
+              closer: str = "", attempt_supersession: bool = False) -> dict:
         """Release a reservation exactly once. Never releases an unproven one.
 
         The receipt is not just a ledger note: it is the durable record that
@@ -609,6 +665,12 @@ class PromptReservations:
             "submit_state": record.get("submit_state"),
             "submit_count": record.get("submit_count"),
         }
+        if attempt_supersession:
+            transition = self._supersede_receipt(receipt, payload, closer=closer)
+            if transition is not None:
+                Path(record["path"]).unlink(missing_ok=True)
+                return transition
+
         try:
             fd = os.open(receipt, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
         except FileExistsError:
@@ -632,6 +694,120 @@ class PromptReservations:
             "released": True, "already_released": False, "release_count": 1,
             "outcome": outcome, "closed_path": str(receipt),
         }
+
+    def _take_transition_lock(self, lock: Path, wait_s: float = 5.0) -> bool:
+        """Claim the single-slot transition lock, bounded.
+
+        Exactly one closer may perform the release->terminal transition of one
+        (instance, attempt) slot. The loser of that race does not guess: it waits
+        (bounded) for the winner to publish, then re-reads the receipt and is
+        refused by the ordinary legality check, which keeps the winner's bytes.
+        """
+        deadline = time.time() + max(0.0, float(wait_s))
+        while True:
+            try:
+                fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            except FileExistsError:
+                if time.time() >= deadline:
+                    return False
+                time.sleep(0.01)
+                continue
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as fh:
+                    fh.write(f"{os.getpid()}\n")
+            except BaseException:
+                lock.unlink(missing_ok=True)
+                raise
+            return True
+
+    def _supersede_receipt(self, receipt: Path, payload: dict, *,
+                           closer: str = "") -> dict | None:
+        """Replace a never-submitted release with the terminal receipt of its retry.
+
+        Returns None when there is nothing to supersede yet (no receipt on disk),
+        or when the incoming close cannot prove a POST -- those keep the original
+        one-write-per-slot behaviour. Every unsafe replacement is refused with an
+        EXISTING typed error (`AttemptAlreadyTerminal` / `ReservationConflict` /
+        `CorruptReservation` / `LeaseConflict`) and moves not a single byte.
+        """
+        if not receipt.exists():
+            return None
+        if not str(payload.get("prompt_id") or ""):
+            return None
+        lock = receipt.with_name(receipt.name + TRANSITION_LOCK_SUFFIX)
+        held = self._take_transition_lock(lock)
+        try:
+            if not held:
+                raise LeaseConflict(
+                    "refusing to replace this attempt's receipt: another closer is "
+                    "performing the transition of this slot right now",
+                    supersession=True, refusal="transition_in_progress",
+                    receipt=str(receipt))
+            prev = _read_json(receipt)
+            if prev is None:
+                raise CorruptReservation(
+                    "refusing to replace a receipt that exists but cannot be read; "
+                    "unknown state is never overwritten",
+                    supersession=True, refusal="unreadable_receipt", receipt=str(receipt),
+                    incoming_outcome=payload.get("outcome"),
+                    incoming_prompt_id=payload.get("prompt_id"))
+            # Idempotent re-close of the SAME terminal fact (same outcome, same
+            # prompt, same durable identity): there is nothing to replace, and
+            # `close()` must stay exactly-once. Only a DIFFERENT record for this
+            # slot reaches the supersession rules below.
+            same_identity = all(
+                str(prev.get(field) or "") == str(payload.get(field) or "")
+                for field in ("instance_id", "host", *DURABLE_IDENTITY_FIELDS))
+            if (same_identity
+                    and str(prev.get("outcome") or "") == str(payload.get("outcome") or "")
+                    and str(prev.get("prompt_id") or "")
+                    == str(payload.get("prompt_id") or "")):
+                return {"released": False, "already_released": True,
+                        "release_count": int(prev.get("release_count") or 1),
+                        "outcome": prev.get("outcome"), "closed_path": str(receipt),
+                        "transitioned": False, "already_recorded": True,
+                        "marker_removed": True}
+            ok, reason = receipt_is_legal_predecessor(prev, payload)
+            if not ok:
+                identity_mismatch = " differs:" in reason
+                error = (ReservationConflict if identity_mismatch else AttemptAlreadyTerminal)
+                raise error(
+                    f"refusing to replace this attempt's receipt: {reason}",
+                    supersession=True, refusal=reason, receipt=str(receipt),
+                    recorded_outcome=prev.get("outcome"),
+                    recorded_prompt_id=prev.get("prompt_id"),
+                    recorded_submit_count=prev.get("submit_count"),
+                    recorded_release_count=prev.get("release_count"),
+                    incoming_outcome=payload.get("outcome"),
+                    incoming_prompt_id=payload.get("prompt_id"))
+            history = list(prev.get("transitions") or [])
+            history.append({
+                "from_outcome": prev.get("outcome"), "to_outcome": payload.get("outcome"),
+                "at": time.time(), "by": closer or payload.get("closer"),
+                "from_prompt_id": prev.get("prompt_id"),
+                "to_prompt_id": payload.get("prompt_id"),
+                "reason": "legal release->retry transition: the release proved no POST "
+                          "started and the retry recorded the terminal outcome",
+            })
+            replaced = dict(payload)
+            # The slot was released exactly once and stays released exactly once.
+            replaced["release_count"] = 1
+            replaced["supersedes"] = {
+                "outcome": prev.get("outcome"), "closed_at": prev.get("closed_at"),
+                "closer": prev.get("closer"), "submit_count": prev.get("submit_count"),
+                "prompt_id": prev.get("prompt_id"),
+                "close_evidence": prev.get("close_evidence") or {},
+            }
+            replaced["transitions"] = history
+            replaced["superseded_by"] = payload.get("prompt_id")
+            _write_json_atomic(receipt, replaced)
+            return {"released": True, "already_released": False, "release_count": 1,
+                    "transitioned": True, "previous_outcome": prev.get("outcome"),
+                    "outcome": payload.get("outcome"), "closed_path": str(receipt),
+                    "transitions": len(history), "marker_removed": True}
+        finally:
+            if held:
+                lock.unlink(missing_ok=True)
 
     # -- read -------------------------------------------------------------
     def read(self, instance_id: str, attempt_id: str) -> dict | None:

@@ -148,6 +148,16 @@ class ComfyStageAdapter:
         self.gate_acquired = False
         self.lease_acquired = False
         self.reservation_events: list[dict] = []
+        # R28 (R27-03-F2): the durable records THIS adapter itself dispositioned
+        # (its own never-submitted release: the marker path it removed and the
+        # receipt path it wrote). The in-gate decision ignores exactly these, so
+        # re-deciding while holding the lock can never turn this caller's own
+        # legal release into a refusal of the attempt that release freed.
+        self.self_dispositioned: set[str] = set()
+        # R28 (R27-6-F1): a terminal outcome the ledger REFUSED to record; the
+        # refusal is surfaced as a typed failure and must not be retried blindly.
+        self.outcome_recording_refused: dict | None = None
+        self._last_resolve_view: frozenset = frozenset()
         self.ws_events: list[dict] = []
         self.notes: list[str] = []
         self.instance_epoch: dict | None = None
@@ -721,22 +731,9 @@ class ComfyStageAdapter:
                               "reused_from": receipt.get("path")})
         return artifacts
 
-    def _durable_union_fingerprint(self, instance_epoch: dict | None = None) -> frozenset:
-        """What the durable ledger said when THIS caller took its decision.
-
-        R27-03: the resolve/claim decision is taken before the gate and REPEATED
-        inside the gate's critical section, because a caller holding the same
-        attempt identity can durably commit while this caller waits for the lock.
-        This fingerprint is the comparison the in-gate decision uses: the decision
-        is re-taken exactly when another caller changed the durable state, and
-        never re-triggered by the records THIS caller has already dispositioned
-        itself (its own `not_accepted` release, its own adopted marker) -- reading
-        those again would turn a legitimate requeue into a refusal of the very
-        attempt the release was meant to free.
-        """
-        if self.reservations is None:
-            return frozenset()
-        view = self.ledger_candidates(instance_epoch)
+    @staticmethod
+    def _union_marks(view: dict) -> frozenset:
+        """Identity marks of every record in one ledger view (audit evidence)."""
         marks: set = set()
         for bucket in ("markers", "receipts", "quarantined"):
             for rec in view[bucket]:
@@ -744,13 +741,55 @@ class ComfyStageAdapter:
                            str(rec.get("outcome") or ""), str(rec.get("prompt_id") or "")))
         for item in view["misnamed"]:
             rec = item.get("record") or {}
-            marks.add(("misnamed", str(rec.get("path") or ""), str(rec.get("state") or ""),
-                       str(rec.get("outcome") or ""), str(rec.get("prompt_id") or "")))
+            marks.add(("misnamed", str(rec.get("path") or item.get("path") or ""),
+                       str(rec.get("state") or ""), str(rec.get("outcome") or ""),
+                       str(rec.get("prompt_id") or "")))
         for item in view["corrupt"]:
             marks.add(("corrupt", str(item.get("path") or ""), "", "", ""))
         return frozenset(marks)
 
-    def resolve_durable_prior(self, claim: dict, instance_epoch: dict | None = None) -> dict | None:
+    @staticmethod
+    def _without_paths(view: dict, ignore) -> dict:
+        """Drop the records this caller dispositioned ITSELF from one ledger view.
+
+        Only ever used with an explicitly tracked set of paths this adapter wrote
+        (its own release receipt / removed marker), never to hide somebody else's
+        record: an ignored path is a transition this caller already decided on.
+        """
+        ign = {str(p) for p in (ignore or ()) if p}
+        if not ign:
+            return view
+
+        def keep(rec) -> bool:
+            return str((rec or {}).get("path") or "") not in ign
+
+        out = dict(view)
+        for bucket in ("markers", "receipts", "quarantined"):
+            out[bucket] = [r for r in view[bucket] if keep(r)]
+        out["misnamed"] = [item for item in view["misnamed"]
+                           if str(((item.get("record") or {}).get("path")
+                                   or item.get("path") or "")) not in ign]
+        return out
+
+    def _durable_union_fingerprint(self, instance_epoch: dict | None = None,
+                                   ignore=()) -> frozenset:
+        """OBSERVATION of the durable union -- never the trigger of a decision.
+
+        R27-03 recorded this snapshot to decide whether to re-resolve inside the
+        gate, and R28 removed it from that job: a snapshot taken AFTER the decision
+        can already contain a commit the decision never evaluated (reviewer probe:
+        two live callers of ONE attempt, the second enters the critical section with
+        an unchanged fingerprint and POSTs a second prompt). The decision is now
+        re-taken unconditionally under the lock, and this fingerprint is kept only
+        as the ordered audit evidence of what each caller saw when.
+        """
+        if self.reservations is None:
+            return frozenset()
+        return self._union_marks(
+            self._without_paths(self.ledger_candidates(instance_epoch), ignore))
+
+    def resolve_durable_prior(self, claim: dict, instance_epoch: dict | None = None, *,
+                              ignore=()) -> dict | None:
         """Reconcile the durable UNION against this caller's declared identity.
 
         Returns the receipt to REPLAY when a terminal completion of exactly this
@@ -760,10 +799,17 @@ class ComfyStageAdapter:
         nothing durable claims this attempt).
 
         Fixed order: integrity (`ledger_candidates`) -> enumerate the COMPLETE
-        candidate union and resolve its conflicts (round D) -> reconcile on
-        independent identity -> release/reuse -> and only THEN may a stage submit.
+        reconcile on independent identity -> release/reuse -> and only THEN may a stage submit.
+
+        `ignore` is the set of durable paths THIS caller already dispositioned
+        itself; those records are removed from the view before it is reconciled, so
+        the caller's own never-submitted release cannot be read back as a terminal
+        outcome of the attempt that release freed (R28). The union this decision
+        evaluated is published as `_last_resolve_view` for the audit trail.
         """
         view = self.ledger_candidates(instance_epoch)
+        self._last_resolve_view = self._union_marks(self._without_paths(view, ignore))
+        view = self._without_paths(view, ignore)
         if view["corrupt"]:
             raise CorruptReservation(
                 "refusing to resolve this attempt: durable reservation state is unreadable",
@@ -1122,6 +1168,8 @@ class ComfyStageAdapter:
                           "client_id": rec.get("client_id"),
                           "submit_state": rec.get("submit_state"),
                           "submit_owner_pid": rec.get("submit_owner_pid")})
+            self.self_dispositioned.update(
+                {str(rec.get("path") or ""), str(res.get("closed_path") or "")} - {""})
             self._record_event("released_not_accepted", {"result": res})
             return None
         # absence is NOT proof: keep it, and keep blocking
@@ -1133,14 +1181,54 @@ class ComfyStageAdapter:
         return None
 
     def close_reservation(self, outcome: str, evidence: dict | None = None,
-                          closer: str | None = None) -> dict:
-        """Release this attempt's reservation exactly once (idempotent)."""
+                          closer: str | None = None,
+                          attempt_supersession: bool | None = None) -> dict:
+        """Release this attempt's reservation exactly once (idempotent).
+
+        R28 (R27-6-F1): `attempt_supersession` enables the ONE legal replacement
+        of this slot's receipt -- a never-submitted release superseded by the
+        terminal receipt of the retry it authorised -- so a completed requeue can
+        record its prompt and its validated artifact instead of leaving a
+        `not_accepted` receipt that blocks every later replay. It defaults to "on
+        for a close that carries the prompt of a real POST". An ILLEGAL replace is
+        refused by the ledger with a typed failure and its bytes are kept; this
+        method surfaces that refusal as evidence and re-raises it, so the outcome
+        is never reported as recorded when it was not.
+        """
         if self.reservations is None or self.reservation is None:
             return {"released": False, "already_released": False, "reason": "no_reservation"}
-        res = self.reservations.close(self.reservation, outcome,
-                                      evidence=evidence or {}, closer=closer or self.owner)
+        if attempt_supersession is None:
+            attempt_supersession = bool(self.reservation.get("prompt_id"))
+        try:
+            res = self.reservations.close(
+                self.reservation, outcome, evidence=evidence or {},
+                closer=closer or self.owner, attempt_supersession=bool(attempt_supersession))
+        except MfComfyError as exc:
+            if not (exc.to_dict().get("details") or {}).get("supersession"):
+                raise
+            self.outcome_recording_refused = exc.to_dict()
+            self.self_dispositioned.update(
+                {str(self.reservation.get("path") or "")} - {""})
+            self._record_event("receipt_supersession_refused",
+                               {"requested_outcome": outcome,
+                                **(exc.to_dict().get("details") or {})})
+            self.notes.append(
+                f"the durable ledger REFUSED to record this attempt's {outcome!r}: "
+                f"{exc.message}; the recorded bytes are kept as evidence "
+                f"({(exc.to_dict().get('details') or {}).get('receipt')})")
+            raise
         if res.get("released") or res.get("already_released"):
             self.reservation_released = True
+        if res.get("transitioned"):
+            self._record_event("receipt_superseded", {
+                "requested_outcome": outcome, "previous_outcome": res.get("previous_outcome"),
+                "prompt_id": self.reservation.get("prompt_id"),
+                "artifacts": len((evidence or {}).get("artifacts") or []),
+                "release_count": res.get("release_count"),
+                "receipt": res.get("closed_path")})
+        self.self_dispositioned.update(
+            {str(self.reservation.get("path") or ""),
+             str(res.get("closed_path") or "")} - {""})
         self._record_event("close", {"outcome": outcome, "result": res})
         self._report_unrecorded_outcome(outcome, res)
         return res
@@ -1534,9 +1622,13 @@ class ComfyStageAdapter:
             # unresolved (it keeps blocking the gate below).
             adopted = self.adopt_pending(instance_epoch, claim)
             adopt_key = self.reservation.get("key") if (adopted and self.reservation) else None
-            # R27-03: the durable state THIS caller has already decided on, taken
-            # after our own pre-gate commit (own marker adopted / own orphan
-            # released) and compared again inside the gate below.
+            # R28 (R27-03-F2): this fingerprint is an OBSERVATION of the union the
+            # provisional decision above was taken against -- NOT the trigger of the
+            # decision taken under the lock. A snapshot taken AFTER a decision can
+            # already contain a commit that decision never evaluated (reviewer probe:
+            # two callers of one attempt, the second enters the gate with an
+            # unchanged fingerprint and POSTs a second prompt), so it decides
+            # nothing here; it is recorded as ordered audit evidence instead.
             durable_decided = self._durable_union_fingerprint(instance_epoch)
 
             if self.gate is not None:
@@ -1546,24 +1638,39 @@ class ComfyStageAdapter:
                 self.gate.acquire(stage_label=spec.stage_id, epoch=instance_epoch,
                                   reconcile=self.gate_reconcile_hook, adopt_key=adopt_key)
                 self.gate_acquired = True
-                # R27-03 (class fix): the durable resolve/claim DECISION is re-taken
-                # inside the gate's critical section. Two callers of ONE attempt
-                # identity can both read an empty candidate union before the gate;
-                # the first then completes, closes its reservation and releases the
-                # lock while the second is still waiting, so the second would enter
-                # the gate holding a stale decision and POST a second prompt for an
-                # already-terminal attempt (reviewer probe: 2 POSTs for one attempt,
-                # duplicate artifact published, receipt keeps the first prompt).
-                # Re-resolving here means the caller entering the critical section
-                # either reuses the exact committed receipt/artifact or refuses with
-                # an existing typed error -- exactly one POST per attempt identity.
-                if self._durable_union_fingerprint(instance_epoch) != durable_decided:
-                    prior_in_gate = self.resolve_durable_prior(claim, instance_epoch)
-                    if prior_in_gate is not None:
-                        return self._replayed_output(spec, prior_in_gate, stage_input, base)
-                    adopted = self.adopt_pending(instance_epoch, claim)
-                    adopt_key = (self.reservation.get("key")
-                                 if (adopted and self.reservation) else None)
+                # R28 (R27-03-F2, class fix): the durable decision AND the ownership
+                # transition are SERIALIZED under the gate. Both are re-taken here,
+                # inside the critical section, against the union as it is while this
+                # caller holds the exclusive lock: everything another caller
+                # committed while this caller waited (its terminal receipt, its
+                # released orphan, its quarantine) is visible to a decision that can
+                # no longer be stale -- and the records THIS caller dispositioned
+                # itself are excluded, so the re-decision cannot refuse the attempt
+                # its own legal release just freed. The re-decision is UNCONDITIONAL:
+                # gating it on the pre-gate fingerprint is what left the window open
+                # (a commit landing between the decision and the snapshot is already
+                # inside the snapshot, so the comparison reports "unchanged").
+                # The evidence of the in-gate decision is emitted BEFORE the decision
+                # itself: the case this round is about is the one where the commit
+                # landed while this caller waited -- and that caller then either
+                # REPLAYS it or REFUSES typed, both of which leave this frame before
+                # any later line could record anything.
+                self._record_event("durable_decision_in_gate", {
+                    "fingerprint_at_decision": sorted(
+                        f"{b}:{p}" for b, p, *_ in durable_decided),
+                    "fingerprint_in_gate": sorted(
+                        f"{b}:{p}" for b, p, *_ in self._durable_union_fingerprint(
+                            instance_epoch, ignore=self.self_dispositioned)),
+                    "ignored_own_records": sorted(self.self_dispositioned),
+                    "note": "the decision is re-taken under the lock; the pre-gate "
+                            "fingerprint is evidence only"})
+                prior_in_gate = self.resolve_durable_prior(claim, instance_epoch,
+                                                          ignore=self.self_dispositioned)
+                if prior_in_gate is not None:
+                    return self._replayed_output(spec, prior_in_gate, stage_input, base)
+                adopted = self.adopt_pending(instance_epoch, claim)
+                adopt_key = (self.reservation.get("key")
+                             if (adopted and self.reservation) else None)
             if self.lease is not None:
                 self.lease.acquire(attempt_id=stage_input.attempt_id, prompt_id=None)
                 self.lease_acquired = True
@@ -1700,7 +1807,7 @@ class ComfyStageAdapter:
                                                        evidence={"error": exc.to_dict()})
                     self.reservation_released = True
                     self._record_event("quarantine_epoch_lost", {"result": res})
-            elif terminal_proven:
+            elif terminal_proven and self.outcome_recording_refused is None:
                 self.close_reservation("terminal_error", evidence={"error": exc.to_dict()})
             elif isinstance(exc, (MissingModel, MissingNode, InvalidGraph)):
                 # the server rejected the graph outright: the POST provably never landed
