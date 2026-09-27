@@ -29,7 +29,15 @@ VERDICT
         P2 verified stop   - every engine-chain pid carries a pid-scoped stop action
                              (exact `/PID <pid>`, never /T, /IM or /FI) with rc=0;
         P3 epoch binding   - every piece of evidence belongs to ONE frozen epoch/port;
-        P4 corroboration   - an own-client exit carries its own self-exit receipt.
+        P4 corroboration   - an own-client exit carries its own self-exit receipt;
+        P5 instance bond   - every piece of evidence belongs to ONE immutable INSTANCE
+                             (R27-06): the record must DECLARE an instance id, the declared
+                             instance's process must be the engine-chain process whose
+                             shutdown is proven (matching lifetime), and when a frozen
+                             epoch snapshot is filed with the evidence the declared
+                             identity must match it.  The LIVE runtime epoch is reported
+                             but never used as the identity authority, because after a
+                             restart it describes a NEWER instance.
       plus port closed (by REFUSAL), no LISTENING row after, collateral_removed == [].
   SHUTDOWN_UNPROVEN_CONTRADICTION
       the evidence contradicts itself (engine still present, a successful connect next
@@ -306,8 +314,177 @@ def epoch_binding(ev, *, resolved_port) -> dict:
             "note": ("a record from another epoch/port is not evidence about this instance")}
 
 
+
+# ---------------------------------------------------------------------------
+# R27-06 (P2): the verdict must be bound to the immutable INSTANCE IDENTITY and to
+# the lifetime of the process the claim is about.  A port or a pid alone is reusable,
+# and this classifier used to RESOLVE the port from the live instance_epoch.json and
+# then only RECORD the record's own instance_id.
+#
+# Measured before the fix: a record declaring NO instance id, and a record declaring a
+# FOREIGN instance id on the SAME port, both still returned
+# SHUTDOWN_CONFIRMED_WITH_DISCLOSED_OWN_CLIENT_EXIT.
+#
+# Rules now enforced by instance_identity_binding():
+#   * the record must DECLARE an instance id (absence is missing authority, not a
+#     contradiction);
+#   * the declared instance's process must BE the engine-chain process whose shutdown is
+#     being proven - matching lifetime, not a recycled pid;
+#   * when the evidence directory carries its OWN frozen epoch snapshot, the declared
+#     identity must match it exactly.  The frozen snapshot is the authority; the LIVE
+#     epoch file is never allowed to bless old evidence (measured 2026-09-27: the live
+#     file holds instance b9d3df1c... while the frozen wave-B evidence declares
+#     96ab17eb... on the same port 8310).
+# ---------------------------------------------------------------------------
+EPOCH_SNAPSHOT_NAMES = ("instance_epoch.json", "wave2_instance_epoch.json",
+                        "instance_epoch_frozen.json")
+_LIVE_EPOCH_CACHE: dict | None = None
+
+
+def read_json_object(path):
+    """Parse a JSON object, or None.  Never raises on a missing/corrupt file."""
+    try:
+        d = json.loads(Path(path).read_text(encoding="utf-8", errors="replace"))
+    except Exception:  # noqa: BLE001
+        return None
+    return d if isinstance(d, dict) else None
+
+
+def live_epoch_read_once() -> dict:
+    """The live runtime epoch, read ONCE at classifier start, for the RECORD only.
+
+    It is deliberately NOT an authority: after a restart this file describes a newer
+    instance, and attaching the newest epoch to old evidence is the R27-06 defect.
+    """
+    global _LIVE_EPOCH_CACHE
+    if _LIVE_EPOCH_CACHE is None:
+        _LIVE_EPOCH_CACHE = {
+            "read_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+            "path": str(_EPOCH).replace(chr(92), "/"),
+            "epoch": read_json_object(_EPOCH) if _EPOCH.is_file() else None,
+            "read_once": True,
+            "used_as_identity_authority": False,
+            "why_not_the_authority": ("the live epoch may belong to an instance that started "
+                                      "AFTER the evidence was written"),
+        }
+    return _LIVE_EPOCH_CACHE
+
+
+def resolve_epoch_authority(wave2_dir, live_epoch=None) -> dict:
+    """The ONE epoch/instance this verdict may speak about, resolved ONCE.
+
+    Priority: the epoch FROZEN with the evidence (an instance_epoch.json snapshot in the
+    evidence directory) > the record's own declared epoch (frozen by the first pass).
+    A live/newest epoch is never promoted to authority.
+    """
+    d = Path(wave2_dir)
+    for name in EPOCH_SNAPSHOT_NAMES:
+        p = d / name
+        if not p.is_file():
+            continue
+        snap = read_json_object(p)
+        if isinstance(snap, dict):
+            return {"source": "evidence_frozen_snapshot",
+                    "path": str(p).replace(chr(92), "/"),
+                    "instance_id": snap.get("instance_id"), "port": snap.get("port"),
+                    "pid": snap.get("pid"), "launched_at": snap.get("launched_at"),
+                    "owner": snap.get("owner"),
+                    "live_epoch_used_as_authority": False,
+                    "note": ("the epoch frozen beside the evidence is the identity authority; "
+                             "a live epoch is never adopted for old evidence")}
+    ev_path = d / "wave2_shutdown_evidence.json"
+    rec = read_json_object(ev_path) or {}
+    rec_epoch = rec.get("instance_epoch")
+    if isinstance(rec_epoch, dict):
+        return {"source": "record_declared_epoch",
+                "path": str(ev_path).replace(chr(92), "/"),
+                "instance_id": rec_epoch.get("instance_id"), "port": rec_epoch.get("port"),
+                "pid": rec_epoch.get("pid"), "launched_at": rec_epoch.get("launched_at"),
+                "owner": rec_epoch.get("owner"),
+                "live_epoch_used_as_authority": False,
+                "note": ("no frozen epoch snapshot was filed beside the evidence: the first "
+                         "pass's own declared epoch is the only frozen authority available")}
+    return {"source": "absent", "path": None, "instance_id": None, "port": None, "pid": None,
+            "launched_at": None, "owner": None,
+            "live_epoch_used_as_authority": False,
+            "live_epoch_seen": bool(live_epoch),
+            "note": "no epoch/instance authority anywhere in the evidence"}
+
+
+def instance_identity_binding(ev, *, authority, chain_pids) -> dict:
+    """R27-06: bind the verdict to the immutable instance identity + process lifetime.
+
+    `bound` is what CONFIRMED needs.  `mismatch` is true only when something WAS declared
+    and DISAGREES - only that may flip the verdict to CONTRADICTION; absence is missing
+    evidence, never a contradiction.
+    """
+    epoch = ev.get("instance_epoch")
+    chain = {int(p) for p in (chain_pids or [])}
+    problems: list[str] = []
+    mismatch = False
+    declared = {"instance_id": None, "port": None, "pid": None, "launched_at": None}
+    if not isinstance(epoch, dict):
+        problems.append("instance_epoch_missing")
+    else:
+        declared = {k: epoch.get(k) for k in ("instance_id", "port", "pid", "launched_at")}
+        if declared["instance_id"] in (None, ""):
+            problems.append("instance_epoch_has_no_instance_id")
+        dpid = declared["pid"]
+        if isinstance(dpid, bool) or (dpid is not None and not isinstance(dpid, int)):
+            problems.append("instance_epoch_pid_is_not_an_integer")
+        elif isinstance(dpid, int):
+            if chain and dpid not in chain:
+                problems.append("instance_epoch_pid_" + str(dpid)
+                                + "_is_not_an_engine_chain_pid_" + str(sorted(chain)))
+                mismatch = True
+        else:
+            problems.append("instance_epoch_has_no_pid")
+        if authority.get("source") == "evidence_frozen_snapshot":
+            aid = authority.get("instance_id")
+            aport = authority.get("port")
+            apid = authority.get("pid")
+            if declared["instance_id"] and aid and declared["instance_id"] != aid:
+                problems.append("instance_epoch_instance_id_" + str(declared["instance_id"])
+                                + "_is_not_the_frozen_run_instances_" + str(aid))
+                mismatch = True
+            if (declared["port"] is not None and aport is not None
+                    and str(declared["port"]) != str(aport)):
+                problems.append("instance_epoch_port_" + str(declared["port"])
+                                + "_is_not_the_frozen_run_instances_" + str(aport))
+                mismatch = True
+            if isinstance(dpid, int) and isinstance(apid, int) and dpid != apid:
+                problems.append("instance_epoch_pid_" + str(dpid)
+                                + "_is_not_the_frozen_run_instances_" + str(apid))
+                mismatch = True
+    ident_match = None
+    if declared["instance_id"] and authority.get("instance_id"):
+        ident_match = declared["instance_id"] == authority["instance_id"]
+    return {
+        "bound": not problems, "mismatch": mismatch,
+        "authority_source": authority.get("source"),
+        "authority_path": authority.get("path"),
+        "authority_instance_id": authority.get("instance_id"),
+        "authority_port": authority.get("port"),
+        "authority_pid": authority.get("pid"),
+        "authority_launched_at": authority.get("launched_at"),
+        "authority_is_a_frozen_snapshot": authority.get("source") == "evidence_frozen_snapshot",
+        "live_epoch_used_as_authority": False,
+        "declared_instance_id": declared["instance_id"],
+        "declared_epoch_port": declared["port"],
+        "declared_epoch_pid": declared["pid"],
+        "declared_launched_at": declared["launched_at"],
+        "instance_id_matches_the_authority": ident_match,
+        "declared_pid_is_an_engine_chain_pid": (
+            None if not isinstance(declared["pid"], int) else declared["pid"] in chain),
+        "problems": problems,
+        "note": ("a record that declares no instance id, or another instance's id on the same "
+                 "port, cannot confirm THIS instance's shutdown; ports and pids are reusable"),
+    }
+
+
 def contradiction_report(*, port_closed, connect_ex_after, listening_after,
-                         engine_absent_after, epoch_mismatch) -> dict:
+                         engine_absent_after, epoch_mismatch,
+                         identity_mismatch=False) -> dict:
     """Any pair of facts that cannot both be true makes CONFIRMED unreachable.
 
     Only evidence that is PRESENT and disagrees counts here.  Absent evidence is a
@@ -321,6 +498,8 @@ def contradiction_report(*, port_closed, connect_ex_after, listening_after,
         contras.append("engine_chain_pid_still_present_in_the_after_dump")
     if epoch_mismatch:
         contras.append("evidence_declares_another_epoch_port_than_the_resolved_one")
+    if identity_mismatch:
+        contras.append("evidence_declares_another_instance_id_than_this_instances_authority")
     if port_closed is True and listening_after:
         contras.append("port_closed_true_but_a_LISTENING_row_exists_after")
     return {"contradictions": contras, "contradictory": bool(contras),
@@ -595,6 +774,11 @@ def main() -> int:
     # must belong to the one epoch/port this classifier resolved.
     engine_absent_after = not (set(chain_pids) & pids_after)
     epoch = epoch_binding(ev, resolved_port=PORT)
+    # R27-06: the identity authority is resolved ONCE, from the evidence itself; the live
+    # epoch is read once too but is only ever reported.
+    live_epoch = live_epoch_read_once()
+    authority = resolve_epoch_authority(wave2, live_epoch=live_epoch.get("epoch"))
+    identity = instance_identity_binding(ev, authority=authority, chain_pids=chain_pids)
     stop_order = owner_chain_stop_order(chain_pids, rows_before)
 
     first_pass_blocking = None
@@ -702,12 +886,14 @@ def main() -> int:
         connect_ex_after=ev.get("connect_ex_after"),
         listening_after=listening_after,
         engine_absent_after=engine_absent_after,
-        epoch_mismatch=epoch["mismatch"])
+        epoch_mismatch=epoch["mismatch"],
+        identity_mismatch=identity["mismatch"])
 
     pillars = {
         "p1_engine_absent_after": engine_absent_after,
         "p2_verified_stop_action_for_the_owned_chain": stop_audit["all_chain_pids_verified"],
         "p3_epoch_port_binding": epoch["bound"],
+        "p5_instance_identity_authority": identity["bound"],
         "p4_own_client_exit_corroborated": not own_client_uncorroborated,
         "port_closed_proven_by_refusal": closure_proven_by_refusal,
         "no_listening_row_after": not listening_after,
@@ -737,6 +923,8 @@ def main() -> int:
                            f"{sorted(set(chain_pids) & pids_after)}")
         if not epoch["bound"]:
             reasons.append("epoch_port_binding: " + ",".join(epoch["problems"]))
+        if not identity["bound"]:
+            reasons.append("instance_identity_binding: " + ",".join(identity["problems"]))
         if own_client_uncorroborated:
             reasons.append(f"own_client_exit_without_self_exit_receipt="
                            f"{own_client_uncorroborated}")
@@ -791,6 +979,9 @@ def main() -> int:
         "verified_stop_audit": stop_audit,
         "stop_order_leaf_to_root": stop_order,
         "epoch_binding": epoch,
+        "epoch_authority": authority,
+        "live_instance_epoch_read_once": live_epoch,
+        "instance_identity_binding": identity,
         "contradictions": contra,
         "own_client_uncorroborated": own_client_uncorroborated,
         "stop_log_refused_rows": refused,
@@ -825,6 +1016,12 @@ def main() -> int:
             "pillars": pillars,
             "engine_absent_after": engine_absent_after,
             "epoch_port_bound": epoch["bound"],
+            "instance_identity_bound": identity["bound"],
+            "instance_identity_authority_source": authority.get("source"),
+            "instance_identity_is_a_frozen_snapshot": identity["authority_is_a_frozen_snapshot"],
+            "instance_identity_matches": identity["instance_id_matches_the_authority"],
+            "declared_pid_is_an_engine_chain_pid": identity["declared_pid_is_an_engine_chain_pid"],
+            "live_epoch_used_as_authority": False,
             "own_client_exit_corroborated": not own_client_uncorroborated,
             "contradictions": contra["contradictions"],
         },
@@ -843,6 +1040,8 @@ def main() -> int:
                                           "collateral_removed", "pid_classification",
                                           "verdict_basis", "verified_stop_audit",
                                           "stop_order_leaf_to_root", "epoch_binding",
+                                          "instance_identity_binding", "epoch_authority",
+                                          "live_instance_epoch_read_once",
                                           "contradictions", "self_audit_no_kill_path",
                                           "read_only_recheck")},
                      indent=1, ensure_ascii=False))
