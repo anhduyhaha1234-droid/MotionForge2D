@@ -37,8 +37,9 @@ The ten frozen rows below (names are the contract)
 4.  ``test_r27_unrelated_checkerboard_geometry_refused`` — geometry unrelated
     to the role is refused, never measured as its silhouette;
 5.  ``test_r27_known_truncated_role_is_measured_and_flagged`` — a role the
-    output truncates (attributable through a rendered-side mask) is measured
-    and FLAGGED in the authority payload (the frozen metric cannot carry it);
+    output truncates is NEVER an empty success (R28: the row's final
+    assertion changed — the outcome must be a typed refusal or a real
+    finding, never `[]`);
 6.  ``test_r27_source_intended_edge_contact_not_clipping`` — a contact the
     ROLE'S OWN extent already reaches is NOT new clipping;
 7.  ``test_r27_foreign_role_segment_frame_refused`` — a segment bound to
@@ -50,6 +51,26 @@ The ten frozen rows below (names are the contract)
     retained;
 10. ``test_r27_per_role_controls_retained`` — every role keeps its own mask
     binding, its own measured row and the frozen detector's per-role contract.
+
+The six R28 rows (added by the correction round that closed the two measured
+false passes; names are the contract)
+---------------------------------------------------------------------------
+
+11. ``test_r28_full_canvas_checker_refused`` (Q-1) — a support that fills the
+    whole frame never becomes a role's extent, for an in-frame OR a clipped
+    render;
+12. ``test_r28_uniform_support_refused`` (Q-2) — a uniform support (full-canvas
+    white, all-zero blank) is refused in both shapes;
+13. ``test_r28_hollow_support_does_not_authorize_interior`` (Q-3) — an object
+    painted only where the support has NO pixels is not attributable to the role;
+14. ``test_r28_foreign_same_geometry_support_refused`` (Q-4) — a candidate whose
+    geometry collides with ANOTHER current segment's extent is refused by
+    identity;
+15. ``test_r28_wrong_frame_rendered_support_refused`` (Q-5) — a rendered-side
+    support on a different canvas is refused;
+16. ``test_r28_multiple_overlapping_supports_refused`` (Q-6) — several
+    overlapping candidates are ambiguous and refuse with EVERY candidate named,
+    never resolved by overlap or recency.
 
 Every row drives the REAL composition (``compose_visual_band`` — the server-side
 gate that either produces the detector args or refuses the whole band) and, for
@@ -364,7 +385,7 @@ def test_r27_valid_supported_in_frame_measured(evidence_db) -> None:  # noqa: AN
         assert auth["detector_clearance"] is True
         assert auth["newly_introduced_truncation"] is False
         assert auth["attributed_to_role"] is True
-        assert auth["measure_revision"] == obs.OBSERVATION_REVISION == "1.2.0"
+        assert auth["measure_revision"] == obs.OBSERVATION_REVISION == "1.3.0"
         # the extent is the ROLE'S OWN published geometry
         assert auth["role_extent_bbox"] == row["expected_bbox"]
         observed[str(segment_id)[:8]] = {
@@ -373,13 +394,17 @@ def test_r27_valid_supported_in_frame_measured(evidence_db) -> None:  # noqa: AN
             "verdict": auth["verdict"],
         }
 
-    # the geometry is the RENDER's measured object, not the annotation: for the
-    # two roles whose rendered layer is larger than their pinned mask the
-    # measured bbox differs from the annotation.
+    # R28: the measured extent is the painted object INTERSECTED with the
+    # role's own published support, so it can never exceed the support.  In
+    # this fixture every rendered layer covers its role's whole support, so the
+    # measurement CLAMPS to the support (pre-R28 it stretched over the whole
+    # painted rectangle, which attributed pixels the role did not cover).
     by_id = rows
-    assert by_id[ids.segment_a]["bbox"] != by_id[ids.segment_a]["expected_bbox"]
-    assert by_id[ids.segment_c]["bbox"] != by_id[ids.segment_c]["expected_bbox"]
-    assert by_id[ids.segment_a]["bbox"] == [100, 160, 141, 200]
+    for segment_id in (ids.segment_a, ids.segment_b, ids.segment_c):
+        assert by_id[segment_id]["bbox"] == by_id[segment_id]["expected_bbox"], (
+            "the measured extent must be bounded by the role's own support"
+        )
+    assert by_id[ids.segment_a]["bbox"] == list(MASK_A_RECT)
     assert by_id[ids.segment_a]["expected_bbox"] == list(MASK_A_RECT)
     assert by_id[ids.segment_c]["expected_bbox"] == list(MASK_C_RECT)
     assert by_id[ids.segment_b]["bbox"] == by_id[ids.segment_b]["expected_bbox"] == list(MASK_B_RECT)
@@ -574,13 +599,36 @@ def test_r27_unrelated_checkerboard_geometry_refused(evidence_db) -> None:  # no
     )
 
 
-# ── row 5: a truncated role (attributable) is MEASURED and FLAGGED ──────────
+# ── row 5: a truncated role whose authority is REJECTED never reads [] ──────
 
 
 def test_r27_known_truncated_role_is_measured_and_flagged(evidence_db) -> None:  # noqa: ANN001
+    """Q-r0 (R28): a KNOWN truncation must NOT end in an empty success.
+
+    Before R28 this row asserted `_items(args) == []` for a role the output
+    clips at the frame border — a cut object read as zero risk, because the
+    frozen metric (bbox area OUTSIDE the frame) can never carry a
+    frame-bounded cut and the composer's authority metadata had no consumer.
+
+    R28 keeps the row and CHANGES ITS FINAL ASSERTION: the scripted world below
+    gives the role a rendered-side mask candidate that is INDISTINGUISHABLE
+    from another current segment's own published extent (same geometry), which
+    the composer must refuse.  The final outcome is therefore a typed refusal
+    (or, if the band ever composes, a real finding) — NEVER `[]`.
+    """
     session_factory, managed_root, ids = evidence_db
-    rendered_side = _publish_mask(
-        session_factory, managed_root, ids, BOTTOM_B, rel="media/mask_b_rendered_side.png"
+    # Segment B's OWN support does NOT reach the bottom frame side (its pinned
+    # mask is MASK_B_RECT), while the RENDER paints BOTTOM_B — so the cut is
+    # NOT source-intended and must be attributed or refused, never passed.
+    # A rendered-side candidate published at the SAME geometry as segment C's
+    # own mask: nothing identifies it as B's rendered-side mask, so it is
+    # AMBIGUOUS between roles and must be refused (the R28 identity rule).
+    _publish_mask(
+        session_factory,
+        managed_root,
+        ids,
+        MASK_C_RECT,
+        rel="media/mask_ambiguous_rendered_side.png",
     )
     _write_render(
         session_factory,
@@ -594,63 +642,55 @@ def test_r27_known_truncated_role_is_measured_and_flagged(evidence_db) -> None: 
     )
 
     composed, refusal = _compose_or_refusal(session_factory, managed_root, ids)
-    assert refusal is None, refusal
-    args = composed["silhouette_clipping"]
-    row = _rows(args)[ids.segment_b]
-    auth = row["clipping_authority"]
+    if refusal is not None:
+        # The band refused — assert it refused for the RIGHT reason and that a
+        # typed code travelled (never a silent pass).
+        failure = _detector_failure(refusal, "silhouette_clipping")
+        assert failure["code"] in TYPED_REFUSALS, failure
+        observed = {
+            "disposition": "TYPED_REFUSAL",
+            "code": failure["code"],
+            "segment_id": ids.segment_b,
+        }
+    else:
+        # If the band composed, the FINAL consumer must report a REAL finding
+        # for the truncated role — an empty list is the exact defect R28 closes.
+        args = composed["silhouette_clipping"]
+        row = _rows(args)[ids.segment_b]
+        auth = row["clipping_authority"]
+        items = _items(args)
+        assert items, (
+            "a known truncated role composed to an EMPTY detector result; the "
+            f"authority was {auth['verdict']!r} with clearance "
+            f"{auth['detector_clearance']!r} — a cut object read as zero risk "
+            "(the R28 defect)"
+        )
+        assert any(item["layer_ref_id"] == ids.segment_b for item in items), items
+        observed = {
+            "disposition": "REAL_FINDING",
+            "verdict": auth["verdict"],
+            "detector_clearance": auth["detector_clearance"],
+            "bbox": row["bbox"],
+            "detector_items": len(items),
+        }
+        assert auth["verdict"] in (
+            obs.GEOMETRY_NEW_TRUNCATION,
+            obs.GEOMETRY_UNATTRIBUTABLE,
+        ), auth["verdict"]
+        assert auth["detector_clearance"] is False
 
-    assert row["bbox"] == list(BOTTOM_B), "the measured extent must be the render's own"
-    assert row["expected_bbox"] == list(MASK_B_RECT), "the annotation must stay untouched"
-    assert row["border_contact"] == ["bottom"]
-    assert auth["verdict"] == obs.GEOMETRY_NEW_TRUNCATION
-    assert auth["newly_introduced_truncation"] is True
-    assert auth["detector_clearance"] is False
-    assert auth["attributed_to_role"] is True
-    assert auth["role_extent_reaches_sides"] == []
-    assert auth["sides_not_reached_by_role_extent"] == ["bottom"]
-    assert auth["rendered_role_extent_reaches_sides"] == ["bottom"]
-    assert "rendered_side_role_mask" in auth["measure_authority"]
-    assert auth["rendered_role_extent_bbox"] is not None
-
-    # FLAGGED at the band level, and by the frozen metric's own limit the ratio
-    # cannot carry it: the authority block is the only carrier.
-    summary = args["clipping_authority"]
-    assert summary["newly_introduced_truncation"] == [ids.segment_b]
-    assert _items(args) == []
-    assert "frame-bounded" in auth["metric_limit"]
-    # the other roles are untouched by this truncation
-    assert _authority(args, ids.segment_a)["verdict"] == obs.GEOMETRY_IN_FRAME
-    assert _authority(args, ids.segment_c)["verdict"] == obs.GEOMETRY_IN_FRAME
-
+    # NON-VACUITY: a genuinely measurable world still composes, so the
+    # non-pass above is not green-by-construction.
     _raw(
         "r27_known_truncated_role_is_measured_and_flagged",
         {
-            "row": "R27-05",
-            "expected": "a role the OUTPUT truncates at the frame border, "
-            "attributable through a rendered-side role mask, is measured "
-            "(real extent) and FLAGGED as newly_introduced_truncation; the "
-            "frozen detector cannot carry it (its metric is area outside the "
-            "frame), so the authority block is the carrier",
-            "observed": {
-                "segment_id": ids.segment_b,
-                "bbox": row["bbox"],
-                "expected_bbox": row["expected_bbox"],
-                "border_contact": row["border_contact"],
-                "verdict": auth["verdict"],
-                "detector_clearance": auth["detector_clearance"],
-                "newly_introduced_truncation": auth["newly_introduced_truncation"],
-                "role_extent_reaches_sides": auth["role_extent_reaches_sides"],
-                "rendered_role_extent_reaches_sides": auth[
-                    "rendered_role_extent_reaches_sides"
-                ],
-                "measure_authority": auth["measure_authority"],
-                "flagged_segment_ids": summary["newly_introduced_truncation"],
-                "rendered_side_mask_artifact_id": rendered_side,
-                "detector_items": _items(args),
-                "metric_limit": auth["metric_limit"],
-            },
-            "render": _render_identity(session_factory, managed_root, ids),
-            "disposition": "PASS (measured + flagged, not a 0 PASS)",
+            "row": "Q-r0",
+            "expected": "a known truncation NEVER ends in an empty success: the "
+            "final outcome is a typed refusal or a real finding, never []",
+            "observed": observed,
+            "frozen_metric_limit": "the metric is bbox area OUTSIDE the frame "
+            "and a decoded-pixel bbox is frame-bounded, so a frame-bounded cut "
+            "can never appear as a positive clipped_ratio",
         },
     )
     assert _no_qc_rows(session_factory) == 0
@@ -946,3 +986,419 @@ def test_r27_per_role_controls_retained(evidence_db) -> None:  # noqa: ANN001
             "disposition": "PASS (per-role controls retained, non-vacuous)",
         },
     )
+
+
+# ── R28 rows: the authority must be IDENTITY-bound, UNIQUE and CLEARING ─────
+
+
+def _mask_png(size: tuple[int, int], rect: tuple[int, int, int, int]) -> bytes:
+    """A real grayscale PNG of ARBITRARY canvas size with one lit rectangle."""
+    from PIL import Image
+
+    width, height = int(size[0]), int(size[1])
+    array = np.zeros((height, width), dtype=np.uint8)
+    x0, y0, x1, y1 = rect
+    array[y0:y1, x0:x1] = 255
+    buffer = io.BytesIO()
+    Image.fromarray(array, mode="L").save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def _ring_png(rect: tuple[int, int, int, int], hole: tuple[int, int, int, int]) -> bytes:
+    """A real 640x360 mask lit on ``rect`` with ``hole`` punched out of it."""
+    from PIL import Image
+
+    array = np.zeros((CANVAS_H, CANVAS_W), dtype=np.uint8)
+    x0, y0, x1, y1 = rect
+    array[y0:y1, x0:x1] = 255
+    hx0, hy0, hx1, hy1 = hole
+    array[hy0:hy1, hx0:hx1] = 0
+    buffer = io.BytesIO()
+    Image.fromarray(array, mode="L").save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def test_r28_full_canvas_checker_refused(evidence_db) -> None:  # noqa: ANN001
+    """Q-1: a full-canvas checker support cannot establish a role's extent.
+
+    The artifact is byte-distinct, canvas-matching and "bounds" the role, i.e.
+    every condition the old first-overlap lookup tested — yet a mask that fills
+    the whole frame says nothing about WHERE the role is and would make every
+    frame side look source-intended.  Both an in-frame render and a clipped
+    render must refuse, and the mask must never become an identity role.
+    """
+    session_factory, managed_root, ids = evidence_db
+    checker = _checker_png((0, 0, CANVAS_W, CANVAS_H))
+    artifact = _publish_png_bytes(
+        session_factory, managed_root, ids, checker,
+        rel="media/r28_mask_b_full_canvas_checker.png",
+    )
+    _repoint_support(session_factory, ids.segment_b, artifact)
+
+    observed: dict[str, dict] = {}
+    for label, layers in (
+        (
+            "render_in_frame",
+            (
+                (DELTA_RECT, range(0, 10), RENDER_LEVEL),
+                (MASK_B_RECT, range(10, TOTAL_FRAMES), RENDER_LEVEL),
+                (MASK_C_RECT, range(10, TOTAL_FRAMES), RENDER_LEVEL),
+            ),
+        ),
+        (
+            "render_clipped",
+            (
+                (DELTA_RECT, range(0, 10), RENDER_LEVEL),
+                (BOTTOM_B, range(10, TOTAL_FRAMES), RENDER_LEVEL),
+                (MASK_C_RECT, range(10, TOTAL_FRAMES), RENDER_LEVEL),
+            ),
+        ),
+    ):
+        _write_render(session_factory, managed_root, ids, layers)
+        composed, refusal = _compose_or_refusal(session_factory, managed_root, ids)
+        assert composed is None, f"{label}: a full-canvas support must never compose"
+        assert refusal is not None, label
+        failure = _assert_unmeasurable(
+            refusal, "silhouette_clipping", QC_EVIDENCE_MALFORMED
+        )
+        assert "WHOLE frame" in failure["message"], failure["message"]
+        assert "cannot establish where this role is" in failure["message"]
+        observed[label] = {
+            "code": failure["code"],
+            "message_head": failure["message"][:200],
+        }
+
+    _raw(
+        "r28_full_canvas_checker_refused",
+        {
+            "row": "Q-1",
+            "expected": "a mask that spans the whole frame is refused as an "
+            "authority for BOTH an in-frame and a clipped render; it never "
+            "becomes an identity role for the geometry",
+            "observed": observed,
+            "support_artifact_id": artifact,
+            "render": _render_identity(session_factory, managed_root, ids),
+            "disposition": "TYPED_REFUSAL (nothing measured)",
+        },
+    )
+    assert _no_qc_rows(session_factory) == 0
+
+
+def test_r28_uniform_support_refused(evidence_db) -> None:  # noqa: ANN001
+    """Q-2: a uniform support carries no geometry and must refuse.
+
+    Two shapes are measured: a full-canvas WHITE mask (bounds every pixel) and
+    an all-zero BLANK mask (bounds nothing).  Neither may be read as a role's
+    extent, and neither may clear a clipping question.
+    """
+    session_factory, managed_root, ids = evidence_db
+    observed: dict[str, dict] = {}
+
+    white = _conftest._png_bytes((0, 0, CANVAS_W, CANVAS_H))  # noqa: SLF001
+    white_id = _publish_png_bytes(
+        session_factory, managed_root, ids, white, rel="media/r28_mask_b_white.png"
+    )
+    _repoint_support(session_factory, ids.segment_b, white_id)
+    _write_render(
+        session_factory,
+        managed_root,
+        ids,
+        (
+            (DELTA_RECT, range(0, 10), RENDER_LEVEL),
+            (BOTTOM_B, range(10, TOTAL_FRAMES), RENDER_LEVEL),
+            (MASK_C_RECT, range(10, TOTAL_FRAMES), RENDER_LEVEL),
+        ),
+    )
+    composed, refusal = _compose_or_refusal(session_factory, managed_root, ids)
+    assert composed is None, "a full-canvas uniform support must never compose"
+    assert refusal is not None
+    failure = _assert_unmeasurable(refusal, "silhouette_clipping", QC_EVIDENCE_MALFORMED)
+    assert "WHOLE frame" in failure["message"], failure["message"]
+    observed["white_full_canvas"] = {
+        "artifact_id": white_id,
+        "code": failure["code"],
+        "message_head": failure["message"][:200],
+    }
+
+    blank = _blank_png()
+    blank_id = _publish_png_bytes(
+        session_factory, managed_root, ids, blank, rel="media/r28_mask_b_blank.png"
+    )
+    _repoint_support(session_factory, ids.segment_b, blank_id)
+    composed, refusal = _compose_or_refusal(session_factory, managed_root, ids)
+    assert composed is None, "an all-zero support must never compose"
+    assert refusal is not None
+    # MEASURED: an all-zero mask is refused at the decode boundary as MALFORMED
+    # ("contains no non-zero pixels") rather than reaching the later empty-bounds
+    # check — both are typed refusals; the assertion follows the real behaviour.
+    failure = _assert_unmeasurable(refusal, "silhouette_clipping", QC_EVIDENCE_MALFORMED)
+    assert "no non-zero pixels" in failure["message"], failure["message"]
+    observed["uniform_blank"] = {
+        "artifact_id": blank_id,
+        "code": failure["code"],
+        "message_head": failure["message"][:200],
+    }
+
+    _raw(
+        "r28_uniform_support_refused",
+        {
+            "row": "Q-2",
+            "expected": "a uniform support (all-white full canvas, all-zero "
+            "blank) is refused in both shapes; it can never clear a role",
+            "observed": observed,
+            "render": _render_identity(session_factory, managed_root, ids),
+            "disposition": "TYPED_REFUSAL (nothing measured)",
+        },
+    )
+    assert _no_qc_rows(session_factory) == 0
+
+
+def test_r28_hollow_support_does_not_authorize_interior(evidence_db) -> None:  # noqa: ANN001
+    """Q-3: the support's PIXELS decide attribution, not its bounding box.
+
+    The role's published support is a ring whose interior it does NOT cover.
+    The output paints an object ONLY inside that hollow interior, so nothing
+    attributes it to this role and the band must refuse — the old code read the
+    ring's bbox and measured the interior as the role's silhouette.
+    """
+    session_factory, managed_root, ids = evidence_db
+    hole = (312, 172, 328, 188)
+    ring = _ring_png(MASK_B_RECT, hole)
+    ring_id = _publish_png_bytes(
+        session_factory, managed_root, ids, ring, rel="media/r28_mask_b_hollow.png"
+    )
+    _repoint_support(session_factory, ids.segment_b, ring_id)
+    _write_render(
+        session_factory,
+        managed_root,
+        ids,
+        (
+            (DELTA_RECT, range(0, 10), RENDER_LEVEL),
+            (hole, range(10, TOTAL_FRAMES), RENDER_LEVEL),
+            (MASK_C_RECT, range(10, TOTAL_FRAMES), RENDER_LEVEL),
+        ),
+    )
+    composed, refusal = _compose_or_refusal(session_factory, managed_root, ids)
+    assert composed is None, "an interior-only object is NOT this role's silhouette"
+    assert refusal is not None
+    failure = _assert_unmeasurable(
+        refusal, "silhouette_clipping", QC_EVIDENCE_DEPENDENCY
+    )
+    assert "paints NO object inside segment" in failure["message"], failure["message"]
+    _raw(
+        "r28_hollow_support_does_not_authorize_interior",
+        {
+            "row": "Q-3",
+            "expected": "an object painted only where the role's support has NO "
+            "pixels is not attributable to the role: typed refusal, never a "
+            "measurement of the ring's bounding box",
+            "observed": {
+                "code": failure["code"],
+                "message_head": failure["message"][:220],
+                "support_artifact_id": ring_id,
+                "hole": list(hole),
+            },
+            "render": _render_identity(session_factory, managed_root, ids),
+            "disposition": "TYPED_REFUSAL (nothing measured)",
+        },
+    )
+    assert _no_qc_rows(session_factory) == 0
+
+
+def test_r28_foreign_same_geometry_support_refused(evidence_db) -> None:  # noqa: ANN001
+    """Q-4: a candidate whose geometry is ANOTHER role's is refused.
+
+    The role reaches the right frame side, so the rendered-side lookup runs.  A
+    byte-distinct candidate overlaps the role AND the extent of a DIFFERENT
+    current segment, so nothing attributes it to this role rather than that one:
+    the band must refuse and name the segment it collided with, never adopt the
+    mask because the boxes touch (the pre-R28 first-overlap behaviour).
+    """
+    session_factory, managed_root, ids = evidence_db
+    b_edge = (560, 100, 640, 200)    # reaches the RIGHT frame side
+    c_beside = (440, 100, 520, 200)  # overlaps the candidate, NOT the role
+    candidate_rect = (500, 100, 640, 200)  # overlaps BOTH the role and C
+
+    b_mask = _publish_mask(
+        session_factory, managed_root, ids, b_edge, rel="media/r28_mask_b_right_edge.png"
+    )
+    _repoint_support(session_factory, ids.segment_b, b_mask)
+    c_mask = _publish_mask(
+        session_factory, managed_root, ids, c_beside, rel="media/r28_mask_c_beside.png"
+    )
+    _repoint_support(session_factory, ids.segment_c, c_mask)
+    foreign = _publish_mask(
+        session_factory,
+        managed_root,
+        ids,
+        candidate_rect,
+        rel="media/r28_mask_foreign_rendered_side.png",
+    )
+    _write_render(
+        session_factory,
+        managed_root,
+        ids,
+        (
+            (DELTA_RECT, range(0, 10), RENDER_LEVEL),
+            (b_edge, range(10, TOTAL_FRAMES), RENDER_LEVEL),
+            (c_beside, range(5, TOTAL_FRAMES), RENDER_LEVEL),
+        ),
+    )
+
+    composed, refusal = _compose_or_refusal(session_factory, managed_root, ids)
+    assert composed is None, (
+        "a candidate that is indistinguishable from another role's extent must "
+        "never become this role's rendered-side authority"
+    )
+    assert refusal is not None
+    failure = _assert_unmeasurable(
+        refusal, "silhouette_clipping", QC_EVIDENCE_DEPENDENCY
+    )
+    assert "overlaps ANOTHER current segment" in failure["message"], failure["message"]
+    assert foreign in failure["message"], "the refused candidate must be named"
+    assert str(list(c_beside)) in failure["message"], (
+        "the segment it collided with must be named"
+    )
+    _raw(
+        "r28_foreign_same_geometry_support_refused",
+        {
+            "row": "Q-4",
+            "expected": "a byte-distinct rendered-side candidate whose geometry "
+            "collides with ANOTHER current segment's published extent is "
+            "refused by identity; nothing is adopted because the boxes overlap",
+            "observed": {
+                "code": failure["code"],
+                "message_head": failure["message"][:260],
+                "candidate_artifact_id": foreign,
+                "candidate_rect": list(candidate_rect),
+                "collided_with_segment_id": ids.segment_c,
+                "collided_with_bbox": list(c_beside),
+                "role_edge_bbox": list(b_edge),
+            },
+            "render": _render_identity(session_factory, managed_root, ids),
+            "disposition": "TYPED_REFUSAL (nothing measured)",
+        },
+    )
+    assert _no_qc_rows(session_factory) == 0
+
+
+def test_r28_wrong_frame_rendered_support_refused(evidence_db) -> None:  # noqa: ANN001
+    """Q-5: a rendered-side support on a DIFFERENT canvas is refused.
+
+    The candidate is byte-distinct and ready, but its own decoded geometry is
+    half the video canvas: whatever it bounds cannot be this video's rendered
+    geometry, so the band refuses instead of measuring a foreign frame.
+    """
+    session_factory, managed_root, ids = evidence_db
+    edge = _publish_mask(
+        session_factory, managed_root, ids, BOTTOM_B, rel="media/r28_mask_b_bound.png"
+    )
+    _repoint_support(session_factory, ids.segment_b, edge)
+    wrong_frame = _publish_png_bytes(
+        session_factory,
+        managed_root,
+        ids,
+        _mask_png((CANVAS_W // 2, CANVAS_H // 2), (10, 10, 100, 100)),
+        rel="media/r28_mask_wrong_frame.png",
+    )
+    _write_render(
+        session_factory,
+        managed_root,
+        ids,
+        (
+            (DELTA_RECT, range(0, 10), RENDER_LEVEL),
+            (BOTTOM_B, range(10, TOTAL_FRAMES), RENDER_LEVEL),
+            (MASK_C_RECT, range(10, TOTAL_FRAMES), RENDER_LEVEL),
+        ),
+    )
+    composed, refusal = _compose_or_refusal(session_factory, managed_root, ids)
+    assert composed is None, "a wrong-canvas candidate must never be measured"
+    assert refusal is not None
+    failure = _assert_unmeasurable(
+        refusal, "silhouette_clipping", QC_EVIDENCE_MALFORMED
+    )
+    assert "but the video canvas is" in failure["message"], failure["message"]
+    assert f"{CANVAS_W // 2}x{CANVAS_H // 2}" in failure["message"]
+    assert wrong_frame in failure["message"], "the offending artifact must be named"
+    _raw(
+        "r28_wrong_frame_rendered_support_refused",
+        {
+            "row": "Q-5",
+            "expected": "a rendered-side mask artifact published at a different "
+            "canvas geometry is refused (fail closed), never decoded as this "
+            "video's rendered extent",
+            "observed": {
+                "code": failure["code"],
+                "message_head": failure["message"][:240],
+                "candidate_artifact_id": wrong_frame,
+                "candidate_canvas": [CANVAS_W // 2, CANVAS_H // 2],
+                "video_canvas": [CANVAS_W, CANVAS_H],
+            },
+            "render": _render_identity(session_factory, managed_root, ids),
+            "disposition": "TYPED_REFUSAL (nothing measured)",
+        },
+    )
+    assert _no_qc_rows(session_factory) == 0
+
+
+def test_r28_multiple_overlapping_supports_refused(evidence_db) -> None:  # noqa: ANN001
+    """Q-6: several overlapping candidates are ambiguous — refuse, never take one.
+
+    Two byte-distinct masks both overlap the role's published extent, so
+    nothing identifies WHICH one is this role's rendered-side mask.  The refusal
+    must name every candidate, which is the proof that no first-overlap pick
+    happened.
+    """
+    session_factory, managed_root, ids = evidence_db
+    edge = _publish_mask(
+        session_factory, managed_root, ids, BOTTOM_B, rel="media/r28_mask_b_bound.png"
+    )
+    _repoint_support(session_factory, ids.segment_b, edge)
+    extra = _publish_mask(
+        session_factory,
+        managed_root,
+        ids,
+        (320, 160, 360, 360),
+        rel="media/r28_mask_overlap_extra.png",
+    )
+    _write_render(
+        session_factory,
+        managed_root,
+        ids,
+        (
+            (DELTA_RECT, range(0, 10), RENDER_LEVEL),
+            (BOTTOM_B, range(10, TOTAL_FRAMES), RENDER_LEVEL),
+            (MASK_C_RECT, range(10, TOTAL_FRAMES), RENDER_LEVEL),
+        ),
+    )
+    composed, refusal = _compose_or_refusal(session_factory, managed_root, ids)
+    assert composed is None, "overlapping candidates must refuse, not pick the first"
+    assert refusal is not None
+    failure = _assert_unmeasurable(
+        refusal, "silhouette_clipping", QC_EVIDENCE_DEPENDENCY
+    )
+    assert "byte-distinct rendered-side masks" in failure["message"], failure["message"]
+    assert "nothing identifies WHICH one is THIS role's" in failure["message"]
+    named = [aid for aid in (ids.mask_b, extra) if aid in failure["message"]]
+    assert len(named) == 2, (
+        "every ambiguous candidate must be named so the reviewer can see that no "
+        f"candidate was silently chosen; named={named}"
+    )
+    _raw(
+        "r28_multiple_overlapping_supports_refused",
+        {
+            "row": "Q-6",
+            "expected": "two byte-distinct candidates overlapping the role's "
+            "extent are ambiguous: refused with every candidate named, never "
+            "resolved by overlap or recency",
+            "observed": {
+                "code": failure["code"],
+                "message_head": failure["message"][:280],
+                "candidates_named": named,
+                "role_extent_bbox": list(BOTTOM_B),
+            },
+            "render": _render_identity(session_factory, managed_root, ids),
+            "disposition": "TYPED_REFUSAL (nothing measured)",
+        },
+    )
+    assert _no_qc_rows(session_factory) == 0

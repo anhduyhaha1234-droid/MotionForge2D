@@ -160,6 +160,23 @@ def detect_silhouette_clipping(args: dict[str, Any]) -> list[dict[str, Any]]:
         bbox = seg.get("bbox")
         if not isinstance(bbox, list) or len(bbox) != 4:
             continue
+        authority = seg.get("clipping_authority")
+        # R28 (narrow delta): the composer's geometry AUTHORITY is consumed, not
+        # merely attached.  When it exists and does NOT clear this row, the
+        # frozen ratio (bbox area OUTSIDE the frame, and a decoded-pixel bbox is
+        # frame-bounded by construction) can never carry the cut — so the row
+        # must NOT fall through to `continue` (an empty success for a known
+        # truncated role).  A real blocker item is emitted instead.  When the
+        # metadata is ABSENT (legacy args) behaviour is unchanged.
+        if isinstance(authority, dict) and (
+            authority.get("detector_clearance") is False
+            or authority.get("authority_valid") is False
+        ):
+            measured = _clipped_ratio(bbox, frame)
+            items.append(
+                _authority_item(seg, window, frame, bbox, authority, measured)
+            )
+            continue
         measured = _clipped_ratio(bbox, frame)
         status, code = classify(DETECTOR_NAME, measured)
         if status == STATUS_BLOCKER:
@@ -225,6 +242,86 @@ def detect_silhouette_clipping(args: dict[str, Any]) -> list[dict[str, Any]]:
             }
         )
     return items
+
+
+def _authority_item(
+    seg: dict[str, Any],
+    window: dict[str, Any],
+    frame: dict[str, float],
+    bbox: list[Any],
+    authority: dict[str, Any],
+    measured: float,
+) -> dict[str, Any]:
+    """A real BLOCKER item for a row the geometry authority does NOT clear (R28).
+
+    Narrow delta: the composer refuses such a row at its own boundary, so this
+    is the belt-and-braces guard for a caller that passes the authority block
+    straight through.  The item is built exactly like a threshold-driven one —
+    same reason code, same evidence window key derivation — but its metric
+    records the AUTHORITY verdict, because the frozen ratio is 0 by
+    construction for a frame-bounded cut and would read as no risk.
+    """
+    entry = get_threshold(DETECTOR_NAME)  # READ-ONLY (T03A frozen policy)
+    seg_id = str(seg["id"])
+    evidence = {
+        "schema_version": EVIDENCE_SCHEMA_VERSION,
+        "window": window,
+        "frame": frame,
+        "bbox": [float(v) for v in bbox],
+        "mask_artifact_id": seg.get("mask_artifact_id"),
+        "clipped_ratio": measured,
+        "threshold": {
+            "policy": entry["provenance"]["fixture"],
+            "warning_boundary": entry["warning_boundary"],
+            "blocker_boundary": entry["blocker_boundary"],
+            "code": f"{DETECTOR_NAME}_authority_not_cleared",
+        },
+        "clipping_authority": dict(authority),
+        "metric_limit": "the frozen metric is bbox area OUTSIDE the frame and a "
+        "pixel-measured bbox is frame-bounded by construction, so this row is "
+        "carried by the composer's AUTHORITY verdict, never by clipped_ratio",
+    }
+    metric = {
+        "name": DETECTOR_NAME,
+        "value": measured,
+        "code": f"{DETECTOR_NAME}_authority_not_cleared",
+        "authority_verdict": authority.get("verdict"),
+        "authority_valid": authority.get("authority_valid"),
+        "detector_clearance": authority.get("detector_clearance"),
+    }
+    key_core = {
+        "reason_code": DETECTOR_NAME,
+        "layer_ref_type": "segment",
+        "layer_ref_id": seg_id,
+        "metric": metric,
+        "window": window,
+        "frame": frame,
+        "bbox": evidence["bbox"],
+        "schema_version": EVIDENCE_SCHEMA_VERSION,
+    }
+    confidence = float(seg.get("confidence", 1.0))
+    if not 0.0 <= confidence <= 1.0:
+        confidence = 1.0
+    return {
+        "reason_code": DETECTOR_NAME,
+        "category": DETECTOR_NAME,
+        "severity": "blocker",
+        "status": "open",
+        "layer_ref_type": "segment",
+        "layer_ref_id": seg_id,
+        "segment_row_id": None,
+        "segment_logical_id": seg.get("logical_id"),
+        "evidence_window_key": hashlib.sha256(
+            _canonical_json(key_core).encode("utf-8")
+        ).hexdigest(),
+        "evidence": evidence,
+        "detector": DETECTOR_NAME,
+        "detector_revision": DETECTOR_REVISION,
+        "confidence": confidence,
+        "confidence_source": "derived",
+        "checkpoint_ref": f"s11-t03c:{DETECTOR_NAME}",
+        "metric": metric,
+    }
 
 
 def register(*, version: str = DETECTOR_REVISION) -> DetectorSpec:

@@ -44,11 +44,13 @@ from app.services.qc_evidence.errors import dependency, malformed, missing
 #: background) replaces "differs from the source" as the geometry authority,
 #: and the rendered cut is searched over the annotation's whole span and is
 #: reported only when it is a DOMINANT discontinuity.
-#: 1.2.0 (correction round R27-04): a rendered object is attributed to a role
-#: only through that role's OWN published support (its segmentation mask), and
-#: a measured extent that reaches a frame side carries the AUTHORITY verdict
-#: instead of being reported as a frame-bounded "clipped_ratio = 0" pass.
-OBSERVATION_REVISION = "1.2.0"
+#: 1.3.0 (correction round R28): the role's published support is INTERSECTED
+#: with the rendered object instead of being discarded after its bbox is read
+#: (a hollow/uniform support could otherwise attribute an unrelated interior
+#: object to the role), and an extent that fills the whole frame is no longer
+#: readable as "the role legitimately reaches every side" — it is refused as
+#: unattributable (a frame-filling mask says nothing about where the role is).
+OBSERVATION_REVISION = "1.3.0"
 
 #: Refusal scope used by the pure measurement helpers.
 _SCOPE = "qc_evidence_render_observation"
@@ -285,23 +287,45 @@ def support_mask(value: Any, *, detector: str = _SCOPE) -> np.ndarray:
     return mask
 
 
-def supported_object_bbox(
+def _refuse_frame_filling_support(mask: np.ndarray, *, detector: str) -> None:
+    """Refuse a support whose bbox fills the ENTIRE frame (R28 fail-closed).
+
+    A mask that bounds every pixel of the canvas cannot say WHERE the role is:
+    every side is trivially "reached", so it would read as a source-intended
+    partial visibility for any cut and would attribute any painted pixel to
+    this role.  Such a support is published but unusable — ``malformed``.
+    """
+    bbox = bbox_of_mask(mask)
+    height, width = int(mask.shape[0]), int(mask.shape[1])
+    if bbox is not None and bbox == (0, 0, width, height):
+        raise malformed(
+            detector,
+            f"the role's published support mask spans the WHOLE frame "
+            f"({width}x{height}); a support that bounds every pixel cannot "
+            "establish where this role is and would make every frame side look "
+            "source-intended, so the rendered object cannot be attributed "
+            "through it (fail closed)",
+        )
+
+
+def supported_object_mask(
     frame: Any,
     *,
     support: Any,
     region: Region,
     detector: str = _SCOPE,
-) -> Region | None:
-    """Measured bbox of the rendered object ATTRIBUTED to one role.
+) -> np.ndarray | None:
+    """Boolean mask of the rendered object pixels the role's support COVERS.
 
-    The object the render paints is measured only inside the role's OWN
-    published support: ``region`` must BE that support's measured bbox, so a
-    region that is not the role's geometry (an arbitrary box, an unrelated
-    textured area, another segment's mask) is refused instead of becoming "the
-    object".  ``None`` when the output paints nothing inside the support — the
-    caller must refuse, the source's pixels are never substituted.
+    The role's published support is the ONLY thing that makes "this rendered
+    content is this role" an attributed fact, so it is INTERSECTED with the
+    object the render paints — never merely consulted for its bounding box
+    (R28: a hollow support whose interior the role does not cover cannot
+    attribute an object painted in that interior to the role).  ``None`` when
+    nothing is painted where the support actually is.
     """
     mask = support_mask(support, detector=detector)
+    _refuse_frame_filling_support(mask, detector=detector)
     array = _gray(frame, detector=detector)
     if mask.shape != array.shape:
         raise malformed(
@@ -320,7 +344,53 @@ def supported_object_bbox(
             f"role's own published extent {bbox}; a region that is not this "
             "role's persisted geometry cannot be measured as its silhouette",
         )
-    return rendered_object_bbox(array, region=bbox, detector=detector)
+    painted = rendered_object_mask(array, detector=detector)
+    covered = painted & mask
+    if not covered.any():
+        return None
+    return covered
+
+
+def supported_object_bbox(
+    frame: Any,
+    *,
+    support: Any,
+    region: Region,
+    detector: str = _SCOPE,
+) -> Region | None:
+    """Measured bbox of the rendered object ATTRIBUTED to one role.
+
+    The object the render paints is measured only inside the role's OWN
+    published support: ``region`` must BE that support's measured bbox, so a
+    region that is not the role's geometry (an arbitrary box, an unrelated
+    textured area, another segment's mask) is refused instead of becoming "the
+    object".  The support PIXELS are intersected with the painted pixels, so
+    content the role's support does not cover is never attributed to the role.
+    ``None`` when the output paints nothing inside the support — the caller
+    must refuse, the source's pixels are never substituted.
+    """
+    covered = supported_object_mask(
+        frame, support=support, region=region, detector=detector
+    )
+    if covered is None:
+        return None
+    bbox = bbox_of_mask(covered)
+    if bbox is None:  # pragma: no cover - covered.any() was already proven
+        return None
+    grown = grown_region(covered, bbox)
+    if grown is None:  # pragma: no cover - bbox carries pixels by construction
+        return None
+    gx0, gy0, gx1, gy1 = grown
+    inner = bbox_of_mask(covered[gy0:gy1, gx0:gx1])
+    if inner is None:  # pragma: no cover - same reason as above
+        return None
+    return (gx0 + inner[0], gy0 + inner[1], gx0 + inner[2], gy0 + inner[3])
+
+
+def _fills_shape(region: Region, shape: tuple[int, int]) -> bool:
+    """True when ``region`` covers the whole ``(height, width)`` canvas."""
+    height, width = int(shape[0]), int(shape[1])
+    return tuple(int(v) for v in region) == (0, 0, width, height)
 
 
 def clipping_authority(
@@ -348,13 +418,23 @@ def clipping_authority(
         if rendered_role_extent
         else []
     )
-    intended = [side for side in contact if side in role_sides]
-    uncovered = [side for side in contact if side not in role_sides]
+    # R28: a role extent that fills the WHOLE frame "reaches" every side
+    # trivially, so it is not evidence of a legitimately-intended edge contact.
+    # Reading it as intended is exactly the false pass this round closes: a
+    # full-canvas mask would bless ANY cut as source-intended.
+    rejections: list[str] = []
+    if role_extent and _fills_shape(role_extent, shape):
+        rejections.append("role_extent_fills_frame")
+    if rendered_role_extent and _fills_shape(rendered_role_extent, shape):
+        rejections.append("rendered_role_extent_fills_frame")
+    role_sides_effective = [] if rejections else role_sides
+    intended = [side for side in contact if side in role_sides_effective]
+    uncovered = [side for side in contact if side not in role_sides_effective]
     if not contact:
         verdict = GEOMETRY_IN_FRAME
     elif not uncovered:
         verdict = GEOMETRY_SOURCE_INTENDED_EDGE
-    elif rendered_role_extent is not None:
+    elif rendered_role_extent is not None and not rejections:
         verdict = GEOMETRY_NEW_TRUNCATION
     else:
         verdict = GEOMETRY_UNATTRIBUTABLE
@@ -374,6 +454,8 @@ def clipping_authority(
             if rendered_role_extent is None
             else "role_mask + rendered_side_role_mask"
         ),
+        "authority_valid": not rejections,
+        "authority_rejections": rejections,
         "detector_clearance": verdict in GEOMETRY_CLEARING,
         "newly_introduced_truncation": verdict == GEOMETRY_NEW_TRUNCATION,
         "attributed_to_role": verdict != GEOMETRY_UNATTRIBUTABLE,
@@ -709,4 +791,5 @@ __all__ = [
     "stacking_order",
     "support_mask",
     "supported_object_bbox",
+    "supported_object_mask",
 ]

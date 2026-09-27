@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from fractions import Fraction
 from pathlib import Path
@@ -1065,12 +1065,25 @@ def _rendered_role_extent(
     """Measured extent of the role's RENDERED-side published mask, if any.
 
     Candidate discovery is the SAME authority rule ``edge_halo`` already
-    consumes (``sources.rendered_minus_expected_masks``): a byte-DISTINCT
-    published mask artifact that bounds the role's own region.  ``None`` when
-    the video publishes no rendered-side mask for this role — the caller then
-    refuses instead of attributing the cut rendered object to the role.
+    consumes (``sources.rendered_minus_expected_masks``), but R28 requires the
+    authority to be IDENTITY-bound and UNIQUE rather than first-overlap:
+
+    * every byte-distinct, canvas-matching candidate whose bbox overlaps the
+      role is collected FIRST — picking the first overlapping artifact made
+      overlap stand in for identity;
+    * TWO OR MORE such candidates are AMBIGUOUS (nothing says which one is
+      this role's) and are refused instead of silently resolving to the
+      newest;
+    * the single remaining candidate must not be a DIFFERENT current segment's
+      published extent: if another segment's own mask carries the same
+      geometry it is indistinguishable from this role's, so it is refused.
+
+    ``None`` when the video publishes no rendered-side mask for this role —
+    the caller then refuses instead of attributing the cut rendered object to
+    the role.
     """
     width, height = int(canvas[0]), int(canvas[1])
+    matches: list[tuple[str, tuple[int, int, int, int]]] = []
     for candidate in src.rendered_minus_expected_masks(
         ctx.session, ctx.scope, expected_id=expected.artifact_id
     ):
@@ -1093,8 +1106,129 @@ def _rendered_role_extent(
         candidate_bbox = mask_bbox(matrix)
         if not _bbox_overlaps(candidate_bbox, role_bbox):
             continue
-        return candidate_bbox
-    return None
+        matches.append((evidence.artifact_id, candidate_bbox))
+    if not matches:
+        return None
+    if len(matches) > 1:
+        raise dependency(
+            detector,
+            "the video publishes "
+            f"{len(matches)} byte-distinct rendered-side masks whose geometry "
+            "overlaps this role's published extent "
+            f"({[artifact_id for artifact_id, _ in matches]}); nothing "
+            "identifies WHICH one is THIS role's rendered-side mask, and "
+            "resolving it by overlap or recency would substitute a guess for "
+            "the role's identity (fail closed)",
+            fact="exactly ONE rendered-side role mask whose geometry is "
+            "identifiable as this role's",
+            producer="object-correction mask publication (publishes a NEW "
+            "mask artifact per corrected role)",
+            persistence="artifact(kind='image', purpose='mask', "
+            "owner_type='video_item') + re-verified sha256/size",
+            candidate_artifact_ids=[artifact_id for artifact_id, _ in matches],
+        )
+    artifact_id, candidate_bbox = matches[0]
+    for segment_id, segment_mask_id, segment_bbox in _other_current_segment_extents(
+        ctx, detector
+    ):
+        # skip the role's OWN segment: its mask is the `expected` one we are
+        # looking for a rendered-side counterpart to.
+        if segment_mask_id == expected.artifact_id:
+            continue
+        if _bbox_overlaps(candidate_bbox, segment_bbox):
+            raise dependency(
+                detector,
+                f"the rendered-side role mask {artifact_id!r} "
+                f"(bbox {list(candidate_bbox)}) overlaps ANOTHER current "
+                f"segment's own published extent ({list(segment_bbox)}): "
+                "nothing in the persisted evidence attributes that mask to THIS "
+                "role rather than to that one, and adopting it because the "
+                "boxes touch would substitute geometry for identity (fail "
+                "closed)",
+                fact="a rendered-side role mask whose geometry identifies THIS "
+                "role and no other current segment",
+                producer="object-correction mask publication (publishes a NEW "
+                "mask artifact per corrected role)",
+                persistence="artifact(kind='image', purpose='mask', "
+                "owner_type='video_item') + re-verified sha256/size",
+                artifact_id=artifact_id,
+                ambiguous_with_segment_id=segment_id,
+                ambiguous_with_bbox=[int(v) for v in segment_bbox],
+            )
+    return candidate_bbox
+
+
+def _other_current_segment_extents(
+    ctx: _Context, detector: str
+) -> list[tuple[str, str, tuple[int, int, int, int]]]:
+    """Every current segment's OWN published mask extent (id, mask id, bbox)."""
+    out: list[tuple[str, str, tuple[int, int, int, int]]] = []
+    for segment in ctx.segments(detector):
+        mask_id = getattr(segment, "mask_artifact_id", None)
+        if not mask_id:
+            continue
+        _evidence, _matrix, _width, _height, bbox = ctx.mask(mask_id, detector)
+        if bbox is None:
+            continue
+        out.append((str(segment.id), str(mask_id), bbox))
+    return out
+
+
+def _unsupported_object_contact(
+    render_frames: dict[int, Any],
+    indices: Sequence[int],
+    *,
+    support: Any,
+    canvas: tuple[int, int],
+    detector: str,
+) -> list[str] | None:
+    """Frame sides reached by THIS role's object continuing beyond its support.
+
+    R28: intersecting the rendered object with the role's support bounds the
+    measurement (correct — content the role does not cover is not its
+    silhouette), but it can also HIDE a cut: the output may paint the role
+    continuing past the frame border in a region the support does not span.
+    Such content is real rendered content that nothing attributes to this role,
+    so the composer must refuse rather than pass the supported part as
+    in-frame.
+
+    The search is bounded by the object the render paints CONTIGUOUS with this
+    role's own support (``grown_region`` seeded at the support's own extent —
+    the module's established "what the render actually paints here" primitive),
+    and reports only the frame sides that grown object reaches while the
+    support itself does NOT.  Both bounds are load-bearing: an earlier
+    whole-frame version attributed ANOTHER role's painted rectangle to this
+    role and refused a legitimate source-intended edge contact (raw:
+    ``raw/probe/r28_guard_dump_BEFORE_row6.json`` call1), while a fixed halo box
+    hid the very cut the guard exists to catch (row Q-r0).  Returns ``None``
+    when this role paints nothing outside its own support that reaches a new
+    frame side.
+    """
+    mask = obs.support_mask(support, detector=detector)
+    height, width = int(canvas[1]), int(canvas[0])
+    support_bbox = obs.bbox_of_mask(mask)
+    if support_bbox is None:  # pragma: no cover - support_mask refused empty
+        return None
+    support_sides = set(obs.border_contact(support_bbox, (height, width)))
+    sides: set[str] = set()
+    for index in indices:
+        frame = render_frames.get(index)
+        if frame is None:
+            continue
+        painted = obs.rendered_object_mask(frame, detector=detector)
+        if painted.shape != mask.shape:  # pragma: no cover - ctx verified it
+            raise malformed(
+                detector,
+                f"the rendered frame is {painted.shape} but the role's support "
+                f"mask is {mask.shape}; geometry mismatch (fail closed)",
+            )
+        grown = obs.grown_region(painted, support_bbox)
+        if grown is None:
+            continue
+        for side in obs.border_contact(grown, (height, width)):
+            if side not in support_sides:
+                sides.add(side)
+    return sorted(sides) or None
 
 
 def _silhouette_clipping(ctx: _Context) -> dict[str, Any]:
@@ -1205,6 +1339,38 @@ def _silhouette_clipping(ctx: _Context) -> dict[str, Any]:
                 background_levels=background_levels,
             )
         contact = obs.border_contact(observed, (int(height), int(width)))
+        # R28: support-bounded measurement can HIDE a cut.  When the render
+        # paints object pixels OUTSIDE this role's support and that unsupported
+        # painted region reaches a frame side, the output truncated content the
+        # role's own support does not account for — nothing attributes it to
+        # this role, so the band must REFUSE rather than pass an in-frame
+        # measurement of the supported part alone.  (Without this, intersecting
+        # the support would silently turn a known truncation into a 0 PASS.)
+        unsupported_contact = _unsupported_object_contact(
+            render_frames, indices, support=role_support,
+            canvas=(int(width), int(height)), detector=detector,
+        )
+        if unsupported_contact is not None and not contact:
+            raise dependency(
+                detector,
+                f"the render paints object pixels OUTSIDE segment "
+                f"{segment.id!r}'s published support that reach the frame "
+                f"side(s) {unsupported_contact} while the support itself does "
+                "NOT reach them: the output shows content the role's own "
+                "support does not cover, so its silhouette cannot be attributed "
+                "to this role (fail closed rather than measure the supported "
+                "part alone as in-frame)",
+                fact="a rendered object pixel set bounded by the role's own "
+                "published support",
+                producer="object-correction mask publication (publishes a NEW "
+                "mask artifact per corrected role)",
+                persistence="artifact(kind='image', purpose='mask', "
+                "owner_type='video_item') + re-verified sha256/size",
+                segment_id=str(segment.id),
+                contact_sides=unsupported_contact,
+                role_extent_bbox=[int(v) for v in bbox],
+                background_levels=background_levels,
+            )
         authority = obs.clipping_authority(
             observed,
             role_extent=bbox,
@@ -1222,7 +1388,9 @@ def _silhouette_clipping(ctx: _Context) -> dict[str, Any]:
             shape=(int(height), int(width)),
             detector=detector,
         )
-        if authority["verdict"] == obs.GEOMETRY_UNATTRIBUTABLE:
+        if authority["verdict"] == obs.GEOMETRY_UNATTRIBUTABLE or not authority[
+            "authority_valid"
+        ]:
             raise dependency(
                 detector,
                 f"the rendered object inside segment {segment.id!r}'s region "
@@ -1245,6 +1413,35 @@ def _silhouette_clipping(ctx: _Context) -> dict[str, Any]:
                 observed_bbox=[int(v) for v in observed],
                 role_extent_bbox=[int(v) for v in bbox],
                 clipping_authority=authority,
+                authority_rejections=authority["authority_rejections"],
+            )
+        # R28: a NON-CLEARING authority must never be an empty success.  The
+        # frozen metric cannot carry a frame-bounded cut, so a row the composer
+        # itself declined to clear cannot be handed to the detector as a
+        # measured 0 — it is refused here, at the boundary.
+        if not authority["detector_clearance"]:
+            raise dependency(
+                detector,
+                f"segment {segment.id!r}'s measured silhouette "
+                f"(verdict {authority['verdict']!r}) is NOT cleared by its "
+                "geometry authority, and the frozen silhouette metric (bbox area "
+                "OUTSIDE the frame) can never carry a frame-bounded cut: handing "
+                "this row to the detector as a measured clipped_ratio of 0 would "
+                "report a cut object as zero risk, so the band refuses instead",
+                fact="a geometry authority that CLEARS this role's measured "
+                "silhouette (in-frame, or an edge contact the role's own "
+                "published extent already reaches)",
+                producer="S10 full-apply (stitch + publication) job / render-side "
+                "artifact publication + object-correction mask publication",
+                persistence="artifact bytes of the video's rendered result "
+                "(purpose='result') and the role's published mask "
+                "(purpose='mask') + re-verified sha256/size",
+                segment_id=str(segment.id),
+                contact_sides=authority["contact_sides"],
+                observed_bbox=[int(v) for v in observed],
+                role_extent_bbox=[int(v) for v in bbox],
+                clipping_authority=authority,
+                authority_rejections=authority["authority_rejections"],
             )
         payload.append(
             {

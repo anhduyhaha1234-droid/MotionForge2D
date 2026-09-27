@@ -533,10 +533,51 @@ def test_q03r_e_recolour_is_measured_on_the_render(evidence_db) -> None:  # noqa
             "disposition": "PASS",
         },
     )
-    assert first["bbox"] == [100, 160, 141, 200]
+    # R28: the measured extent is INTERSECTED with the role's own published
+    # support, so for this world the pinned number is the support-bounded
+    # extent (the recolour covers MORE than the support).  The row's claim —
+    # measured on the RENDER's own bytes, never built from the source — is
+    # unchanged and is re-proved by the non-vacuity control below.
+    assert first["bbox"] == list(MASK_A_RECT) == [100, 160, 116, 176]
     assert first["measured_on"].startswith("rendered_object_pixels")
     assert first["expected_bbox"] == list(MASK_A_RECT)
     assert args["render_observation"]["artifact"]["artifact_id"] == ids.render_artifact_id
+
+    # NON-VACUITY: repaint the SAME role STRICTLY INSIDE its annotation.  A
+    # measurement taken from the annotation would keep returning MASK_A_RECT;
+    # the real measurement must follow the render and SHRINK.
+    shrunk = (100, 160, 110, 170)
+    _write_render(
+        session_factory,
+        managed_root,
+        ids,
+        (
+            (shrunk, range(0, 10), recoloured),
+            (MASK_B_RECT, range(10, TOTAL_FRAMES), recoloured),
+            (MASK_C_RECT, range(10, TOTAL_FRAMES), recoloured),
+        ),
+    )
+    control = _compose(session_factory, managed_root, ids)["silhouette_clipping"]
+    control_first = {row["id"]: row for row in control["segments"]}[ids.segment_a]
+    assert control_first["bbox"] == list(shrunk)
+    assert control_first["bbox"] != control_first["expected_bbox"]
+    _raw(
+        "q03r_e_control_render_shrunk",
+        {
+            "subcase": "Q03R-e (non-vacuity control, R28)",
+            "expected": "the measured extent follows the RENDER: repainting the "
+            "role strictly inside its annotation shrinks the measurement away "
+            "from the annotation box",
+            "observed": {
+                "control_painted_rect": list(shrunk),
+                "control_measured_bbox": control_first["bbox"],
+                "control_expected_bbox": control_first["expected_bbox"],
+                "annotation": list(MASK_A_RECT),
+            },
+            "render": _render_identity(session_factory, managed_root, ids),
+            "disposition": "PASS (render-driven, not annotation-driven)",
+        },
+    )
 
 
 # ── Q03R-f: the actor is missing from the render ───────────────────────────
@@ -787,27 +828,31 @@ def test_q03r_g_border_clipped_actor_carries_real_geometry(evidence_db) -> None:
         assert observed["expected_bbox"] == list(MASK_B_RECT)
         assert silhouette_clipping.detect_silhouette_clipping(args) == []
     else:
-        # R27-04: no authority -> typed refusal, and NOTHING reaches the detector
+        # R28: the refusal STILL fires (never a measured clipped_ratio of 0
+        # PASS) but its CARRIER moved.  The composer now refuses at the
+        # painted-beyond-support guard BEFORE the authority block is computed,
+        # because intersecting the measurement with the role's own support
+        # leaves a support-bounded extent that does not itself reach the border
+        # while the render still paints the actor continuing to it.  The pinned
+        # R27-04 claim is unchanged (typed QC_EVIDENCE_DEPENDENCY, nothing
+        # reaches the detector); the details asserted below are the MEASURED
+        # shape of the R28 refusal (raw/q03r_g.json).
         assert args == {}
         assert failure["code"] == "QC_EVIDENCE_DEPENDENCY"
         details = dict(failure.get("details") or {})
-        authority = dict(details.get("clipping_authority") or {})
-        assert authority["verdict"] == "unattributable_edge_contact"
-        assert authority["attributed_to_role"] is False
-        assert authority["detector_clearance"] is False
-        assert authority["measure_revision"] == "1.2.0"
         assert details["contact_sides"] == ["bottom"]
-        assert details["observed_bbox"] == [
-            MASK_B_RECT[0],
-            MASK_B_RECT[1],
-            MASK_B_RECT[2],
-            CANVAS_H,
-        ]
         assert details["role_extent_bbox"] == list(MASK_B_RECT)
+        assert details["segment_id"] == ids.segment_b
         dependency_report = dict(details.get("dependency") or {})
-        assert dependency_report["missing_fact"].startswith("a rendered-side role mask")
+        assert dependency_report["missing_fact"].startswith(
+            "a rendered object pixel set"
+        )
         assert "object-correction" in dependency_report["missing_producer"]
         assert "purpose='mask'" in dependency_report["expected_persistence"]
+        # The authority block is NOT materialised on this path — the refusal
+        # happens before it — so its absence is asserted to keep the record
+        # exact instead of silently reading a KeyError as a pass.
+        assert "clipping_authority" not in details
 
 
 
