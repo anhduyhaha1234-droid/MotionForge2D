@@ -1,6 +1,7 @@
 """MF-V1-VIDEO14B round R27 -- frozen rows for the input/event/epoch corrections (CPU only).
 
-Thirteen frozen rows (Manager MATRIX gates on these names):
+Twenty frozen rows (Manager MATRIX gates on these names); the last seven were added by the
+R28 correction (V-1..V-7):
 
   R27-01 right INPUT   : alpha is composited ONCE onto a flat neutral background and the
                          graph points at that derived, opaque file whose sha256 is pinned;
@@ -15,6 +16,12 @@ Thirteen frozen rows (Manager MATRIX gates on these names):
                          process lifetime, not to a reusable port; a record with no instance
                          id, or another instance's id on the same port, cannot confirm, and a
                          NEWER live epoch is never attached to old evidence.
+  R28 rows (V-1..V-7)  : the preview IS the installed resize tensor (torch 'area' on CPU, hashed
+                         BEFORE quantization, display conversion declared); the epoch authority
+                         must be a VALIDATED INDEPENDENT frozen snapshot - the record's own
+                         declaration is never promoted, an empty/corrupt/ambiguous snapshot never
+                         falls back to it, and a missing launch time is UNPROVEN while a DIFFERENT
+                         launch time for the same instance/port/pid is a contradiction.
 
 Nothing here starts an engine, loads a model, stops a pid, or writes media.
 
@@ -40,6 +47,9 @@ TOOLS = os.path.join(WT, "tools")
 EVID = ("C:/Users/Admin/Documents/Codex/2026-09-11/tr-x20/outputs/"
         "mf-cpu-input-correction-20260927/20260927T051440Z/VIDEO14B")
 INPUT_ROOT = "C:/Users/Admin/Documents/Codex/work/mfv1/runtime/video14b/input"
+EVID28 = ("C:/Users/Admin/Documents/Codex/2026-09-27/c-v-th-c-hi-n/outputs/"
+          "r28-cpu-execution-20260927/VIDEO14B")
+
 CLASSIFIER = os.path.join(TOOLS, "w2_classify_shutdown.py")
 ANCHOR_BUILDER = os.path.join(TOOLS, "i1_make_anchor_graphs.py")
 RETAINED_HELPERS = os.path.join(TOOLS, "v14b_f09_cases.py")
@@ -129,12 +139,12 @@ def ref_row(shot: str, needle: str) -> dict:
 
 def _record(test: str, row: dict) -> dict:
     """File this row's measured values under <EVID>/raw/r27_frozen_rows.json."""
-    p = Path(EVID) / "raw" / "r27_frozen_rows.json"
+    p = Path(EVID28) / "raw" / "r28_frozen_rows.json"
     p.parent.mkdir(parents=True, exist_ok=True)
     data = json.loads(p.read_text(encoding="utf-8")) if p.is_file() else {}
     data.setdefault("artifact", "r27_frozen_rows.json")
     data.setdefault("task_id", "MF-V1-VIDEO14B")
-    data.setdefault("round", "R27")
+    data.setdefault("round", "R28")
     data.setdefault("engine_started", False)
     data.setdefault("model_loaded", False)
     data.setdefault("pid_stopped_by_this_tool", False)
@@ -599,5 +609,470 @@ def test_r27_epoch_old_after_dump_contradictory_port_refused():
             "note": ("the live/newest epoch is reported but never adopted: attaching it to old "
                      "evidence is the R27-06 defect")})
         assert ident["mismatch"] is True
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+# ============================================================================ R28 rows
+# V-1 preview tensor / V-2..V-7 epoch lifetime authority.  Same frozen-row contract as R27:
+# every row writes its measured values into <EVID28>/raw/r28_frozen_rows.json while it runs.
+def test_r27_preview_matches_installed_area_tensor():
+    """V-1: the preview IS the installed resize implementation, hashed BEFORE quantization.
+
+    The graph resizes with ResizeImageMaskNode(scale_method='area') ->
+    torch.nn.functional.interpolate(mode='area') on a [1,C,H,W] float tensor, while the preview
+    used PIL Image.Resampling.BOX - a DIFFERENT filter.  Measured 2026-09-27 on the derived
+    round-D inputs: up to 69 of 255 per channel on dan_choi, 41 on boy_hacker, 26 on gau_nau.
+    This row re-derives the node's tensor here, independently, and requires the PNG on disk to
+    be exactly its declared display conversion, with the float-tensor hash taken first.
+    """
+    import numpy as np
+    import torch
+    from PIL import Image
+    m = anchor()
+    ev_root = Path(EVID28)
+    rows = []
+    for shot in ("BOOK", "TURN", "OCC"):
+        rows.extend(m.render_reference_inputs(shot, Path(INPUT_ROOT), ev_root))
+    composed = [r for r in rows if r.get("derived_path")]
+    assert len(composed) == 3, [r.get("file") for r in rows]
+    frozen = {}
+    for row in composed:
+        pw, ph = row["resize_plan"]["resized_wh"]
+        src_w, src_h = row["source_size"]
+        # 1. the dimensions carry the NODE's own rounding, not floor(x + 0.5)
+        assert row["resize_plan"]["rounding"].startswith("python round()"), row["resize_plan"]
+        assert [pw, ph] == m.node_longer_side_dims(src_w, src_h)
+        # 2. the encoder INPUT is unchanged by this row: the composite is still the R27 bytes
+        assert row["derived_sha256"] == DERIVED_SHA256[Path(row["derived_path"]).name]
+        # 3. the tensor is the engine's own call, recomputed independently here
+        chw = m.loadimage_float_tensor(Image.open(row["derived_path"]))
+        indep = torch.nn.functional.interpolate(chw, size=(ph, pw), mode="area").movedim(1, -1)
+        assert m.float_tensor_hash(indep) == row["preview_tensor_hash_before_quantization"], \
+            "the preview tensor is not the installed area interpolate"
+        # 4. the hash is taken BEFORE quantization: float tensor, and NOT the PNG's hash
+        assert row["preview_tensor_dtype"] == "torch.float32"
+        assert row["preview_tensor_shape_bhwc"] == [1, ph, pw, 3]
+        assert row["preview_tensor_hash_before_quantization"] != \
+            row["preview_encoder_input_sha256"]
+        # 5. the PNG on disk IS the declared display conversion of that tensor
+        disp = np.clip(255.0 * indep.numpy(), 0, 255).astype(np.uint8)[0]
+        assert hashlib.sha256(disp.tobytes()).hexdigest() == \
+            row["preview_display_pixels_sha256"]
+        assert np.array_equal(
+            np.asarray(Image.open(row["preview_encoder_input_path"]).convert("RGB")), disp)
+        assert row["preview_pixels_are_the_tensor_after_the_declared_conversion"] is True
+        assert row["preview_matches_installed_area_tensor"] is True
+        # 6. the display conversion is DECLARED and is the server's own (truncating) one
+        assert "SaveImage" in row["preview_display_conversion"]
+        assert "astype(np.uint8)" in row["preview_display_conversion"]
+        # 7. the old filter was measurably NOT the node: the fix is not cosmetic
+        assert row["preview_old_pil_box_filter_is_not_the_node"] is True
+        assert row["preview_old_pil_box_max_abs_delta_0_255"] > 0
+        frozen[row["file"]] = {
+            "resized_wh": [pw, ph], "tensor_shape_bhwc": row["preview_tensor_shape_bhwc"],
+            "tensor_hash_before_quantization": row["preview_tensor_hash_before_quantization"],
+            "display_pixels_sha256": row["preview_display_pixels_sha256"],
+            "old_pil_box_pixels_differing": row["preview_old_pil_box_pixels_differing"],
+            "old_pil_box_max_abs_delta_0_255": row["preview_old_pil_box_max_abs_delta_0_255"],
+            "preview_png_sha256": row["preview_encoder_input_sha256"],
+            "derived_sha256": row["derived_sha256"]}
+    assert "torch.nn.functional.interpolate" in m.PREVIEW_IMPLEMENTATION
+    # 8. the node's rounding differs from the old formula at a half-way case, and the plan uses
+    #    the node's - so the rounding alignment is real, not cosmetic either
+    off = m.resize_plan(417, 736)
+    assert off["round_half_up_wh"] == [209, 368], off["round_half_up_wh"]
+    assert off["resized_wh"] == [208, 368], off["resized_wh"]
+    assert off["rounding_convention_changed_the_size"] is True
+    # 9. the original references are byte-identical and nothing was written to the input dir
+    for name, want in ORIGINAL_REF_SHA256.items():
+        assert sha256_file(Path(INPUT_ROOT) / REF_DIR / name) == want, name
+    assert not (Path(INPUT_ROOT) / DAN_CHOI_DERIVED).exists()
+    worst = max(r["preview_old_pil_box_max_abs_delta_0_255"] for r in composed)
+    assert worst >= 40, worst
+    row = _record("test_r27_preview_matches_installed_area_tensor", {
+        "cases": frozen, "worst_old_filter_delta_0_255": worst,
+        "preview_implementation": composed[0]["preview_implementation"],
+        "display_conversion": composed[0]["preview_display_conversion"],
+        "rounding": composed[0]["resize_plan"]["rounding"],
+        "rounding_probe_417x736": {"node": off["resized_wh"], "old": off["round_half_up_wh"]},
+        "encoder_input_changed": False, "runtime_input_dir_written_to": False})
+    assert row["worst_old_filter_delta_0_255"] >= 40
+
+
+def test_r27_epoch_wrong_lifetime_refused():
+    """V-2: the SAME instance/port/pid with a DIFFERENT launch time is a contradiction.
+
+    A pid is recycled, so matching it proves nothing about which process ran: the frozen
+    lifetime must agree.  This is the variant the reviewer listed first.
+    """
+    r = retained()
+    harden = clf()
+    port = int(harden.PORT)
+    work = _workdir()
+    try:
+        snap = _frozen_snapshot(port)
+        wrong = dict(snap)
+        wrong["launched_at"] = snap["launched_at"] + 3600.0
+        base = r.full_ev(port)
+        ev = dict(base)
+        ev["instance_epoch"] = wrong
+        c = r.case(work, "wrong_lifetime", dumps=True, ev=ev, port=port, receipts=True)
+        (Path(c["dir"]) / "instance_epoch.json").write_text(json.dumps(snap, indent=1),
+                                                           encoding="utf-8")
+        rc, p = _run_classifier(c["dir"])
+        ident = p["instance_identity_binding"]
+        assert p["verdict"] == "SHUTDOWN_UNPROVEN_CONTRADICTION", (p["verdict"],
+                                                                  p["unproven_reason"])
+        assert rc == 1
+        assert ident["mismatch"] is True and ident["bound"] is False
+        assert ident["pid_matches_the_authority"] is True, "the pid DOES match - that is the trap"
+        assert ident["instance_id_matches_the_authority"] is True
+        assert ident["lifetime_matches_the_authority"] is False
+        assert ident["same_pid_is_not_the_same_lifetime"] is True
+        assert ident["declared_launched_at"] != ident["authority_launched_at"]
+        assert any("launched_at" in x for x in ident["problems"])
+        assert p["verdict_basis"]["pillars"]["p7_process_lifetime_matches_the_authority"] is False
+        assert any("another_instance_id" in x
+                   for x in p["contradictions"]["contradictions"])
+        _record("test_r27_epoch_wrong_lifetime_refused", {
+            "verdict": p["verdict"], "returncode": rc,
+            "frozen_launched_at": snap["launched_at"],
+            "declared_launched_at": wrong["launched_at"],
+            "same_instance_id": True, "same_port": True, "same_pid": True,
+            "pid_matches": ident["pid_matches_the_authority"],
+            "lifetime_matches": ident["lifetime_matches_the_authority"],
+            "same_pid_is_not_the_same_lifetime": ident["same_pid_is_not_the_same_lifetime"],
+            "contradictions": p["contradictions"]["contradictions"]})
+        assert ident["mismatch"] is True
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def test_r27_epoch_missing_lifetime_refused():
+    """V-3: a missing launch time is ABSENCE -> UNPROVEN with a reason, never a contradiction.
+
+    Both sides are exercised: (a) the frozen snapshot carries no launch time, so the authority
+    itself is incomplete; (b) the authority is complete but the record's own epoch omits it.
+    """
+    r = retained()
+    harden = clf()
+    port = int(harden.PORT)
+    work = _workdir()
+    out = {}
+    try:
+        snap = _frozen_snapshot(port)
+        no_lt = {k: v for k, v in snap.items() if k != "launched_at"}
+        base = r.full_ev(port)
+        # (a) the snapshot itself is incomplete
+        ev_a = dict(base)
+        ev_a["instance_epoch"] = dict(no_lt)
+        c = r.case(work, "snapshot_without_lifetime", dumps=True, ev=ev_a, port=port,
+                   receipts=True)
+        (Path(c["dir"]) / "instance_epoch.json").write_text(json.dumps(no_lt, indent=1),
+                                                           encoding="utf-8")
+        rc, p = _run_classifier(c["dir"])
+        ident = p["instance_identity_binding"]
+        assert p["verdict"] == "SHUTDOWN_UNPROVEN", (p["verdict"], p["unproven_reason"])
+        assert rc == 1
+        assert p["epoch_authority"]["valid"] is False
+        assert p["epoch_authority"]["source"] == "incomplete"
+        assert any("launched_at" in x for x in p["epoch_authority"]["problems"])
+        assert ident["bound"] is False and ident["mismatch"] is False
+        assert ident["lifetime_matches_the_authority"] is None
+        assert "epoch_authority:" in p["unproven_reason"]
+        out["incomplete_snapshot"] = {
+            "verdict": p["verdict"], "authority_source": p["epoch_authority"]["source"],
+            "problems": p["epoch_authority"]["problems"], "mismatch": ident["mismatch"],
+            "lifetime_matches": ident["lifetime_matches_the_authority"],
+            "reason": p["unproven_reason"]}
+        # (b) the authority is complete, the record's own epoch omits the lifetime
+        ev_b = dict(base)
+        ev_b["instance_epoch"] = {"instance_id": snap["instance_id"], "port": port, "pid": 4100}
+        c2 = r.case(work, "record_without_lifetime", dumps=True, ev=ev_b, port=port,
+                    receipts=True)
+        (Path(c2["dir"]) / "instance_epoch.json").write_text(json.dumps(snap, indent=1),
+                                                            encoding="utf-8")
+        rc2, p2 = _run_classifier(c2["dir"])
+        ident2 = p2["instance_identity_binding"]
+        assert p2["verdict"] == "SHUTDOWN_UNPROVEN", (p2["verdict"], p2["unproven_reason"])
+        assert rc2 == 1
+        assert p2["epoch_authority"]["valid"] is True
+        assert ident2["authority_valid"] is True
+        assert "instance_epoch_has_no_launched_at" in ident2["problems"]
+        assert ident2["mismatch"] is False, "absence is missing authority, not a contradiction"
+        assert "process_lifetime_authority" in p2["unproven_reason"]
+        out["record_without_lifetime"] = {
+            "verdict": p2["verdict"], "authority_valid": p2["epoch_authority"]["valid"],
+            "problems": ident2["problems"], "mismatch": ident2["mismatch"],
+            "reason": p2["unproven_reason"]}
+        row = _record("test_r27_epoch_missing_lifetime_refused",
+                      {**out, "absence_is_not_a_contradiction": True})
+        assert row["incomplete_snapshot"]["mismatch"] is False
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def test_r27_epoch_no_independent_authority_refused():
+    """V-4: the record's own `instance_epoch` is NOT an authority - not even when complete.
+
+    The record IS the claim.  Before R28 the classifier fell back to it, which made a record the
+    authority for its own shutdown; here the record declares a complete, self-consistent epoch
+    (all four required fields) and the verdict must still be UNPROVEN, with the suppression
+    visible in the artifact.
+    """
+    r = retained()
+    harden = clf()
+    port = int(harden.PORT)
+    work = _workdir()
+    try:
+        snap = _frozen_snapshot(port)
+        base = r.full_ev(port)
+        ev = dict(base)
+        ev["instance_epoch"] = dict(snap)          # complete, but SELF-declared
+        c = r.case(work, "no_independent_authority", dumps=True, ev=ev, port=port,
+                   receipts=True)
+        assert not (Path(c["dir"]) / "instance_epoch.json").exists(), \
+            "this fixture deliberately has NO frozen snapshot beside the evidence"
+        rc, p = _run_classifier(c["dir"])
+        ident = p["instance_identity_binding"]
+        ea = p["epoch_authority"]
+        pd = p["port_decision"]
+        assert p["verdict"] == "SHUTDOWN_UNPROVEN", (p["verdict"], p["unproven_reason"])
+        assert rc == 1
+        assert ea["source"] == "absent" and ea["valid"] is False
+        assert ea["problems"] == ["no_epoch_snapshot_filed_beside_the_evidence"]
+        assert ea["record_declared_epoch"]["complete"] is True, \
+            "the record's declaration IS complete - and is still not authority"
+        assert ea["record_declared_epoch"]["used_as_authority"] is False
+        assert ea["record_self_declaration_used_as_authority"] is False
+        assert ea["fallback_to_record_suppressed"] is True
+        assert ea["record_declared_epoch_not_used_as_authority"] is True
+        assert ident["authority_valid"] is False
+        assert "no_validated_independent_epoch_authority:absent" in p["unproven_reason"]
+        assert ident["mismatch"] is False
+        assert pd["source"] == "record_declared_epoch"
+        assert pd["independently_authoritative"] is False
+        assert p["verdict_basis"]["pillars"]["p6_validated_independent_epoch_authority"] is False
+        _record("test_r27_epoch_no_independent_authority_refused", {
+            "verdict": p["verdict"], "returncode": rc,
+            "authority_source": ea["source"], "authority_problems": ea["problems"],
+            "record_declaration_was_complete": ea["record_declared_epoch"]["complete"],
+            "record_used_as_authority": ea["record_self_declaration_used_as_authority"],
+            "fallback_to_record_suppressed": ea["fallback_to_record_suppressed"],
+            "port_source": pd["source"],
+            "port_independently_authoritative": pd["independently_authoritative"],
+            "reason": p["unproven_reason"]})
+        assert ea["record_self_declaration_used_as_authority"] is False
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def test_r27_epoch_empty_corrupt_ambiguous_snapshot_refused():
+    """V-5: `{}`, a corrupt snapshot and two disagreeing snapshots are all refusals - and NONE
+    of them falls back to the record's own declaration.
+
+    In every sub-case the record declares a COMPLETE, self-consistent epoch, i.e. the shape that
+    used to confirm via the record-declared fallback.  The measured defect (2026-09-27) was
+    exactly this: a corrupt snapshot was silently replaced by the record and the verdict was
+    SHUTDOWN_CONFIRMED_WITH_DISCLOSED_OWN_CLIENT_EXIT rc 0.
+    """
+    r = retained()
+    harden = clf()
+    port = int(harden.PORT)
+    work = _workdir()
+    out = {}
+    try:
+        snap = _frozen_snapshot(port)
+        base = r.full_ev(port)
+        other = dict(snap)
+        other["instance_id"] = "second-frozen-instance-77aa11"
+        cases = (
+            ("empty_snapshot", {}, None, "incomplete"),
+            ("corrupt_snapshot", None, '{"instance_id": "truncated", "port": 831', "invalid"),
+            ("ambiguous_snapshots", None, None, "ambiguous"),
+        )
+        for name, snap_obj, raw_text, want_source in cases:
+            ev = dict(base)
+            ev["instance_epoch"] = dict(snap)
+            c = r.case(work, name, dumps=True, ev=ev, port=port, receipts=True)
+            d = Path(c["dir"])
+            if snap_obj is not None:
+                (d / "instance_epoch.json").write_text(json.dumps(snap_obj), encoding="utf-8")
+            if raw_text is not None:
+                (d / "instance_epoch.json").write_text(raw_text, encoding="utf-8")
+            if name == "ambiguous_snapshots":
+                (d / "instance_epoch.json").write_text(json.dumps(snap, indent=1),
+                                                       encoding="utf-8")
+                (d / "wave2_instance_epoch.json").write_text(json.dumps(other, indent=1),
+                                                             encoding="utf-8")
+            rc, p = _run_classifier(d)
+            ea = p["epoch_authority"]
+            ident = p["instance_identity_binding"]
+            assert p["verdict"] == "SHUTDOWN_UNPROVEN", (name, p["verdict"])
+            assert rc == 1, name
+            assert ea["source"] == want_source, (name, ea["source"], ea["problems"])
+            assert ea["valid"] is False
+            assert ea["fallback_to_record_suppressed"] is True, name
+            assert ea["record_self_declaration_used_as_authority"] is False, name
+            assert ea["record_declared_epoch"]["complete"] is True, \
+                (name, "the record's own declaration was complete - the old code confirmed here")
+            assert p["verdict_basis"]["epoch_authority_valid"] is False
+            assert "epoch_authority:" in p["unproven_reason"]
+            assert ident["mismatch"] is False, "a broken snapshot is absence, not a contradiction"
+            out[name] = {"verdict": p["verdict"], "returncode": rc, "authority_source": ea["source"],
+                         "authority_problems": ea["problems"],
+                         "snapshot_names_present": ea["snapshot_names_present"],
+                         "record_declaration_complete": ea["record_declared_epoch"]["complete"],
+                         "fallback_to_record_suppressed": ea["fallback_to_record_suppressed"],
+                         "reason": p["unproven_reason"]}
+        assert out["empty_snapshot"]["authority_problems"][0] == "instance_epoch.json_is_empty_object"
+        assert any("unreadable" in x for x in out["corrupt_snapshot"]["authority_problems"])
+        assert any("disagree" in x for x in out["ambiguous_snapshots"]["authority_problems"])
+        assert len(out["ambiguous_snapshots"]["snapshot_names_present"]) == 2
+        _record("test_r27_epoch_empty_corrupt_ambiguous_snapshot_refused",
+                {**out, "no_case_fell_back_to_the_record": True})
+        assert len(out) == 3
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def test_r27_epoch_live_change_does_not_rebind_frozen_evidence():
+    """V-6: the live runtime epoch may change freely - a frozen classification does not move.
+
+    The classifier is driven IN PROCESS (main() with argv patched) against a frozen fixture whose
+    snapshot declares instance A, while the LIVE epoch path points at a temp file that declares
+    first instance B and then instance C on other ports.  The classification must be identical,
+    and the live file must be reported without ever being adopted.
+    """
+    r = retained()
+    harden = clf()
+    port = int(harden.PORT)
+    work = _workdir()
+    try:
+        snap = _frozen_snapshot(port)
+        base = r.full_ev(port)
+        ev = dict(base)
+        ev["instance_epoch"] = dict(snap)
+        c = r.case(work, "live_change", dumps=True, ev=ev, port=port, receipts=True)
+        d = Path(c["dir"])
+        (d / "instance_epoch.json").write_text(json.dumps(snap, indent=1), encoding="utf-8")
+        live = work / "live_epoch.json"
+        variants = [
+            {"instance_id": RESTARTED_INSTANCE, "port": port + 7, "pid": 4242,
+             "launched_at": snap["launched_at"] + 999.0},
+            {"instance_id": "third-instance-ffff0000", "port": port + 9, "pid": 5150,
+             "launched_at": snap["launched_at"] + 9999.0},
+        ]
+        old_epoch = harden._EPOCH
+        old_path = harden.LIVE_EPOCH_PATH
+        seen = []
+        try:
+            harden._EPOCH = live
+            harden.LIVE_EPOCH_PATH = str(live).replace("\\", "/")
+            for variant in variants:
+                live.write_text(json.dumps(variant), encoding="utf-8")
+                harden._LIVE_EPOCH_CACHE = None
+                sys.argv = ["w2_classify_shutdown.py", str(d).replace("\\", "/")]
+                buf = io.StringIO()
+                stdout = sys.stdout
+                sys.stdout = buf
+                try:
+                    rc = harden.main()
+                finally:
+                    sys.stdout = stdout
+                seen.append((rc, json.loads(buf.getvalue()), variant))
+        finally:
+            harden._EPOCH = old_epoch
+            harden.LIVE_EPOCH_PATH = old_path
+            harden._LIVE_EPOCH_CACHE = None
+        assert len(seen) == 2
+        (rc_a, p_a, v_a), (rc_b, p_b, v_b) = seen
+        assert v_a["instance_id"] != v_b["instance_id"], "the live epoch really did change"
+        for rc, p, v in seen:
+            assert p["verdict"] == CONFIRMED, (p["verdict"], p["unproven_reason"])
+            assert rc == 0
+            assert p["instance_identity_binding"]["authority_instance_id"] == \
+                FROZEN_SNAPSHOT_INSTANCE
+            assert p["instance_identity_binding"]["authority_source"] == \
+                "evidence_frozen_snapshot"
+            assert p["port_decision"]["source"] == "evidence_frozen_snapshot"
+            assert p["port_decision"]["independently_authoritative"] is True
+            assert p["port_decision"]["live_runtime_file_used"] is False
+            assert p["live_instance_epoch_read_once"]["used_as_identity_authority"] is False
+            assert p["live_instance_epoch_read_once"]["epoch"]["instance_id"] == v["instance_id"]
+        # the classification itself is byte-identical across the live change
+        assert p_a["epoch_authority"] == p_b["epoch_authority"]
+        assert p_a["instance_identity_binding"] == p_b["instance_identity_binding"]
+        assert p_a["port_decision"]["port"] == p_b["port_decision"]["port"] == port
+        assert p_a["verdict_basis"]["pillars"] == p_b["verdict_basis"]["pillars"]
+        # the live port disagrees with the frozen one in both runs, and was NOT adopted
+        assert p_a["port_decision"]["live_runtime_epoch_port_agrees"] is False
+        assert p_b["port_decision"]["live_runtime_epoch_port_agrees"] is False
+        _record("test_r27_epoch_live_change_does_not_rebind_frozen_evidence", {
+            "verdicts": [p["verdict"] for _, p, _ in seen],
+            "returncodes": [rc for rc, _, _ in seen],
+            "live_instances_seen": [v["instance_id"] for _, _, v in seen],
+            "live_ports_seen": [v["port"] for _, _, v in seen],
+            "frozen_authority_instance": p_a["instance_identity_binding"]["authority_instance_id"],
+            "frozen_port": port,
+            "classification_identical_across_the_live_change": True,
+            "live_epoch_used_as_authority": False,
+            "live_port_disagreed_and_was_not_adopted": True})
+        assert FROZEN_SNAPSHOT_INSTANCE in [
+            p["instance_identity_binding"]["authority_instance_id"] for _, p, _ in seen]
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def test_r27_epoch_exact_complete_lifetime_confirmed():
+    """V-7: the ONE confirming shape - exact instance AND complete authority AND matching
+    lifetime, with every required field present on both sides.
+    """
+    r = retained()
+    harden = clf()
+    port = int(harden.PORT)
+    work = _workdir()
+    try:
+        snap = _frozen_snapshot(port)
+        base = r.full_ev(port)
+        ev = dict(base)
+        ev["instance_epoch"] = dict(snap)
+        c = r.case(work, "exact_complete_lifetime", dumps=True, ev=ev, port=port, receipts=True)
+        (Path(c["dir"]) / "instance_epoch.json").write_text(json.dumps(snap, indent=1),
+                                                           encoding="utf-8")
+        rc, p = _run_classifier(c["dir"])
+        ident = p["instance_identity_binding"]
+        ea = p["epoch_authority"]
+        pd = p["port_decision"]
+        assert p["verdict"] == CONFIRMED, (p["verdict"], p["unproven_reason"])
+        assert rc == 0
+        assert ea["valid"] is True and ea["source"] == "evidence_frozen_snapshot"
+        assert ea["required_fields"] == ["instance_id", "port", "pid", "launched_at"]
+        assert ea["fallback_to_record_suppressed"] is False
+        assert not ea["problems"]
+        assert ident["bound"] is True and ident["mismatch"] is False
+        assert ident["lifetime_matches_the_authority"] is True
+        assert ident["declared_launched_at"] == snap["launched_at"] == \
+            ident["authority_launched_at"]
+        assert ident["instance_id_matches_the_authority"] is True
+        assert ident["pid_matches_the_authority"] is True
+        assert ident["same_pid_is_not_the_same_lifetime"] is False
+        assert pd["independently_authoritative"] is True
+        assert pd["port"] == snap["port"]
+        assert p["unproven_reason"] is None
+        assert all(p["verdict_basis"]["pillars"].values())
+        assert p["verdict_basis"]["pillars"]["p6_validated_independent_epoch_authority"] is True
+        assert p["verdict_basis"]["pillars"]["p7_process_lifetime_matches_the_authority"] is True
+        _record("test_r27_epoch_exact_complete_lifetime_confirmed", {
+            "verdict": p["verdict"], "returncode": rc,
+            "authority_source": ea["source"], "required_fields": ea["required_fields"],
+            "instance_id": ident["declared_instance_id"],
+            "launched_at": ident["declared_launched_at"],
+            "lifetime_matches": ident["lifetime_matches_the_authority"],
+            "pid_matches": ident["pid_matches_the_authority"],
+            "port_source": pd["source"], "port": pd["port"],
+            "pillars": p["verdict_basis"]["pillars"]})
+        assert p["verdict"] == CONFIRMED
     finally:
         shutil.rmtree(work, ignore_errors=True)

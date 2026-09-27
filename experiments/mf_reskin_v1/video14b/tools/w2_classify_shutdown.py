@@ -61,10 +61,18 @@ import sys
 import time
 from pathlib import Path
 
-# wave B: read the port from the epoch the server itself wrote (this wave reserves
-# 8310); never hard-code a previous wave's port into a shutdown classifier.
+# wave B: read the port the server itself wrote (this wave reserves 8310); never
+# hard-code a previous wave's port into a shutdown classifier.
+#
+# R28 / V-4 + V-6: this file is the LIVE runtime epoch.  It is the LAST resort for a port
+# and it is NOT an authority: after a restart it describes a NEWER instance, so adopting
+# its port (or its instance id) for older evidence is exactly the R27-06 defect.
+# `PORT` stays exported because the fixtures and the rows read it, but every port-scoped
+# decision inside main() now goes through resolve_verdict_port() and the flag it returns.
 _EPOCH = Path(r"C:\Users\Admin\Documents\Codex\work\mfv1\runtime\video14b\instance_epoch.json")
 PORT = int(json.loads(_EPOCH.read_text(encoding="utf-8"))["port"]) if _EPOCH.is_file() else 8310
+PORT_IS_AN_AUTHORITY = False
+LIVE_EPOCH_PATH = str(_EPOCH).replace(chr(92), "/")
 ENGINE_MARK = "serve_video14b.py"
 OWN_TOOL_MARK = "experiments/mf_reskin_v1/video14b"
 MANAGER_PIDS = {14872: "hermes desktop", 29648: "hermes serve"}
@@ -340,14 +348,58 @@ EPOCH_SNAPSHOT_NAMES = ("instance_epoch.json", "wave2_instance_epoch.json",
                         "instance_epoch_frozen.json")
 _LIVE_EPOCH_CACHE: dict | None = None
 
+# R28 / V-4 + V-5 (P2): an epoch is an AUTHORITY only when its own frozen snapshot is filed
+# BESIDE the evidence AND carries every field the verdict depends on.  The record's
+# `instance_epoch` block is the first pass DECLARING itself; promoting it to authority made
+# the record the authority of its own claim (measured 2026-09-27: an empty `{}` snapshot, a
+# corrupt snapshot and a snapshot missing a field ALL still returned
+# SHUTDOWN_CONFIRMED_WITH_DISCLOSED_OWN_CLIENT_EXIT rc 0).  Absence of a validated
+# independent authority is UNPROVEN, and a snapshot that is present but unreadable, empty,
+# incomplete or contradictory must NEVER be replaced by the record's own declaration.
+EPOCH_AUTHORITY_REQUIRED_FIELDS = ("instance_id", "port", "pid", "launched_at")
+LIFETIME_TOLERANCE_S = 1e-6
 
-def read_json_object(path):
-    """Parse a JSON object, or None.  Never raises on a missing/corrupt file."""
+
+def read_json_document(path) -> tuple:
+    """(object, error) with error in (None, 'unreadable', 'not_a_json_object').
+
+    The error is kept apart from the value on purpose: `{}` is a READABLE document that
+    carries no authority, while a truncated file is UNREADABLE.  Collapsing both to None is
+    what let the corrupt-snapshot case fall through to the record's own declaration.
+    """
     try:
         d = json.loads(Path(path).read_text(encoding="utf-8", errors="replace"))
     except Exception:  # noqa: BLE001
-        return None
-    return d if isinstance(d, dict) else None
+        return None, "unreadable"
+    if not isinstance(d, dict):
+        return None, "not_a_json_object"
+    return d, None
+
+
+def read_json_object(path):
+    """Parse a JSON object, or None.  Never raises on a missing/corrupt file."""
+    return read_json_document(path)[0]
+
+
+def _is_lifetime(v) -> bool:
+    """A launch time is a number; a bool is not a number here and None is absence."""
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def _same_lifetime(a, b) -> bool:
+    """Same process lifetime, inside LIFETIME_TOLERANCE_S (floats survive JSON round trips)."""
+    return abs(float(a) - float(b)) <= LIFETIME_TOLERANCE_S
+
+
+def _missing_authority_fields(snap) -> list:
+    out: list = []
+    if not isinstance(snap, dict):
+        return list(EPOCH_AUTHORITY_REQUIRED_FIELDS)
+    for k in EPOCH_AUTHORITY_REQUIRED_FIELDS:
+        v = snap.get(k)
+        if v is None or (k == "instance_id" and v == ""):
+            out.append(k)
+    return out
 
 
 def live_epoch_read_once() -> dict:
@@ -360,7 +412,7 @@ def live_epoch_read_once() -> dict:
     if _LIVE_EPOCH_CACHE is None:
         _LIVE_EPOCH_CACHE = {
             "read_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-            "path": str(_EPOCH).replace(chr(92), "/"),
+            "path": LIVE_EPOCH_PATH,
             "epoch": read_json_object(_EPOCH) if _EPOCH.is_file() else None,
             "read_once": True,
             "used_as_identity_authority": False,
@@ -371,67 +423,152 @@ def live_epoch_read_once() -> dict:
 
 
 def resolve_epoch_authority(wave2_dir, live_epoch=None) -> dict:
-    """The ONE epoch/instance this verdict may speak about, resolved ONCE.
+    """The ONE epoch/instance this verdict may speak about, resolved ONCE (R28 / V-4, V-5).
 
-    Priority: the epoch FROZEN with the evidence (an instance_epoch.json snapshot in the
-    evidence directory) > the record's own declared epoch (frozen by the first pass).
-    A live/newest epoch is never promoted to authority.
+    A snapshot filed BESIDE the evidence is the only admissible authority, and it is admitted
+    only when it parses as a JSON object AND carries every required field (`instance_id`,
+    `port`, `pid`, `launched_at`).  Outcomes, and nothing else:
+
+      * exactly one readable + complete snapshot        -> authoritative
+      * several complete snapshots that all AGREE       -> authoritative (duplicates)
+      * several complete snapshots that DISAGREE        -> ambiguous   -> refuse
+      * snapshot present but unreadable / not an object -> invalid     -> refuse
+      * snapshot present but missing a required field   -> incomplete  -> refuse
+      * no snapshot beside the evidence                 -> absent      -> refuse
+
+    In every refusing shape the record's own `instance_epoch` is still REPORTED and is marked
+    `record_self_declaration_used_as_authority: False`; it is never promoted, so the fallback
+    that turned a corrupt snapshot into the record's own authority is gone by construction.  A
+    live epoch is never adopted either.
     """
     d = Path(wave2_dir)
+    ev_path = d / "wave2_shutdown_evidence.json"
+    rec = read_json_object(ev_path) or {}
+    rec_epoch = rec.get("instance_epoch")
+    rec_epoch = rec_epoch if isinstance(rec_epoch, dict) else None
+    rec_missing = _missing_authority_fields(rec_epoch)
+
+    candidates: list = []
     for name in EPOCH_SNAPSHOT_NAMES:
         p = d / name
         if not p.is_file():
             continue
-        snap = read_json_object(p)
-        if isinstance(snap, dict):
-            return {"source": "evidence_frozen_snapshot",
-                    "path": str(p).replace(chr(92), "/"),
-                    "instance_id": snap.get("instance_id"), "port": snap.get("port"),
-                    "pid": snap.get("pid"), "launched_at": snap.get("launched_at"),
-                    "owner": snap.get("owner"),
-                    "live_epoch_used_as_authority": False,
-                    "note": ("the epoch frozen beside the evidence is the identity authority; "
-                             "a live epoch is never adopted for old evidence")}
-    ev_path = d / "wave2_shutdown_evidence.json"
-    rec = read_json_object(ev_path) or {}
-    rec_epoch = rec.get("instance_epoch")
-    if isinstance(rec_epoch, dict):
-        return {"source": "record_declared_epoch",
-                "path": str(ev_path).replace(chr(92), "/"),
-                "instance_id": rec_epoch.get("instance_id"), "port": rec_epoch.get("port"),
-                "pid": rec_epoch.get("pid"), "launched_at": rec_epoch.get("launched_at"),
-                "owner": rec_epoch.get("owner"),
-                "live_epoch_used_as_authority": False,
-                "note": ("no frozen epoch snapshot was filed beside the evidence: the first "
-                         "pass's own declared epoch is the only frozen authority available")}
-    return {"source": "absent", "path": None, "instance_id": None, "port": None, "pid": None,
-            "launched_at": None, "owner": None,
-            "live_epoch_used_as_authority": False,
-            "live_epoch_seen": bool(live_epoch),
-            "note": "no epoch/instance authority anywhere in the evidence"}
+        obj, err = read_json_document(p)
+        candidates.append({"name": name, "path": str(p).replace(chr(92), "/"),
+                           "sha256": sha256_file(p), "bytes": p.stat().st_size,
+                           "error": err,
+                           "empty": bool(isinstance(obj, dict) and not obj),
+                           "fields": ({k: obj.get(k) for k in EPOCH_AUTHORITY_REQUIRED_FIELDS}
+                                      if isinstance(obj, dict) else None),
+                           "missing_fields": (_missing_authority_fields(obj)
+                                              if isinstance(obj, dict) else None),
+                           "_obj": obj})
+
+    problems: list = []
+    snapshot_names = [c["name"] for c in candidates]
+    readable = [c for c in candidates if c["error"] is None]
+    broken = [c for c in candidates if c["error"] is not None]
+    incomplete = [c for c in readable if c["missing_fields"]]
+    complete = [c for c in readable if not c["missing_fields"]]
+
+    source = "absent"
+    valid = False
+    chosen = None
+    if not candidates:
+        problems.append("no_epoch_snapshot_filed_beside_the_evidence")
+    elif broken:
+        source = "invalid"
+        problems.extend(f"{c['name']}_{c['error']}" for c in broken)
+        problems.extend(f"{c['name']}_is_empty_object" for c in broken if c["empty"])
+    elif not complete:
+        source = "incomplete"
+        for c in incomplete:
+            if c["empty"]:
+                problems.append(f"{c['name']}_is_empty_object")
+            problems.extend(f"{c['name']}_missing_{f}" for f in c["missing_fields"])
+    elif len({json.dumps(c["fields"], sort_keys=True) for c in complete}) > 1:
+        source = "ambiguous"
+        problems.append("epoch_snapshots_disagree_on_" + ",".join(EPOCH_AUTHORITY_REQUIRED_FIELDS)
+                        + " (files " + ",".join(sorted(c["name"] for c in complete)) + ")")
+    else:
+        chosen = complete[0]
+        source = "evidence_frozen_snapshot"
+        valid = True
+
+    record_declared = {
+        "source": "record_declared_epoch", "used_as_authority": False,
+        "path": str(ev_path).replace(chr(92), "/"),
+        "fields": ({k: rec_epoch.get(k) for k in EPOCH_AUTHORITY_REQUIRED_FIELDS}
+                   if rec_epoch is not None else None),
+        "missing_fields": rec_missing,
+        "complete": rec_epoch is not None and not rec_missing,
+        "why_not_the_authority": ("the record's own instance_epoch block is the claim declaring "
+                                  "itself: it is not independent evidence about which instance "
+                                  "this verdict is about")}
+
+    out = {"source": source, "valid": valid,
+           "independent": source == "evidence_frozen_snapshot",
+           "path": (chosen["path"] if chosen is not None
+                    else (broken[0]["path"] if broken
+                          else (candidates[0]["path"] if candidates else None))),
+           "instance_id": None, "port": None, "pid": None, "launched_at": None, "owner": None,
+           "snapshot_names_present": snapshot_names,
+           "snapshot_files": [{k: v for k, v in c.items() if k != "_obj"} for c in candidates],
+           "required_fields": list(EPOCH_AUTHORITY_REQUIRED_FIELDS),
+           "problems": problems,
+           "fallback_to_record_suppressed": source != "evidence_frozen_snapshot",
+           "record_declared_epoch_not_used_as_authority": True,
+           "record_self_declaration_used_as_authority": False,
+           "record_declared_epoch": record_declared,
+           "live_epoch_used_as_authority": False,
+           "live_epoch_seen": bool(live_epoch),
+           "note": ("a verdict may speak only about the instance whose frozen snapshot is filed "
+                    "beside its evidence; missing/invalid/ambiguous authority is UNPROVEN, "
+                    "never a record that declares itself")}
+    if chosen is not None:
+        obj = chosen["_obj"]
+        out.update({"instance_id": obj.get("instance_id"), "port": obj.get("port"),
+                    "pid": obj.get("pid"), "launched_at": obj.get("launched_at"),
+                    "owner": obj.get("owner")})
+        if len(complete) > 1:
+            out["note"] = "duplicate snapshots agree field-for-field: the first one is used"
+    return out
 
 
 def instance_identity_binding(ev, *, authority, chain_pids) -> dict:
-    """R27-06: bind the verdict to the immutable instance identity + process lifetime.
+    """R27-06 / R28 (V-2, V-3, V-7): bind the verdict to the immutable instance identity AND to
+    the process LIFETIME, taken from ONE validated authority.
 
-    `bound` is what CONFIRMED needs.  `mismatch` is true only when something WAS declared
-    and DISAGREES - only that may flip the verdict to CONTRADICTION; absence is missing
-    evidence, never a contradiction.
+    Three families, kept strictly apart:
+      * ABSENCE      - no instance id, no pid, no launch time, or no validated authority:
+                       `bound` False and `mismatch` False -> UNPROVEN with a named reason;
+      * DISAGREEMENT - a field IS declared and differs from the authority, INCLUDING the same
+                       pid with a different launch time: `mismatch` True -> CONTRADICTION;
+      * MATCH        - every required field present and equal within LIFETIME_TOLERANCE_S:
+                       `bound` True -> this pillar may contribute to CONFIRMED.
+
+    A matching pid is never a match on its own: pids are recycled, so the lifetime must agree
+    too (`lifetime_matches_the_authority`).  The authority must be VALID; when it is not, this
+    binding refuses instead of falling back to the record's own declaration.
     """
     epoch = ev.get("instance_epoch")
     chain = {int(p) for p in (chain_pids or [])}
     problems: list[str] = []
+    absent: list[str] = []
     mismatch = False
     declared = {"instance_id": None, "port": None, "pid": None, "launched_at": None}
     if not isinstance(epoch, dict):
         problems.append("instance_epoch_missing")
+        absent.append("instance_epoch")
     else:
         declared = {k: epoch.get(k) for k in ("instance_id", "port", "pid", "launched_at")}
         if declared["instance_id"] in (None, ""):
             problems.append("instance_epoch_has_no_instance_id")
+            absent.append("declared_instance_id")
         dpid = declared["pid"]
         if isinstance(dpid, bool) or (dpid is not None and not isinstance(dpid, int)):
             problems.append("instance_epoch_pid_is_not_an_integer")
+            absent.append("declared_pid")
         elif isinstance(dpid, int):
             if chain and dpid not in chain:
                 problems.append("instance_epoch_pid_" + str(dpid)
@@ -439,29 +576,58 @@ def instance_identity_binding(ev, *, authority, chain_pids) -> dict:
                 mismatch = True
         else:
             problems.append("instance_epoch_has_no_pid")
-        if authority.get("source") == "evidence_frozen_snapshot":
-            aid = authority.get("instance_id")
-            aport = authority.get("port")
-            apid = authority.get("pid")
-            if declared["instance_id"] and aid and declared["instance_id"] != aid:
-                problems.append("instance_epoch_instance_id_" + str(declared["instance_id"])
-                                + "_is_not_the_frozen_run_instances_" + str(aid))
+            absent.append("declared_pid")
+        if not _is_lifetime(declared["launched_at"]):
+            problems.append("instance_epoch_has_no_launched_at")
+            absent.append("declared_launched_at")
+
+    authority_valid = bool(authority.get("valid"))
+    authority_has_lifetime = _is_lifetime(authority.get("launched_at"))
+    lifetime_matches = None
+    if not authority_valid:
+        problems.append("no_validated_independent_epoch_authority:" + str(authority.get("source")))
+        absent.append("validated_authority")
+    else:
+        aid = authority.get("instance_id")
+        aport = authority.get("port")
+        apid = authority.get("pid")
+        alifetime = authority.get("launched_at")
+        if declared["instance_id"] and aid and declared["instance_id"] != aid:
+            problems.append("instance_epoch_instance_id_" + str(declared["instance_id"])
+                            + "_is_not_the_frozen_run_instances_" + str(aid))
+            mismatch = True
+        if (declared["port"] is not None and aport is not None
+                and str(declared["port"]) != str(aport)):
+            problems.append("instance_epoch_port_" + str(declared["port"])
+                            + "_is_not_the_frozen_run_instances_" + str(aport))
+            mismatch = True
+        if isinstance(dpid, int) and isinstance(apid, int) and dpid != apid:
+            problems.append("instance_epoch_pid_" + str(dpid)
+                            + "_is_not_the_frozen_run_instances_" + str(apid))
+            mismatch = True
+        if not authority_has_lifetime:
+            problems.append("epoch_authority_has_no_launched_at")
+            absent.append("authority_lifetime")
+        elif _is_lifetime(declared["launched_at"]):
+            lifetime_matches = _same_lifetime(declared["launched_at"], alifetime)
+            if not lifetime_matches:
+                problems.append(
+                    "instance_epoch_launched_at_" + repr(float(declared["launched_at"]))
+                    + "_is_not_the_frozen_run_instances_lifetime_" + repr(float(alifetime))
+                    + " (the same instance_id/port/pid is NOT the same process lifetime)")
                 mismatch = True
-            if (declared["port"] is not None and aport is not None
-                    and str(declared["port"]) != str(aport)):
-                problems.append("instance_epoch_port_" + str(declared["port"])
-                                + "_is_not_the_frozen_run_instances_" + str(aport))
-                mismatch = True
-            if isinstance(dpid, int) and isinstance(apid, int) and dpid != apid:
-                problems.append("instance_epoch_pid_" + str(dpid)
-                                + "_is_not_the_frozen_run_instances_" + str(apid))
-                mismatch = True
+
     ident_match = None
     if declared["instance_id"] and authority.get("instance_id"):
         ident_match = declared["instance_id"] == authority["instance_id"]
+    same_pid = bool(isinstance(declared["pid"], int) and isinstance(authority.get("pid"), int)
+                    and declared["pid"] == authority.get("pid"))
     return {
         "bound": not problems, "mismatch": mismatch,
+        "absent_field_families": sorted(set(absent)),
+        "problems_are_absence_not_contradiction": bool(problems) and not mismatch,
         "authority_source": authority.get("source"),
+        "authority_valid": authority_valid,
         "authority_path": authority.get("path"),
         "authority_instance_id": authority.get("instance_id"),
         "authority_port": authority.get("port"),
@@ -469,17 +635,58 @@ def instance_identity_binding(ev, *, authority, chain_pids) -> dict:
         "authority_launched_at": authority.get("launched_at"),
         "authority_is_a_frozen_snapshot": authority.get("source") == "evidence_frozen_snapshot",
         "live_epoch_used_as_authority": False,
+        "record_declared_epoch_not_used_as_authority": True,
         "declared_instance_id": declared["instance_id"],
         "declared_epoch_port": declared["port"],
         "declared_epoch_pid": declared["pid"],
         "declared_launched_at": declared["launched_at"],
         "instance_id_matches_the_authority": ident_match,
+        "pid_matches_the_authority": (None if not isinstance(declared["pid"], int)
+                                      else declared["pid"] == authority.get("pid")),
+        "lifetime_matches_the_authority": lifetime_matches,
+        "same_pid_is_not_the_same_lifetime": bool(same_pid and lifetime_matches is False),
+        "lifetime_tolerance_s": LIFETIME_TOLERANCE_S,
         "declared_pid_is_an_engine_chain_pid": (
             None if not isinstance(declared["pid"], int) else declared["pid"] in chain),
         "problems": problems,
-        "note": ("a record that declares no instance id, or another instance's id on the same "
-                 "port, cannot confirm THIS instance's shutdown; ports and pids are reusable"),
+        "note": ("a record that declares no instance id, another instance's id on the same port, "
+                 "or the same pid with a different launch time, cannot confirm THIS instance's "
+                 "shutdown; ports and pids are reusable"),
     }
+
+
+def resolve_verdict_port(ev, authority, live_port) -> dict:
+    """The ONE port every port-scoped decision of this verdict may use (R28 / V-6).
+
+    Priority: the validated frozen snapshot > the record's own declared epoch port > the
+    record's top-level port > the live runtime epoch file.  The live file is the LAST resort and
+    is FLAGGED when used, so a live restart can never re-point the port-scoped evidence of a
+    frozen run.  `independently_authoritative` is True only for the frozen snapshot.
+    """
+    epoch = ev.get("instance_epoch")
+    declared = epoch.get("port") if isinstance(epoch, dict) else None
+    top = ev.get("port")
+    if authority.get("valid") and authority.get("port") is not None:
+        src, port = "evidence_frozen_snapshot", authority["port"]
+    elif declared is not None:
+        src, port = "record_declared_epoch", declared
+    elif top is not None:
+        src, port = "record_declared_top_level_port", top
+    else:
+        src, port = "live_runtime_epoch_file", live_port
+    try:
+        port_int = int(port)
+    except (TypeError, ValueError):
+        src, port_int = "none", int(live_port)
+    return {"port": port_int, "source": src,
+            "independently_authoritative": src == "evidence_frozen_snapshot",
+            "live_runtime_file_used": src == "live_runtime_epoch_file",
+            "live_runtime_epoch_path": LIVE_EPOCH_PATH,
+            "live_runtime_epoch_port": int(live_port),
+            "live_runtime_epoch_port_agrees": port_int == int(live_port),
+            "note": ("every port-scoped decision (client attribution, listening rows, probes) "
+                     "uses this port; the live runtime file is never adopted while the evidence "
+                     "carries its own epoch")}
 
 
 def contradiction_report(*, port_closed, connect_ex_after, listening_after,
@@ -763,21 +970,29 @@ def main() -> int:
     refused = [e for e in stop_log if isinstance(e, dict)
                and e.get("action") == "REFUSED_NOT_ENGINE"]
 
+    # R28 / V-4 + V-6: the identity authority is resolved ONCE, from the evidence itself and
+    # VALIDATED; the live epoch is read once too but is only ever REPORTED, and the port every
+    # port-scoped decision uses comes from the authority - never from the live runtime file
+    # while the evidence carries its own epoch.
+    live_epoch = live_epoch_read_once()
+    authority = resolve_epoch_authority(wave2, live_epoch=live_epoch.get("epoch"))
+    # the LIVE port reported here is the one THIS run read, not the import-time constant: the
+    # point of the field is to show that a changed live file was seen and NOT adopted.
+    live_epoch_port = (live_epoch.get("epoch") or {}).get("port", PORT)
+    port_decision = resolve_verdict_port(ev, authority, live_epoch_port)
+    VERDICT_PORT = port_decision["port"]
+
     listeners_before_lines = (ev.get("listeners_before") or {}).get("lines") or []
-    clients_before = established_clients(listeners_before_lines, PORT)
-    server_rows_before = server_side_rows(listeners_before_lines, PORT)
+    clients_before = established_clients(listeners_before_lines, VERDICT_PORT)
+    server_rows_before = server_side_rows(listeners_before_lines, VERDICT_PORT)
     listeners_after_lines = (ev.get("listeners_after") or {}).get("lines") or []
     listening_after = [ln for ln in listeners_after_lines
                        if len(ln.split()) > 3 and ln.split()[3].upper() == "LISTENING"
-                       and f":{PORT}" in ln]
-    # NR09 P1/P3: the engine must be ABSENT afterwards, and every piece of evidence
-    # must belong to the one epoch/port this classifier resolved.
+                       and f":{VERDICT_PORT}" in ln]
+    # NR09 P1/P3: the engine must be ABSENT afterwards, and every piece of evidence must belong
+    # to the one epoch/port this classifier resolved.
     engine_absent_after = not (set(chain_pids) & pids_after)
-    epoch = epoch_binding(ev, resolved_port=PORT)
-    # R27-06: the identity authority is resolved ONCE, from the evidence itself; the live
-    # epoch is read once too but is only ever reported.
-    live_epoch = live_epoch_read_once()
-    authority = resolve_epoch_authority(wave2, live_epoch=live_epoch.get("epoch"))
+    epoch = epoch_binding(ev, resolved_port=VERDICT_PORT)
     identity = instance_identity_binding(ev, authority=authority, chain_pids=chain_pids)
     stop_order = owner_chain_stop_order(chain_pids, rows_before)
 
@@ -812,7 +1027,7 @@ def main() -> int:
                 cls = "own_client_process_exited_after_engine_stop"
                 evidence.append(f"before-dump cmdline runs this task's own tool: {cmdline}")
                 evidence.append(
-                    f"listeners_before ESTABLISHED client of engine :{PORT}: "
+                    f"listeners_before ESTABLISHED client of engine :{VERDICT_PORT}: "
                     f"\"{client['line']}\" (its ephemeral local port {client['local_port']})")
                 for sr in server_rows_before:
                     if f":{client['local_port']} " in sr:
@@ -826,7 +1041,7 @@ def main() -> int:
                 cls = "own_client_exit_without_self_exit_receipt"
                 evidence.append(f"before-dump cmdline runs this task's own tool: {cmdline}")
                 evidence.append(
-                    f"ESTABLISHED client of engine :{PORT} \"{client['line']}\"")
+                    f"ESTABLISHED client of engine :{VERDICT_PORT} \"{client['line']}\"")
                 evidence.append(
                     "NO self-exit receipt found: runs/<run_id>/run_record.json and "
                     "raw/<run_id>.runlog.txt are both absent or unattributable, so this "
@@ -900,6 +1115,11 @@ def main() -> int:
         "collateral_removed_empty": not collateral,
         "stop_order_derived_leaf_to_root": bool(stop_order["derived_leaf_to_root"]),
         "no_contradiction": not contra["contradictory"],
+        # R28 / V-4, V-7: CONFIRMED additionally requires a VALIDATED INDEPENDENT authority and a
+        # matching process lifetime.  Without them the verdict can only be UNPROVEN.
+        "p6_validated_independent_epoch_authority": bool(authority["valid"]),
+        "p7_process_lifetime_matches_the_authority":
+            identity["lifetime_matches_the_authority"] is True,
     }
     confirmed = bool(port_closed) and all(pillars.values())
     verdict = (VERDICT_CONFIRMED if confirmed
@@ -925,6 +1145,16 @@ def main() -> int:
             reasons.append("epoch_port_binding: " + ",".join(epoch["problems"]))
         if not identity["bound"]:
             reasons.append("instance_identity_binding: " + ",".join(identity["problems"]))
+        if not authority["valid"]:
+            reasons.append("epoch_authority:" + str(authority["source"]) + " ("
+                           + "; ".join(authority["problems"]) + ")")
+        if identity["lifetime_matches_the_authority"] is not True:
+            reasons.append("process_lifetime_authority: declared_launched_at="
+                           + repr(identity["declared_launched_at"]) + " authority_launched_at="
+                           + repr(identity["authority_launched_at"]))
+        if port_decision["live_runtime_file_used"]:
+            reasons.append("port_resolved_from_the_live_runtime_epoch_file: the evidence carries "
+                           "no port of its own")
         if own_client_uncorroborated:
             reasons.append(f"own_client_exit_without_self_exit_receipt="
                            f"{own_client_uncorroborated}")
@@ -945,7 +1175,7 @@ def main() -> int:
         read_only = {
             "note": ("read-only end-state re-check at continuation-04; no engine was "
                      "started, no pid was stopped, no media byte touched"),
-            "port_8210": blocking_probe("127.0.0.1", PORT),
+            "port_8210": blocking_probe("127.0.0.1", VERDICT_PORT),
             "port_8199": blocking_probe("127.0.0.1", 8199),
             "manager_pids": {str(p): {"expected": n, "alive": pid_alive(p)}
                              for p, n in recheck_pids.items()},
@@ -963,7 +1193,7 @@ def main() -> int:
         "media_bytes_changed": False,
         "source_artifacts": {n: {"sha256": sha256_file(wave2 / n)} for n in SOURCE_ARTIFACTS},
         "instance_epoch": ev.get("instance_epoch"),
-        "port": PORT,
+        "port": VERDICT_PORT,
         "connect_ex_before": ev.get("connect_ex_before"),
         "connect_ex_after": ev.get("connect_ex_after"),
         "port_closed": port_closed,
@@ -980,6 +1210,7 @@ def main() -> int:
         "stop_order_leaf_to_root": stop_order,
         "epoch_binding": epoch,
         "epoch_authority": authority,
+    "port_decision": port_decision,
         "live_instance_epoch_read_once": live_epoch,
         "instance_identity_binding": identity,
         "contradictions": contra,
@@ -1020,6 +1251,17 @@ def main() -> int:
             "instance_identity_authority_source": authority.get("source"),
             "instance_identity_is_a_frozen_snapshot": identity["authority_is_a_frozen_snapshot"],
             "instance_identity_matches": identity["instance_id_matches_the_authority"],
+            "epoch_authority_valid": authority["valid"],
+            "epoch_authority_source": authority["source"],
+            "epoch_authority_problems": authority["problems"],
+            "epoch_authority_required_fields": authority["required_fields"],
+            "record_self_declaration_used_as_authority": False,
+            "fallback_to_record_suppressed": authority["fallback_to_record_suppressed"],
+            "lifetime_matches_the_authority": identity["lifetime_matches_the_authority"],
+            "same_pid_is_not_the_same_lifetime": identity["same_pid_is_not_the_same_lifetime"],
+            "verdict_port": VERDICT_PORT,
+            "verdict_port_source": port_decision["source"],
+            "verdict_port_independently_authoritative": port_decision["independently_authoritative"],
             "declared_pid_is_an_engine_chain_pid": identity["declared_pid_is_an_engine_chain_pid"],
             "live_epoch_used_as_authority": False,
             "own_client_exit_corroborated": not own_client_uncorroborated,
@@ -1041,6 +1283,7 @@ def main() -> int:
                                           "verdict_basis", "verified_stop_audit",
                                           "stop_order_leaf_to_root", "epoch_binding",
                                           "instance_identity_binding", "epoch_authority",
+                                          "port_decision",
                                           "live_instance_epoch_read_once",
                                           "contradictions", "self_audit_no_kill_path",
                                           "read_only_recheck")},

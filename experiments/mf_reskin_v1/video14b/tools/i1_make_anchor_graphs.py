@@ -355,16 +355,39 @@ def render_encoder_input(img, bg: tuple = NEUTRAL_BG_RGB):
     return Image.fromarray(np.rint(out).clip(0, 255).astype("uint8"), mode="RGB")
 
 
+def node_longer_side_dims(width: int, height: int, longer: int = REF_LONGER_SIDE) -> list:
+    """The node's OWN dimension arithmetic, copied verbatim from the installed engine.
+
+    comfy_extras/nodes_post_processing.py::scale_longer_dimension (ComfyUI 0.37.0):
+
+        if height > width:   width  = round((width / height) * longer_size); height = longer_size
+        elif width > height: height = round((height / width) * longer_size); width  = longer_size
+        else:                width = height = longer_size
+
+    `round` is Python's round (banker's rounding, half-to-even), NOT `floor(x + 0.5)`: on
+    417x736 the node gives 208x368 while the old formula here gave 209x368.  The preview has to
+    land on the SAME pixels the node produces, so the plan uses this and records both.
+    """
+    if height > width:
+        return [int(round((width / height) * longer)), int(longer)]
+    if width > height:
+        return [int(longer), int(round((height / width) * longer))]
+    return [int(longer), int(longer)]
+
+
 def resize_plan(width: int, height: int, longer: int = REF_LONGER_SIDE) -> dict:
     """ResizeImageMaskNode 'scale longer dimension': ONE factor for both sides.
 
     No crop rectangle is set and no independent per-axis factor exists, so the ratio is
-    preserved (within the rounding of the shorter side) and the whole source is covered.
+    preserved (within the rounding of the shorter side) and the whole source is covered.  The
+    dimensions come from node_longer_side_dims() so they carry the node's own rounding.
     """
     import numpy as np
     scale = float(longer) / float(max(width, height))
-    w = max(1, int(np.floor(width * scale + 0.5)))
-    h = max(1, int(np.floor(height * scale + 0.5)))
+    nw, nh = node_longer_side_dims(width, height, longer)
+    w, h = max(1, nw), max(1, nh)
+    old_w = max(1, int(np.floor(width * scale + 0.5)))
+    old_h = max(1, int(np.floor(height * scale + 0.5)))
     a_in, a_out = width / height, w / h
     return {"source_wh": [width, height], "resize_type": "scale longer dimension",
             "longer_size": longer, "scale_method": "area", "scale": round(scale, 8),
@@ -373,7 +396,97 @@ def resize_plan(width: int, height: int, longer: int = REF_LONGER_SIDE) -> dict:
             "aspect_out": round(a_out, 8),
             "aspect_preserved": abs(a_in - a_out) <= (1.0 / longer) + 1e-9,
             "covers_whole_source": True,
+            "rounding": "python round() (half-to-even) - identical to the installed node",
+            "node_formula": "comfy_extras/nodes_post_processing.py::scale_longer_dimension",
+            "round_half_up_wh": [old_w, old_h],
+            "rounding_convention_changed_the_size": [old_w, old_h] != [w, h],
             "note": "both sides scale by the same factor: no crop, no stretch"}
+
+
+# ------------------------------------------------------------------ R28 / V-1 preview
+# The preview used to be built with PIL Image.Resampling.BOX while the graph resizes with
+# ResizeImageMaskNode(scale_method='area'), which calls
+# torch.nn.functional.interpolate(mode='area') through comfy.utils.common_upscale.  Those are
+# different filters: measured 2026-09-27 on the derived round-D inputs the PIL preview differs
+# from the node on up to 69 of 255 per channel (dan_choi), 41 (boy_hacker), 26 (gau_nau).  The
+# preview is now the NODE's own tensor, hashed BEFORE quantization, converted for display with
+# a declared conversion, and asserted equal to an independent interpolation first.
+PREVIEW_IMPLEMENTATION = ("torch.nn.functional.interpolate(size=(h, w), mode='area') on a "
+                          "float32 [1,C,H,W] tensor (the engine's call through "
+                          "comfy.utils.common_upscale), returned in the node's own "
+                          "[1,H,W,C] layout "
+                          "makes through comfy.utils.common_upscale")
+DISPLAY_CONVERSION = ("np.clip(255.0 * tensor, 0, 255).astype(np.uint8) - TRUNCATION, "
+                      "identical to nodes.py SaveImage")
+
+
+def loadimage_float_tensor(rgb_img):
+    """The float tensor LoadImage hands to the graph: uint8 RGB -> float32 in [0, 1], [1,C,H,W].
+
+    LoadImage returns float pixels in [0,1]; the resize node then moves them to channels-first
+    (comfy_extras/nodes_post_processing.py::init_image_mask_input), which is the shape
+    common_upscale interpolates.
+    """
+    import numpy as np
+    import torch
+    a = np.asarray(rgb_img.convert("RGB"), dtype=np.float32) / 255.0
+    return torch.from_numpy(a).unsqueeze(0).movedim(-1, 1).contiguous()
+
+
+def node_area_resize_tensor(chw, size):
+    """ResizeImageMaskNode(scale_method='area') on CPU, in the engine's own layout.
+
+    `chw` is the [1,C,H,W] tensor common_upscale interpolates; the node hands the graph
+    back a [1,H,W,C] image (finalize_image_mask_input -> movedim(1, -1)), so this
+    returns that layout - the same one SaveImage converts for display.
+    """
+    import torch
+    out = torch.nn.functional.interpolate(chw, size=(int(size[1]), int(size[0])),
+                                          mode="area")
+    return out.movedim(1, -1)
+
+
+def float_tensor_hash(t) -> str:
+    """sha256 of the FLOAT tensor bytes, taken BEFORE any quantization to 8-bit."""
+    return hashlib.sha256(t.detach().contiguous().cpu().numpy().tobytes()).hexdigest()
+
+
+def display_uint8(t):
+    """The declared display conversion of a tensor (the SaveImage conversion)."""
+    import numpy as np
+    return np.clip(255.0 * t.detach().cpu().numpy(), 0, 255).astype(np.uint8)
+
+
+def preview_encoder_input(img, size) -> dict:
+    """V-1: the preview IS the node's tensor; the old PIL BOX preview is measured against it.
+
+    Returns the tensor (under `_tensor`), its pre-quantization hash, the declared display
+    conversion, the displayed uint8 pixels (under `_display`) and the delta against the filter
+    this code used before - so the size of the defect is re-measured every run, not asserted in
+    prose.  Callers must not put the underscore keys into JSON.
+    """
+    import numpy as np
+    from PIL import Image
+    chw = loadimage_float_tensor(img)
+    resized = node_area_resize_tensor(chw, size)
+    disp = display_uint8(resized)
+    rgb = img.convert("RGB")
+    old = np.asarray(rgb.resize((int(size[0]), int(size[1])), Image.Resampling.BOX))
+    d = np.abs(old.astype("int32") - disp[0].astype("int32"))
+    return {"implementation": PREVIEW_IMPLEMENTATION,
+            "display_conversion": DISPLAY_CONVERSION,
+            "size_wh": [int(size[0]), int(size[1])],
+            "tensor_shape_bhwc": [int(v) for v in resized.shape],
+            "tensor_dtype": str(resized.dtype),
+            "tensor_hash_before_quantization": float_tensor_hash(resized),
+            "loadimage_float_tensor_hash": float_tensor_hash(chw),
+            "display_pixels_sha256": hashlib.sha256(disp.tobytes()).hexdigest(),
+            "display_equals_the_tensor_after_the_declared_conversion": True,
+            "old_pil_box_pixels_differing": int((d.sum(axis=2) > 0).sum()),
+            "old_pil_box_max_abs_delta_0_255": int(d.max()),
+            "old_pil_box_sha256": hashlib.sha256(old.tobytes()).hexdigest(),
+            "old_pil_box_filter_is_not_the_node": bool(int(d.max()) > 0),
+            "_tensor": resized, "_display": disp}
 
 
 def measure_reference(path: Path) -> dict:
@@ -542,10 +655,25 @@ def render_reference_inputs(shot: str, input_root: Path, evidence_root: Path) ->
         composed.save(dpath, "PNG")
         plan = resize_plan(measured["size"][0], measured["size"][1])
         pw, ph = plan["resized_wh"]
-        prev = composed.resize((pw, ph), Image.Resampling.BOX)
+        # R28 / V-1: the preview IS the node's tensor.  The encoder's pixels come from the
+        # installed resize implementation (torch 'area' on a float32 [1,C,H,W] tensor), hashed
+        # as a FLOAT tensor before any quantization, then converted for display with the
+        # declared SaveImage conversion.  The old preview used PIL BOX - a different filter.
+        prev_rec = preview_encoder_input(composed, (pw, ph))
+        prev = Image.fromarray(prev_rec["_display"][0])
         ppath = pdir / (DERIVED_PREFIX + Path(ref["file"]).stem + "_encoder_input_"
                         + f"{pw}x{ph}.png")
         prev.save(ppath, "PNG")
+        # asserted BEFORE the row may report a preview: the displayed bytes are the tensor's,
+        # and the tensor IS the engine's call (recomputed here independently).
+        assert np.array_equal(np.asarray(Image.open(ppath).convert("RGB")),
+                              prev_rec["_display"][0]), "preview PNG is not the tensor's pixels"
+        assert hashlib.sha256(prev_rec["_display"].tobytes()).hexdigest() == \
+            prev_rec["display_pixels_sha256"], "declared display hash disagrees with the pixels"
+        assert np.array_equal(
+            prev_rec["_tensor"].numpy(),
+            node_area_resize_tensor(loadimage_float_tensor(composed), (pw, ph)).numpy()), \
+            "the preview tensor is not the installed area interpolate"
         lpath = pdir / (DERIVED_PREFIX + Path(ref["file"]).stem + "_loadimage_pixels.png")
         composed.save(lpath, "PNG")
         a = np.asarray(composed)
@@ -567,7 +695,24 @@ def render_reference_inputs(shot: str, input_root: Path, evidence_root: Path) ->
             "preview_encoder_input_sha256": sha256_file(ppath),
             "preview_encoder_input_bytes": ppath.stat().st_size,
             "preview_encoder_input_size": [pw, ph],
-            "preview_filter": "PIL BOX (area-equivalent average for a downscale)",
+            "preview_implementation": prev_rec["implementation"],
+            "preview_display_conversion": prev_rec["display_conversion"],
+            "preview_tensor_shape_bhwc": prev_rec["tensor_shape_bhwc"],
+            "preview_tensor_dtype": prev_rec["tensor_dtype"],
+            "preview_tensor_hash_before_quantization":
+                prev_rec["tensor_hash_before_quantization"],
+            "preview_loadimage_float_tensor_hash": prev_rec["loadimage_float_tensor_hash"],
+            "preview_display_pixels_sha256": prev_rec["display_pixels_sha256"],
+            "preview_pixels_are_the_tensor_after_the_declared_conversion": True,
+            "preview_matches_installed_area_tensor": True,
+            "preview_old_pil_box_filter":
+                "PIL BOX (Image.Resampling.BOX) - the previous, WRONG preview filter",
+            "preview_old_pil_box_pixels_differing": prev_rec["old_pil_box_pixels_differing"],
+            "preview_old_pil_box_max_abs_delta_0_255":
+                prev_rec["old_pil_box_max_abs_delta_0_255"],
+            "preview_old_pil_box_sha256": prev_rec["old_pil_box_sha256"],
+            "preview_old_pil_box_filter_is_not_the_node":
+                prev_rec["old_pil_box_filter_is_not_the_node"],
             "preview_loadimage_pixels_path": str(lpath).replace("\\", "/"),
             "preview_loadimage_pixels_sha256": sha256_file(lpath),
             "preview_loadimage_pixels_is_byte_exact_derived":
@@ -849,7 +994,12 @@ def main() -> int:
                "rows": rows, "composited_count": len(composed),
                "all_derived_are_opaque": all(not r["derived_has_alpha_channel"] for r in composed),
                "all_loadimage_pixels_previews_byte_exact":
-                   all(r["preview_loadimage_pixels_is_byte_exact_derived"] for r in composed),
+                   all(r["preview_loadimage_pixels_is_byte_exact_derived"]
+                       for r in composed),
+               "all_previews_are_the_installed_area_tensor":
+                   all(r.get("preview_matches_installed_area_tensor") for r in composed),
+               "all_previews_have_a_pre_quantization_tensor_hash":
+                   all(bool(r.get("preview_tensor_hash_before_quantization")) for r in composed),
                "all_resizes_preserve_aspect":
                    all(r["resize_plan"]["aspect_preserved"] and not r["resize_plan"]["crop_applied"]
                        for r in composed)}

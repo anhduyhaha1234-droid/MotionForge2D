@@ -24,6 +24,14 @@ D_FIXTURES = ("C:/Users/Admin/Documents/Codex/work/mfv1/runtime/video14b/state/"
               "roundD/f09_fixtures")
 REAL_WAVE2 = ("C:/Users/Admin/Documents/Codex/2026-09-11/tr-x20/outputs/"
               "mf-reskin-correction-20260922/20260922T0955Z/VIDEO14B/waveB/raw/shutdown")
+R28_EVID = ("C:/Users/Admin/Documents/Codex/2026-09-27/c-v-th-c-hi-n/outputs/"
+            "r28-cpu-execution-20260927/VIDEO14B")
+R28_REPLAY = os.path.join(R28_EVID, "raw", "r28_roundd_replay.json")
+# Immutable pins of the HISTORICAL round-D artifact.  d_f09_adversarial_cases.json records the
+# classifier that produced it; both are frozen and neither may be compared with the live file.
+HISTORICAL_CLASSIFIER_SHA256 = "80eac58f2fb795c5335df0b2291058591275dee4133e74a539aec2828bfc3f64"
+HISTORICAL_D_F09_JSON_SHA256 = "1d9aef21cf704e4892ec5fea425d56179015eabcc64eef8607d97c02fc4e6ca4"
+UNPROVEN = "SHUTDOWN_UNPROVEN"
 CONFIRMED = "SHUTDOWN_CONFIRMED_WITH_DISCLOSED_OWN_CLIENT_EXIT"
 
 
@@ -153,8 +161,23 @@ def test_nr09_five_variants_and_controls_are_not_confirmed():
     assert len(cases["adversarial_variants"]) == 5
     assert len(cases["controls"]) == 2
     assert len(cases["retained_fixtures"]) == 4
-    assert cases["classifier_tool_sha256"] == sha256(
-        os.path.join(TOOLS, "w2_classify_shutdown.py"))
+    # V-8 provenance: the round-D JSON is an IMMUTABLE artifact.  It pins the classifier that
+    # WROTE it (80eac58f...) and its own bytes are pinned here too.  The live file has moved on
+    # twice since (R27 hardening, R28 lifetime authority), so comparing the historical pin with
+    # the current source is a false failure - measured 2026-09-27: that comparison asserted
+    # 80eac58f == 7ee82ed0.  The historical pin is asserted against the historical artifact and
+    # the CURRENT behaviour is asserted from the versioned R28 replay below.
+    assert cases["classifier_tool_sha256"] == HISTORICAL_CLASSIFIER_SHA256
+    assert sha256(os.path.join(EV, "raw", "d_f09_adversarial_cases.json")) == \
+        HISTORICAL_D_F09_JSON_SHA256
+    current_classifier_sha = sha256(os.path.join(TOOLS, "w2_classify_shutdown.py"))
+    assert current_classifier_sha != HISTORICAL_CLASSIFIER_SHA256, \
+        "the current classifier is a later revision: the historical pin cannot be the live file"
+    replay = json.loads(open(R28_REPLAY, encoding="utf-8").read())
+    assert replay["historical"]["classifier_tool_sha256_pinned_by_round_d"] == \
+        HISTORICAL_CLASSIFIER_SHA256
+    assert replay["historical"]["round_d_json_sha256"] == HISTORICAL_D_F09_JSON_SHA256
+    assert replay["current"]["classifier_tool_sha256"] == current_classifier_sha
 
     by = {c["case"]: c for c in cases["cases"]}
     expected = {
@@ -229,6 +252,7 @@ def test_nr09_real_endstate_is_separate_and_still_consistent():
 
     # the retained round-C fixture directories still answer the same way
     live = {}
+    live_reason = {}
     for name in ("no_authority", "missing_chain", "timeout_probe", "valid_own_chain"):
         d = os.path.join(ROUND_C_STATE, name)
         assert os.path.isdir(d), d
@@ -236,10 +260,23 @@ def test_nr09_real_endstate_is_separate_and_still_consistent():
         r = subprocess.run([sys.executable, os.path.join(TOOLS, "w2_classify_shutdown.py"),
                             d.replace("\\", "/")],
                            capture_output=True, text=True, encoding="utf-8", errors="replace")
-        live[name] = json.loads(r.stdout)["verdict"]
-    assert live["valid_own_chain"] == CONFIRMED
+        payload = json.loads(r.stdout)
+        live[name] = payload["verdict"]
+        live_reason[name] = payload["unproven_reason"]
     assert live["no_authority"] == live["missing_chain"] == live["timeout_probe"] \
-        == "SHUTDOWN_UNPROVEN"
+        == UNPROVEN
+    # V-8: the round-C `valid_own_chain` fixture carries NO frozen epoch snapshot and no declared
+    # launch time, so under the R28 authority rules it is UNPROVEN with a named reason.  It is
+    # NOT relabelled a positive to keep a count: the CONFIRMED verdict above stays in the
+    # HISTORICAL record, and the positive control is the replay's synthetic exact positive, which
+    # carries a full independent lifetime authority.
+    assert live["valid_own_chain"] == UNPROVEN, live["valid_own_chain"]
+    assert "no_validated_independent_epoch_authority" in live_reason["valid_own_chain"]
+    replay = json.loads(open(R28_REPLAY, encoding="utf-8").read())
+    positive = replay["rows"]["r28_synthetic_exact_positive"]
+    assert positive["verdict"] == CONFIRMED and positive["returncode"] == 0
+    assert positive["instance_identity_binding"]["lifetime_matches_the_authority"] is True
+    assert all(positive["verdict_basis"]["pillars"].values())
 
 
 def test_nr09_classifier_module_never_executes_a_stop():
@@ -380,3 +417,94 @@ def test_nr08_trace_and_canonical_diff_show_the_real_wiring():
         sha256(os.path.join(EV, "raw", "d_visual_observation.json"))
     assert obs["frame_evidence"]["sheet_sha256"] == \
         sha256(obs["frame_evidence"]["sheet"])
+
+
+def test_r28_versioned_replay_binds_current_behaviour_to_current_bytes():
+    """V-8: historical pins stay historical; current behaviour binds to the versioned R28 replay.
+
+    The replay is generated in the R28 evidence root by running the CURRENT classifier over
+    versioned copies of the retained fixtures, a synthetic exact positive carrying a full
+    independent lifetime authority, and the real wave-B end state read-only.  It records the
+    current source shas next to the historical ones, so a reviewer can tell which artefact each
+    assertion is about.
+    """
+    replay = json.loads(open(R28_REPLAY, encoding="utf-8").read())
+    assert replay["replay_version"] == "R28" and replay["generated_by_round"] == "R28"
+    assert replay["cpu_only"] is True and replay["engine_started"] is False
+    assert replay["model_loaded"] is False and replay["pid_stopped_by_this_tool"] is False
+    assert replay["runtime_input_written_to"] is False
+    assert replay["old_evidence_written_to"] is False
+    # --- current bytes, bound by hash
+    assert replay["current"]["classifier_tool_sha256"] == \
+        sha256(os.path.join(TOOLS, "w2_classify_shutdown.py"))
+    assert replay["current"]["anchor_tool_sha256"] == \
+        sha256(os.path.join(TOOLS, "i1_make_anchor_graphs.py"))
+    assert replay["current"]["classifier_sha_moved"] is True
+    # --- historical bytes: immutable, and NOT overwritten by this round
+    assert replay["historical"]["classifier_tool_sha256_pinned_by_round_d"] == \
+        HISTORICAL_CLASSIFIER_SHA256
+    assert replay["historical"]["round_d_json_sha256"] == HISTORICAL_D_F09_JSON_SHA256
+    assert sha256(os.path.join(EV, "raw", "d_f09_adversarial_cases.json")) == \
+        HISTORICAL_D_F09_JSON_SHA256, "the historical round-D JSON must not be rewritten"
+    assert replay["historical"]["immutable"] is True
+    # --- the versioned fixtures were copied, and the copies carry the source hashes
+    assert replay["fixtures"]["copied"], "no versioned fixture was copied into the root"
+    for entry in replay["fixtures"]["copied"]:
+        assert entry["file_count"] > 0
+        assert os.path.isdir(entry["copied_dir"]), entry["copied_dir"]
+    # --- current behaviour, row by row
+    rows = replay["rows"]
+    assert len(rows) == replay["row_count"] == 17
+    for key in ("roundD_f09_fixtures/adv_absent_self_exit_receipt",
+                "roundD_f09_fixtures/adv_connect_succeeded_but_closed_flag",
+                "roundD_f09_fixtures/adv_engine_still_present",
+                "roundD_f09_fixtures/adv_non_stop_command_rc0",
+                "roundD_f09_fixtures/adv_wrong_epoch_port",
+                "roundD_f09_fixtures/ctl_missing_stop_authority",
+                "roundD_f09_fixtures/ctl_unknown_port_state"):
+        assert rows[key]["verdict"].startswith(UNPROVEN), (key, rows[key]["verdict"])
+        assert rows[key]["is_confirmed"] is False and rows[key]["returncode"] == 1
+    for key in ("roundC_v01_fixtures_post/no_authority",
+                "roundC_v01_fixtures_post/missing_chain",
+                "roundC_v01_fixtures_post/timeout_probe",
+                "roundC_v01_fixtures_post/valid_own_chain"):
+        assert rows[key]["verdict"] == UNPROVEN, (key, rows[key]["verdict"])
+        assert "no_validated_independent_epoch_authority" in rows[key]["unproven_reason"]
+    # the reviewer's five variants, judged by the CURRENT classifier: none is confirmed
+    for name in ("adv_absent_self_exit_receipt", "adv_engine_still_present",
+                 "adv_non_stop_command_rc0", "adv_connect_succeeded_but_closed_flag",
+                 "adv_wrong_epoch_port"):
+        row = rows["roundD_f09_fixtures/" + name]
+        assert row["is_confirmed"] is False, name
+        assert row["unproven_reason"], name
+    # NOTE (behaviour change, disclosed): `adv_wrong_epoch_port` used to be
+    # SHUTDOWN_UNPROVEN_CONTRADICTION because the classifier compared the record against the LIVE
+    # runtime port.  With the R28 rule the live file is not an authority, so nothing DISAGREES
+    # and the honest verdict is UNPROVEN - which still cannot confirm.  The historical JSON keeps
+    # its own, older expectation; this replay records the current one.
+    assert rows["roundD_f09_fixtures/adv_wrong_epoch_port"]["verdict"] == UNPROVEN
+    assert "epoch_authority:absent" in rows["roundD_f09_fixtures/adv_wrong_epoch_port"][
+        "unproven_reason"]
+    # --- the synthetic positive needs a FULL independent lifetime authority
+    positive = rows["r28_synthetic_exact_positive"]
+    snap = positive["frozen_epoch_snapshot"]
+    assert positive["verdict"] == CONFIRMED and positive["returncode"] == 0
+    assert set(snap) >= {"instance_id", "port", "pid", "launched_at"}
+    ident = positive["instance_identity_binding"]
+    assert ident["authority_source"] == "evidence_frozen_snapshot"
+    assert ident["authority_valid"] is True
+    assert ident["lifetime_matches_the_authority"] is True
+    assert ident["instance_id_matches_the_authority"] is True
+    assert positive["port_decision"]["independently_authoritative"] is True
+    assert all(positive["verdict_basis"]["pillars"].values())
+    # --- the real end state: no authority in the old record -> current UNPROVEN, historical kept
+    real = rows["real_waveB_endstate"]
+    assert real["verdict"] == UNPROVEN and real["returncode"] == 1
+    assert real["historical_verdict"] == CONFIRMED
+    assert real["historical_matches_expected"] is True
+    assert real["historical_had_no_authority_fields"] is True
+    assert real["frozen_epoch_snapshot_files"] == []
+    assert "no_validated_independent_epoch_authority" in real["unproven_reason"]
+    assert real["epoch_authority"]["record_declared_epoch"]["complete"] is True, \
+        "the real record declares a complete epoch and is still not an authority"
+    assert real["epoch_authority"]["record_self_declaration_used_as_authority"] is False
