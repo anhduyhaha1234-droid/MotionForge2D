@@ -160,6 +160,9 @@ class S10ChunkRecord:
     revision: int
     created_at: datetime
     updated_at: datetime
+    # DELTA-F1: whole-shot/GROUP membership persisted from the frozen plan
+    # (empty for legacy per-layer chunks).
+    member_layer_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -207,6 +210,27 @@ def _map_run(row: S10FullApplyRun) -> S10RunRecord:
     )
 
 
+def _parse_member_layer_ids(raw: str | None) -> tuple[str, ...]:
+    """DELTA-F1: persisted whole-shot/GROUP members JSON -> tuple.
+
+    Corruption fails closed (a chunk whose membership cannot be read must
+    never be silently treated as member-less by a caller that then guesses).
+    """
+    if not raw:
+        return ()
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError) as err:
+        raise S10ApplyParamsError(f"member_layer_ids_json is not valid JSON: {err}") from err
+    if not isinstance(parsed, list) or any(
+        not isinstance(m, str) or not m for m in parsed
+    ):
+        raise S10ApplyParamsError(
+            "member_layer_ids_json must be a JSON array of non-empty strings"
+        )
+    return tuple(parsed)
+
+
 def _map_chunk(row: S10FullApplyChunk) -> S10ChunkRecord:
     return S10ChunkRecord(
         id=row.id,
@@ -230,6 +254,7 @@ def _map_chunk(row: S10FullApplyChunk) -> S10ChunkRecord:
         revision=row.revision,
         created_at=row.created_at,
         updated_at=row.updated_at,
+        member_layer_ids=_parse_member_layer_ids(row.member_layer_ids_json),
     )
 
 
@@ -490,6 +515,7 @@ class S10ApplyRepository:
         attempt: int = 1,
         natural_key: str | None = None,
         idempotency_key: str | None = None,
+        member_layer_ids: list[str] | None = None,
     ) -> tuple[S10ChunkRecord, bool]:
         if chunk_index < 0 or order_index < 0:
             raise S10ApplyParamsError("chunk_index/order_index must be >= 0")
@@ -508,6 +534,21 @@ class S10ApplyRepository:
             raise S10ApplyParamsError("natural_key too long")
         if idempotency_key is not None and len(idempotency_key) > 255:
             raise S10ApplyParamsError("idempotency_key too long")
+        # DELTA-F1: the whole-shot/GROUP membership rides with the chunk row.
+        member_ids: tuple[str, ...] = ()
+        if member_layer_ids is not None:
+            if isinstance(member_layer_ids, (str, bytes)):
+                raise S10ApplyParamsError(
+                    "member_layer_ids must be a list of layer ids, not a string"
+                )
+            ids = [str(m) for m in member_layer_ids]
+            if any(not m or len(m) > 128 for m in ids):
+                raise S10ApplyParamsError(
+                    "member_layer_ids entries must be non-empty and <= 128 chars"
+                )
+            if len(ids) > 64:
+                raise S10ApplyParamsError("member_layer_ids exceeds 64 entries")
+            member_ids = tuple(sorted(set(ids)))
 
         run = self._session.scalar(
             select(S10FullApplyRun).where(
@@ -571,6 +612,9 @@ class S10ApplyRepository:
             verified=0,
             natural_key=natural_key,
             idempotency_key=idempotency_key,
+            member_layer_ids_json=(
+                _canonical_json(list(member_ids)) if member_ids else None
+            ),
         )
         self._session.add(row)
         try:

@@ -1799,11 +1799,31 @@ def _list_chunks(session_factory, ws: str, run_id: str) -> list[dict[str, Any]]:
     with session_factory() as s:
         rows = s.execute(
             sa_text(
-                "SELECT id, chunk_index, order_index, shot_id, layer_id, object_role_id, core_start_frame, core_end_frame, overlap_before, overlap_after, content_hash, state, attempt, artifact_id, verified, natural_key FROM s10_full_apply_chunk WHERE workspace_id=:ws AND run_id=:rid ORDER BY order_index, chunk_index"
+                "SELECT id, chunk_index, order_index, shot_id, layer_id, object_role_id, core_start_frame, core_end_frame, overlap_before, overlap_after, content_hash, state, attempt, artifact_id, verified, natural_key, member_layer_ids_json FROM s10_full_apply_chunk WHERE workspace_id=:ws AND run_id=:rid ORDER BY order_index, chunk_index"
             ),
             {"ws": ws, "rid": run_id},
         ).mappings().all()
-        return [dict(r) for r in rows]
+        out: list[dict[str, Any]] = []
+        for row in rows:
+            item = dict(row)
+            raw = item.pop("member_layer_ids_json", None)
+            members: list[str] = []
+            if raw:
+                try:
+                    parsed = json.loads(raw)
+                except (TypeError, ValueError):
+                    parsed = None
+                # DELTA-F1: ALL-or-NOTHING — a persisted array is trusted only
+                # when EVERY entry is a non-empty string; anything else stays
+                # EMPTY so the comfy branch fails closed instead of silently
+                # rendering a partial cast (the guard is never widened).
+                if isinstance(parsed, list) and all(
+                    isinstance(m, str) and m for m in parsed
+                ):
+                    members = [str(m) for m in parsed]
+            item["member_layer_ids"] = members
+            out.append(item)
+        return out
 
 
 def _quarantine_chunk(session_factory, ws: str, ch: dict[str, Any], managed_root: Path | None = None) -> None:  # type: ignore[no-untyped-def]
