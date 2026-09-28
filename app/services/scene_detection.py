@@ -72,3 +72,23 @@ def detect_scenes(
         ))
 
     return scenes
+
+def detect_scene_intervals(
+    video_path: str | Path,
+    threshold: float = 27.0,
+    min_scene_len_frames: int = 15,
+) -> list[tuple[int, int]]:
+    """MF-END-11 adapter: frame-exact HALF-OPEN ``[start, end)`` intervals.
+
+    Thin adapter over :func:`detect_scenes` for the MF-END shot planner
+    (``app/services/shot_reskin_plan.py``); the legacy detector contract is
+    untouched.  ``SceneInfo.end_frame`` is inclusive, so the exclusive bound
+    is ``end_frame + 1``.  The planner always re-validates the partition
+    against the MEASURED frame count, so a detector boundary beyond the
+    measured tail is reconciled (dropped + recorded) there - never silently
+    kept.
+    """
+    scenes = detect_scenes(
+        video_path, threshold=threshold, min_scene_len_frames=min_scene_len_frames
+    )
+    return [(scene.start_frame, scene.end_frame + 1) for scene in scenes]
