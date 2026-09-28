@@ -1,7 +1,7 @@
 {
  "schema_version": "mf.reference_asset.graph.v1",
  "graph_id": "reference_asset_v1",
- "generated_at_utc": "2026-09-28T06:10:11Z",
+ "generated_at_utc": "2026-09-28T06:08:41Z",
  "workflow": {
   "graph_file": "app/media_workflows/reference_asset_v1.json",
   "graph_file_sha256": "e49b5669e6e45326ba77c08fc9ab6c6b8c07e0a55479876213847ffa99c1e760",
