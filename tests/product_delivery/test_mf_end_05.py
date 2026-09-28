@@ -454,7 +454,10 @@ def test_micro_repro_sole_head_and_single_child() -> None:
     cfg.set_main_option("script_location", str(root / "migrations"))
     script = ScriptDirectory.from_config(cfg)
 
-    assert script.get_heads() == ["e5f6a7b8c9d0"]
+    # NOTE (integration, DELTA-F1): the sole head moved to b3c4d5e6f7a8
+    # (delta-F1 membership migration), appended AFTER this task's revision.
+    # Pre-registered in manager/protected_test_change_end05.json.
+    assert script.get_heads() == ["b3c4d5e6f7a8"]
     revision = script.get_revision("e5f6a7b8c9d0")
     assert revision.down_revision == "f8b9c0d1e2f3"
     children = [
@@ -463,6 +466,12 @@ def test_micro_repro_sole_head_and_single_child() -> None:
         if rev.down_revision == "f8b9c0d1e2f3"
     ]
     assert children == ["e5f6a7b8c9d0"]
+    children_of_05 = [
+        rev.revision
+        for rev in script.walk_revisions()
+        if rev.down_revision == "e5f6a7b8c9d0"
+    ]
+    assert children_of_05 == ["b3c4d5e6f7a8"]
     migration = root / "migrations" / "versions" / "e5f6a7b8c9d0_mf_series_cast.py"
     assert migration.is_file()
 
@@ -1283,7 +1292,12 @@ def test_negative_downgrade_with_snapshot_rows_refused_zero_mutation(
     finally:
         conn.close()
     assert ddl_after == ddl_before
-    assert version_after == version_before == [("e5f6a7b8c9d0",)]
+    # NOTE (integration, DELTA-F1): head is b3c4d5e6f7a8; the refused downgrade
+    # rolls back the additive delta-F1 step first and stops at this task's
+    # revision e5f6a7b8c9d0 (the series-cast DDL and row stay untouched).
+    # Pre-registered in manager/protected_test_change_end05.json.
+    assert version_before == [("b3c4d5e6f7a8",)]
+    assert version_after == [("e5f6a7b8c9d0",)]
     assert count == 1
 
 

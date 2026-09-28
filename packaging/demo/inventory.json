@@ -1,6 +1,6 @@
 {
   "backend": {
-    "app_tree_sha256": "d9e5ffb6012eee2c5d953a43bf111b28947ecd6af501cfdf503c548ba3178072",
+    "app_tree_sha256": "a2da845734b15dd263b3ef8ea4eec7da12e95c90a88a13f2f7b6399cc2304969",
     "pins": [
       "Pillow==12.2.0",
       "aiosqlite==0.22.1",
@@ -177,7 +177,7 @@
       "sha256": "76f7a5d0b7d69cb0caa5fd3f34aef805334110753d3c294def1b2e4c9cfaabf8"
     }
   ],
-  "generated_at_utc": "2026-09-28T15:31:02+00:00",
+  "generated_at_utc": "2026-09-28T18:02:10+00:00",
   "guardrails": {
     "absolute_user_path_hits": [],
     "absolute_user_path_markers": [
@@ -319,7 +319,7 @@
     ]
   },
   "schema": "mf2d-demo-inventory/1",
-  "source_head": "4b15d93a4e2bb8b71209e7ed72351d69831f4eda",
+  "source_head": "82c84a890349fd2d2251b753d00c5f03f798063d",
   "toolchain": {
     "ffmpeg": {
       "available": true,
