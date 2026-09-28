@@ -1813,11 +1813,14 @@ def _list_chunks(session_factory, ws: str, run_id: str) -> list[dict[str, Any]]:
                     parsed = json.loads(raw)
                 except (TypeError, ValueError):
                     parsed = None
-                if isinstance(parsed, list):
-                    members = [str(m) for m in parsed if isinstance(m, str)]
-            # DELTA-F1: the worker reads the persisted whole-shot/GROUP
-            # membership; unreadable/absent values stay EMPTY so the
-            # comfy branch still fails closed (the guard is never widened).
+                # DELTA-F1: ALL-or-NOTHING — a persisted array is trusted only
+                # when EVERY entry is a non-empty string; anything else stays
+                # EMPTY so the comfy branch fails closed instead of silently
+                # rendering a partial cast (the guard is never widened).
+                if isinstance(parsed, list) and all(
+                    isinstance(m, str) and m for m in parsed
+                ):
+                    members = [str(m) for m in parsed]
             item["member_layer_ids"] = members
             out.append(item)
         return out

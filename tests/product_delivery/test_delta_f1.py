@@ -618,7 +618,9 @@ def test_delta_f1_5_corrupt_members_json_fails_closed_never_fabricates(
 ) -> None:
     factory, seed, _artifacts, scene_pk = _seed_world(tmp_path)
     run_id, _plan = _submit(factory, seed, scene_pk)
-    _set_raw_members(tmp_path / "delta-f1.db", run_id, "{not a json array")
+    db = tmp_path / "delta-f1.db"
+    # (a) unparsable JSON
+    _set_raw_members(db, run_id, "{not a json array")
     world = _EngineWorld(tmp_path, factory, seed, run_id)
     assert world.members == []
 
@@ -627,6 +629,18 @@ def test_delta_f1_5_corrupt_members_json_fails_closed_never_fabricates(
 
     assert "member_layer_ids" in str(exc.value)
     assert world.calls == []
+
+    # (b) parseable array with a NON-string entry: all-or-nothing, never a
+    # silently reduced cast
+    _set_raw_members(db, run_id, '["a-layer", 5]')
+    world2 = _EngineWorld(tmp_path, factory, seed, run_id)
+    assert world2.members == []
+
+    with pytest.raises(jobs.S10FullApplyJobError) as exc2:
+        world2.render(monkeypatch)
+
+    assert "member_layer_ids" in str(exc2.value)
+    assert world2.calls == []
 
 
 # ── F1.6 — legacy plans stay member-less (the column invents nothing) ───────
