@@ -2578,6 +2578,112 @@ class StructuralEvidenceRepository:
         return [_map_motion(row) for row in rows]
 
     def get_motion(self, workspace_id: str, motion_id: str) -> MotionRecord:
+        """Read one motion record (workspace-scoped)."""
+        return self._map_motion_or_raise(workspace_id, motion_id)
+
+    # ── source-algorithm read helper (MF-END-13) ─────────────────────────
+
+    def list_source_algorithm_facts(
+        self, workspace_id: str, video_item_id: str, *, algorithm: str
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Read the rows ONE source-fact algorithm published for a video.
+
+        Deterministic (start frame, id) order.  The read authority the
+        structural-lock manifest and the source-interaction-facts API share;
+        it never mutates rows and never invents a row for a missing fact.
+        """
+        contacts = list(
+            self._session.scalars(
+                select(SceneGraphContact)
+                .where(
+                    SceneGraphContact.workspace_id == workspace_id,
+                    SceneGraphContact.video_item_id == video_item_id,
+                    SceneGraphContact.algorithm == algorithm,
+                )
+                .order_by(SceneGraphContact.start_frame, SceneGraphContact.id)
+            ).all()
+        )
+        occlusions = list(
+            self._session.scalars(
+                select(SceneGraphOcclusion)
+                .where(
+                    SceneGraphOcclusion.workspace_id == workspace_id,
+                    SceneGraphOcclusion.video_item_id == video_item_id,
+                    SceneGraphOcclusion.algorithm == algorithm,
+                )
+                .order_by(SceneGraphOcclusion.start_frame, SceneGraphOcclusion.id)
+            ).all()
+        )
+        motions = list(
+            self._session.scalars(
+                select(SegmentMotion)
+                .join(
+                    OccurrenceSegment,
+                    SegmentMotion.occurrence_segment_id == OccurrenceSegment.id,
+                )
+                .where(
+                    OccurrenceSegment.workspace_id == workspace_id,
+                    OccurrenceSegment.video_item_id == video_item_id,
+                    SegmentMotion.algorithm == algorithm,
+                )
+                .order_by(SegmentMotion.start_frame, SegmentMotion.id)
+            ).all()
+        )
+
+        def _prov(raw: str | None) -> dict[str, Any]:
+            value = parse_json(raw)
+            return value if isinstance(value, dict) else {}
+
+        return {
+            "contacts": [
+                {
+                    "id": str(row.id),
+                    "source_segment_id": str(row.source_segment_id),
+                    "target_segment_id": str(row.target_segment_id),
+                    "contact_kind": str(row.contact_kind),
+                    "start_frame": int(row.start_frame),
+                    "end_frame": int(row.end_frame),
+                    "confidence": float(row.confidence),
+                    "algorithm": row.algorithm,
+                    "algorithm_version": row.algorithm_version,
+                    "provenance": _prov(row.provenance_json),
+                }
+                for row in contacts
+            ],
+            "occlusions": [
+                {
+                    "id": str(row.id),
+                    "occluder_segment_id": str(row.occluder_segment_id),
+                    "occludee_segment_id": str(row.occludee_segment_id),
+                    "start_frame": int(row.start_frame),
+                    "end_frame": int(row.end_frame),
+                    "confidence": float(row.confidence),
+                    "algorithm": row.algorithm,
+                    "algorithm_version": row.algorithm_version,
+                    "provenance": _prov(row.provenance_json),
+                }
+                for row in occlusions
+            ],
+            "motions": [
+                {
+                    "id": str(row.id),
+                    "occurrence_segment_id": str(row.occurrence_segment_id),
+                    "transform_type": str(row.transform_type),
+                    "transform": parse_json(row.transform_json) or {},
+                    "start_frame": int(row.start_frame),
+                    "end_frame": int(row.end_frame),
+                    "start_time_ms": int(row.start_time_ms),
+                    "end_time_ms": int(row.end_time_ms),
+                    "confidence": float(row.confidence),
+                    "algorithm": row.algorithm,
+                    "algorithm_version": row.algorithm_version,
+                    "provenance": _prov(row.provenance_json),
+                }
+                for row in motions
+            ],
+        }
+
+    def _map_motion_or_raise(self, workspace_id: str, motion_id: str) -> MotionRecord:
         row = self._session.get(SegmentMotion, motion_id)
         if row is None or row.workspace_id != workspace_id:
             raise MotionNotFoundError(f"Motion {motion_id!r} not found")

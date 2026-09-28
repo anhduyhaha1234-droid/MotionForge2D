@@ -590,6 +590,38 @@ class Sam2ExtractionProvider(ExtractionProvider):
     def available(self) -> bool:
         return self._capability()[0]
 
+    def capability_report(self) -> dict[str, Any]:
+        """Structured REAL capability record (MF-END-12.1 probe).
+
+        Runs the same probe as :meth:`available` — nothing is inferred from a
+        bare environment string: the checkpoint file is opened and
+        magic-checked, the ``sam2`` package and its shipped model config are
+        imported, and the torch backend is exercised.  The returned mapping is
+        the record a role-track artifact binds as its engine probe, with an
+        explicit ``AVAILABLE_PROBED``/``BLOCKED_DEPENDENCY`` status so a
+        missing checkpoint is recorded as evidence, never as an applied engine.
+        """
+        ready, message = self._capability()
+        checkpoint = self._resolved_checkpoint()
+        report: dict[str, Any] = {
+            "provider": self.name,
+            "model_version": self.model_version,
+            "status": "AVAILABLE_PROBED" if ready else "BLOCKED_DEPENDENCY",
+            "ready": bool(ready),
+            "message": message,
+            "checkpoint": None if checkpoint is None else str(checkpoint),
+            "model_cfg": self._resolved_model_cfg(),
+            "device": self._resolved_device(),
+            "checkpoint_bytes": None,
+        }
+        if checkpoint is not None:
+            try:
+                if checkpoint.is_file():
+                    report["checkpoint_bytes"] = int(checkpoint.stat().st_size)
+            except OSError:
+                report["checkpoint_bytes"] = None
+        return report
+
     def _decode_frame(self, media_path: Path, time_seconds: float) -> Any | None:
         """Decode ONE frame from the managed media (read-only, bounded)."""
         from app.services.ffmpeg_utils import find_ffmpeg  # noqa: PLC0415

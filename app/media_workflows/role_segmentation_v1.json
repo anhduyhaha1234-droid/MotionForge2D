@@ -1,0 +1,108 @@
+{
+  "contract": {
+    "artifact_schema": "mf.source_role_tracks.v1",
+    "service": "app/services/source_role_tracks.py",
+    "timebase_contract": "app/services/shot_reskin_plan.py (MF-END-11 SourceSpan/TimebaseFacts)"
+  },
+  "digest": "3279e2e00e5233dadc283a4d4dcf95da46168c148843c539533ca9cc23bbfe8e",
+  "engines": {
+    "comfyui_sam2_nodes": {
+      "blocked_reason": "runtime object_info shows Sam2Segmentation + TrackToMask are NOT registered (P0_RUNTIME_MATRIX.json missing_nodes) and the runtime model roots have no sam2 weights; the ComfyUI segmentation route cannot run, so the app-side SAM2.1 provider route is the only real one",
+      "refusal_if_unavailable": "ROLE_TRACKS_ENGINE_UNPROBED",
+      "status": "BLOCKED_DEPENDENCY"
+    },
+    "contour": {
+      "detail": "OpenCV contour adapter: deterministic CI fixtures only, never production tracks",
+      "production": false,
+      "refusal_if_production": "ROLE_TRACKS_FIXTURE_NOT_PRODUCTION",
+      "status": "CI_ONLY"
+    },
+    "sam2.1": {
+      "adapter": "app.adapters.segmentation.SAM2Adapter",
+      "probe_evidence": "tasks/MF-END-12/raw/sam21_capability_probe.json",
+      "probe_note": "probed on this host during MF-END-12: capability_report() -> AVAILABLE_PROBED (checkpoint stat + PK magic + sam2 package + torch cuda)",
+      "provider": "app.services.object_extraction.Sam2ExtractionProvider",
+      "refusal_if_unavailable": "ROLE_TRACKS_ENGINE_UNPROBED",
+      "status": "AVAILABLE_PROBED",
+      "weights": "C:/Users/Admin/MotionForge2D/models_checkpoints/sam2.1_hiera_large.pt",
+      "weights_bytes": 898083611
+    },
+    "sam3": {
+      "blocked_reason": "no SAM3/SAM3.1 weights in the pinned model roots (P0_MODEL_INVENTORY.json missing_groups includes sam2/sam3/checkpoints); SAM3 has NOT run on this machine and must not be recorded as applied",
+      "probe_run": null,
+      "promotion_policy": "promote ONLY after a real Windows 12GB run that fits VRAM and passes the same role-track tests on identical frames",
+      "refusal_if_claimed": "ROLE_TRACKS_SAM3_UNPROBED",
+      "status": "BLOCKED_DEPENDENCY"
+    }
+  },
+  "mask_rules": {
+    "all_canvas_max_coverage_ratio": 0.92,
+    "hollow_max_hole_ratio": 0.35,
+    "min_area_px": 16,
+    "note": "a mask at/above the coverage ratio or hole ratio NEVER grants an edit permission"
+  },
+  "provenance_rules": {
+    "ci_fixture": "never counts as production; require_production refuses it",
+    "missing_data": "an unmeasured value stays null/UNKNOWN; it is never invented (U21)",
+    "production": "requires a production mask source with a real AVAILABLE_PROBED probe record"
+  },
+  "purpose": "Seed and track every real role/prop of a source span into the sealed frame->mask->track artifact mf.source_role_tracks.v1. Masks come from a REAL segmenter; a CI fixture source may never be recorded as production.",
+  "refusal_codes": [
+    "ROLE_TRACKS_SOURCE_INVALID",
+    "ROLE_TRACKS_SPAN_INVALID",
+    "ROLE_TRACKS_SEED_INVALID",
+    "ROLE_TRACKS_SEED_NOT_SEEN",
+    "ROLE_TRACKS_MASK_EMPTY",
+    "ROLE_TRACKS_MASK_ALL_CANVAS",
+    "ROLE_TRACKS_MASK_HOLLOW",
+    "ROLE_TRACKS_DUPLICATE_INSTANCE",
+    "ROLE_TRACKS_FIXTURE_NOT_PRODUCTION",
+    "ROLE_TRACKS_ENGINE_UNPROBED",
+    "ROLE_TRACKS_SAM3_UNPROBED",
+    "ROLE_TRACKS_NO_TRACE",
+    "ROLE_TRACKS_PARTIAL_DROPPED",
+    "ROLE_TRACKS_INSTANCE_CHANGED",
+    "ROLE_TRACKS_SOURCE_CHANGED",
+    "ROLE_TRACKS_DIGEST_MISMATCH",
+    "ROLE_TRACKS_VERSION_UNSUPPORTED",
+    "ROLE_TRACKS_SERIALIZATION_INVALID",
+    "ROLE_TRACKS_MANIFEST_INVALID",
+    "ROLE_TRACKS_ARTIFACT_INVALID",
+    "ROLE_TRACKS_OBSERVATION_INVALID"
+  ],
+  "schema": "mf.role_segmentation_workflow.v1",
+  "steps": [
+    {
+      "adapter_probe": "app.workflow.segmentation_service.SegmentationService.capability",
+      "detail": "real availability probe of the segmenter: checkpoint stat + torch zip magic + sam2 package import + torch backend; record concrete path/bytes/device, never a bare name",
+      "id": "capability_probe",
+      "provider": "app.services.object_extraction.Sam2ExtractionProvider.capability_report"
+    },
+    {
+      "detail": "declared real seeds (role_id, kind, box, declare_frames)",
+      "id": "seed_roles_props"
+    },
+    {
+      "detail": "per-frame mask on the REAL decoded frame; digest + measured stats",
+      "id": "frame_to_mask"
+    },
+    {
+      "detail": "single instance id per seed, occlusion runs, no re-identification",
+      "id": "mask_to_track"
+    },
+    {
+      "detail": "check_artifact invariants + require_production at publication time",
+      "id": "validate_artifact"
+    }
+  ],
+  "track_rules": {
+    "area_jump_factor": 3.0,
+    "drift_ratio_of_seed_box_diagonal": 0.75,
+    "duplicate_instance_iou": 0.85,
+    "instance_id_policy": "one id per seed for the whole declared span; occlusion keeps the id",
+    "partial_character_policy": "partial-required roles are mandatory: any gap refuses ROLE_TRACKS_PARTIAL_DROPPED",
+    "unstable_step_shift_ratio_of_sqrt_area": 0.6
+  },
+  "version": "1.0.0",
+  "workflow_id": "role_segmentation_v1"
+}

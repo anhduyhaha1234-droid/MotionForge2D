@@ -50,6 +50,7 @@ __all__ = [
     "select_occurrence_box",
     "derive_region",
     "validate_partition",
+    "validate_half_open_partition",
     "validate_timeline_block",
     "parse_time_base",
     "pick_partition_code",
@@ -412,3 +413,55 @@ def validate_timeline_block(
         route = occ.get("route")
         if not isinstance(route, str) or not route:
             raise TimelineAuthorityError(CODE_TIMELINE_INVALID, f"occurrence {layer_id!r} route missing")
+
+def validate_half_open_partition(spans: Any, frame_count: Any) -> list[str]:
+    """Half-open ``[start, end)`` variant of :func:`validate_partition`.
+
+    MF-END-11 (shot plan) keeps the product convention - half-open,
+    exclusive end - while the frozen timeline block above keeps the
+    inclusive one; the problem strings use the SAME vocabulary so
+    :func:`pick_partition_code` maps them onto the same typed codes.
+    Contract: strictly increasing starts, first ``start == 0``, contiguous
+    (``cur.start == prev.end``), last ``end == frame_count``.
+
+    Returns problem strings (``[]`` = ok).
+    """
+    problems: list[str] = []
+    if not isinstance(spans, list) or not spans:
+        return ["no shots"]
+    ordered: list[tuple[int, int]] = []
+    for index, span in enumerate(spans):
+        if not isinstance(span, (list, tuple)) or len(span) != 2:
+            return [f"shot[{index}] must be a [start, end) pair"]
+        try:
+            start = int(span[0])
+            end = int(span[1])
+        except (TypeError, ValueError):
+            return [f"shot[{index}] missing/invalid frames"]
+        ordered.append((start, end))
+    if ordered[0][0] != 0:
+        problems.append(f"first shot must start at 0, got {ordered[0][0]}")
+    prev: int | None = None
+    for start, end in ordered:
+        if end <= start:
+            problems.append(f"shot [{start},{end}) is empty or inverted")
+        if prev is not None:
+            if start < prev:
+                problems.append(
+                    f"shots overlap or non-monotonic: start {start} < previous end {prev}"
+                )
+            elif start > prev:
+                problems.append(
+                    f"gap between shots: previous ends at {prev}, next starts at {start}"
+                )
+        prev = end
+    if problems:
+        return problems
+    assert prev is not None
+    if not isinstance(frame_count, int) or frame_count < 1:
+        problems.append(f"frame_count {frame_count!r} must be int >= 1")
+    elif prev != frame_count:
+        problems.append(
+            f"coverage mismatch: shots cover {prev} frames, frame_count is {frame_count}"
+        )
+    return problems
