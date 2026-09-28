@@ -36,6 +36,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import time
 import uuid
 from pathlib import Path
@@ -1231,6 +1232,177 @@ def _render_shot_chunk_via_engine(
     return rel, sha, size, evidence
 
 
+# ── DELTA-F5: declaration-driven publication conform ─────────────────────────
+
+#: The profile pad-declaration grammar this module can reconcile against real
+#: bytes, e.g. ``"centered (4+4 rows over 640x360)"``.  Anything else refuses.
+_PAD_DECLARATION_RE = re.compile(
+    r"^\s*(?P<mode>[A-Za-z][A-Za-z _-]*?)\s*\(\s*(?P<top>\d+)\s*\+\s*(?P<bottom>\d+)"
+    r"\s+rows?\s+over\s+(?P<width>\d+)\s*[xX]\s*(?P<height>\d+)\s*\)\s*$"
+)
+
+
+def _parse_pad_declaration(pad: Any) -> dict[str, Any]:
+    """Parse the run profile's declared pad into explicit rows + base geometry.
+
+    The declaration is the ONLY authority for WHERE the padding rows are: this
+    parser never guesses a symmetric split from ``native_output_dims`` alone.
+    An absent/unrecognized declaration is a TYPED refusal — the publication
+    never crops bytes it cannot reconcile with a declaration.
+    """
+    if not isinstance(pad, str) or not pad.strip():
+        raise S10FullApplyJobError(
+            "STITCH_CONFORM_DECLARATION_MISSING: the run's model profile declares "
+            "no pad, so a render whose geometry differs from the source cannot be "
+            "conformed to the publication geometry (fail closed)"
+        )
+    match = _PAD_DECLARATION_RE.match(pad)
+    if match is None:
+        raise S10FullApplyJobError(
+            f"STITCH_CONFORM_DECLARATION_INVALID: profile pad declaration {pad!r} "
+            "is not of the form '<mode> (<top>+<bottom> rows over <w>x<h>)' "
+            "(fail closed)"
+        )
+    declared: dict[str, Any] = {
+        "mode": str(match.group("mode")).strip().lower(),
+        "top": int(match.group("top")),
+        "bottom": int(match.group("bottom")),
+        "base_width": int(match.group("width")),
+        "base_height": int(match.group("height")),
+        "declaration": pad,
+    }
+    if declared["mode"] == "centered":
+        extra = declared["top"] + declared["bottom"]
+        if declared["top"] != extra // 2 or declared["bottom"] != extra - extra // 2:
+            raise S10FullApplyJobError(
+                f"STITCH_CONFORM_PAD_MISMATCH: pad declaration {pad!r} claims a "
+                f"centered split but {declared['top']}+{declared['bottom']} rows "
+                "are not centered (fail closed)"
+            )
+    return declared
+
+
+def _publication_conform(
+    *,
+    source_shape: tuple[int, int],
+    render_shape: tuple[int, int],
+    declaration: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Resolve the declaration-driven crop that conforms render → source geometry.
+
+    The publication geometry is the SOURCE geometry (the QC evidence compares
+    source frames against the rendered publication; the render graph keeps its
+    own /16-friendly geometry).  When the measured render geometry already
+    equals the source geometry the conform is the identity.  Otherwise the
+    profile's OWN declaration must reconcile with BOTH measured geometries:
+
+      * ``pad`` parses into explicit top/bottom rows + base width/height;
+      * declared base width/height == measured source width/height;
+      * declared base width == measured render width (the pad carries rows only);
+      * ``top + bottom + base_height`` == measured render height;
+      * when the profile also declares ``native_output_dims``, they must equal
+        the measured render geometry and stay consistent with the pad rows.
+    """
+    src_h, src_w = int(source_shape[0]), int(source_shape[1])
+    ren_h, ren_w = int(render_shape[0]), int(render_shape[1])
+    if (ren_h, ren_w) == (src_h, src_w):
+        return {
+            "schema": "mf-delta-f5/publication-conform@1",
+            "applied": False,
+            "mode": "identity",
+            "pad_top": 0,
+            "pad_bottom": 0,
+            "render_dims": [ren_w, ren_h],
+            "source_dims": [src_w, src_h],
+            "declaration": None,
+        }
+    decl = dict(declaration or {})
+    declared = _parse_pad_declaration(decl.get("pad"))
+    mismatches: list[str] = []
+    if declared["base_width"] != src_w or declared["base_height"] != src_h:
+        mismatches.append(
+            f"declared base {declared['base_width']}x{declared['base_height']} != "
+            f"measured source {src_w}x{src_h}"
+        )
+    if declared["base_width"] != ren_w:
+        mismatches.append(
+            f"declared base width {declared['base_width']} != measured render "
+            f"width {ren_w} (the declared pad carries rows only)"
+        )
+    if declared["top"] + declared["bottom"] + declared["base_height"] != ren_h:
+        mismatches.append(
+            f"declared rows {declared['top']}+{declared['bottom']} + base height "
+            f"{declared['base_height']} != measured render height {ren_h}"
+        )
+    native = decl.get("native_output_dims")
+    if native is not None:
+        try:
+            native_w, native_h = int(native[0]), int(native[1])
+        except Exception:  # noqa: BLE001 — an unreadable dims pair cannot reconcile
+            mismatches.append(f"native_output_dims {native!r} is not a [w, h] pair")
+        else:
+            if (native_w, native_h) != (ren_w, ren_h):
+                mismatches.append(
+                    f"declared native_output_dims {native_w}x{native_h} != measured "
+                    f"render {ren_w}x{ren_h}"
+                )
+            if (
+                declared["base_width"] != native_w
+                or declared["top"] + declared["bottom"] + declared["base_height"] != native_h
+            ):
+                mismatches.append(
+                    f"pad declaration {declared['declaration']!r} is inconsistent "
+                    f"with native_output_dims {native_w}x{native_h}"
+                )
+    if mismatches:
+        raise S10FullApplyJobError(
+            "STITCH_CONFORM_PAD_MISMATCH: the run profile's geometry declaration "
+            f"does not reconcile with the measured bytes ({'; '.join(mismatches)}) "
+            "— refusing to crop frames on a guess (fail closed)"
+        )
+    return {
+        "schema": "mf-delta-f5/publication-conform@1",
+        "applied": True,
+        "mode": declared["mode"],
+        "pad_top": declared["top"],
+        "pad_bottom": declared["bottom"],
+        "render_dims": [ren_w, ren_h],
+        "source_dims": [src_w, src_h],
+        "declaration": declared["declaration"],
+    }
+
+
+def _conform_frames(frames: list[Any], conform: dict[str, Any]) -> list[Any]:
+    """Strip the DECLARED pad rows from every frame of one decoded chunk."""
+    if not conform["applied"]:
+        return frames
+    top = int(conform["pad_top"])
+    bottom = int(conform["pad_bottom"])
+    height = int(frames[0].shape[0])
+    return [frame[top : height - bottom] for frame in frames]
+
+
+def _publication_geometry_declaration(backend: dict[str, Any]) -> dict[str, Any]:
+    """The run profile's OWN geometry declaration: pad + native_output_dims.
+
+    Read from the frozen profile registry through the same accessor the render
+    path uses.  An unreadable/unknown profile declares NOTHING here — and a
+    conform that then cannot be reconciled refuses (fail closed), it is never
+    replaced by a hardcoded crop.
+    """
+    profile_id = str(backend.get("profile_id") or "")
+    if not profile_id or _select_shot_profile is None:
+        return {}
+    try:
+        profile = _select_shot_profile(profile_id)
+    except Exception:  # noqa: BLE001 — an unreadable profile declares no pad
+        return {}
+    params = profile.get("params") if isinstance(profile, dict) else None
+    if not isinstance(params, dict):
+        return {}
+    return {"pad": params.get("pad"), "native_output_dims": params.get("native_output_dims")}
+
+
 def _stitch_shot_chunks(
     *,
     managed_root: Path,
@@ -1243,6 +1415,7 @@ def _stitch_shot_chunks(
     authority: dict[str, Any] | None = None,
     manifest: dict[str, Any] | None = None,
     frame_count: int | None = None,
+    pad: dict[str, Any] | None = None,
 ) -> tuple[Path, str, int, dict[str, Any]]:
     """Stitch verified whole-shot chunks into one playable MP4 (19.4).
 
@@ -1253,6 +1426,13 @@ def _stitch_shot_chunks(
     fail closed, zero publication), at least one frame must be GENERATED, and
     the stitched file must NOT be the source bytes — the source is never
     returned as a successful output.
+
+    DELTA-F5: the publication geometry IS the source geometry.  When the
+    decoded chunk bytes carry a different geometry, the DECLARED pad of the
+    run's model profile (``pad``, e.g. ``centered (4+4 rows over 640x360)``)
+    is stripped from every chunk frame before assembly — never a hardcoded
+    crop, and a declaration that does not reconcile with the measured bytes
+    refuses (fail closed).
     """
     from app.services.renderer_routes.composite import (  # noqa: PLC0415
         canonical_frame_sha256,
@@ -1280,6 +1460,10 @@ def _stitch_shot_chunks(
         )
     timeline: list[Any] = [None] * expected
     per_chunk: list[dict[str, Any]] = []
+    # DELTA-F5: resolved from the FIRST decoded chunk against the decoded
+    # source (measured bytes, not declared numbers alone).
+    conform: dict[str, Any] | None = None
+    target_shape = (int(src_frames[0].shape[0]), int(src_frames[0].shape[1]))
     for ch in ordered:
         chunk_id = str(ch.get("chunk_id"))
         if not bool(ch.get("verified")):
@@ -1320,7 +1504,21 @@ def _stitch_shot_chunks(
                 f"STITCH_FRAME_COVERAGE_MISMATCH: chunk {chunk_id} decodes to "
                 f"{len(frames)} frames; core range wants {want}"
             )
-        for i, frame in enumerate(frames):
+        if conform is None:
+            conform = _publication_conform(
+                source_shape=target_shape,
+                render_shape=(int(frames[0].shape[0]), int(frames[0].shape[1])),
+                declaration=pad,
+            )
+        conformed = _conform_frames(frames, conform)
+        for _frame_index, _frame in enumerate(conformed):
+            if _frame.shape[:2] != target_shape:
+                raise S10FullApplyJobError(
+                    f"STITCH_CONFORM_FRAME_GEOMETRY: chunk {chunk_id} frame "
+                    f"{_frame_index} is {_frame.shape[:2]} after conform; the "
+                    f"publication geometry is {target_shape} (fail closed)"
+                )
+        for i, frame in enumerate(conformed):
             idx = c_start + i
             if idx < 0 or idx >= expected:
                 raise S10FullApplyJobError(
@@ -1343,6 +1541,8 @@ def _stitch_shot_chunks(
                 "artifact_size_bytes": int(row["size_bytes"] or 0),
                 "decoded_frame_count": len(frames),
                 "decoded_sha256": canonical_frame_sha256(frames),
+                "publication_decoded_sha256": canonical_frame_sha256(conformed),
+                "conform_applied": bool(conform["applied"]),
             }
         )
     generated = sum(1 for f in timeline if f is not None)
@@ -1354,6 +1554,14 @@ def _stitch_shot_chunks(
     for idx, frame in enumerate(timeline):
         if frame is None:
             timeline[idx] = src_frames[idx]
+    assert conform is not None  # the chunk loop above always resolves it
+    for idx, frame in enumerate(timeline):
+        if frame.shape[:2] != target_shape:
+            raise S10FullApplyJobError(
+                f"STITCH_CONFORM_FRAME_GEOMETRY: timeline frame {idx} is "
+                f"{frame.shape[:2]} but the publication geometry is "
+                f"{target_shape} (fail closed)"
+            )
     rel = Path(f"s10_full_apply/{run_id}/stitch_shot_chunks.mp4")
     abs_out = _lp(managed_root / rel)
     abs_out.parent.mkdir(parents=True, exist_ok=True)
@@ -1374,6 +1582,8 @@ def _stitch_shot_chunks(
         "source_frames_verbatim": expected - generated,
         "per_chunk_evidence": per_chunk,
         "backend": "comfy_shot_engine",
+        "publication_geometry": {"width": int(target_shape[1]), "height": int(target_shape[0])},
+        "conform": dict(conform),
     }
     return rel, stitch_sha, abs_out.stat().st_size, meta
 
@@ -1651,6 +1861,11 @@ def s10_full_apply_handler(ctx: WorkerContext) -> dict[str, Any]:
             # source as the output); the legacy backend keeps the per-layer
             # composition contract.
             _stitch_fn = _stitch_shot_chunks if comfy_shot_mode else _stitch_verified_chunks
+            _stitch_kwargs: dict[str, Any] = {}
+            if comfy_shot_mode:
+                # DELTA-F5: conform the publication to the SOURCE geometry using
+                # the run profile's OWN pad declaration (never a hardcoded crop).
+                _stitch_kwargs["pad"] = _publication_geometry_declaration(backend_manifest)
             stitch_rel, stitch_sha, stitch_size, stitch_meta = _stitch_fn(
                 managed_root=managed_root,
                 run_id=run_id,
@@ -1662,6 +1877,7 @@ def s10_full_apply_handler(ctx: WorkerContext) -> dict[str, Any]:
                 authority=authority,
                 manifest=manifest,
                 frame_count=int(run_row.get("frame_count") or 0) or None,
+                **_stitch_kwargs,
             )
         except Exception as exc:
             _mark_run_status(session_factory, ws, run_id, "failed")
