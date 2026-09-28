@@ -154,6 +154,200 @@ def resolve_original_audio_source(
     }
 
 
+# ── DELTA-F7: original-audio fallback for the export stitch ─────────────────
+#
+# The completed Full Apply publication is written VIDEO-ONLY by design
+# (``write_frames_mp4`` stitches the reskinned video), so probing it alone can
+# never carry audio to the export master.  The product contract
+# (ORIGINAL_AUDIO_REMUX_CONTRACT §1/§4 — "the original audio survives to
+# render time"; no-audio ⇒ explicit NO_AUDIO_PRESENT, never a fabricated
+# track) requires the export legs to resolve the ORIGINAL audio from the
+# server-owned VideoItem artifacts when the publication itself is silent.
+
+#: Artifact-owner purpose of a VideoItem's canonical attached original audio
+#: (S11-T04C attach slice; literal kept here so the export leg never imports
+#: the attach handler's module surface).
+ORIGINAL_AUDIO_ARTIFACT_PURPOSE = "original_audio"
+
+#: Provenance modes of the original-audio fallback resolution.
+AUDIO_FALLBACK_MODE_ATTACH = "original_audio_attach"
+AUDIO_FALLBACK_MODE_SOURCE = "source_artifact"
+
+
+def _managed_relative_file(
+    managed_root: str | Path | None, relative_path: str | None
+) -> Path | None:
+    """Resolve a server-owned managed relative path to a real file, or None.
+
+    Same containment contract as the route's ``_source_artifact_path``: the
+    row's ``relative_path`` is managed-root relative; a missing root, an
+    empty path, an escape from the root, or a non-file is treated as absent
+    (never exported/resolved).
+    """
+    if managed_root is None or not relative_path:
+        return None
+    root = Path(str(managed_root))
+    try:
+        root_resolved = root.resolve()
+        candidate = (root_resolved / str(relative_path)).resolve()
+    except OSError:
+        return None
+    if not str(candidate).startswith(str(root_resolved)):
+        return None
+    if not candidate.is_file():
+        return None
+    return candidate
+
+
+def resolve_export_audio_source(
+    session: Any,
+    *,
+    workspace_id: str,
+    video_item_id: str | None,
+    source_path: str | Path,
+    managed_root: str | Path | None,
+) -> tuple[str | None, dict[str, Any]]:
+    """DELTA-F7 — export audio resolution with the original-audio fallback.
+
+    Resolution order; every candidate is probed with the real bounded ffprobe
+    before it enters the run manifest:
+
+    1. the publication itself (unchanged MF-END-26 behavior) — present ⇒ used;
+    2. the canonical attached original-audio artifact (``artifact_owner``:
+       owner_type ``video_item``, purpose ``original_audio``, ready state;
+       newest row wins) — the S11-T04C attach output;
+    3. the VideoItem's CURRENT source artifact (``source_artifact_id`` — the
+       R5-P1 single authority), which carries the canonical first audio
+       stream of the imported source by definition.
+
+    Absent everywhere (the source genuinely has no audio) ⇒ ``None`` with
+    ``mode="absent"`` plus the measured probe outcomes of every candidate —
+    the export stays honestly silent; nothing is ever fabricated.  Never a
+    loose/client path: every candidate comes from a workspace-scoped
+    artifact row under the managed root, and the probe is the arbiter.  The
+    fallback is additive and fail-soft: unreadable rows/roots are recorded
+    as attempts, never raised into the submit leg.
+    """
+    value, provenance = resolve_original_audio_source(source_path)
+    if value is not None:
+        return value, provenance
+
+    publication_probe = dict(provenance)
+    attempts: list[dict[str, Any]] = []
+    try:
+        from app.persistence.models import (  # noqa: PLC0415
+            Artifact,
+            ArtifactOwner,
+            VideoItem,
+        )
+        from app.services.original_audio_remux import (  # noqa: PLC0415
+            OriginalAudioRemuxError,
+            probe_original_audio,
+        )
+
+        candidates: list[tuple[str, str, Any]] = []
+        if video_item_id:
+            item = session.get(VideoItem, str(video_item_id))
+            owner_rows = list(
+                session.scalars(
+                    select(ArtifactOwner).where(
+                        ArtifactOwner.owner_type == "video_item",
+                        ArtifactOwner.owner_id == str(video_item_id),
+                        ArtifactOwner.purpose == ORIGINAL_AUDIO_ARTIFACT_PURPOSE,
+                    )
+                )
+            )
+            attached = [
+                artifact
+                for artifact in (
+                    session.get(Artifact, str(row.artifact_id)) for row in owner_rows
+                )
+                if artifact is not None
+                and str(artifact.workspace_id) == str(workspace_id)
+                and str(artifact.state) == "ready"
+            ]
+            attached.sort(
+                key=lambda a: (
+                    str(a.created_at or ""),
+                    int(a.revision or 0),
+                    str(a.id),
+                ),
+                reverse=True,
+            )
+            for artifact in attached:
+                candidates.append(
+                    (
+                        AUDIO_FALLBACK_MODE_ATTACH,
+                        "attached original audio artifact "
+                        "(video_item purpose=original_audio)",
+                        artifact,
+                    )
+                )
+            source_artifact_id = getattr(item, "source_artifact_id", None)
+            if source_artifact_id:
+                source_artifact = session.get(Artifact, str(source_artifact_id))
+                if (
+                    source_artifact is not None
+                    and str(source_artifact.workspace_id) == str(workspace_id)
+                    and str(source_artifact.state) == "ready"
+                ):
+                    candidates.append(
+                        (
+                            AUDIO_FALLBACK_MODE_SOURCE,
+                            "video item source artifact (purpose=source)",
+                            source_artifact,
+                        )
+                    )
+
+        for mode, label, artifact in candidates:
+            attempt: dict[str, Any] = {
+                "mode": mode,
+                "artifact_id": str(artifact.id),
+                "relative_path": str(artifact.relative_path or ""),
+                "kind": str(artifact.kind or ""),
+            }
+            path = _managed_relative_file(managed_root, artifact.relative_path)
+            if path is None:
+                attempt["outcome"] = "not resolvable under the managed root"
+                attempts.append(attempt)
+                continue
+            try:
+                probe = probe_original_audio(path)
+            except OriginalAudioRemuxError as exc:
+                attempt["outcome"] = f"probe failed closed: {exc.code}"
+                attempts.append(attempt)
+                continue
+            except Exception as exc:  # noqa: BLE001 — never crash the submit leg
+                attempt["outcome"] = f"probe error: {type(exc).__name__}"
+                attempts.append(attempt)
+                continue
+            if not probe.present:
+                attempt["outcome"] = "absent"
+                attempt["detail"] = probe.detail
+                attempts.append(attempt)
+                continue
+            attempt["outcome"] = "present"
+            attempts.append(attempt)
+            return str(path), {
+                "source": label,
+                "mode": mode,
+                "artifact_id": str(artifact.id),
+                "relative_path": str(artifact.relative_path or ""),
+                "publication_probe": publication_probe,
+                "codec": probe.codec,
+                "sample_rate": probe.sample_rate,
+                "channels": probe.channels,
+                "duration": probe.duration,
+                "time_base": probe.time_base,
+                "stream_index": probe.stream_index,
+                "container": probe.container,
+            }
+    except Exception as exc:  # noqa: BLE001 — the fallback is additive, never fatal
+        attempts.append({"outcome": f"resolution error: {type(exc).__name__}"})
+
+    return None, {**publication_probe, "fallbacks": attempts}
+
+
 # ── Durable Job discovery / classification (R6 F01 union identity) ───────
 #
 # ONE discovery/classification contract resolves which durable Job (if
@@ -460,7 +654,17 @@ def submit_export_job(
             "source": "caller-supplied (legacy compatibility)",
         }
     else:
-        audio_value, audio_provenance = resolve_original_audio_source(source_path)
+        # DELTA-F7 — the publication is video-only by design; when it carries
+        # no audio the ORIGINAL audio resolves from the VideoItem's attached
+        # original-audio / current source artifacts (server-owned rows).
+        with factory() as audio_session:
+            audio_value, audio_provenance = resolve_export_audio_source(
+                audio_session,
+                workspace_id=workspace_id,
+                video_item_id=video_item_id,
+                source_path=source_path,
+                managed_root=getattr(job_service, "managed_root", None),
+            )
 
     with factory() as session:
         # 26.3 — the MF-END-23 export gate is consumed BEFORE any mutation:
@@ -756,7 +960,25 @@ def submit_retry_export_job(
             "source": "predecessor manifest (material identity preserved)",
         }
     else:
-        audio_value, audio_provenance = resolve_original_audio_source(source_path)
+        # DELTA-F7 — same server-owned resolution as the initial submit; the
+        # predecessor supplies the VideoItem identity for the fallback.
+        with factory() as audio_session:
+            try:
+                predecessor_identity = S12ExportRepository(audio_session).get_run(
+                    predecessor_run_id
+                )
+                fallback_video_item_id: str | None = str(
+                    predecessor_identity.video_item_id
+                )
+            except Exception:  # noqa: BLE001 — lineage refusal owns missing rows
+                fallback_video_item_id = None
+            audio_value, audio_provenance = resolve_export_audio_source(
+                audio_session,
+                workspace_id=workspace_id,
+                video_item_id=fallback_video_item_id,
+                source_path=source_path,
+                managed_root=getattr(job_service, "managed_root", None),
+            )
 
     with factory() as session:
         repo = S12ExportRepository(session)
