@@ -95,8 +95,10 @@ __all__ = [
     "STATUS_STREAM_COPY",
     "STATUS_TRANSCODE",
     "VIETNAMESE_ACTIONS",
+    "OriginalAudioProbe",
     "OriginalAudioRemuxError",
     "OriginalAudioRemuxResult",
+    "probe_original_audio",
     "remux_original_audio",
 ]
 
@@ -845,6 +847,116 @@ def _resolve_managed_target(
 
 
 # ── Engine entry point ───────────────────────────────────────────────────────
+
+
+# ── Public audio-shape probe (MF-END-26.2) ───────────────────────────────────
+
+
+@dataclass(frozen=True)
+class OriginalAudioProbe:
+    """Read-only shape of the canonical FIRST audio stream (26.2 evidence).
+
+    Pure evidence: no bytes are written, nothing is published.  The export
+    path uses this to prove — BEFORE any stitch — that the completed
+    publication's audio is real, decodable and mapped to the same timeline
+    (codec / sample-rate / channels / exact duration / timebase).
+    """
+
+    present: bool
+    codec: str | None = None
+    sample_rate: int | None = None
+    channels: int | None = None
+    duration: str | None = None
+    time_base: str | None = None
+    stream_index: int | None = None
+    video_codec: str | None = None
+    container: str | None = None
+    detail: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "present": self.present,
+            "codec": self.codec,
+            "sample_rate": self.sample_rate,
+            "channels": self.channels,
+            "duration": self.duration,
+            "time_base": self.time_base,
+            "stream_index": self.stream_index,
+            "video_codec": self.video_codec,
+            "container": self.container,
+            "detail": self.detail,
+        }
+
+
+def _parse_positive_int(raw: object) -> int | None:
+    """Parse an ffprobe integer-ish value; None unless strictly positive."""
+    try:
+        value = int(str(raw))
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
+
+
+def probe_original_audio(
+    source_path: str | Path,
+    *,
+    timeout_seconds: float | None = None,
+    cancel_event: threading.Event | None = None,
+) -> OriginalAudioProbe:
+    """Bounded probe of the canonical FIRST audio stream of *source_path*.
+
+    Reuses the SAME bounded, stream-selected ffprobe machinery as
+    :func:`remux_original_audio` (no second probe implementation): one
+    ``-select_streams a:0`` query plus the container format query, sharing
+    one deadline budget.  A source WITHOUT an audio stream is a valid,
+    non-raising result (``present=False``); corrupt/unreadable sources
+    raise the module's stable :class:`OriginalAudioRemuxError` codes.
+    """
+    source = Path(source_path)
+    if not source.exists():
+        raise OriginalAudioRemuxError(
+            CODE_SOURCE_NOT_FOUND, f"source not found: {source}"
+        )
+    if not source.is_file():
+        raise OriginalAudioRemuxError(
+            CODE_SOURCE_NOT_A_FILE, f"source is not a file: {source}"
+        )
+    budget = (
+        timeout_seconds
+        if timeout_seconds is not None
+        else DEFAULT_REMUX_TIMEOUT_SECONDS
+    )
+    deadline = time.monotonic() + max(0.0, float(budget))
+    data = _probe_streams(source, deadline=deadline, cancel_event=cancel_event)
+    video = _first_stream(data, "video")
+    audio = _first_stream(data, "audio")
+    fmt = data.get("format") or {}
+    container = str(fmt.get("format_name") or "") or None
+    video_codec = (
+        str(video.get("codec_name") or "") or None if video is not None else None
+    )
+    if audio is None:
+        return OriginalAudioProbe(
+            present=False,
+            video_codec=video_codec,
+            container=container,
+            detail="no audio stream (a:0) present in the source",
+        )
+    duration = _decimal6(_parse_decimal(audio.get("duration")))
+    if duration is None:
+        duration = _decimal6(_parse_decimal(fmt.get("duration")))
+    return OriginalAudioProbe(
+        present=True,
+        codec=str(audio.get("codec_name") or "") or None,
+        sample_rate=_parse_positive_int(audio.get("sample_rate")),
+        channels=_parse_positive_int(audio.get("channels")),
+        duration=duration,
+        time_base=str(audio.get("time_base") or "") or None,
+        stream_index=_parse_positive_int(audio.get("index")),
+        video_codec=video_codec,
+        container=container,
+        detail="canonical first audio stream (a:0) probed",
+    )
 
 
 def remux_original_audio(
