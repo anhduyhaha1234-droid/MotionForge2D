@@ -178,11 +178,26 @@ def test_28_2_builder_is_deterministic(tmp_path: Path) -> None:
     committed = json.loads(INVENTORY.read_text(encoding="utf-8"))
     fresh = dict(inv_a)
     committed_cmp = dict(committed)
+    # Hai field tự-tham-chiếu, loại khỏi so khớp và kiểm riêng:
+    #  - generated_at_utc: dấu thời gian của lần build;
+    #  - source_head: một file KHÔNG thể chứa hash của chính commit tạo ra nó
+    #    (regenerate-rồi-commit luôn để lại nó lùi 1 commit) -> kiểm độ tươi
+    #    bằng ancestry: recorded head phải là HEAD hoặc tổ tiên của HEAD.
     fresh.pop("generated_at_utc", None)
     committed_cmp.pop("generated_at_utc", None)
+    fresh.pop("source_head", None)
+    committed_cmp.pop("source_head", None)
     assert fresh == committed_cmp, (
         "committed inventory.json is stale vs a fresh build "
         "(rerun packaging/demo/build_demo_package_inventory.py)")
+
+    recorded = committed.get("source_head")
+    if recorded:
+        anc = _run(["git", "merge-base", "--is-ancestor", recorded, "HEAD"],
+                   cwd=WT)
+        assert anc.returncode == 0, (
+            f"recorded source_head {recorded} is not HEAD nor an ancestor "
+            f"(stale manifest from another lineage)")
 
 
 def test_28_2b_guardrail_scans_are_clean() -> None:
