@@ -1,0 +1,830 @@
+{
+ "schema_version": "mf.shot_anchor.graph.v1",
+ "graph_id": "shot_anchor_v1",
+ "generated_at_utc": "2026-09-28T08:06:34Z",
+ "workflow": {
+  "graph_file": "app/media_workflows/shot_anchor_v1.json",
+  "graph_file_sha256": "e02574f799cfac6477be455aa18ff68e02f5ba5ed34c2651dba55d8496f266c6",
+  "graph_object_sha256": "611dc085423fff0c6ab88a53e9a258d1742c9e11d74d8d0923da351d57b3ada3",
+  "template_file": "image_flux2_klein_image_edit_4b_distilled.json",
+  "template_path": "C:/Users/Admin/Documents/Codex/work/mfv1/runtime/video14b/venv/Lib/site-packages/comfyui_workflow_templates_json/templates/image_flux2_klein_image_edit_4b_distilled.json",
+  "template_sha256": "e0388a8870495802314d58fa61616ddcdb7064dac5f85a8787c9e08180b8a560",
+  "template_sha256_16": "e0388a8870495802",
+  "template_license": "MIT (comfyui-workflow-templates-json 0.1.92 dist-info License-Expression)",
+  "base_template_reference": {
+   "template_file": "image_flux2_klein_image_edit_4b_base.json",
+   "template_sha256": "346cd9a63bfe34a5a9207f50c34a87feaf4e70806d13c9d2738fd521133670d0",
+   "used": false,
+   "why": "base 4B checkpoint + full_encoder_small_decoder VAE are NOT installed"
+  },
+  "accepted_predecessor_graph": {
+   "file": "proof/graphs/anchor_book.p2.api.json",
+   "sha256": "853cafb4f88fa8a284d6de085910a573640e0e76e58a52e3d75a90ed6c2d46cb",
+   "why": "the accepted P2 BOOK anchor run; this in-tree graph is its formalization: declared canvas, per-image alpha composite, the same 4 inputs, the same seed, the same frozen prompt (text sha frozen below)"
+  },
+  "prompt_sha256": "8e48cfbe5d81fad581cc237fd803a7c39039c4633fb89cba27e0c742c9fe0b09",
+  "validation_live_server": {
+   "errors": [],
+   "warnings": [],
+   "enum_checked": 17,
+   "inputs_checked": 118,
+   "nodes": 48,
+   "unreachable": []
+  }
+ },
+ "models": [
+  {
+   "role": "diffusion_models",
+   "file": "flux-2-klein-4b-fp8.safetensors",
+   "rel": "diffusion_models/flux-2-klein-4b-fp8.safetensors",
+   "path": "C:/Users/Admin/Documents/Codex/work/mfv1/runtime/video14b/models/diffusion_models/flux-2-klein-4b-fp8.safetensors",
+   "bytes": 4070624520,
+   "sha256": "97ed34fe0567e436200f2faee3939b88f2b5d99f8af2a4dc16532c4245c0ccb6",
+   "sha256_first_1mib": "da9faef49996aa68316a2501897c1ee69aa3041bfb474b18f32fa36e30d3c022",
+   "license": "apache-2.0",
+   "source": "https://huggingface.co/black-forest-labs/FLUX.2-klein-4b-fp8",
+   "source_file": "flux-2-klein-4b-fp8.safetensors (repo root)",
+   "upstream_repo_revision": "5b4408e59397a4a37ccb46afe426d8ed86379441",
+   "probe": "HF model API cardData.license (MF-END-08 raw/hf_license_probe.json); the file sha256 is re-measured here and is byte-identical",
+   "file_embedded_license": "none (measured: only _quantization_metadata)",
+   "why_used": "the DISTILLED FLUX.2 klein 4B checkpoint the official template pins"
+  },
+  {
+   "role": "text_encoders",
+   "file": "qwen_3_4b.safetensors",
+   "rel": "text_encoders/qwen_3_4b.safetensors",
+   "path": "C:/Users/Admin/Documents/Codex/work/mfv1/runtime/video14b/models/text_encoders/qwen_3_4b.safetensors",
+   "bytes": 8044982048,
+   "sha256": "6c671498573ac2f7a5501502ccce8d2b08ea6ca2f661c458e708f36b36edfc5a",
+   "sha256_first_1mib": "dfb09eaaca8c01d6ef2d261e243212a2d0f456af7133e56252f7caceab2a1513",
+   "license": "apache-2.0",
+   "source": "https://huggingface.co/Comfy-Org/vae-text-encorder-for-flux-klein-4b",
+   "source_file": "split_files/text_encoders/qwen_3_4b.safetensors",
+   "upstream_repo_revision": "5f526678002e43af5551dadb73ce2e8c91b43afe",
+   "probe": "HF model API cardData.license (MF-END-08 raw/hf_license_probe.json); same file sha256 re-measured here",
+   "download_log_same_revision": "runtime/logs/fetch_klein.log: FETCH Comfy-Org/vae-text-encorder-for-flux-klein-4b",
+   "why_used": "the FLUX.2 text encoder (CLIPLoader type=flux2) for the distilled template"
+  },
+  {
+   "role": "vae",
+   "file": "flux2-vae.safetensors",
+   "rel": "vae/flux2-vae.safetensors",
+   "path": "C:/Users/Admin/Documents/Codex/work/mfv1/runtime/video14b/models/vae/flux2-vae.safetensors",
+   "bytes": 336211292,
+   "sha256": "868fe7b343cc8f3a19dbcfcafbc3d5f888802be3f89bd81b65b3621a066ce8f3",
+   "sha256_first_1mib": "336588517106e2215c1f0ae5388273ea7766734ba4661c6045858ddafdbd4855",
+   "license": "apache-2.0",
+   "source": "https://huggingface.co/Comfy-Org/vae-text-encorder-for-flux-klein-4b",
+   "source_file": "split_files/vae/flux2-vae.safetensors",
+   "upstream_repo_revision": "5f526678002e43af5551dadb73ce2e8c91b43afe",
+   "probe": "HF model API cardData.license (MF-END-08 raw/hf_license_probe.json); same file sha256 re-measured here",
+   "same_name_elsewhere": "Comfy-Org/flux2-dev hosts a flux2-vae.safetensors under a NON-commercial license; the fetch-log line decides provenance for THIS installed copy",
+   "why_used": "the FLUX.2 VAE paired with the klein 4B distilled checkpoint"
+  }
+ ],
+ "nodes": [
+  {
+   "class_type": "LoadImage",
+   "defining_files": [
+    "nodes.py"
+   ],
+   "sha256": {
+    "nodes.py": "4678d41906fa63780816748b38d9d7bb7364e5504ea4be91b6d8fcb842f5d891"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "EmptyImage",
+   "defining_files": [
+    "nodes.py"
+   ],
+   "sha256": {
+    "nodes.py": "4678d41906fa63780816748b38d9d7bb7364e5504ea4be91b6d8fcb842f5d891"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "SaveImage",
+   "defining_files": [
+    "nodes.py"
+   ],
+   "sha256": {
+    "nodes.py": "4678d41906fa63780816748b38d9d7bb7364e5504ea4be91b6d8fcb842f5d891"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "GetImageSize",
+   "defining_files": [
+    "comfy_extras/nodes_images.py"
+   ],
+   "sha256": {
+    "comfy_extras/nodes_images.py": "35f289727897b7bfe7fb04a4b9fe420b61bbd8b55227f92198b6dd34a9be5e51"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "VAEEncode",
+   "defining_files": [
+    "nodes.py"
+   ],
+   "sha256": {
+    "nodes.py": "4678d41906fa63780816748b38d9d7bb7364e5504ea4be91b6d8fcb842f5d891"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "VAEDecode",
+   "defining_files": [
+    "nodes.py"
+   ],
+   "sha256": {
+    "nodes.py": "4678d41906fa63780816748b38d9d7bb7364e5504ea4be91b6d8fcb842f5d891"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "ImageCompositeMasked",
+   "defining_files": [
+    "comfy_extras/nodes_mask.py"
+   ],
+   "sha256": {
+    "comfy_extras/nodes_mask.py": "9b60550e7cd7ea8b2b38bb64ef7fd587a3c6cbb97a287c407d11b1a622fca5f7"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "InvertMask",
+   "defining_files": [
+    "comfy_extras/nodes_mask.py"
+   ],
+   "sha256": {
+    "comfy_extras/nodes_mask.py": "9b60550e7cd7ea8b2b38bb64ef7fd587a3c6cbb97a287c407d11b1a622fca5f7"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "ResizeImageMaskNode",
+   "defining_files": [
+    "comfy_extras/nodes_post_processing.py",
+    "comfy_extras/nodes_replacements.py"
+   ],
+   "sha256": {
+    "comfy_extras/nodes_post_processing.py": "5b468c80a8367354a5d0e7fc6a85061f3d04e6fe0a1b8244d1394ba253e46b93",
+    "comfy_extras/nodes_replacements.py": "f7e70ac130098e243f3c36987941e70244b320a7c5e3d5042434509be8974849"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "EmptyFlux2LatentImage",
+   "defining_files": [
+    "comfy_extras/nodes_flux.py"
+   ],
+   "sha256": {
+    "comfy_extras/nodes_flux.py": "a4917fd9d4aed2afdbdfc005a527b6381be942200054d7998477a16987e7aff9"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "Flux2Scheduler",
+   "defining_files": [
+    "comfy_extras/nodes_flux.py"
+   ],
+   "sha256": {
+    "comfy_extras/nodes_flux.py": "a4917fd9d4aed2afdbdfc005a527b6381be942200054d7998477a16987e7aff9"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "ReferenceLatent",
+   "defining_files": [
+    "comfy_extras/nodes_edit_model.py"
+   ],
+   "sha256": {
+    "comfy_extras/nodes_edit_model.py": "3773fd748c404758ee36a3bac24cfea6e10c1b9990fa388cc440c56db1dc6a4a"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "ConditioningZeroOut",
+   "defining_files": [
+    "nodes.py"
+   ],
+   "sha256": {
+    "nodes.py": "4678d41906fa63780816748b38d9d7bb7364e5504ea4be91b6d8fcb842f5d891"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "CLIPTextEncode",
+   "defining_files": [
+    "nodes.py"
+   ],
+   "sha256": {
+    "nodes.py": "4678d41906fa63780816748b38d9d7bb7364e5504ea4be91b6d8fcb842f5d891"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "UNETLoader",
+   "defining_files": [
+    "nodes.py"
+   ],
+   "sha256": {
+    "nodes.py": "4678d41906fa63780816748b38d9d7bb7364e5504ea4be91b6d8fcb842f5d891"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "CLIPLoader",
+   "defining_files": [
+    "nodes.py"
+   ],
+   "sha256": {
+    "nodes.py": "4678d41906fa63780816748b38d9d7bb7364e5504ea4be91b6d8fcb842f5d891"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "VAELoader",
+   "defining_files": [
+    "nodes.py"
+   ],
+   "sha256": {
+    "nodes.py": "4678d41906fa63780816748b38d9d7bb7364e5504ea4be91b6d8fcb842f5d891"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "SamplerCustomAdvanced",
+   "defining_files": [
+    "comfy_extras/nodes_custom_sampler.py"
+   ],
+   "sha256": {
+    "comfy_extras/nodes_custom_sampler.py": "913d776b5e696c70b77b8184f2af504533fbff2fad62a05cef4ecba87975f0bf"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "KSamplerSelect",
+   "defining_files": [
+    "comfy_extras/nodes_custom_sampler.py"
+   ],
+   "sha256": {
+    "comfy_extras/nodes_custom_sampler.py": "913d776b5e696c70b77b8184f2af504533fbff2fad62a05cef4ecba87975f0bf"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "RandomNoise",
+   "defining_files": [
+    "comfy_extras/nodes_custom_sampler.py"
+   ],
+   "sha256": {
+    "comfy_extras/nodes_custom_sampler.py": "913d776b5e696c70b77b8184f2af504533fbff2fad62a05cef4ecba87975f0bf"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "CFGGuider",
+   "defining_files": [
+    "comfy_extras/nodes_custom_sampler.py"
+   ],
+   "sha256": {
+    "comfy_extras/nodes_custom_sampler.py": "913d776b5e696c70b77b8184f2af504533fbff2fad62a05cef4ecba87975f0bf"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  }
+ ],
+ "runtime": {
+  "head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+  "porcelain_clean": true,
+  "source_read_only": true,
+  "version_file_sha256": "1103c6ccdac33468682e5d128b028fc0ae0139984f00820150b653c011053257",
+  "comfyui_dir": "C:/Users/Admin/Documents/Codex/work/mfv1/runtime/video14b/ComfyUI",
+  "models_root": "C:/Users/Admin/Documents/Codex/work/mfv1/runtime/video14b/models",
+  "license": "ComfyUI GPL-3.0 (LICENSE at the repo root)",
+  "isolation_recipe": "own base-directory (input/output/temp/user/custom_nodes under the MF-END-14 evidence root; custom_nodes pre-created because main.py::execute_prestartup_script lists it before serving) + --models-directory pointing at the shared read-only model root + own port + --reserve-vram 1.0 + --disable-auto-launch; one job at a time",
+  "object_info_live_file": "raw/object_info_live.json",
+  "object_info_live_nodes": 959
+ },
+ "inputs": {
+  "staged": [
+   {
+    "tag": "KEY",
+    "source_path": "C:/Users/Admin/Documents/Codex/work/mf-delivery-runs/20260927/20260927T163824Z/proof/inputs/i1_BOOK_f000_640x368.png",
+    "source_sha256": "3f0d090a9c022fe136542c9f017b1f7cde40b1f79e80b92541846ed0e0a9c8c0",
+    "staged_file": "sa_v1_keyframe_book_f000.png",
+    "staged_path": "C:/Users/Admin/Documents/Codex/work/mf-delivery-runs/20260927/20260927T163824Z/tasks/MF-END-14/runtime/input/sa_v1_keyframe_book_f000.png",
+    "bytes": 115799,
+    "dims": [
+     640,
+     368
+    ],
+    "mode": "RGB",
+    "composite_display_pixels_sha256": "1c93f57d84f9f6dba88eb8848d0839d6cb725f07b49bdf5ab85ab295f4ea1be0",
+    "composite_identity_vs_staged_differing_pixels": 0
+   },
+   {
+    "tag": "R1",
+    "source_path": "C:/Users/Admin/Documents/Codex/work/mf-delivery-runs/20260927/20260927T163824Z/proof/inputs/i1d_cast_boy_hacker_sitting_on_neutral_bg.png",
+    "source_sha256": "a2ad4db98ac733c969260d052f35e737c37eef664b1b36d5a6fd9a7254006821",
+    "staged_file": "sa_v1_ref_p1_boy_hacker.png",
+    "staged_path": "C:/Users/Admin/Documents/Codex/work/mf-delivery-runs/20260927/20260927T163824Z/tasks/MF-END-14/runtime/input/sa_v1_ref_p1_boy_hacker.png",
+    "bytes": 3586,
+    "dims": [
+     768,
+     512
+    ],
+    "mode": "RGB",
+    "composite_display_pixels_sha256": "90a2a2093c12b8e55c69cc6dfb182ac59c6a35f04676a4c894ccc35504e37b34",
+    "composite_identity_vs_staged_differing_pixels": 0,
+    "resize_plan": {
+     "resize_type": "scale longer dimension",
+     "longer_size": 368,
+     "scale_method": "area",
+     "source_wh": [
+      768,
+      512
+     ],
+     "resized_wh": [
+      368,
+      245
+     ]
+    }
+   },
+   {
+    "tag": "R2",
+    "source_path": "C:/Users/Admin/Documents/Codex/work/mf-delivery-runs/20260927/20260927T163824Z/proof/inputs/i1d_cast_dan_choi_standing_on_neutral_bg.png",
+    "source_sha256": "2ffc245346340b4cc95ffa4c5ac9f3ad3e4485927a655e6a47ab960e5c848969",
+    "staged_file": "sa_v1_ref_p2_dan_choi.png",
+    "staged_path": "C:/Users/Admin/Documents/Codex/work/mf-delivery-runs/20260927/20260927T163824Z/tasks/MF-END-14/runtime/input/sa_v1_ref_p2_dan_choi.png",
+    "bytes": 156508,
+    "dims": [
+     1024,
+     1024
+    ],
+    "mode": "RGB",
+    "composite_display_pixels_sha256": "623e1b45e130b09144a5eccc1f53dbedd3ada7aa7d0c001ed73c722b8874d2db",
+    "composite_identity_vs_staged_differing_pixels": 0,
+    "resize_plan": {
+     "resize_type": "scale longer dimension",
+     "longer_size": 368,
+     "scale_method": "area",
+     "source_wh": [
+      1024,
+      1024
+     ],
+     "resized_wh": [
+      368,
+      368
+     ]
+    }
+   },
+   {
+    "tag": "R3",
+    "source_path": "C:/Users/Admin/Documents/Codex/work/mf-delivery-runs/20260927/20260927T163824Z/proof/inputs/i1d_cast_gau_nau_back_on_neutral_bg.png",
+    "source_sha256": "49e99094d802495dd92e1dbab87125806efcb077f0be37125738b7218a63096f",
+    "staged_file": "sa_v1_ref_p3_gau_nau_back.png",
+    "staged_path": "C:/Users/Admin/Documents/Codex/work/mf-delivery-runs/20260927/20260927T163824Z/tasks/MF-END-14/runtime/input/sa_v1_ref_p3_gau_nau_back.png",
+    "bytes": 3195,
+    "dims": [
+     640,
+     640
+    ],
+    "mode": "RGB",
+    "composite_display_pixels_sha256": "10913c2705eb1912937a47e8a86c13b8cf84519ded1ccac23f0c1cc8674cca85",
+    "composite_identity_vs_staged_differing_pixels": 0,
+    "resize_plan": {
+     "resize_type": "scale longer dimension",
+     "longer_size": 368,
+     "scale_method": "area",
+     "source_wh": [
+      640,
+      640
+     ],
+     "resized_wh": [
+      368,
+      368
+     ]
+    }
+   }
+  ],
+  "alpha_formula": "out = mask*src + (1 - mask)*dst ; mask = InvertMask(1-alpha)",
+  "neutral_rgb": [
+   128,
+   128,
+   128
+  ],
+  "alpha_proof_derived_crosscheck": {
+   "raw_artwork": "C:/Users/Admin/Documents/Codex/work/mf-tool-20260923/mf-p1-ui-build/presets/characters/dan_choi_standing.png",
+   "raw_artwork_sha256": "271f1c5789ee8fb9022ab402d834c8f2d4e862f972a105060e457b68b0282496",
+   "raw_mode": "RGBA",
+   "raw_alpha_extrema": [
+    0,
+    255
+   ],
+   "implementation": "float64 + rint (independent of the float32 node path)",
+   "staged_ref": "sa_v1_ref_p2_dan_choi.png",
+   "differing_pixels": 0,
+   "max_abs_delta_0_255": 0
+  }
+ },
+ "golden_run": {
+  "declared_gpu_jobs": 1,
+  "prefix_job_cpu_only": {
+   "note": "tensor-truth preview: intake only (LoadImage / composite / resize). NO model node in that graph, so it is not a GPU job",
+   "prompt_id": "c977a4fe-b7ad-4c11-a413-f3c9f19edf73",
+   "completed": true,
+   "wall_s": 1.505,
+   "pixel_comparison": {
+    "KEY_COMP": {
+     "file": "key_comp_00001_.png",
+     "bytes": 124040,
+     "file_sha256": "e0fbc5cd6cda7b06ec983e6645f41f3a678a3f4c1630b942d308f1657bf97b0c",
+     "file_sha256_matches_receipt": true,
+     "dims": [
+      640,
+      368
+     ],
+     "pixels_sha256": "1c93f57d84f9f6dba88eb8848d0839d6cb725f07b49bdf5ab85ab295f4ea1be0",
+     "expected_pixels_sha256": "1c93f57d84f9f6dba88eb8848d0839d6cb725f07b49bdf5ab85ab295f4ea1be0",
+     "pixels_match_offline_expectation": true,
+     "expected_dims": [
+      640,
+      368
+     ]
+    },
+    "R1_COMP": {
+     "file": "r1_comp_00001_.png",
+     "bytes": 9553,
+     "file_sha256": "04a37b296263f3433a016648105d950d6bd8f8a6be80154d14114814ed72a217",
+     "file_sha256_matches_receipt": true,
+     "dims": [
+      768,
+      512
+     ],
+     "pixels_sha256": "90a2a2093c12b8e55c69cc6dfb182ac59c6a35f04676a4c894ccc35504e37b34",
+     "expected_pixels_sha256": "90a2a2093c12b8e55c69cc6dfb182ac59c6a35f04676a4c894ccc35504e37b34",
+     "pixels_match_offline_expectation": true,
+     "expected_dims": [
+      768,
+      512
+     ]
+    },
+    "R1_RES": {
+     "file": "r1_res_00001_.png",
+     "bytes": 9574,
+     "file_sha256": "5d873c02f3638efe097c12135640fb8f83b38407aefb540e8095b4c14cfc36f0",
+     "file_sha256_matches_receipt": true,
+     "dims": [
+      368,
+      245
+     ],
+     "pixels_sha256": "b4006a4936cb8f91e6169673a1ff066d69cf5b0b3f82c3500695eca7e0f6a474",
+     "expected_pixels_sha256": "b4006a4936cb8f91e6169673a1ff066d69cf5b0b3f82c3500695eca7e0f6a474",
+     "pixels_match_offline_expectation": true,
+     "expected_dims": [
+      368,
+      245
+     ]
+    },
+    "R2_COMP": {
+     "file": "r2_comp_00001_.png",
+     "bytes": 167280,
+     "file_sha256": "9fdbbc085cb62e4d7cdc75664a0a3bf09b25d62651f2f729bbf9d4f889dd3778",
+     "file_sha256_matches_receipt": true,
+     "dims": [
+      1024,
+      1024
+     ],
+     "pixels_sha256": "623e1b45e130b09144a5eccc1f53dbedd3ada7aa7d0c001ed73c722b8874d2db",
+     "expected_pixels_sha256": "623e1b45e130b09144a5eccc1f53dbedd3ada7aa7d0c001ed73c722b8874d2db",
+     "pixels_match_offline_expectation": true,
+     "expected_dims": [
+      1024,
+      1024
+     ]
+    },
+    "R2_RES": {
+     "file": "r2_res_00001_.png",
+     "bytes": 39018,
+     "file_sha256": "047230cce8c8c45fb238dbf8c5a6fbace347b2464a34fdc07637b88447ec4bbf",
+     "file_sha256_matches_receipt": true,
+     "dims": [
+      368,
+      368
+     ],
+     "pixels_sha256": "d31cb984006921bd92ecb21b538836095c501b5ee6ab27c66c6239fce237c13e",
+     "expected_pixels_sha256": "d31cb984006921bd92ecb21b538836095c501b5ee6ab27c66c6239fce237c13e",
+     "pixels_match_offline_expectation": true,
+     "expected_dims": [
+      368,
+      368
+     ]
+    },
+    "R3_COMP": {
+     "file": "r3_comp_00001_.png",
+     "bytes": 9148,
+     "file_sha256": "590667ebf36ef08e0bc3bd40f4a991944a2cb6d56aba49ae52e4b18879361cf9",
+     "file_sha256_matches_receipt": true,
+     "dims": [
+      640,
+      640
+     ],
+     "pixels_sha256": "10913c2705eb1912937a47e8a86c13b8cf84519ded1ccac23f0c1cc8674cca85",
+     "expected_pixels_sha256": "10913c2705eb1912937a47e8a86c13b8cf84519ded1ccac23f0c1cc8674cca85",
+     "pixels_match_offline_expectation": true,
+     "expected_dims": [
+      640,
+      640
+     ]
+    },
+    "R3_RES": {
+     "file": "r3_res_00001_.png",
+     "bytes": 8759,
+     "file_sha256": "916bed5005f9273c246c74386fdd429de6b15f8a773a5c7d891bb6856ebe0708",
+     "file_sha256_matches_receipt": true,
+     "dims": [
+      368,
+      368
+     ],
+     "pixels_sha256": "cefbb9f1f41d89b5e182a4394ef544669c4e1ca51a8632f2d6cd29746a476134",
+     "expected_pixels_sha256": "cefbb9f1f41d89b5e182a4394ef544669c4e1ca51a8632f2d6cd29746a476134",
+     "pixels_match_offline_expectation": true,
+     "expected_dims": [
+      368,
+      368
+     ]
+    }
+   }
+  },
+  "prompt_id": "0aa33cf6-9411-48bd-8ed8-f13b6e8fbe88",
+  "completed": true,
+  "graph_object_sha256": "611dc085423fff0c6ab88a53e9a258d1742c9e11d74d8d0923da351d57b3ada3",
+  "wall_s": 4.544,
+  "vram_peak_mib": 11574,
+  "gpu_util_peak_pct": 100,
+  "epoch": {
+   "instance_id": "2659fab86b404f319c1fa6c553bb9355",
+   "pid": 5084,
+   "port": 8342,
+   "launched_at_unix": 1790582782.0822985,
+   "launched_at_utc": "2026-09-28T08:06:22Z",
+   "device": "[{\"name\": \"cuda:0 NVIDIA GeForce RTX 5070 : cudaMallocAsync\", \"type\": \"cuda\", \"index\": 0, \"vram_total\": 12820480000, \"vram_free\": 11571036160, \"torch_vram_total\": 0, \"torch_vram_free\": 0}]"
+  },
+  "shutdown": {
+   "phase": "POST_STOP_VERIFIED",
+   "pid": 5084,
+   "pre": {
+    "listening": true,
+    "error": null
+   },
+   "post": {
+    "listening": false,
+    "error": "TimeoutError('timed out')",
+    "errno": null
+   },
+   "pid_exists": false,
+   "stop_scope": "ONLY the pid this run launched (Popen handle)"
+  },
+  "server_log": "runtime/server.log",
+  "asset": {
+   "file": "book_f000_00001_.png",
+   "path": "C:/Users/Admin/Documents/Codex/work/mf-delivery-runs/20260927/20260927T163824Z/tasks/MF-END-14/asset/book_f000_00001_.png",
+   "bytes": 197658,
+   "sha256": "26f47998999dd8a6824498ae6604c13b3367680c35a53958a1d17b2503920d91",
+   "dims": [
+    640,
+    368
+   ],
+   "mode": "RGB",
+   "outputs": [
+    {
+     "node": "SAVE",
+     "filename": "book_f000_00001_.png",
+     "subfolder": "mf_shot_anchor_v1",
+     "type": "output",
+     "bytes": 197658,
+     "sha256": "26f47998999dd8a6824498ae6604c13b3367680c35a53958a1d17b2503920d91"
+    }
+   ]
+  },
+  "review": {
+   "verdict": "PASS",
+   "verdict_scope": "mechanical rows only (dims + tensor-preview byte equality + region deltas); appearance identity is NOT judged by the worker",
+   "fidelity_identity_layout": "NEEDS_REVIEW (BENCH / DEMO / Codex reviewer)",
+   "artifacts": {
+    "side_by_side": "previews/sa_v1_side_by_side_source_vs_anchor.png",
+    "side_by_side_accepted": "previews/sa_v1_side_by_side_accepted_vs_delivered.png",
+    "overlay_source": "previews/sa_v1_overlay_source.png",
+    "overlay_anchor": "previews/sa_v1_overlay_anchor.png"
+   },
+   "mechanical_rows": {
+    "anchor_dims_equal_canvas": [
+     640,
+     368
+    ],
+    "anchor_dims_ok": true,
+    "delivered_vs_source": {
+     "mean_abs_delta": 32.0837,
+     "max_abs_delta": 223,
+     "differing_pixels": 228947,
+     "border_mean_abs_delta_rlbt": [
+      28.3139,
+      22.5121,
+      33.08,
+      30.8971
+     ],
+     "identical": false
+    },
+    "delivered_vs_accepted_anchor": {
+     "mean_abs_delta": 21.1575,
+     "max_abs_delta": 255,
+     "differing_pixels": 232089,
+     "border_mean_abs_delta_rlbt": [
+      6.082,
+      45.5042,
+      19.4008,
+      37.2697
+     ],
+     "identical": false
+    },
+    "role_regions": {
+     "ROLE-BOOK-P1": {
+      "bbox_xyxy": [
+       223,
+       100,
+       294,
+       295
+      ],
+      "mask_pixels": 9779,
+      "region_mean_abs_delta_anchor_vs_source": 16.5945,
+      "region_changed_fraction": 0.940193
+     },
+     "PROP-BOOK": {
+      "bbox_xyxy": [
+       248,
+       161,
+       297,
+       231
+      ],
+      "mask_pixels": 488,
+      "region_mean_abs_delta_anchor_vs_source": 16.9655,
+      "region_changed_fraction": 0.954648
+     },
+     "ROLE-BOOK-P4-EDGE": {
+      "bbox_xyxy": [
+       597,
+       98,
+       639,
+       291
+      ],
+      "mask_pixels": 3351,
+      "region_mean_abs_delta_anchor_vs_source": 38.7115,
+      "region_changed_fraction": 0.997962
+     }
+    },
+    "watermark_region": {
+     "region_xyxy": [
+      0,
+      328,
+      160,
+      368
+     ],
+     "source_vs_anchor_mean_abs_delta": 50.3568,
+     "source_vs_anchor_changed_fraction": 0.925,
+     "note": "the frozen prompt requires the source watermark NOT to appear in the result; this row measures that the region was repainted, the visual verdict stays with the reviewer"
+    }
+   },
+   "facts_quoted": {
+    "artifact_digest": "b286377c2ba583dffe19b43dd0fac0530eb8a3b77af4d06aac876c645234191b",
+    "holder": {
+     "check": "holder",
+     "declared": {
+      "object_role_id": "PROP-BOOK",
+      "subject_role_id": "ROLE-BOOK-P1"
+     },
+     "match": true,
+     "measured": {
+      "frames": [
+       2,
+       17
+      ],
+      "kind": "grasp",
+      "mean_containment": 1.0
+     }
+    },
+    "camera_book": {
+     "classification": "static",
+     "cut_frames": [],
+     "content_events": [
+      72,
+      95
+     ]
+    },
+    "occlusion": "in_front_of",
+    "contacts": 7
+   },
+   "overlay_geometry": [
+    {
+     "role": "ROLE-BOOK-P1",
+     "bbox_xyxy": [
+      223,
+      100,
+      294,
+      295
+     ],
+     "pixels": 9779,
+     "color": [
+      255,
+      0,
+      0
+     ],
+     "label": "ROLE-BOOK-P1 71x195"
+    },
+    {
+     "role": "PROP-BOOK",
+     "bbox_xyxy": [
+      248,
+      161,
+      297,
+      231
+     ],
+     "pixels": 488,
+     "color": [
+      0,
+      160,
+      0
+     ],
+     "label": "PROP-BOOK 49x70"
+    },
+    {
+     "role": "ROLE-BOOK-P4-EDGE",
+     "bbox_xyxy": [
+      597,
+      98,
+      639,
+      291
+     ],
+     "pixels": 3351,
+     "color": [
+      0,
+      0,
+      255
+     ],
+     "label": "ROLE-BOOK-P4-EDGE 42x193"
+    }
+   ],
+   "observations": {
+    "observed_by": "worker vision, on previews/sa_v1_side_by_side_source_vs_anchor.png + previews/sa_v1_side_by_side_accepted_vs_delivered.png + previews/sa_v1_overlay_anchor.png (delivered anchor asset sha 26f47998999dd8a6824498ae6604c13b3367680c35a53958a1d17b2503920d91)",
+    "observed_at_utc": "2026-09-28T07:00:00Z",
+    "people_count_observed": 4,
+    "roles_seen": {
+     "ROLE-BOOK-P1": "grey-haired figure seated LEFT holding the BLUE book closed and upright against the chest, yellow part beside it — same seat and same silhouette family as the source",
+     "ROLE-BOOK-P2": "brown-haired figure in the magenta/pink dress standing behind-right of the holder — same position class; reads slightly LARGER and higher than in the source and in the accepted anchor",
+     "ROLE-BOOK-P3": "dark-haired figure seen from BEHIND at the table (right) — same position class; reads slightly LARGER than the source",
+     "ROLE-BOOK-P4-EDGE": "the right-edge strip was REPAINTED: an ORANGE mass at the top of the strip and a violet mass at its bottom, where the source shows a violet partial mass — the partial person is NOT completed, NOT brought into the frame and NOT removed, but its colour blocks read differently from the source"
+    },
+    "held_object": "the blue book stays with the seated-left figure (holder fact kept); the book stays CLOSED with no page spread at this frame",
+    "background_changes": [
+     "a brown block was added between the cyan panel and the peach wall (the accepted anchor has the same addition)",
+     "the table with the green model is kept; the green area reads larger/flatter",
+     "the left wardrobe is plain (the source has squiggle texture)",
+     "the left chair seat is kept; the chair back under the figure reads thinner than the source"
+    ],
+    "watermark": "ABSENT in the delivered anchor (the source has the bottom-left YouTube mark) — matches the frozen prompt requirement",
+    "box_alignment": "the source-space boxes land on the corresponding figures: red on the seated holder, green on the book, blue on the right-edge strip",
+    "identity_fidelity": "NOT judged by the worker — cast refs 1 and 3 are documented placeholders and ref 2 is authored artwork; identity/appearance acceptance stays with BENCH/DEMO/Codex",
+    "deviations_for_reviewer": [
+     "orange mass at the top of the right-edge strip where the source (and the accepted anchor) show plain wall/brown",
+     "P2/P3 read slightly larger than the source",
+     "the book reads thinner than in the source",
+     "left chair back thinner than the source"
+    ]
+   }
+  }
+ },
+ "evidence_root": "C:/Users/Admin/Documents/Codex/work/mf-delivery-runs/20260927/20260927T163824Z/tasks/MF-END-14"
+}

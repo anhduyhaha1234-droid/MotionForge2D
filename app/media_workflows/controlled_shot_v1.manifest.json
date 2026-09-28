@@ -1,0 +1,259 @@
+{
+ "schema_version": "mf.controlled_shot.manifest.v1",
+ "graph_id": "controlled_shot_v1",
+ "generated_at_utc": "2026-09-28T09:06:57Z",
+ "workflow": {
+  "graph_file": "app/media_workflows/controlled_shot_v1.json",
+  "graph_file_sha256": "ebc0a2587f06788d3fd5c0ef777913a84cc8a9793a5ef71eeaee984aba06dc91",
+  "graph_file_bytes": 22380,
+  "shipped_runnable_graph": false,
+  "why_no_graph": "no candidate satisfies the eligibility rule; shipping a non-deliverable graph would misrepresent the controlled path (the acceptance forbids a fake live workflow)",
+  "measured_evidence_graph": {
+   "file": "proof/graphs/animate2_vace_book.p4.api.json",
+   "sha256": "18d97cbabf3b7b473e9810b61ba90e1a07795a28d234bcb86eec66f88e54afeb",
+   "node_count": 15,
+   "node_classes": {
+    "3": "KSampler",
+    "6": "CLIPTextEncode",
+    "7": "CLIPTextEncode",
+    "8": "VAEDecode",
+    "48": "ModelSamplingSD3",
+    "49": "WanVaceToVideo",
+    "58": "TrimVideoLatent",
+    "68": "CreateVideo",
+    "105": "VAELoader",
+    "106": "UNETLoader",
+    "110": "CLIPLoader",
+    "114": "SaveVideo",
+    "134": "LoadImage",
+    "144": "GetVideoComponents",
+    "145": "LoadVideo"
+   },
+   "template_file": "C:/Users/Admin/Documents/Codex/2026-09-11/tr-x20/outputs/mf-reskin-model-upgrade-20260922/20260922T0345Z/VIDEO14B/wave2/api/mf_vace14b_book4s.api.fixed.json",
+   "template_sha256": "b0a7e774459a7a5885d0882f89819f0b910273d823834248e8c3ff852ec65be6",
+   "validation_offline": {
+    "p0_object_info": {
+     "ok": true,
+     "node_count": 15,
+     "dynamic_combo_accepted": [
+      "114:format.codec"
+     ]
+    },
+    "p3_object_info_gpu": {
+     "ok": true,
+     "node_count": 15,
+     "dynamic_combo_accepted": [
+      "114:format.codec"
+     ]
+    }
+   }
+  }
+ },
+ "decision": {
+  "criteria": [
+   "active only when the unit is input-ready AND the Wan profile fails a measured hard constraint OR does not fit this runtime",
+   "the verdict must be derived from measured rows only; no new condition may be invented",
+   "a skip is recorded as SKIPPED_NOT_NEEDED and is never counted as a test pass"
+  ],
+  "criteria_source": "packet MF-END-17 micro-job 1 + acceptance clause; frozen before evaluation",
+  "verdict": "SKIPPED_NOT_NEEDED",
+  "counts_as_test_pass": false,
+  "rationale": "The activation trigger is not met on the measured rows: every measured hard gate of the Wan profile on all four measured cases (dims 640x368; timing 120/120/102/18 @30/1 pts monotonic; per-segment coverage incl. the partial right-edge person; holder/contact; no watermark) is PASS, and the only two non-PASS rows are routed open items (F5 product decision, F6 instrument) rather than measured failures. Independently, no eligible candidate exists to run: the only installed challenger with weights (VACE 14B fp16) is already measured and INELIGIBLE (watermark copy, 1 of 4 cases), and the SCAIL-2 correspondence family has no weights anywhere in the models root. Re-running a model would therefore violate the acceptance rule 'do not run models without cause' and could not produce an eligible candidate.",
+  "wan_measured_hard_constraint_failures": [],
+  "open_items_routed": [
+   {
+    "id": "F5_BOOK_STATE",
+    "status": "OPEN_PRODUCT_DECISION",
+    "detail": "source event open_two_pages @72; Wan keeps the book CLOSED across the window, VACE shows it OPEN at f119",
+    "routed_to": "product decision -> S12 review packet (PROOF_GATE_EVALUATION §3.1); explicitly NOT classified as a measured hard-constraint failure here"
+   },
+   {
+    "id": "F6_RAM_INSTRUMENT",
+    "status": "OPEN_INSTRUMENT",
+    "detail": "RAM peak NOT MEASURED for every GPU run (non-credible sampler figures); reported as NOT_MEASURED, never guessed",
+    "routed_to": "instrument fix; does not gate the runtime-fit question the challenger answers (VRAM peak is measured)"
+   },
+   {
+    "id": "PROOF_GATE_EVALUATION-F2-P2",
+    "status": "ROUTED_DELTA",
+    "detail": "demo-side coverage delta: right-edge partial-person form / wall picture frame in BOOK",
+    "routed_to": "backlog Phase B/C delta coverage; no profile change (per PROOF_GATE_EVALUATION findings table)"
+   }
+  ],
+  "decided_by": "MF-END-17 worker (eligibility measured from sealed evidence; quality acceptance reserved to BENCH / DEMO / Codex)",
+  "quality_acceptance": "reserved to BENCH / DEMO / Codex (QUALITY_ACCEPTED=0)"
+ },
+ "candidates": [
+  {
+   "id": "scail2_wan_scail",
+   "status": "BLOCKED_NO_WEIGHTS",
+   "eligibility": {
+    "real_local_mp4": "NONE - cannot run",
+    "quality": "NOT_MEASURED",
+    "vram": "NOT_MEASURED",
+    "verdict": "NOT_ELIGIBLE"
+   },
+   "inference_tested": "NOT_RUN"
+  },
+  {
+   "id": "vace_14b_fp16_book",
+   "status": "MEASURED_INELIGIBLE",
+   "eligibility_gates": {
+    "real_local_mp4": {
+     "verdict": "PASS",
+     "artifacts": [
+      "proof/output/p4/animate2_vace_book_p4_00001_.mp4",
+      "proof/output/p4/animate2_vace_book_p4_00001__trim120.mp4"
+     ]
+    },
+    "quality": {
+     "verdict": "FAIL",
+     "defect": "WATERMARK COPIED - the source's YouTube play button + 'Lạnh Vcl' text reappears bottom-left in the VACE output (frame 0 and frame 119). The Animate2 result has NO watermark. VACE is a control-faithful model, so it reproduced the control video's watermark; this is a product blocker for the delivered clip and it is NOT fixed in this pass.",
+     "coverage_verdict": "PASS_WITH_WATERMARK_DEFECT",
+     "evidence": [
+      "proof/evidence/P4_GEOMETRY_GATE.json"
+     ]
+    },
+    "vram": {
+     "verdict": "PASS",
+     "peak_mib": 11680,
+     "gpu_total_mib": 12227
+    },
+    "verdict": "INELIGIBLE"
+   },
+   "cases_run": "1 of 4 measured cases (BOOK only)",
+   "semantics": {
+    "reference": "single primary reference_image (the node takes the first image); no per-identity reference batch is consumed",
+    "control_masks": "edit masks (control_video/control_masks) - NOT the G4 correspondence masks",
+    "multi_ref_claim": false
+   },
+   "gates_not_loosened": "the quality gate is applied as-is; the watermark blocker (F4) is not masked, cropped or tuned away",
+   "unsupported_recorded": true,
+   "unsupported_reason": "copies the source watermark (play button + 'Lạnh Vcl') at frames 0 and 119 - a product blocker for any delivered clip; the profile stays INELIGIBLE until a removal strategy is proven"
+  }
+ ],
+ "models": [
+  {
+   "role": "unet",
+   "rel": "diffusion_models/wan2.1_vace_14B_fp16.safetensors",
+   "sha256": "f202a5c59b8a91ada1862c46a038214f1f7f216c61ec8350d25f69b919da4307",
+   "bytes": 34675323640,
+   "sha256_match_sealed_mf_end_16": true,
+   "license": "apache-2.0",
+   "source": "Comfy-Org/Wan_2.1_ComfyUI_repackaged",
+   "revision": "617a7633e636506f850e043bc4605f290a466a8e",
+   "lfs_oid_equals_measured_sha256": true
+  },
+  {
+   "role": "vae",
+   "rel": "vae/wan_2.1_vae.safetensors",
+   "sha256": "2fc39d31359a4b0a64f55876d8ff7fa8d780956ae2cb13463b0223e15148976b",
+   "bytes": 253815318,
+   "license": "apache-2.0",
+   "source": "Comfy-Org/Wan_2.1_ComfyUI_repackaged",
+   "revision": "617a7633e636506f850e043bc4605f290a466a8e",
+   "lfs_oid_equals_measured_sha256": true
+  },
+  {
+   "role": "text_encoder",
+   "rel": "text_encoders/umt5_xxl_fp16.safetensors",
+   "sha256": "7b8850f1961e1cf8a77cca4c964a358d303f490833c6c087d0cff4b2f99db2af",
+   "bytes": 11366399385,
+   "license": "apache-2.0",
+   "source": "Comfy-Org/Wan_2.1_ComfyUI_repackaged",
+   "revision": "617a7633e636506f850e043bc4605f290a466a8e",
+   "lfs_oid_equals_measured_sha256": true
+  }
+ ],
+ "runtime": {
+  "comfyui_version": "0.37.0",
+  "head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+  "head_match": true,
+  "porcelain_clean": true,
+  "version_file_sha256": null,
+  "models_root": "C:/Users/Admin/Documents/Codex/work/mfv1/runtime/video14b/models",
+  "node_source_sha256": {
+   "comfy_extras/nodes_scail.py": "7cd7f3588a7fbdb1d1379ad7fd0669364bbae3d921ba17cfbd9ee007251a980b",
+   "comfy_extras/nodes_wan.py": "39ff111cc45c8d2a75cab1aa3b97ad9bf9037868178af2468bc52b34dbd0d96d"
+  },
+  "reverified": "raw/evidence_reverify.json (22 rows MATCH, cross-links equal, 0 listeners)"
+ },
+ "measurement": {
+  "vace_14b_fp16": {
+   "server_side_wall_s": 1174.24,
+   "seconds_per_output_second_121f": 291.13,
+   "vram_peak_mib": 11680,
+   "cases": 1
+  },
+  "wan_reference": {
+   "warm_s_per_output_second": 38.67,
+   "cache_off_s_per_output_second": 33.8,
+   "vram_peak_mib": 11224,
+   "cases": 4
+  },
+  "gpu_total_mib": 12227
+ },
+ "scail_probe": {
+  "family": "wan_scail / SCAIL-2 correspondence path",
+  "status": "BLOCKED_NO_WEIGHTS",
+  "inference_tested": "NOT_RUN",
+  "node_ids": [
+   "SCAIL2ColoredMask",
+   "WanSCAILToVideo"
+  ],
+  "weights_present": false,
+  "palette_count": 6,
+  "win12gb": "NOT_PROVEN_ON_THIS_GPU"
+ },
+ "failure_taxonomy_preserved": [
+  {
+   "id": "F1_GEOMETRY_CROP",
+   "status": "FIXED_VERIFIED",
+   "note": "unchanged by this task"
+  },
+  {
+   "id": "F2_PROMPT_CARRYOVER",
+   "status": "FIXED_VERIFIED",
+   "note": "unchanged by this task"
+  },
+  {
+   "id": "F3_SEGMENT_AT_CUT",
+   "status": "FIXED_VERIFIED",
+   "note": "unchanged by this task"
+  },
+  {
+   "id": "F4_WATERMARK_COPY",
+   "status": "OPEN_PRODUCT_BLOCKER",
+   "note": "this task re-binds it as the VACE ineligibility blocker; strategy still required before any VACE use"
+  },
+  {
+   "id": "F5_BOOK_STATE",
+   "status": "OPEN_PRODUCT_DECISION",
+   "note": "routed to the S12 review packet; not adjudicated here"
+  },
+  {
+   "id": "F6_RAM_INSTRUMENT",
+   "status": "OPEN_INSTRUMENT",
+   "note": "NOT_MEASURED kept; never guessed"
+  },
+  {
+   "id": "F7_SEAM_FLAG_BOOK",
+   "status": "FLAGGED_KEPT",
+   "note": "unchanged by this task"
+  },
+  {
+   "id": "F8_TURN_TRANSIENT_GLYPH",
+   "status": "RECORDED_KEPT",
+   "note": "unchanged by this task"
+  }
+ ],
+ "evidence_root": "C:/Users/Admin/Documents/Codex/work/mf-delivery-runs/20260927/20260927T163824Z/tasks/MF-END-17",
+ "claims": {
+  "quality_accepted": false,
+  "quality_verdict_owner": "BENCH / DEMO / Codex",
+  "no_best_newest_claim": true,
+  "new_gpu_jobs_this_task": 0,
+  "deliverable": false,
+  "skip_not_a_pass": true
+ }
+}

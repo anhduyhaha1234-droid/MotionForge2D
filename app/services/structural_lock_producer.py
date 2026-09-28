@@ -80,7 +80,10 @@ from app.persistence.object_intelligence import (
     ObjectIntelligenceRepository,
     RoleNotFoundError,
 )
-from app.persistence.structural_evidence import canonical_json
+from app.persistence.structural_evidence import (
+    StructuralEvidenceRepository,
+    canonical_json,
+)
 from app.persistence.structural_lock import (
     LockManifestRecord,
     StructuralLockConflictError,
@@ -91,6 +94,7 @@ from app.persistence.structural_lock import (
     StructuralLockRepository,
 )
 from app.services.s09_approval import FULL_APPLY_EXECUTABLE_ROUTES
+from app.services.source_interaction_facts import ALGORITHM as SOURCE_FACTS_ALGORITHM
 from app.services.structural_lock_source_timing import (
     SourceTimingError,
     SourceTimingProof,
@@ -141,6 +145,8 @@ CODE_UNSUPPORTED_ROUTE = "STRUCTURAL_LOCK_UNSUPPORTED_ROUTE"
 CODE_ROUTE_AMBIGUOUS = "STRUCTURAL_LOCK_ROUTE_AMBIGUOUS"
 CODE_CONFLICT = "STRUCTURAL_LOCK_CONFLICT"
 CODE_READ_ERROR = "STRUCTURAL_LOCK_READ_ERROR"
+CODE_SOURCE_FACTS_SOURCE_MISMATCH = "STRUCTURAL_LOCK_SOURCE_FACTS_SOURCE_MISMATCH"
+CODE_SOURCE_FACTS_OUT_OF_SCOPE = "STRUCTURAL_LOCK_SOURCE_FACTS_OUT_OF_SCOPE"
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
@@ -434,6 +440,21 @@ class StructuralLockProducer:
                 ],
                 "policy_version": policy,
             }
+
+            # Source interaction facts (MF-END-13): when a video HAS published
+            # source facts they are frozen into the manifest and its source
+            # identity must agree with the manifest's own source artifact —
+            # sealed source facts can never be re-bound to another source
+            # (a manifest without source facts keeps the exact legacy shape).
+            source_facts = self._source_facts_payload(
+                workspace_id, video_item_id, {plan.segment.id for plan in plans}
+            )
+            if source_facts is not None:
+                self._validate_source_facts(source_facts, str(source.sha256))
+                manifest["source_interaction_facts"] = source_facts
+                manifest["fingerprints"]["source_interaction_facts"] = _sha256_hex(
+                    source_facts
+                )
 
             record, created = self._create_manifest(
                 workspace_id,
@@ -865,6 +886,67 @@ class StructuralLockProducer:
                 and str(row.target_segment_id) in segment_ids
             ]
         }
+
+    # ── source interaction facts freeze (MF-END-13) ──────────────────────
+
+    def _source_facts_payload(
+        self,
+        workspace_id: str,
+        video_item_id: str,
+        segment_ids: set[str],
+    ) -> dict[str, Any] | None:
+        """The published source facts for this video, or ``None`` when none.
+
+        Reads the durable rows the source-interaction-facts algorithm wrote
+        (never a client payload) and keeps only rows whose endpoints are part
+        of the manifest segment set.  ``None`` (no rows at all) leaves the
+        legacy manifest shape untouched.
+        """
+        rows = StructuralEvidenceRepository(self._session).list_source_algorithm_facts(
+            workspace_id, video_item_id, algorithm=SOURCE_FACTS_ALGORITHM
+        )
+        contacts = [
+            row for row in rows["contacts"] if str(row["source_segment_id"]) in segment_ids
+            and str(row["target_segment_id"]) in segment_ids
+        ]
+        occlusions = [
+            row
+            for row in rows["occlusions"]
+            if str(row["occluder_segment_id"]) in segment_ids
+            and str(row["occludee_segment_id"]) in segment_ids
+        ]
+        motions = [
+            row for row in rows["motions"] if str(row["occurrence_segment_id"]) in segment_ids
+        ]
+        if not contacts and not occlusions and not motions:
+            return None
+        provenance = [row.get("provenance") or {} for row in (*contacts, *occlusions, *motions)]
+        source_shas = sorted(
+            {str(item.get("source_sha256")) for item in provenance if item.get("source_sha256")}
+        )
+        return {
+            "algorithm": SOURCE_FACTS_ALGORITHM,
+            "source_sha256": source_shas,
+            "contacts": contacts,
+            "occlusions": occlusions,
+            "motions": motions,
+        }
+
+    def _validate_source_facts(
+        self, source_facts: dict[str, Any], manifest_source_sha: str
+    ) -> None:
+        """Fail closed when published facts contradict the frozen source."""
+        shas = [str(item) for item in source_facts.get("source_sha256") or []]
+        if not shas or len(shas) > 1 or shas[0] != manifest_source_sha:
+            raise ProducerValidationError(
+                CODE_SOURCE_FACTS_SOURCE_MISMATCH,
+                "published source interaction facts are bound to "
+                f"{shas!r}, not to the manifest source {manifest_source_sha!r}; "
+                "a sealed source fact is never re-bound to another source",
+                reasons=tuple(
+                    f"source_interaction_facts.source_sha256={value}" for value in shas
+                ),
+            )
 
     # ── timebase / manifest creation ─────────────────────────────────────
 

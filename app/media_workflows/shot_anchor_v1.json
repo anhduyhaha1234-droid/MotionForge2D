@@ -1,0 +1,1234 @@
+{
+ "schema_version": "mf.shot_anchor.graph.v1",
+ "graph_id": "shot_anchor_v1",
+ "purpose": "Build the TARGET full-scene anchor of a shot, headless: the measured source keyframe is redrawn in the cast's flat style with every role (incl. the partial person at the frame edge) addressed, while the holder, the book state, the camera and the layout of the source composition are kept. No video.",
+ "derived_from": {
+  "template_id": "image_flux2_klein_image_edit_4b_distilled",
+  "template_path": "C:/Users/Admin/Documents/Codex/work/mfv1/runtime/video14b/venv/Lib/site-packages/comfyui_workflow_templates_json/templates/image_flux2_klein_image_edit_4b_distilled.json",
+  "template_sha256": "e0388a8870495802314d58fa61616ddcdb7064dac5f85a8787c9e08180b8a560",
+  "template_sha256_16": "e0388a8870495802",
+  "accepted_predecessor_graph": {
+   "file": "proof/graphs/anchor_book.p2.api.json",
+   "sha256": "853cafb4f88fa8a284d6de085910a573640e0e76e58a52e3d75a90ed6c2d46cb",
+   "why": "the accepted P2 BOOK anchor run; this in-tree graph is its formalization: declared canvas, per-image alpha composite, the same 4 inputs, the same seed, the same frozen prompt (text sha frozen below)"
+  },
+  "in_tree_precedent": {
+   "graph": "app/media_workflows/reference_asset_v1.json",
+   "why": "same formalization pattern (parameters/alpha/dimensions policies + validator)"
+  },
+  "multi_reference_support": {
+   "node_source": "comfy_extras/nodes_edit_model.py: ReferenceLatent",
+   "node_doc": "\"If the model supports it you can chain multiple to set multiple reference images.\"",
+   "model_source": "comfy/model_base.py Flux.extra_conds -> ref_latents CONDList over ALL reference_latents (not only the last); Flux2 inherits",
+   "measured": "the accepted predecessor graph chained 3 extra references on both positive and negative conditioning; extra anchors are CONDITIONING ONLY (they never drive canvas/size or the edit base)"
+  }
+ },
+ "source_facts": {
+  "artifact_schema": "mf.source_interaction_facts.v1",
+  "artifact_digest": "b286377c2ba583dffe19b43dd0fac0530eb8a3b77af4d06aac876c645234191b",
+  "track_artifact_digest": "47e327e94d8c3d53d77ac6e5794d1da3c52f6ae35f790a6d4f5d8eacb235492d",
+  "track_engine": "sam2.1",
+  "producer": "MF-END-13 app/services/source_interaction_facts.py (sealed artifact, production=true)",
+  "window_id": "BOOK",
+  "source_sha256": "0a7ed862b799838a13eea9e2202b0962b41d383c3ca35f06ce8d1fc00cbe4acc",
+  "keyframe": {
+   "frame": 0,
+   "file": "sa_v1_keyframe_book_f000.png",
+   "sha256": "3f0d090a9c022fe136542c9f017b1f7cde40b1f79e80b92541846ed0e0a9c8c0",
+   "dims": [
+    640,
+    368
+   ],
+   "recipe": "native 640x360 decoded at t=0 + translation pad 4/4 (measured, P1_UNIT_MANIFESTS BOOK-UNIT-001 'source_frame'); the graph never resamples or crops the frame"
+  },
+  "camera": {
+   "classification": "static",
+   "cut_frames": [],
+   "content_events": [
+    72,
+    95
+   ],
+   "border_drift_px_per_frame_median": 0.000468,
+   "policy": "no new camera is inferred: the canvas IS the source composition geometry and the graph exposes NO camera/zoom/crop/pan parameter"
+  },
+  "holder": {
+   "subject_role_id": "ROLE-BOOK-P1",
+   "object_role_id": "PROP-BOOK",
+   "contact_intervals": 7,
+   "first_interval": [
+    2,
+    17
+   ],
+   "last_interval": [
+    106,
+    120
+   ],
+   "all_kind": "grasp"
+  },
+  "occlusion": {
+   "occluder_role_id": "PROP-BOOK",
+   "occludee_role_id": "ROLE-BOOK-P1",
+   "order": "in_front_of",
+   "span": [
+    0,
+    120
+   ],
+   "mean_containment": 0.969667
+  },
+  "change_frames": [
+   1,
+   2,
+   17,
+   43,
+   46,
+   47,
+   72,
+   95,
+   105,
+   106
+  ],
+  "book_state_at_keyframe": "closed, cover upright against the chest; the book's first state change in the source is open_two_pages @72, outside frame 0"
+ },
+ "role_map": {
+  "note": "each visible person and the prop, with the measured source evidence and the target disposition; the frozen prompt binds the same mapping (reference images 2/3/4) and the partial-person keep policy",
+  "roles": [
+   {
+    "role_id": "ROLE-BOOK-P1",
+    "instance_id": "trk:ROLE-BOOK-P1",
+    "kind": "person",
+    "source_evidence": {
+     "tracker": "sam2.1",
+     "track_digest": "47e327e94d8c3d53d77ac6e5794d1da3c52f6ae35f790a6d4f5d8eacb235492d",
+     "bbox_frame0_xywh": [
+      223,
+      100,
+      72,
+      196
+     ],
+     "span": [
+      0,
+      120
+     ],
+     "visibility": "visible"
+    },
+    "target_ref": {
+     "file": "sa_v1_ref_p1_boy_hacker.png",
+     "sha256": "a2ad4db98ac733c969260d052f35e737c37eef664b1b36d5a6fd9a7254006821",
+     "kind": "cast_placeholder_flat_color_block",
+     "appearance_claim": false
+    },
+    "disposition": "redraw with the reference-2 design at the same seated position, same silhouette envelope; keeps holding the closed book (holder fact)"
+   },
+   {
+    "role_id": "ROLE-BOOK-P2",
+    "instance_id": null,
+    "kind": "person",
+    "source_evidence": {
+     "unit_manifest": "BOOK-UNIT-001",
+     "element": "cast_dan_choi_seated_cross_legged",
+     "authored_artwork_sha256": "271f1c5789ee8fb9022ab402d834c8f2d4e862f972a105060e457b68b0282496",
+     "staged_on_neutral_sha256": "2ffc245346340b4cc95ffa4c5ac9f3ad3e4485927a655e6a47ab960e5c848969"
+    },
+    "target_ref": {
+     "file": "sa_v1_ref_p2_dan_choi.png",
+     "sha256": "2ffc245346340b4cc95ffa4c5ac9f3ad3e4485927a655e6a47ab960e5c848969",
+     "kind": "authored_artwork_on_neutral",
+     "appearance_claim": true
+    },
+    "disposition": "redraw with the reference-3 design at the same standing position behind-right; never copy the reference's own stance"
+   },
+   {
+    "role_id": "ROLE-BOOK-P3",
+    "instance_id": null,
+    "kind": "person",
+    "source_evidence": {
+     "unit_manifest": "BOOK-UNIT-001",
+     "element": "cast_gau_nau_back_PLACEHOLDER_flat_color_block",
+     "staged_on_neutral_sha256": "49e99094d802495dd92e1dbab87125806efcb077f0be37125738b7218a63096f"
+    },
+    "target_ref": {
+     "file": "sa_v1_ref_p3_gau_nau_back.png",
+     "sha256": "49e99094d802495dd92e1dbab87125806efcb077f0be37125738b7218a63096f",
+     "kind": "cast_placeholder_flat_color_block",
+     "appearance_claim": false
+    },
+    "disposition": "redraw with the reference-4 design at the same position, seen from behind, same amount of body showing"
+   },
+   {
+    "role_id": "ROLE-BOOK-P4-EDGE",
+    "instance_id": "trk:ROLE-BOOK-P4-EDGE",
+    "kind": "partial_person_at_frame_edge",
+    "source_evidence": {
+     "tracker": "sam2.1",
+     "track_digest": "47e327e94d8c3d53d77ac6e5794d1da3c52f6ae35f790a6d4f5d8eacb235492d",
+     "bbox_frame0_xywh": [
+      597,
+      98,
+      43,
+      194
+     ],
+     "border_touch": true,
+     "span": [
+      0,
+      120
+     ]
+    },
+    "target_ref": null,
+    "disposition": "KEEP PARTIAL: stays at the same edge with exactly the same amount visible; not completed, not brought into frame, not removed (frozen prompt states this binding)"
+   },
+   {
+    "role_id": "PROP-BOOK",
+    "instance_id": "trk:PROP-BOOK",
+    "kind": "prop",
+    "source_evidence": {
+     "tracker": "sam2.1",
+     "track_digest": "47e327e94d8c3d53d77ac6e5794d1da3c52f6ae35f790a6d4f5d8eacb235492d",
+     "bbox_frame0_xywh": [
+      248,
+      161,
+      50,
+      71
+     ],
+     "span": [
+      0,
+      120
+     ]
+    },
+    "target_ref": null,
+    "disposition": "redrawn in the same flat style, same position, closed upright with the yellow part beside it; no page spread at frame 0"
+   }
+  ]
+ },
+ "parameters": [
+  {
+   "name": "keyframe",
+   "pointer": "graph/KEY_LOAD/inputs/image",
+   "type": "string",
+   "rule": "file in the isolated server input dir; MUST be the frozen keyframe (sha256 3f0d090a9c022fe1...), dims == canvas",
+   "golden": "sa_v1_keyframe_book_f000.png"
+  },
+  {
+   "name": "ref_p1",
+   "pointer": "graph/R1_LOAD/inputs/image",
+   "type": "string",
+   "rule": "cast reference for ROLE-BOOK-P1 (reference image 2 in the prompt)",
+   "golden": "sa_v1_ref_p1_boy_hacker.png"
+  },
+  {
+   "name": "ref_p2",
+   "pointer": "graph/R2_LOAD/inputs/image",
+   "type": "string",
+   "rule": "cast reference for ROLE-BOOK-P2 (reference image 3 in the prompt)",
+   "golden": "sa_v1_ref_p2_dan_choi.png"
+  },
+  {
+   "name": "ref_p3",
+   "pointer": "graph/R3_LOAD/inputs/image",
+   "type": "string",
+   "rule": "cast reference for ROLE-BOOK-P3 (reference image 4 in the prompt)",
+   "golden": "sa_v1_ref_p3_gau_nau_back.png"
+  },
+  {
+   "name": "prompt",
+   "pointer": "graph/PROMPT/inputs/text",
+   "type": "string",
+   "rule": "frozen shot-anchor prompt (verbatim from the accepted P2 BOOK anchor graph)",
+   "golden": null,
+   "golden_sha256": "8e48cfbe5d81fad581cc237fd803a7c39039c4633fb89cba27e0c742c9fe0b09"
+  },
+  {
+   "name": "seed",
+   "pointer": "graph/NOISE/inputs/noise_seed",
+   "type": "int",
+   "rule": "0 <= seed < 2**63",
+   "golden": 2026092501
+  },
+  {
+   "name": "canvas_width",
+   "pointer": "graph/LATENT/inputs/width",
+   "type": "int",
+   "rule": "16..16384, divisible by 16; must equal the staged keyframe width",
+   "mirrors": [
+    "graph/SIGMAS/inputs/width"
+   ],
+   "golden": 640
+  },
+  {
+   "name": "canvas_height",
+   "pointer": "graph/LATENT/inputs/height",
+   "type": "int",
+   "rule": "16..16384, divisible by 16; must equal the staged keyframe height",
+   "mirrors": [
+    "graph/SIGMAS/inputs/height"
+   ],
+   "golden": 368
+  },
+  {
+   "name": "ref_longer_side",
+   "pointer": "graph/R1_RES/inputs/resize_type.longer_size",
+   "type": "int",
+   "rule": "16..4096, python round() (half-to-even) as in the node",
+   "mirrors": [
+    "graph/R2_RES/inputs/resize_type.longer_size",
+    "graph/R3_RES/inputs/resize_type.longer_size"
+   ],
+   "golden": 368
+  },
+  {
+   "name": "neutral_rgb_int",
+   "pointer": "graph/KEY_BG/inputs/color",
+   "type": "int",
+   "rule": "0..0xFFFFFF as 0xRRGGBB",
+   "mirrors": [
+    "graph/R1_BG/inputs/color",
+    "graph/R2_BG/inputs/color",
+    "graph/R3_BG/inputs/color"
+   ],
+   "golden": 8421504
+  },
+  {
+   "name": "steps",
+   "pointer": "graph/SIGMAS/inputs/steps",
+   "type": "int",
+   "rule": "distilled profile: 4 (a base profile of 20 steps is NOT this graph)",
+   "golden": 4
+  },
+  {
+   "name": "cfg",
+   "pointer": "graph/GUIDER/inputs/cfg",
+   "type": "number",
+   "rule": "distilled profile: 1",
+   "golden": 1.0
+  },
+  {
+   "name": "sampler",
+   "pointer": "graph/SAMPLER/inputs/sampler_name",
+   "type": "string",
+   "rule": "enum: measured registered samplers",
+   "golden": "euler"
+  },
+  {
+   "name": "filename_prefix",
+   "pointer": "graph/SAVE/inputs/filename_prefix",
+   "type": "string",
+   "rule": "run-scoped prefix; outputs land under <output>/<prefix>_00001_.png",
+   "golden": "mf_shot_anchor_v1/book_f000"
+  }
+ ],
+ "alpha_policy": {
+  "neutral_rgb": [
+   128,
+   128,
+   128
+  ],
+  "emptyimage_color_int": 8421504,
+  "composite_applied_in_graph": true,
+  "composite_times_per_image": 1,
+  "images_covered": [
+   "KEY_LOAD",
+   "R1_LOAD",
+   "R2_LOAD",
+   "R3_LOAD"
+  ],
+  "formula": "out = rgb*(alpha/255) + neutral*(1 - alpha/255)",
+  "nodes": {
+   "background": "<P>_BG:EmptyImage",
+   "invert": "<P>_INV:InvertMask",
+   "composite": "<P>_COMP:ImageCompositeMasked"
+  },
+  "mask_convention": "measured in the pinned runtime: nodes.py LoadImage returns MASK = 1 - alpha; comfy_extras/nodes_mask.py ImageCompositeMasked weights the SOURCE with `mask`; so the mask must be inverted first",
+  "why": "all delivered inputs are opaque RGB (measured: composite is the identity path); an RGBA input (e.g. the raw authored artwork) is still composited correctly exactly once instead of being silently blackened by VAEEncode",
+  "output": {
+   "channel_count": 3,
+   "alpha_synthesized": false,
+   "format": "PNG (opaque RGB)",
+   "owner_of_background_removal": "library ingest job - NOT this graph; no segmentation weights are claimed here"
+  }
+ },
+ "dimensions_policy": {
+  "canvas_wh": [
+   640,
+   368
+  ],
+  "canvas_source": "declared constants in the graph (parameters canvas_width/height); canvas == source keyframe composition geometry (640x360 native + 4/4 translation pad, measured)",
+  "divisible_by": 16,
+  "reference_resize": {
+   "node": "<P>_RES:ResizeImageMaskNode",
+   "resize_type": "scale longer dimension",
+   "longer_size": 368,
+   "scale_method": "area",
+   "node_formula": "comfy_extras/nodes_post_processing.py scale_longer_dimension - python round() (half-to-even)"
+  },
+  "crop_applied": false,
+  "stretch_applied": false,
+  "layout_pin": "the delivered anchor keeps the source layout: same aspect, same frame edges, no crop/zoom/letterbox; the graph exposes no geometry parameter other than the declared canvas/ref-resize constants",
+  "output_dims": "equal to canvas_wh (verified against the real run receipt)"
+ },
+ "graph": {
+  "KEY_LOAD": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": "sa_v1_keyframe_book_f000.png"
+   },
+   "_meta": {
+    "title": "KEY: staged input (opaque RGB or RGBA; composite below is the declared identity for opaque inputs)"
+   }
+  },
+  "KEY_SIZE": {
+   "class_type": "GetImageSize",
+   "inputs": {
+    "image": [
+     "KEY_LOAD",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "KEY: source size"
+   }
+  },
+  "KEY_BG": {
+   "class_type": "EmptyImage",
+   "inputs": {
+    "width": [
+     "KEY_SIZE",
+     0
+    ],
+    "height": [
+     "KEY_SIZE",
+     1
+    ],
+    "batch_size": 1,
+    "color": 8421504
+   },
+   "_meta": {
+    "title": "KEY: declared neutral background 0x808080"
+   }
+  },
+  "KEY_INV": {
+   "class_type": "InvertMask",
+   "inputs": {
+    "mask": [
+     "KEY_LOAD",
+     1
+    ]
+   },
+   "_meta": {
+    "title": "KEY: LoadImage MASK is 1-alpha; invert to alpha"
+   }
+  },
+  "KEY_COMP": {
+   "class_type": "ImageCompositeMasked",
+   "inputs": {
+    "destination": [
+     "KEY_BG",
+     0
+    ],
+    "source": [
+     "KEY_LOAD",
+     0
+    ],
+    "x": 0,
+    "y": 0,
+    "resize_source": false,
+    "mask": [
+     "KEY_INV",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "KEY: composite ONCE (graph-side alpha policy)"
+   }
+  },
+  "R1_LOAD": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": "sa_v1_ref_p1_boy_hacker.png"
+   },
+   "_meta": {
+    "title": "R1: staged input (opaque RGB or RGBA; composite below is the declared identity for opaque inputs)"
+   }
+  },
+  "R1_SIZE": {
+   "class_type": "GetImageSize",
+   "inputs": {
+    "image": [
+     "R1_LOAD",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "R1: source size"
+   }
+  },
+  "R1_BG": {
+   "class_type": "EmptyImage",
+   "inputs": {
+    "width": [
+     "R1_SIZE",
+     0
+    ],
+    "height": [
+     "R1_SIZE",
+     1
+    ],
+    "batch_size": 1,
+    "color": 8421504
+   },
+   "_meta": {
+    "title": "R1: declared neutral background 0x808080"
+   }
+  },
+  "R1_INV": {
+   "class_type": "InvertMask",
+   "inputs": {
+    "mask": [
+     "R1_LOAD",
+     1
+    ]
+   },
+   "_meta": {
+    "title": "R1: LoadImage MASK is 1-alpha; invert to alpha"
+   }
+  },
+  "R1_COMP": {
+   "class_type": "ImageCompositeMasked",
+   "inputs": {
+    "destination": [
+     "R1_BG",
+     0
+    ],
+    "source": [
+     "R1_LOAD",
+     0
+    ],
+    "x": 0,
+    "y": 0,
+    "resize_source": false,
+    "mask": [
+     "R1_INV",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "R1: composite ONCE (graph-side alpha policy)"
+   }
+  },
+  "R2_LOAD": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": "sa_v1_ref_p2_dan_choi.png"
+   },
+   "_meta": {
+    "title": "R2: staged input (opaque RGB or RGBA; composite below is the declared identity for opaque inputs)"
+   }
+  },
+  "R2_SIZE": {
+   "class_type": "GetImageSize",
+   "inputs": {
+    "image": [
+     "R2_LOAD",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "R2: source size"
+   }
+  },
+  "R2_BG": {
+   "class_type": "EmptyImage",
+   "inputs": {
+    "width": [
+     "R2_SIZE",
+     0
+    ],
+    "height": [
+     "R2_SIZE",
+     1
+    ],
+    "batch_size": 1,
+    "color": 8421504
+   },
+   "_meta": {
+    "title": "R2: declared neutral background 0x808080"
+   }
+  },
+  "R2_INV": {
+   "class_type": "InvertMask",
+   "inputs": {
+    "mask": [
+     "R2_LOAD",
+     1
+    ]
+   },
+   "_meta": {
+    "title": "R2: LoadImage MASK is 1-alpha; invert to alpha"
+   }
+  },
+  "R2_COMP": {
+   "class_type": "ImageCompositeMasked",
+   "inputs": {
+    "destination": [
+     "R2_BG",
+     0
+    ],
+    "source": [
+     "R2_LOAD",
+     0
+    ],
+    "x": 0,
+    "y": 0,
+    "resize_source": false,
+    "mask": [
+     "R2_INV",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "R2: composite ONCE (graph-side alpha policy)"
+   }
+  },
+  "R3_LOAD": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": "sa_v1_ref_p3_gau_nau_back.png"
+   },
+   "_meta": {
+    "title": "R3: staged input (opaque RGB or RGBA; composite below is the declared identity for opaque inputs)"
+   }
+  },
+  "R3_SIZE": {
+   "class_type": "GetImageSize",
+   "inputs": {
+    "image": [
+     "R3_LOAD",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "R3: source size"
+   }
+  },
+  "R3_BG": {
+   "class_type": "EmptyImage",
+   "inputs": {
+    "width": [
+     "R3_SIZE",
+     0
+    ],
+    "height": [
+     "R3_SIZE",
+     1
+    ],
+    "batch_size": 1,
+    "color": 8421504
+   },
+   "_meta": {
+    "title": "R3: declared neutral background 0x808080"
+   }
+  },
+  "R3_INV": {
+   "class_type": "InvertMask",
+   "inputs": {
+    "mask": [
+     "R3_LOAD",
+     1
+    ]
+   },
+   "_meta": {
+    "title": "R3: LoadImage MASK is 1-alpha; invert to alpha"
+   }
+  },
+  "R3_COMP": {
+   "class_type": "ImageCompositeMasked",
+   "inputs": {
+    "destination": [
+     "R3_BG",
+     0
+    ],
+    "source": [
+     "R3_LOAD",
+     0
+    ],
+    "x": 0,
+    "y": 0,
+    "resize_source": false,
+    "mask": [
+     "R3_INV",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "R3: composite ONCE (graph-side alpha policy)"
+   }
+  },
+  "KEY_ENC": {
+   "class_type": "VAEEncode",
+   "inputs": {
+    "pixels": [
+     "KEY_COMP",
+     0
+    ],
+    "vae": [
+     "VAE",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "reference image 1: keyframe latent (edit base / composition)"
+   }
+  },
+  "R1_RES": {
+   "class_type": "ResizeImageMaskNode",
+   "inputs": {
+    "input": [
+     "R1_COMP",
+     0
+    ],
+    "resize_type": "scale longer dimension",
+    "resize_type.longer_size": 368,
+    "scale_method": "area"
+   },
+   "_meta": {
+    "title": "reference image 2: aspect-preserving resize, no crop"
+   }
+  },
+  "R1_ENC": {
+   "class_type": "VAEEncode",
+   "inputs": {
+    "pixels": [
+     "R1_RES",
+     0
+    ],
+    "vae": [
+     "VAE",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "reference image 2: latent for the conditioning chain"
+   }
+  },
+  "R2_RES": {
+   "class_type": "ResizeImageMaskNode",
+   "inputs": {
+    "input": [
+     "R2_COMP",
+     0
+    ],
+    "resize_type": "scale longer dimension",
+    "resize_type.longer_size": 368,
+    "scale_method": "area"
+   },
+   "_meta": {
+    "title": "reference image 3: aspect-preserving resize, no crop"
+   }
+  },
+  "R2_ENC": {
+   "class_type": "VAEEncode",
+   "inputs": {
+    "pixels": [
+     "R2_RES",
+     0
+    ],
+    "vae": [
+     "VAE",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "reference image 3: latent for the conditioning chain"
+   }
+  },
+  "R3_RES": {
+   "class_type": "ResizeImageMaskNode",
+   "inputs": {
+    "input": [
+     "R3_COMP",
+     0
+    ],
+    "resize_type": "scale longer dimension",
+    "resize_type.longer_size": 368,
+    "scale_method": "area"
+   },
+   "_meta": {
+    "title": "reference image 4: aspect-preserving resize, no crop"
+   }
+  },
+  "R3_ENC": {
+   "class_type": "VAEEncode",
+   "inputs": {
+    "pixels": [
+     "R3_RES",
+     0
+    ],
+    "vae": [
+     "VAE",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "reference image 4: latent for the conditioning chain"
+   }
+  },
+  "PROMPT": {
+   "class_type": "CLIPTextEncode",
+   "inputs": {
+    "text": "Reference image 1 is the exact frame to redraw. Redraw it as a flat 2D cel-shaded animation illustration in a flat colour palette: solid flat colour fills, one hard shadow tone per shape, thin clean outlines, no gradients, no photographic texture, no 3D rendering. Keep the identical composition, camera, scale and aspect ratio of reference image 1 and keep every contact between bodies and objects. Keep the frame edges exactly as they are, including the thin black band at the very top and the very bottom: do not crop, do not zoom, do not letterbox, do not add borders. Reference image 1 shows three people in one room and a fourth person who is only partially inside the frame. The pale/grey-haired figure seated on the left in the black chair holds the blue book with its COVER UPRIGHT and closed against the chest: the flat blue cover and its thin pale page edge are visible and the bright yellow part of the second object sits in the same hand at the cover's left. Reference image 1 does not show the book's pages spread at this frame, so keep the book closed and upright in exactly that position with the yellow part beside it; do not open the book, do not draw a page spread, and do not move either hand on to a page. This figure takes the character design of reference image 2: same seated posture, same screen position, same silhouette envelope and the same overlap with the chair, the table and the book. The brown-haired figure in the magenta/pink dress standing behind and to the right takes the character design of reference image 3: same standing position, same height, same overlap in front of the wall. Reference images 2, 3 and 4 are identity and design references only: their own stance, framing and props are not the target, and reference image 3 is a seated cross-legged design, so never copy a stance from a reference and never draw a stance that reference image 1 does not show. The dark-haired figure seated on the right, seen from behind so that only the back of the head and shoulders show above the table, takes the character design of reference image 4: same seated position, same amount of body showing. A fourth person is only PARTIALLY inside the frame at the right edge, next to the table: a magenta/violet sleeve and body curve cut off by the right frame border. Keep that partial person at the same edge with exactly the same amount visible behind the table; do not complete that person, do not bring them into the frame and do not remove them. The blue book, the table with the green tray, and the chairs are redrawn in the same flat style, in the same positions, with the same interactions. The room - the brown wall panel, the window opening, the floor line and the cupboard on the right - becomes a flat background design with the same layout and the same openings. The number of people must not change: do not add or remove a person, do not add a face, a head or a hand that reference image 1 does not already show, and do not move any person. No added text, no captions, no subtitles, no logo, no watermark: the video watermark in the bottom-left corner of reference image 1 must not appear in the result.",
+    "clip": [
+     "CLIP",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "frozen shot-anchor prompt (role map + holder + partial policy, verbatim)"
+   }
+  },
+  "NEG_ZERO": {
+   "class_type": "ConditioningZeroOut",
+   "inputs": {
+    "conditioning": [
+     "PROMPT",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "distilled template: zeroed negative"
+   }
+  },
+  "KPOS": {
+   "class_type": "ReferenceLatent",
+   "inputs": {
+    "conditioning": [
+     "PROMPT",
+     0
+    ],
+    "latent": [
+     "KEY_ENC",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "positive + reference image 1 (keyframe)"
+   }
+  },
+  "KNEG": {
+   "class_type": "ReferenceLatent",
+   "inputs": {
+    "conditioning": [
+     "NEG_ZERO",
+     0
+    ],
+    "latent": [
+     "KEY_ENC",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "negative + reference image 1 (keyframe)"
+   }
+  },
+  "R1_POS": {
+   "class_type": "ReferenceLatent",
+   "inputs": {
+    "conditioning": [
+     "KPOS",
+     0
+    ],
+    "latent": [
+     "R1_ENC",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "positive + reference image 2 (cast conditioning, chained)"
+   }
+  },
+  "R1_NEG": {
+   "class_type": "ReferenceLatent",
+   "inputs": {
+    "conditioning": [
+     "KNEG",
+     0
+    ],
+    "latent": [
+     "R1_ENC",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "negative + reference image 2 (cast conditioning, chained)"
+   }
+  },
+  "R2_POS": {
+   "class_type": "ReferenceLatent",
+   "inputs": {
+    "conditioning": [
+     "R1_POS",
+     0
+    ],
+    "latent": [
+     "R2_ENC",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "positive + reference image 3 (cast conditioning, chained)"
+   }
+  },
+  "R2_NEG": {
+   "class_type": "ReferenceLatent",
+   "inputs": {
+    "conditioning": [
+     "R1_NEG",
+     0
+    ],
+    "latent": [
+     "R2_ENC",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "negative + reference image 3 (cast conditioning, chained)"
+   }
+  },
+  "R3_POS": {
+   "class_type": "ReferenceLatent",
+   "inputs": {
+    "conditioning": [
+     "R2_POS",
+     0
+    ],
+    "latent": [
+     "R3_ENC",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "positive + reference image 4 (cast conditioning, chained)"
+   }
+  },
+  "R3_NEG": {
+   "class_type": "ReferenceLatent",
+   "inputs": {
+    "conditioning": [
+     "R2_NEG",
+     0
+    ],
+    "latent": [
+     "R3_ENC",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "negative + reference image 4 (cast conditioning, chained)"
+   }
+  },
+  "UNET": {
+   "class_type": "UNETLoader",
+   "inputs": {
+    "unet_name": "flux-2-klein-4b-fp8.safetensors",
+    "weight_dtype": "default"
+   },
+   "_meta": {
+    "title": "FLUX.2 klein 4B fp8 (distilled)"
+   }
+  },
+  "CLIP": {
+   "class_type": "CLIPLoader",
+   "inputs": {
+    "clip_name": "qwen_3_4b.safetensors",
+    "type": "flux2",
+    "device": "default"
+   },
+   "_meta": {
+    "title": "Qwen3-4B text encoder"
+   }
+  },
+  "VAE": {
+   "class_type": "VAELoader",
+   "inputs": {
+    "vae_name": "flux2-vae.safetensors"
+   },
+   "_meta": {
+    "title": "FLUX.2 VAE"
+   }
+  },
+  "LATENT": {
+   "class_type": "EmptyFlux2LatentImage",
+   "inputs": {
+    "width": 640,
+    "height": 368,
+    "batch_size": 1
+   },
+   "_meta": {
+    "title": "canvas = source composition geometry (declared constants, /16)"
+   }
+  },
+  "SIGMAS": {
+   "class_type": "Flux2Scheduler",
+   "inputs": {
+    "steps": 4,
+    "width": 640,
+    "height": 368
+   },
+   "_meta": {
+    "title": "Flux2Scheduler (distilled 4 steps)"
+   }
+  },
+  "SAMPLER": {
+   "class_type": "KSamplerSelect",
+   "inputs": {
+    "sampler_name": "euler"
+   },
+   "_meta": {
+    "title": "euler"
+   }
+  },
+  "NOISE": {
+   "class_type": "RandomNoise",
+   "inputs": {
+    "noise_seed": 2026092501
+   },
+   "_meta": {
+    "title": "declared seed (same as the accepted P2 BOOK anchor, for comparability)"
+   }
+  },
+  "GUIDER": {
+   "class_type": "CFGGuider",
+   "inputs": {
+    "cfg": 1.0,
+    "model": [
+     "UNET",
+     0
+    ],
+    "positive": [
+     "R3_POS",
+     0
+    ],
+    "negative": [
+     "R3_NEG",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "cfg 1 (distilled)"
+   }
+  },
+  "SAMPLE": {
+   "class_type": "SamplerCustomAdvanced",
+   "inputs": {
+    "noise": [
+     "NOISE",
+     0
+    ],
+    "guider": [
+     "GUIDER",
+     0
+    ],
+    "sampler": [
+     "SAMPLER",
+     0
+    ],
+    "sigmas": [
+     "SIGMAS",
+     0
+    ],
+    "latent_image": [
+     "LATENT",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "sample"
+   }
+  },
+  "DECODE": {
+   "class_type": "VAEDecode",
+   "inputs": {
+    "samples": [
+     "SAMPLE",
+     0
+    ],
+    "vae": [
+     "VAE",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "decode"
+   }
+  },
+  "SAVE": {
+   "class_type": "SaveImage",
+   "inputs": {
+    "filename_prefix": "mf_shot_anchor_v1/book_f000",
+    "images": [
+     "DECODE",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "save target full-scene anchor (opaque RGB PNG)"
+   }
+  }
+ },
+ "tensor_preview": {
+  "job": "CPU-only prefix job of the same isolated server; its graph has NO model node, so it is not a GPU job and runs before the golden GPU job (one job at a time)",
+  "renders": [
+   {
+    "node": "KEY_COMP",
+    "reason": "composited keyframe (identity path, opaque in)"
+   },
+   {
+    "node": "R1_COMP",
+    "reason": "composited cast ref 1"
+   },
+   {
+    "node": "R1_RES",
+    "reason": "resized cast ref 1"
+   },
+   {
+    "node": "R2_COMP",
+    "reason": "composited cast ref 2"
+   },
+   {
+    "node": "R2_RES",
+    "reason": "resized cast ref 2"
+   },
+   {
+    "node": "R3_COMP",
+    "reason": "composited cast ref 3"
+   },
+   {
+    "node": "R3_RES",
+    "reason": "resized cast ref 3"
+   }
+  ],
+  "pixel_comparison": "each rendered preview's display pixels must equal the OFFLINE float32 node path (torch.nn.functional.interpolate mode='area') byte-for-byte: sha256 equality in raw/run_record.json",
+  "overlay": {
+   "artifact": "previews/sa_v1_overlay_*.png",
+   "recipe": "role/prop/contact overlay drawn from the SEALED MF-END-12 masks (raw/mask_*.png) and the SEALED MF-END-13 facts on both the source keyframe and the produced anchor, for review BEFORE video",
+   "never_an_input": "the overlay is derived evidence; it is not part of the graph"
+  }
+ },
+ "golden_request": {
+  "shot": "BOOK",
+  "window_id": "BOOK",
+  "keyframe_frame": 0,
+  "why_this_keyframe": "frame 0 of the measured BOOK window; camera static, book closed; the accepted P2 anchor gates measured this composition",
+  "seed_rationale": "the same seed as the accepted P2 BOOK anchor run, so the delivered graph is directly comparable with the accepted anchor",
+  "source_facts_digest": "b286377c2ba583dffe19b43dd0fac0530eb8a3b77af4d06aac876c645234191b",
+  "staged_inputs": [
+   {
+    "role": "reference image 1 (edit base / canvas driver)",
+    "file": "sa_v1_keyframe_book_f000.png",
+    "sha256": "3f0d090a9c022fe136542c9f017b1f7cde40b1f79e80b92541846ed0e0a9c8c0",
+    "bytes": 115799,
+    "dims": [
+     640,
+     368
+    ],
+    "mode": "RGB",
+    "source": "proof/inputs/i1_BOOK_f000_640x368.png"
+   },
+   {
+    "role": "reference image 2 (ROLE-BOOK-P1 design)",
+    "file": "sa_v1_ref_p1_boy_hacker.png",
+    "sha256": "a2ad4db98ac733c969260d052f35e737c37eef664b1b36d5a6fd9a7254006821",
+    "bytes": 3586,
+    "dims": [
+     768,
+     512
+    ],
+    "mode": "RGB",
+    "source": "proof/inputs/i1d_cast_boy_hacker_sitting_on_neutral_bg.png",
+    "appearance_claim": false
+   },
+   {
+    "role": "reference image 3 (ROLE-BOOK-P2 design)",
+    "file": "sa_v1_ref_p2_dan_choi.png",
+    "sha256": "2ffc245346340b4cc95ffa4c5ac9f3ad3e4485927a655e6a47ab960e5c848969",
+    "bytes": 156508,
+    "dims": [
+     1024,
+     1024
+    ],
+    "mode": "RGB",
+    "source": "proof/inputs/i1d_cast_dan_choi_standing_on_neutral_bg.png"
+   },
+   {
+    "role": "reference image 4 (ROLE-BOOK-P3 design)",
+    "file": "sa_v1_ref_p3_gau_nau_back.png",
+    "sha256": "49e99094d802495dd92e1dbab87125806efcb077f0be37125738b7218a63096f",
+    "bytes": 3195,
+    "dims": [
+     640,
+     640
+    ],
+    "mode": "RGB",
+    "source": "proof/inputs/i1d_cast_gau_nau_back_on_neutral_bg.png",
+    "appearance_claim": false
+   }
+  ],
+  "prompt_sha256": "8e48cfbe5d81fad581cc237fd803a7c39039c4633fb89cba27e0c742c9fe0b09",
+  "prompt_len": 3146,
+  "bindings": {
+   "keyframe": {
+    "pointer": "graph/KEY_LOAD/inputs/image",
+    "value": "sa_v1_keyframe_book_f000.png"
+   },
+   "ref_p1": {
+    "pointer": "graph/R1_LOAD/inputs/image",
+    "value": "sa_v1_ref_p1_boy_hacker.png"
+   },
+   "ref_p2": {
+    "pointer": "graph/R2_LOAD/inputs/image",
+    "value": "sa_v1_ref_p2_dan_choi.png"
+   },
+   "ref_p3": {
+    "pointer": "graph/R3_LOAD/inputs/image",
+    "value": "sa_v1_ref_p3_gau_nau_back.png"
+   },
+   "seed": {
+    "pointer": "graph/NOISE/inputs/noise_seed",
+    "value": 2026092501
+   },
+   "canvas_width": {
+    "pointer": "graph/LATENT/inputs/width",
+    "value": 640
+   },
+   "canvas_height": {
+    "pointer": "graph/LATENT/inputs/height",
+    "value": 368
+   },
+   "ref_longer_side": {
+    "pointer": "graph/R1_RES/inputs/resize_type.longer_size",
+    "value": 368
+   },
+   "neutral_rgb_int": {
+    "pointer": "graph/KEY_BG/inputs/color",
+    "value": 8421504
+   },
+   "steps": {
+    "pointer": "graph/SIGMAS/inputs/steps",
+    "value": 4
+   },
+   "cfg": {
+    "pointer": "graph/GUIDER/inputs/cfg",
+    "value": 1.0
+   },
+   "filename_prefix": {
+    "pointer": "graph/SAVE/inputs/filename_prefix",
+    "value": "mf_shot_anchor_v1/book_f000"
+   }
+  }
+ },
+ "output_contract": {
+  "node": "SAVE:SaveImage",
+  "files": 1,
+  "dims": "canvas_wh",
+  "alpha": "opaque RGB",
+  "naming": "<filename_prefix>_00001_.png under the run output dir",
+  "note": "the anchor is a still image; video rendering is a different task (Wan profile), not this graph"
+ }
+}

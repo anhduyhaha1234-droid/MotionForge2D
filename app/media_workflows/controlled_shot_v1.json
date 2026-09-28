@@ -1,0 +1,579 @@
+{
+ "schema_version": "mf.controlled_shot.v1",
+ "graph_id": "controlled_shot_v1",
+ "generated_at_utc": "2026-09-28T09:06:57Z",
+ "purpose": "conditional controlled-shot path (G4): the challenger track for units where the Wan Animate 2 profile fails a measured hard constraint or does not fit this runtime. This artifact records the measured activation decision, the measured eligibility of every candidate, and the unsupported status on this runtime. It deliberately ships NO runnable graph: no candidate satisfies the eligibility rule, and a workflow may never claim capability it does not have.",
+ "derived_from": {
+  "packet": "mf-takeover-20260927/tasks/MF-END-17.md + MF-END-17-launch (Phase B wave 10)",
+  "plan": "PRODUCT_AND_COMFY_PLAN.md §5 (G4 contract row)",
+  "predecessor_registry": {
+   "path": "app/media_workflows/model_profiles.json",
+   "set_by": "MF-END-16",
+   "base_commit": "a2d7cc8f18a598ade29a24082fb6f30c55904de4"
+  },
+  "challenger_run": {
+   "graph": "proof/graphs/animate2_vace_book.p4.api.json",
+   "receipt": "proof/evidence/P4_RECEIPT.json",
+   "gate": "proof/evidence/P4_GEOMETRY_GATE.json",
+   "prompt_id": "402d0c10-fb71-44ca-9250-94029cc3366c"
+  }
+ },
+ "runtime_pin": {
+  "comfyui_version": "0.37.0",
+  "head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+  "porcelain_clean": true,
+  "source_read_only": true,
+  "models_root": "C:/Users/Admin/Documents/Codex/work/mfv1/runtime/video14b/models",
+  "license": "ComfyUI GPL-3.0 (LICENSE at the repo root)",
+  "isolation_recipe": "own base-directory + --models-directory at the shared read-only root + own port + --reserve-vram 1.0 --disable-auto-launch; one job at a time",
+  "verification": "raw/evidence_reverify.json (runtime.head_match, no listener on 8188/8189/8190/8310/8321/8342)"
+ },
+ "activation": {
+  "criteria": [
+   "active only when the unit is input-ready AND the Wan profile fails a measured hard constraint OR does not fit this runtime",
+   "the verdict must be derived from measured rows only; no new condition may be invented",
+   "a skip is recorded as SKIPPED_NOT_NEEDED and is never counted as a test pass"
+  ],
+  "criteria_source": "packet MF-END-17 micro-job 1 + acceptance clause; frozen before evaluation",
+  "input_ready_reference": {
+   "source": "P1_UNIT_MANIFESTS.json (units) + MF-END-15 shot_input_readiness (runtime gate owner)",
+   "claim_by_this_task": "none - readiness is not re-adjudicated here"
+  },
+  "wan_measured_hard_gate_rows": [
+   {
+    "gate": "dims 640x368",
+    "verdict": "PASS",
+    "evidence": "P3B_GEOMETRY_GATE / P5FIX_GATE / P5FIX3_GATE"
+   },
+   {
+    "gate": "timing (120/120/102/18 frames, 30/1, PTS monotonic)",
+    "verdict": "PASS",
+    "evidence": "per-case gates"
+   },
+   {
+    "gate": "coverage per segment (incl. partial right-edge person on BOOK)",
+    "verdict": "PASS",
+    "evidence": "per-case coverage previews + vision rows"
+   },
+   {
+    "gate": "holder/contact preserved (BOOK)",
+    "verdict": "PASS",
+    "evidence": "P3B coverage vision row"
+   },
+   {
+    "gate": "no watermark",
+    "verdict": "PASS",
+    "evidence": "per-case coverage vision rows"
+   },
+   {
+    "gate": "book-state equals the source event open_two_pages @72",
+    "verdict": "OPEN (product decision F5)",
+    "evidence": "P3B gate note"
+   },
+   {
+    "gate": "RAM peak quantified",
+    "verdict": "OPEN (instrument F6)",
+    "evidence": "receipts"
+   }
+  ],
+  "wan_measured_hard_constraint_failures": [],
+  "open_items_routed": [
+   {
+    "id": "F5_BOOK_STATE",
+    "status": "OPEN_PRODUCT_DECISION",
+    "detail": "source event open_two_pages @72; Wan keeps the book CLOSED across the window, VACE shows it OPEN at f119",
+    "routed_to": "product decision -> S12 review packet (PROOF_GATE_EVALUATION §3.1); explicitly NOT classified as a measured hard-constraint failure here"
+   },
+   {
+    "id": "F6_RAM_INSTRUMENT",
+    "status": "OPEN_INSTRUMENT",
+    "detail": "RAM peak NOT MEASURED for every GPU run (non-credible sampler figures); reported as NOT_MEASURED, never guessed",
+    "routed_to": "instrument fix; does not gate the runtime-fit question the challenger answers (VRAM peak is measured)"
+   },
+   {
+    "id": "PROOF_GATE_EVALUATION-F2-P2",
+    "status": "ROUTED_DELTA",
+    "detail": "demo-side coverage delta: right-edge partial-person form / wall picture frame in BOOK",
+    "routed_to": "backlog Phase B/C delta coverage; no profile change (per PROOF_GATE_EVALUATION findings table)"
+   }
+  ],
+  "verdict": "SKIPPED_NOT_NEEDED",
+  "counts_as_test_pass": false,
+  "rationale": "The activation trigger is not met on the measured rows: every measured hard gate of the Wan profile on all four measured cases (dims 640x368; timing 120/120/102/18 @30/1 pts monotonic; per-segment coverage incl. the partial right-edge person; holder/contact; no watermark) is PASS, and the only two non-PASS rows are routed open items (F5 product decision, F6 instrument) rather than measured failures. Independently, no eligible candidate exists to run: the only installed challenger with weights (VACE 14B fp16) is already measured and INELIGIBLE (watermark copy, 1 of 4 cases), and the SCAIL-2 correspondence family has no weights anywhere in the models root. Re-running a model would therefore violate the acceptance rule 'do not run models without cause' and could not produce an eligible candidate.",
+  "decided_by": "MF-END-17 worker (eligibility measured from sealed evidence; quality acceptance reserved to BENCH / DEMO / Codex)"
+ },
+ "contract": {
+  "family": "G4 controlled shot (conditional) - PRODUCT_AND_COMFY_PLAN.md §5",
+  "inputs": [
+   "correspondence masks",
+   "reference set",
+   "source",
+   "frozen profile"
+  ],
+  "outputs": [
+   "video",
+   "receipt"
+  ],
+  "gates": "the SAME hard gates as the G3 Wan profile (dims / timing / coverage / holder-contact / no watermark)",
+  "gate_loosening": "FORBIDDEN - a challenger may never win by loosening a gate ('không nới để challenger thắng')",
+  "mask_semantics": {
+   "correspondence_masks": "per-identity colored masks (SCAIL-2 palette semantics); required by this contract",
+   "vace_control_masks": "edit masks with different semantics - NOT correspondence masks",
+   "rule": "mask formats are never reused across profiles; any converter must be profile-specific and tested (no raw mask reuse, no threshold tuning to fit an output)"
+  },
+  "multi_reference": {
+   "rule": "no workflow may claim multi-reference support it does not have",
+   "claimed_multi_ref": false
+  },
+  "one_candidate_at_a_time": true,
+  "pre_install_checks": [
+   "verify model source (official org/repo)",
+   "verify license",
+   "verify disk at the dedicated model area",
+   "record revision + per-file sha256 / LFS oid"
+  ],
+  "corrections_route": "a wrong relation routes to the interaction/correspondence owner (PRODUCT_AND_COMFY_PLAN §6)"
+ },
+ "probe": {
+  "family": "wan_scail / SCAIL-2 correspondence path",
+  "status": "BLOCKED_NO_WEIGHTS",
+  "inference_tested": "NOT_RUN",
+  "node_ids": [
+   "SCAIL2ColoredMask",
+   "WanSCAILToVideo"
+  ],
+  "node_source": {
+   "file": "comfy_extras/nodes_scail.py",
+   "sha256": "7cd7f3588a7fbdb1d1379ad7fd0669364bbae3d921ba17cfbd9ee007251a980b",
+   "lines": 352
+  },
+  "registration": {
+   "source_present": true,
+   "imported": true,
+   "evidence": "P0_RUNTIME_MATRIX.json wan_scail rows (source_present/imported true)"
+  },
+  "weights": {
+   "present": false,
+   "scan_hits": {
+    "*scail*": 0,
+    "*SCAIL*": 0,
+    "*sam3*": 0,
+    "*SAM3*": 0,
+    "*sam2*": 0,
+    "*SAM2*": 0
+   },
+   "sam3_weights_present": false,
+   "p0_missing_groups": [
+    "sam3",
+    "sam2",
+    "checkpoints"
+   ],
+   "matches": [],
+   "note": "no SCAIL/SAM weight file exists under the models root; the family cannot run here and no inference is claimed"
+  },
+  "correspondence_graph_semantics": {
+   "driving_masks": "SAM3 track of the driving pose video, rendered as a colored per-identity mask video at pose resolution",
+   "reference_masks": "SAM3 tracks of the reference image(s) - one identity per object, colored in batch order - or a plain MASK rendered as a single identity (palette[0])",
+   "identity_rule": "the SAME order is applied to reference and pose masks so one identity keeps one colour; objects appearing earlier always come first",
+   "sort_options": [
+    "none",
+    "left_to_right",
+    "area"
+   ],
+   "palette": {
+    "count": 6,
+    "colors": [
+     {
+      "rgb": [
+       0.0,
+       0.0,
+       1.0
+      ],
+      "name": "Blue"
+     },
+     {
+      "rgb": [
+       1.0,
+       0.0,
+       0.0
+      ],
+      "name": "Red"
+     },
+     {
+      "rgb": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "name": "Green"
+     },
+     {
+      "rgb": [
+       1.0,
+       0.0,
+       1.0
+      ],
+      "name": "Magenta"
+     },
+     {
+      "rgb": [
+       0.0,
+       1.0,
+       1.0
+      ],
+      "name": "Cyan"
+     },
+     {
+      "rgb": [
+       1.0,
+       1.0,
+       0.0
+      ],
+      "name": "Yellow"
+     }
+    ],
+    "trained_note": "model was trained on these exact colours; more identities than palette entries wrap with modulo (re-use a colour)"
+   },
+   "modes": {
+    "animation": "pose mask black background / reference mask white",
+    "replacement": "pose mask white background / reference mask black"
+   },
+   "chunking": "trained at previous_frame_count 5 (81-frame chunks, 76-frame step)",
+   "model_input": "the WanSCAILToVideo node conditions the model the graph loads; the family needs its own finetuned weights, which are absent"
+  },
+  "win12gb": {
+   "gpu": "RTX 5070, 12,227 MiB VRAM (single GPU; one GPU job at a time on this host)",
+   "status": "NOT_PROVEN_ON_THIS_GPU",
+   "why": "no SCAIL-2 weights are installed, therefore no inference was run and no VRAM figure was measured; the family's fit on 12 GB is unproven and is not claimed",
+   "closest_measured_reference": {
+    "profile": "vace_14b_fp16_book (a 14B-family checkpoint, single run P4)",
+    "vram_peak_mib": 11680,
+    "gpu_total_mib": 12227,
+    "note": "measured for VACE, NOT a SCAIL-2 measurement"
+   }
+  }
+ },
+ "candidates": [
+  {
+   "id": "scail2_wan_scail",
+   "kind": "correspondence (the contract's primary family)",
+   "status": "BLOCKED_NO_WEIGHTS",
+   "eligibility": {
+    "real_local_mp4": "NONE - cannot run",
+    "quality": "NOT_MEASURED",
+    "vram": "NOT_MEASURED",
+    "verdict": "NOT_ELIGIBLE"
+   },
+   "inference_tested": "NOT_RUN",
+   "evidence": [
+    "proof/evidence/P0_RUNTIME_MATRIX.json",
+    "proof/evidence/P0_MODEL_INVENTORY.json",
+    "proof/evidence/P0_NODE_INTERFACES.json"
+   ],
+   "unsupported_note": "recorded as unsupported on this runtime; nothing is downloaded in this task"
+  },
+  {
+   "id": "vace_14b_fp16_book",
+   "kind": "installed masked-edit candidate (fallback per the research: 'hoac installed VACE')",
+   "status": "MEASURED_INELIGIBLE",
+   "measured": {
+    "case": "BOOK (same unit/seed as the Wan baseline)",
+    "prompt_id": "402d0c10-fb71-44ca-9250-94029cc3366c",
+    "graph": "proof/graphs/animate2_vace_book.p4.api.json",
+    "graph_sha256": "18d97cbabf3b7b473e9810b61ba90e1a07795a28d234bcb86eec66f88e54afeb",
+    "server_side_wall_s": 1174.24,
+    "seconds_per_output_second": 291.13,
+    "vram_peak_mib": 11680,
+    "outputs": [
+     {
+      "file": "p4/animate2_vace_book_p4_00001_.mp4",
+      "bytes": 104836,
+      "sha256": "691a8530e3f4bdbbf13fb99ffee9abc4e64b43b3617597736098c8d13a756611",
+      "ffprobe": {
+       "width": 640,
+       "height": 368,
+       "r_frame_rate": "30/1",
+       "duration": "4.033333",
+       "nb_read_frames": "121"
+      }
+     }
+    ],
+    "comparison_artifact": {
+     "file": "p4/animate2_vace_book_p4_00001__trim120.mp4",
+     "bytes": 131390,
+     "sha256": "32e0963bc39f758894c1dccadbefa1b5adb26b013e064d308cefb28d87ee0274",
+     "ffprobe": {
+      "width": 640,
+      "height": 368,
+      "r_frame_rate": "30/1",
+      "duration": "4.000000",
+      "nb_read_frames": "120"
+     }
+    },
+    "trim_policy": "the node needs length 4n+1 = 121 frames, so the raw clip carries 121; a DECLARED 120-frame copy (first 120 frames, re-encoded crf18) is used for the A/B against P3b, exactly as the packet asks",
+    "fps": "30/1",
+    "dims": [
+     640,
+     368
+    ],
+    "prompt_sha256": "caf87cae0e819eb1112af3e3fa9092b912e83a207c090787cbc345f7c7acbc1a",
+    "declared_params": {
+     "unet": "wan2.1_vace_14B_fp16.safetensors",
+     "vae": "wan_2.1_vae.safetensors",
+     "clip": "umt5_xxl_fp16.safetensors",
+     "steps": 20,
+     "cfg": 6,
+     "sampler": "uni_pc",
+     "scheduler": "simple",
+     "seed": 582699151003550,
+     "shift": 8.000000000000002,
+     "length": 121,
+     "width": 640,
+     "height": 368,
+     "fps": 30
+    },
+    "deltas_vs_template": [
+     {
+      "node": "134",
+      "class_type": "LoadImage",
+      "input": "image",
+      "template": "mf_book_anchor_1650.png",
+      "built": "anchor_book_p2_00001_.png"
+     },
+     {
+      "node": "145",
+      "class_type": "LoadVideo",
+      "input": "file",
+      "template": "mf_book_f1650_1770_drive_121f.mp4",
+      "built": "mf_book_f1650_1770_drive_121f.mp4"
+     },
+     {
+      "node": "3",
+      "class_type": "KSampler",
+      "input": "seed",
+      "template": 654654950714624,
+      "built": 582699151003550
+     },
+     {
+      "node": "114",
+      "class_type": "SaveVideo",
+      "input": "filename_prefix",
+      "template": "mf_reskin_v1/video14b/vace14b_book4s",
+      "built": "p4/animate2_vace_book_p4"
+     }
+    ]
+   },
+   "eligibility_gates": {
+    "real_local_mp4": {
+     "verdict": "PASS",
+     "artifacts": [
+      "proof/output/p4/animate2_vace_book_p4_00001_.mp4",
+      "proof/output/p4/animate2_vace_book_p4_00001__trim120.mp4"
+     ]
+    },
+    "quality": {
+     "verdict": "FAIL",
+     "defect": "WATERMARK COPIED - the source's YouTube play button + 'Lạnh Vcl' text reappears bottom-left in the VACE output (frame 0 and frame 119). The Animate2 result has NO watermark. VACE is a control-faithful model, so it reproduced the control video's watermark; this is a product blocker for the delivered clip and it is NOT fixed in this pass.",
+     "coverage_verdict": "PASS_WITH_WATERMARK_DEFECT",
+     "evidence": [
+      "proof/evidence/P4_GEOMETRY_GATE.json"
+     ]
+    },
+    "vram": {
+     "verdict": "PASS",
+     "peak_mib": 11680,
+     "gpu_total_mib": 12227
+    },
+    "verdict": "INELIGIBLE"
+   },
+   "hard_relations": {
+    "who_holds_the_book": "SEE_VISION_PASS",
+    "partial_person_visible": "SEE_VISION_PASS"
+   },
+   "behaviour_difference": "at frame 119 the VACE clip shows the book OPEN (two pages) which matches the source event table's open_two_pages @ frame 72, while the Animate2 clip still shows it closed - recorded as a measured difference for the reviewer, not as a worker verdict",
+   "cases_run": "1 of 4 measured cases (BOOK only)",
+   "semantics": {
+    "reference": "single primary reference_image (the node takes the first image); no per-identity reference batch is consumed",
+    "control_masks": "edit masks (control_video/control_masks) - NOT the G4 correspondence masks",
+    "multi_ref_claim": false
+   },
+   "gates_not_loosened": "the quality gate is applied as-is; the watermark blocker (F4) is not masked, cropped or tuned away",
+   "evidence": [
+    "proof/evidence/P4_RECEIPT.json",
+    "proof/evidence/P4_GEOMETRY_GATE.json",
+    "proof/evidence/P4_GRAPH.json"
+   ],
+   "unsupported_recorded": true,
+   "unsupported_reason": "copies the source watermark (play button + 'Lạnh Vcl') at frames 0 and 119 - a product blocker for any delivered clip; the profile stays INELIGIBLE until a removal strategy is proven"
+  }
+ ],
+ "path_status": {
+  "status": "UNSUPPORTED_ON_THIS_RUNTIME",
+  "basis": [
+   "no candidate satisfies real-local-MP4 + quality + VRAM",
+   "SCAIL-2: no weights installed (BLOCKED)",
+   "VACE 14B: measured but quality gate FAIL (watermark copy)"
+  ],
+  "reference": "MF-END-16 model_profiles.json keeps the Wan profile chosen; this artifact adds the challenger record"
+ },
+ "eligibility_policy": {
+  "rule": "a challenger is eligible only when it has a real local MP4 + a passing quality gate + a passing VRAM gate",
+  "applied_verbatim": true,
+  "no_gate_loosening": true,
+  "no_multi_ref_claim": true
+ },
+ "model_area_policy": {
+  "models_root": "C:/Users/Admin/Documents/Codex/work/mfv1/runtime/video14b/models",
+  "downloads_performed_this_task": 0,
+  "model_area_unchanged_vs_p0": true,
+  "files_checked": 12,
+  "install_requirements_when_authorized": [
+   "source = official repo/org",
+   "license recorded",
+   "dedicated model area only",
+   "revision + per-file sha256/LFS oid recorded in this registry"
+  ]
+ },
+ "claims": {
+  "quality_accepted": false,
+  "quality_verdict_owner": "BENCH / DEMO / Codex",
+  "no_best_newest_claim": true,
+  "new_gpu_jobs_this_task": 0,
+  "deliverable": false,
+  "skip_not_a_pass": true
+ },
+ "evidence": [
+  {
+   "path": "proof/graphs/animate2_vace_book.p4.api.json",
+   "sha256": "18d97cbabf3b7b473e9810b61ba90e1a07795a28d234bcb86eec66f88e54afeb",
+   "bytes": 4147,
+   "role": "measured controlled-path graph (P4, bound by receipt+gate+graph record)"
+  },
+  {
+   "path": "proof/output/p4/animate2_vace_book_p4_00001_.mp4",
+   "sha256": "691a8530e3f4bdbbf13fb99ffee9abc4e64b43b3617597736098c8d13a756611",
+   "bytes": 104836,
+   "role": "real local MP4 produced by the challenger run (raw 121f)"
+  },
+  {
+   "path": "proof/output/p4/animate2_vace_book_p4_00001__trim120.mp4",
+   "sha256": "32e0963bc39f758894c1dccadbefa1b5adb26b013e064d308cefb28d87ee0274",
+   "bytes": 131390,
+   "role": "declared 120-frame copy used for the A/B"
+  },
+  {
+   "path": "proof/evidence/P4_RECEIPT.json",
+   "sha256": "902efa816941f91f14da552ea82adb8b49600a9157b1246b35a42daa94780cb5",
+   "bytes": 3919,
+   "role": "P4 run receipt (prompt_id, wall, VRAM, outputs)"
+  },
+  {
+   "path": "proof/evidence/P4_GEOMETRY_GATE.json",
+   "sha256": "fffcca4d131c7dea7a5d71d806bb7685e6deb7689165615202645f95eeab6d62",
+   "bytes": 4998,
+   "role": "P4 gates + watermark blocking defect + vision rows"
+  },
+  {
+   "path": "proof/evidence/P4_GRAPH.json",
+   "sha256": "e373bcf4fe5add07b406f1ca9a5bdd62463f88513d5f46145bfe3400ea5999be",
+   "bytes": 3010,
+   "role": "P4 graph build record (template sha + deltas)"
+  },
+  {
+   "path": "proof/evidence/P4_SERVER_SHUTDOWN_PROOF.json",
+   "sha256": "da8a3041989bb45f493c79cc7f0890d05d972438a4690a0642918f220ec538a1",
+   "bytes": 1485,
+   "role": "challenger server stopped clean (POST_STOP_VERIFIED)"
+  },
+  {
+   "path": "proof/evidence/P0_RUNTIME_MATRIX.json",
+   "sha256": "adb6bf7cffbce5b56146fe0379461eed0dbc34eea6d88f2957ef322c0321fc2b",
+   "bytes": 18378,
+   "role": "SCAIL-2 node rows: source present / imported / weights_present false"
+  },
+  {
+   "path": "proof/evidence/P0_NODE_INTERFACES.json",
+   "sha256": "c360474bb95e998e7e5210a03d3fb2c37b386bad56abc7d9832ae73d490aaf1a",
+   "bytes": 41739,
+   "role": "official node interfaces for the SCAIL family (tooltips)"
+  },
+  {
+   "path": "proof/evidence/P0_MODEL_INVENTORY.json",
+   "sha256": "19aafcafa8be989faf7a6adabefc1eaa160eb613c2b5a0028a39754b015cae5b",
+   "bytes": 2703,
+   "role": "models-root inventory incl. missing groups sam3/sam2/checkpoints"
+  },
+  {
+   "path": "proof/evidence/P0_object_info.json",
+   "sha256": "80850af29e04c4ae108b61b6ef21ccb9d9a328beaef7785a4c0d3721fc3a8653",
+   "bytes": 1857638,
+   "role": "CPU /object_info dump used for offline graph validation"
+  },
+  {
+   "path": "proof/evidence/P3_object_info_gpu.json",
+   "sha256": "f78455538fb726e5cbc6e819eca47e198de03a227c8bb59e8ddf374d9dbb9dd0",
+   "bytes": 1860409,
+   "role": "GPU /object_info dump used for offline graph validation"
+  },
+  {
+   "path": "proof/evidence/P1_UNIT_MANIFESTS.json",
+   "sha256": "9763a1d14a3fef1cd075c9252ea4d54961b9ca5a6626e02a5148f4076b6ed0cf",
+   "bytes": 19904,
+   "role": "input-ready unit manifests BOOK/TURN/OCC (readiness reference)"
+  },
+  {
+   "path": "proof/evidence/P2_ANCHOR_GATES.json",
+   "sha256": "d580db708c712652844e8300af2765fd9065b16689dd5f35a61844a18044d792",
+   "bytes": 8549,
+   "role": "target anchors gate (input chain the decision reads)"
+  },
+  {
+   "path": "proof/evidence/P3B_GEOMETRY_GATE.json",
+   "sha256": "f47ab0e456cc263422411a68d7f6a6c5cefccdfa4b2f4188ea52877bfcb0350a",
+   "bytes": 7021,
+   "role": "Wan side: BOOK geometry/coverage/holder gate rows"
+  },
+  {
+   "path": "proof/evidence/P5FIX_GATE.json",
+   "sha256": "fb7371154d7435f7b51b7c0f1f9d3e6f51c3af89368e2e97e7ac015e6e6098f2",
+   "bytes": 3246,
+   "role": "Wan side: TURN coverage gate row"
+  },
+  {
+   "path": "proof/evidence/P5FIX2_GATE.json",
+   "sha256": "e18dba5a97635763e97533f812e4fc1f7497827fcaa4af242b1bf307f5ee1647",
+   "bytes": 4317,
+   "role": "Wan side: OCC_SEG1 coverage gate row"
+  },
+  {
+   "path": "proof/evidence/P5FIX3_GATE.json",
+   "sha256": "b5a8c6996326fbeb55b3575337fb7dd746135fb16b799863a3773b496192d4d7",
+   "bytes": 1713,
+   "role": "Wan side: OCC_SEG2 coverage gate row"
+  },
+  {
+   "path": "proof/evidence/P5FIX3_SERVER_SHUTDOWN_PROOF.json",
+   "sha256": "b783991124d223f3c3a7f1949f79f7ee5d51b89e45233fe62df01812bec7b4b9",
+   "bytes": 511,
+   "role": "Wan segment server stopped clean"
+  },
+  {
+   "path": "proof/evidence/P6_NOCACHE_GATE.json",
+   "sha256": "a5c0dd2a39e849b34dd69997d6b91e55607fb4c1fac7de04ec2f30055db0b5ed",
+   "bytes": 1129,
+   "role": "Wan run with cache OFF (the selected variant)"
+  },
+  {
+   "path": "proof/evidence/P7_ASSEMBLY_V13.json",
+   "sha256": "abdbf30ff4cc2f0907c37950ff476485bbfebd32b5eb612879d9704b4a22afda",
+   "bytes": 3018,
+   "role": "final assembly v1.3 (360f) the decision protects"
+  },
+  {
+   "path": "proof/evidence/P7_ASSEMBLY_CHECK.json",
+   "sha256": "dd5f3211f93d9e290a447b9950fd8297bb48aa8012086c5871ec0b0de775904f",
+   "bytes": 3999,
+   "role": "assembly v1.1 check row (published-hash cross-check)"
+  }
+ ]
+}

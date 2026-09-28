@@ -37,7 +37,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy import func, select
 
 from app.api.deps import SessionDep
@@ -79,6 +79,10 @@ from app.schemas.structural_evidence import (
 )
 
 log = logging.getLogger("motionforge.structural-evidence")
+
+# ── MF-END-13: source interaction facts (measurement-only producer) ──────────
+from app.services import source_interaction_facts as sif  # noqa: E402
+from app.services import source_role_tracks as srt  # noqa: E402
 
 
 class _StructuralEvidenceRoute(APIRoute):
@@ -1265,3 +1269,130 @@ def update_contact(
         reasons=list(record.reasons or []),
         provenance=dict(record.provenance or {}),
     )
+# ── source interaction facts (MF-END-13) ─────────────────────────────────────
+
+
+class _SourceFactsPublishBody(BaseModel):
+    """Bounded request: server-owned workspace; no client paths/authority."""
+
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+    project_id: str = Field(..., min_length=1, max_length=36)
+    video_item_id: str = Field(..., min_length=1, max_length=36)
+    #: The sealed MF-END-12 track artifact (inline; the server never reads a
+    #: client path).  Exactly one of ``track_artifact`` / ``artifact`` is used.
+    track_artifact: dict[str, Any] | None = None
+    #: role_id -> occurrence_segment_id for REAL current segments.
+    bindings: dict[str, str]
+    #: Optional prebuilt + sealed facts artifact (re-verified, never trusted).
+    artifact: dict[str, Any] | None = None
+    idempotency_prefix: str | None = Field(None, min_length=1, max_length=120)
+
+
+def _source_facts_status(err: sif.SourceFactsError) -> int:
+    if err.code in (sif.CODE_FACT_CONFLICT, sif.CODE_OUTPUT_OVERWRITE):
+        return 409
+    return 422
+
+
+@router.post("/source-interaction-facts", status_code=201)
+@router.post("/source-interaction-facts/", status_code=201)
+def publish_source_interaction_facts(
+    session: SessionDep,
+    response: Response,
+    body: _SourceFactsPublishBody,
+    workspace_id: str = WORKSPACE_ID,
+) -> dict[str, Any]:
+    """Publish measured source facts through the structural-evidence authority.
+
+    The facts are derived from the supplied REAL track artifact (or an
+    already-sealed facts artifact is re-verified) and written ONLY through
+    ``StructuralEvidenceRepository`` — both endpoints of every contact and
+    occlusion must be real current segments, otherwise the publish refuses
+    with ``SOURCE_FACTS_SECOND_SEGMENT_MISSING`` (no fake segment is created).
+    """
+    repo = _repo(session)
+    try:
+        if body.artifact is None:
+            if body.track_artifact is None:
+                raise sif.SourceFactsError(
+                    sif.CODE_MISSING_DATA,
+                    "one of track_artifact / artifact is required",
+                )
+            tracks = srt.RoleTracksArtifact.from_payload(body.track_artifact)
+            facts: Any = sif.build_artifact(tracks=tracks)
+        else:
+            facts = sif.FactSet(payload=dict(body.artifact))
+            violations = sif.check_artifact(facts)
+            if violations:
+                raise sif.SourceFactsError(
+                    sif.CODE_ARTIFACT_INVALID, f"artifact invalid: {list(violations)}"
+                )
+        segment_ranges: dict[str, dict[str, int]] = {}
+        for segment_id in sorted(set(dict(body.bindings).values())):
+            record = repo.get_segment(workspace_id, segment_id)
+            segment_ranges[segment_id] = {
+                "start_frame": int(record.start_frame),
+                "end_frame": int(record.end_frame),
+            }
+        outcome = sif.publish_facts(
+            session,
+            workspace_id=workspace_id,
+            project_id=body.project_id,
+            video_item_id=body.video_item_id,
+            artifact=facts,
+            bindings=body.bindings,
+            segment_ranges=segment_ranges,
+            idempotency_prefix=body.idempotency_prefix,
+        )
+        session.commit()
+    except sif.SourceFactsError as err:
+        session.rollback()
+        raise HTTPException(
+            status_code=_source_facts_status(err), detail=err.as_dict()
+        ) from err
+    except srt.RoleTracksError as err:
+        session.rollback()
+        raise HTTPException(
+            status_code=422, detail={"code": err.code, "message": err.detail}
+        ) from err
+    except Exception as err:
+        _raise_mapped(session, err)
+    created = (
+        outcome.contacts_created + outcome.occlusions_created + outcome.motions_created
+    )
+    if created == 0:
+        response.status_code = 200
+    return {
+        "artifact_digest": outcome.artifact_digest,
+        "algorithm": sif.ALGORITHM,
+        "policy_version": sif.POLICY_VERSION,
+        "contacts_created": outcome.contacts_created,
+        "contacts_replayed": outcome.contacts_replayed,
+        "occlusions_created": outcome.occlusions_created,
+        "occlusions_replayed": outcome.occlusions_replayed,
+        "motions_created": outcome.motions_created,
+        "motions_replayed": outcome.motions_replayed,
+        "segment_ids": list(outcome.segment_ids),
+    }
+
+
+@router.get("/source-interaction-facts")
+@router.get("/source-interaction-facts/")
+def list_source_interaction_facts(
+    session: SessionDep,
+    video_item_id: Annotated[str, Query(min_length=1, max_length=36)],
+    workspace_id: str = WORKSPACE_ID,
+) -> dict[str, Any]:
+    """Read the published source facts for one video item (no side effects)."""
+    rows = _repo(session).list_source_algorithm_facts(
+        workspace_id, video_item_id, algorithm=sif.ALGORITHM
+    )
+    return {
+        "video_item_id": video_item_id,
+        "algorithm": sif.ALGORITHM,
+        "contacts": rows["contacts"],
+        "occlusions": rows["occlusions"],
+        "motions": rows["motions"],
+    }
+
