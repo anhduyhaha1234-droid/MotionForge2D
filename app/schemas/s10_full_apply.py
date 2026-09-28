@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 RunStatus = Literal["pending", "running", "verifying", "completed", "failed", "cancelled"]
 ChunkState = Literal["pending", "running", "completed", "failed", "skipped"]
@@ -141,15 +141,107 @@ class S10PublicationOut(BaseModel):
     updated_at: datetime
 
 
+# ── execution backend manifest (MF-END-19.1) ─────────────────────────
+#
+# The backend axis is ORTHOGONAL to the legacy renderer routes (see
+# ``app.schemas.shot_reskin.ExecutionBackend``).  The manifest travels inside
+# ``chunk_config["execution_backend"]`` so the deterministic planner (the
+# existing S10 authority) validates it, the run row persists it and the worker
+# re-derives it before any render.  ABSENT => pure legacy behaviour with
+# byte-identical plans to pre-19 runs.
+
+ExecutionBackendName = Literal["legacy_renderer", "comfy_shot_engine"]
+
+#: Backends whose manifest must pin a registered profile + the frozen graph digest.
+BACKENDS_REQUIRING_PROFILE: frozenset[str] = frozenset({"comfy_shot_engine"})
+
+
+def _is_lower_hex64(value: str) -> bool:
+    return len(value) == 64 and all(c in "0123456789abcdef" for c in value)
+
+
+class ShotAnchorPin(_StrictModel):
+    """One shot's digest-pinned start anchor (managed-root relative)."""
+
+    relative_path: str = Field(min_length=1, max_length=512)
+    sha256: str = Field(min_length=64, max_length=64)
+
+    @model_validator(mode="after")
+    def _check(self) -> ShotAnchorPin:
+        if not _is_lower_hex64(self.sha256):
+            raise ValueError("anchor sha256 must be lowercase hex64")
+        return self
+
+
+class ExecutionBackendManifest(_StrictModel):
+    """Validated execution-backend manifest of one FullApply run (MF-END-19.1)."""
+
+    backend: ExecutionBackendName
+    profile_id: str | None = Field(default=None, min_length=1, max_length=128)
+    capability: str | None = Field(default=None, min_length=1, max_length=64)
+    graph_file: str | None = Field(default=None, min_length=1, max_length=512)
+    graph_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+    output_node: str | None = Field(default=None, min_length=1, max_length=32)
+    engine_base_url: str | None = Field(default=None, min_length=1, max_length=128)
+    seed: int | None = Field(default=None, ge=0)
+    shot_prompts: dict[str, str] = Field(default_factory=dict)
+    shot_anchors: dict[str, ShotAnchorPin] = Field(default_factory=dict)
+    require_accepted_anchor: bool = False
+
+    @model_validator(mode="after")
+    def _cross_check(self) -> ExecutionBackendManifest:
+        if self.graph_sha256 is not None and not _is_lower_hex64(self.graph_sha256):
+            raise ValueError("graph_sha256 must be lowercase hex64")
+        if self.engine_base_url is not None and not self.engine_base_url.startswith(
+            ("http://127.0.0.1:", "http://localhost:")
+        ):
+            raise ValueError(
+                "engine_base_url must be loopback (the engine only drives a local instance)"
+            )
+        if self.backend in BACKENDS_REQUIRING_PROFILE:
+            if not self.profile_id:
+                raise ValueError(
+                    f"backend {self.backend!r} requires profile_id (a registered eligible profile)"
+                )
+            if not self.graph_sha256:
+                raise ValueError(
+                    f"backend {self.backend!r} requires graph_sha256 (the frozen graph file pin)"
+                )
+        else:
+            for name in (
+                "profile_id",
+                "capability",
+                "graph_file",
+                "graph_sha256",
+                "output_node",
+                "engine_base_url",
+            ):
+                if getattr(self, name) is not None:
+                    raise ValueError(f"backend {self.backend!r} cannot carry {name}")
+            if self.seed is not None:
+                raise ValueError(f"backend {self.backend!r} cannot carry a seed pin")
+            if self.shot_prompts:
+                raise ValueError(f"backend {self.backend!r} cannot carry shot_prompts")
+            if self.shot_anchors:
+                raise ValueError(f"backend {self.backend!r} cannot carry shot_anchors")
+            if self.require_accepted_anchor:
+                raise ValueError(f"backend {self.backend!r} cannot require_accepted_anchor")
+        return self
+
+
 __all__ = [
+    "BACKENDS_REQUIRING_PROFILE",
     "ChunkState",
     "CreateChunkRequest",
     "CreateFullApplyRunRequest",
     "CreatePublicationRequest",
+    "ExecutionBackendManifest",
+    "ExecutionBackendName",
     "MarkChunkVerifiedRequest",
     "PublicationState",
     "RunStatus",
     "S10ChunkOut",
     "S10PublicationOut",
     "S10RunOut",
+    "ShotAnchorPin",
 ]

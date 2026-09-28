@@ -13,6 +13,8 @@ import hashlib
 import json
 from typing import Any
 
+from app.schemas.s10_full_apply import ExecutionBackendManifest
+
 __all__ = [
     "RENDERER_ROUTES",
     "ChunkPlanError",
@@ -296,9 +298,44 @@ def _filtered_policy(raw: Any) -> dict[str, Any]:
     return out
 
 
-def _normalize_chunk_config(raw: Any, chunk_frames: int | None, overlap_frames: int | None) -> dict[str, int]:
+def _normalize_execution_backend(raw: Any) -> dict[str, Any]:
+    """Validate + normalize the execution-backend manifest (MF-END-19.1).
+
+    The manifest is validated by the FROZEN schema (``ExecutionBackendManifest``)
+    and normalized to a canonical sub-dict so the service path and the worker
+    recompute path (``_require_manifest_authority``) agree byte-for-byte — the
+    plan hash therefore binds the backend choice.  Invalid/unknown manifests
+    fail closed with :class:`ChunkPlanError`.
+    """
+    if not isinstance(raw, dict):
+        raise ChunkPlanError("execution_backend must be an object (fail closed)")
+    try:
+        manifest = ExecutionBackendManifest.model_validate(raw)
+    except Exception as exc:  # pydantic ValidationError -> typed fail-closed
+        raise ChunkPlanError(f"execution_backend manifest invalid: {exc}") from exc
+    body: dict[str, Any] = {"backend": manifest.backend}
+    if manifest.backend == "comfy_shot_engine":
+        body["profile_id"] = str(manifest.profile_id)
+        body["capability"] = str(manifest.capability or "source_video_motion_transfer")
+        body["graph_file"] = manifest.graph_file
+        body["graph_sha256"] = str(manifest.graph_sha256)
+        body["output_node"] = manifest.output_node
+        body["engine_base_url"] = manifest.engine_base_url
+        body["seed"] = int(manifest.seed) if manifest.seed is not None else None
+        body["shot_prompts"] = {
+            str(k): str(v) for k, v in sorted(manifest.shot_prompts.items())
+        }
+        body["shot_anchors"] = {
+            str(k): {"relative_path": v.relative_path, "sha256": v.sha256}
+            for k, v in sorted(manifest.shot_anchors.items())
+        }
+        body["require_accepted_anchor"] = bool(manifest.require_accepted_anchor)
+    return body
+
+
+def _normalize_chunk_config(raw: Any, chunk_frames: int | None, overlap_frames: int | None) -> dict[str, Any]:
     # raw may be dict with chunk_frames/overlap_frames
-    cfg: dict[str, int] = {}
+    cfg: dict[str, Any] = {}
     if isinstance(raw, dict):
         if "chunk_frames" in raw:
             cfg["chunk_frames"] = raw["chunk_frames"]
@@ -308,6 +345,8 @@ def _normalize_chunk_config(raw: Any, chunk_frames: int | None, overlap_frames: 
             cfg["chunk_frames"] = raw["chunk_size"]
         if "overlap" in raw and "overlap_frames" not in cfg:
             cfg["overlap_frames"] = raw["overlap"]
+        if "execution_backend" in raw:
+            cfg["execution_backend"] = _normalize_execution_backend(raw["execution_backend"])
     if chunk_frames is not None:
         cfg["chunk_frames"] = chunk_frames
     if overlap_frames is not None:
@@ -324,7 +363,7 @@ def _normalize_chunk_config(raw: Any, chunk_frames: int | None, overlap_frames: 
         raise ChunkPlanError("overlap_frames must be int >= 0")
     if ov >= cf:
         raise ChunkPlanError("overlap_frames must be < chunk_frames")
-    return {"chunk_frames": cf, "overlap_frames": ov}
+    return cfg
 
 
 # ── main planner ─────────────────────────────────────────────────────────────
@@ -500,11 +539,36 @@ def plan_full_apply(
                         record[key] = layer[key]
                 chunks.append(record)
 
+    # ── MF-END-19.2: whole-shot/GROUP plan for the generative backend ─────
+    # When the frozen execution-backend manifest selects the shot-level engine,
+    # the generation UNIT is the shot GROUP: every member role of the shot
+    # rides in ONE generation (no independent per-person video).  The
+    # per-layer emission above stays the legacy unit for "legacy_renderer".
+    backend_manifest: dict[str, Any] = cfg.get("execution_backend") or {}
+    if backend_manifest.get("backend") == "comfy_shot_engine":
+        chunks = _emit_group_chunks(
+            shots=shots,
+            mappings=mappings,
+            cfg=cfg,
+            backend=backend_manifest,
+            pinned_hash=pinned_hash,
+            ckpt=ckpt,
+            manifest=manifest,
+            policy=policy,
+        )
+
     # Deterministic order: sort by shot start_frame, then layer_id, then core_start
     # Build shot order map for stable sort
     shot_order = {s["shot_id"]: i for i, s in enumerate(shots)}
     layer_order = {m["layer_id"]: i for i, m in enumerate(mappings)}
-    chunks.sort(key=lambda c: (shot_order[c["shot_id"]], layer_order[c["layer_id"]], c["core_start_frame"]))
+    # A whole-shot/GROUP chunk carries a synthetic group layer id; it sorts
+    # after every real layer deterministically (legacy ids keep their exact
+    # historical order — the default is len(layer_order) for them only).
+    chunks.sort(key=lambda c: (
+        shot_order[c["shot_id"]],
+        layer_order.get(c["layer_id"], len(layer_order)),
+        c["core_start_frame"],
+    ))
 
     # Canonical plan without plan_id for hashing
     plan_body: dict[str, Any] = {
@@ -524,3 +588,113 @@ def plan_full_apply(
         "chunk_config": cfg,
     }
     return plan
+
+
+def _emit_group_chunks(
+    *,
+    shots: list[dict[str, Any]],
+    mappings: list[dict[str, Any]],
+    cfg: dict[str, Any],
+    backend: dict[str, Any],
+    pinned_hash: str,
+    ckpt: dict[str, Any],
+    manifest: dict[str, Any],
+    policy: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Whole-shot/GROUP emission for the comfy_shot_engine backend (19.2).
+
+    One generation unit per shot GROUP: every member role (layer) of a shot
+    rides together in EVERY emitted chunk — the plan never splits a shot into
+    independent per-person videos.  A long group range splits by
+    ``chunk_frames`` with the declared overlap (Q10 edge rule kept: zero
+    overlap at the group edges).  Every shot that yields at least one chunk
+    MUST carry a frozen prompt in the backend manifest — otherwise the plan
+    fails closed (a generation without a per-shot prompt is not planned).
+    """
+    shot_prompts = dict(backend.get("shot_prompts") or {})
+    chunks: list[dict[str, Any]] = []
+    for shot in shots:
+        shot_id = str(shot["shot_id"])
+        s_start = int(shot["start_frame"])
+        s_end = int(shot["end_frame"])
+        members: list[dict[str, Any]] = []
+        for layer in mappings:
+            p_start = max(s_start, int(layer.get("start_frame", s_start)))
+            p_end = min(s_end, int(layer.get("end_frame", s_end)))
+            if p_end < p_start:
+                continue
+            members.append({"layer": layer, "start": p_start, "end": p_end})
+        if not members:
+            continue
+        if shot_id not in shot_prompts:
+            raise ChunkPlanError(
+                f"comfy_shot_engine backend requires a shot_prompts entry for shot "
+                f"{shot_id!r} (the per-shot prompt is frozen plan input; fail closed)"
+            )
+        union_start = min(m["start"] for m in members)
+        union_end = max(m["end"] for m in members)
+        group_layer_id = f"grp_{shot_id}"
+        member_layer_ids = sorted(str(m["layer"]["layer_id"]) for m in members)
+        span = union_end - union_start + 1
+        num_chunks = (span + cfg["chunk_frames"] - 1) // cfg["chunk_frames"]
+
+        def _group_chunk_id(
+            group_id: str, sid: str, core_start: int, core_end: int
+        ) -> str:
+            identity = {
+                "layer_id": group_id,
+                "core_end_frame": core_end,
+                "core_start_frame": core_start,
+                "pinned_hash": pinned_hash,
+                "shot_id": sid,
+            }
+            return "ck_" + _sha256_hex(_canonical_json(identity))[:16]
+
+        for ci in range(num_chunks):
+            core_start = union_start + ci * cfg["chunk_frames"]
+            core_end = min(core_start + cfg["chunk_frames"] - 1, union_end)
+            # Q10 edge rule: no overlap bleed at the group edges.
+            overlap_before = cfg["overlap_frames"] if ci > 0 else 0
+            overlap_after = cfg["overlap_frames"] if core_end < union_end else 0
+            deps: list[str] = []
+            if ci > 0:
+                deps.append(
+                    _group_chunk_id(
+                        group_layer_id,
+                        shot_id,
+                        core_start - cfg["chunk_frames"],
+                        core_start - 1,
+                    )
+                )
+            deps = sorted(set(deps))
+            chunk_id = _group_chunk_id(group_layer_id, shot_id, core_start, core_end)
+            content_input = {
+                "backend": "comfy_shot_engine",
+                "checkpoint_hash": ckpt["checkpoint_hash"],
+                "core_end_frame": core_end,
+                "core_start_frame": core_start,
+                "deps": deps,
+                "manifest_hash": manifest["manifest_hash"],
+                "member_layer_ids": member_layer_ids,
+                "overlap_after": overlap_after,
+                "overlap_before": overlap_before,
+                "policy_version": policy["policy_version"],
+                "route": "shot_group",
+                "shot_id": shot_id,
+            }
+            chunks.append(
+                {
+                    "chunk_id": chunk_id,
+                    "shot_id": shot_id,
+                    "layer_id": group_layer_id,
+                    "core_start_frame": core_start,
+                    "core_end_frame": core_end,
+                    "overlap_before": overlap_before,
+                    "overlap_after": overlap_after,
+                    "route": "shot_group",
+                    "deps": deps,
+                    "content_hash_input": _sha256_hex(_canonical_json(content_input)),
+                    "member_layer_ids": member_layer_ids,
+                }
+            )
+    return chunks
