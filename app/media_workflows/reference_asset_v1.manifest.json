@@ -1,0 +1,558 @@
+{
+ "schema_version": "mf.reference_asset.graph.v1",
+ "graph_id": "reference_asset_v1",
+ "generated_at_utc": "2026-09-28T06:10:11Z",
+ "workflow": {
+  "graph_file": "app/media_workflows/reference_asset_v1.json",
+  "graph_file_sha256": "e49b5669e6e45326ba77c08fc9ab6c6b8c07e0a55479876213847ffa99c1e760",
+  "graph_object_sha256": "2b7ff22c7af9365d58049b91abb2c9ee120b9f2b470c7cab9d3e61dc4da774db",
+  "template_file": "image_flux2_klein_image_edit_4b_distilled.json",
+  "template_path": "C:/Users/Admin/Documents/Codex/work/mfv1/runtime/video14b/venv/Lib/site-packages/comfyui_workflow_templates_json/templates/image_flux2_klein_image_edit_4b_distilled.json",
+  "template_sha256": "e0388a8870495802314d58fa61616ddcdb7064dac5f85a8787c9e08180b8a560",
+  "template_sha256_16": "e0388a8870495802",
+  "template_license": "MIT (comfyui-workflow-templates-json 0.1.92 dist-info License-Expression)",
+  "base_template_reference": {
+   "template_file": "image_flux2_klein_image_edit_4b_base.json",
+   "template_sha256": "346cd9a63bfe34a5a9207f50c34a87feaf4e70806d13c9d2738fd521133670d0",
+   "used": false,
+   "why": "base 4B checkpoint + full_encoder_small_decoder VAE are NOT installed"
+  },
+  "validation_offline_vs_pinned_object_info": {
+   "errors": [
+    "node REF_LOAD (LoadImage): 'image'='ra_v1_ref_dan_choi.png' not in ['BOOK_f000_640x368.png', 'BOOK_f000_native_640x360.png', 'BOOK_f000_roundtrip_640x360.png', 'OCC_f000_640x368.png', 'OCC_f000_native_640x360.png', 'OCC_f000_roundtrip_640x360.png', 'OCC_f040_640x368.png', 'OCC_f040_native_640x360.png', 'OCC_f040_roundtrip_640x360.png', 'TURN_f000_640x368.png', 'TURN_f000_native_640x360.png', 'TURN_f000_roundtrip_640x360.png']"
+   ],
+   "warnings": [],
+   "enum_checked": 10,
+   "inputs_checked": 53,
+   "nodes": 22,
+   "unreachable": []
+  },
+  "validation_enum_extended_with_staged_name": {
+   "staged_name": "ra_v1_ref_dan_choi.png",
+   "errors": [],
+   "warnings": [],
+   "enum_checked": 10,
+   "inputs_checked": 53,
+   "nodes": 22,
+   "unreachable": []
+  },
+  "validation_live_server": {
+   "errors": [],
+   "warnings": [],
+   "enum_checked": 10,
+   "inputs_checked": 53,
+   "nodes": 22,
+   "unreachable": []
+  }
+ },
+ "models": [
+  {
+   "role": "diffusion_models",
+   "file": "flux-2-klein-4b-fp8.safetensors",
+   "rel": "diffusion_models/flux-2-klein-4b-fp8.safetensors",
+   "path": "C:/Users/Admin/Documents/Codex/work/mfv1/runtime/video14b/models/diffusion_models/flux-2-klein-4b-fp8.safetensors",
+   "bytes": 4070624520,
+   "sha256": "97ed34fe0567e436200f2faee3939b88f2b5d99f8af2a4dc16532c4245c0ccb6",
+   "sha256_first_1mib": "da9faef49996aa68316a2501897c1ee69aa3041bfb474b18f32fa36e30d3c022",
+   "license": "apache-2.0",
+   "source": "https://huggingface.co/black-forest-labs/FLUX.2-klein-4b-fp8",
+   "source_file": "flux-2-klein-4b-fp8.safetensors (repo root)",
+   "upstream_repo_revision": "5b4408e59397a4a37ccb46afe426d8ed86379441",
+   "probe": "HF model API cardData.license (raw/hf_license_probe.json)",
+   "file_embedded_license": "none (measured: only _quantization_metadata in the tensor file)",
+   "why_used": "the DISTILLED FLUX.2 klein 4B checkpoint the official template pins"
+  },
+  {
+   "role": "text_encoders",
+   "file": "qwen_3_4b.safetensors",
+   "rel": "text_encoders/qwen_3_4b.safetensors",
+   "path": "C:/Users/Admin/Documents/Codex/work/mfv1/runtime/video14b/models/text_encoders/qwen_3_4b.safetensors",
+   "bytes": 8044982048,
+   "sha256": "6c671498573ac2f7a5501502ccce8d2b08ea6ca2f661c458e708f36b36edfc5a",
+   "sha256_first_1mib": "dfb09eaaca8c01d6ef2d261e243212a2d0f456af7133e56252f7caceab2a1513",
+   "license": "apache-2.0",
+   "source": "https://huggingface.co/Comfy-Org/vae-text-encorder-for-flux-klein-4b",
+   "source_file": "split_files/text_encoders/qwen_3_4b.safetensors",
+   "upstream_repo_revision": "5f526678002e43af5551dadb73ce2e8c91b43afe",
+   "probe": "HF model API cardData.license (raw/hf_license_probe.json)",
+   "download_log": "runtime/logs/fetch_klein.log: FETCH Comfy-Org/vae-text-encorder-for-flux-klein-4b",
+   "file_embedded_license": "none (measured)",
+   "why_used": "the FLUX.2 text encoder (CLIPLoader type=flux2) for the distilled template"
+  },
+  {
+   "role": "vae",
+   "file": "flux2-vae.safetensors",
+   "rel": "vae/flux2-vae.safetensors",
+   "path": "C:/Users/Admin/Documents/Codex/work/mfv1/runtime/video14b/models/vae/flux2-vae.safetensors",
+   "bytes": 336211292,
+   "sha256": "868fe7b343cc8f3a19dbcfcafbc3d5f888802be3f89bd81b65b3621a066ce8f3",
+   "sha256_first_1mib": "336588517106e2215c1f0ae5388273ea7766734ba4661c6045858ddafdbd4855",
+   "license": "apache-2.0",
+   "source": "https://huggingface.co/Comfy-Org/vae-text-encorder-for-flux-klein-4b",
+   "source_file": "split_files/vae/flux2-vae.safetensors",
+   "upstream_repo_revision": "5f526678002e43af5551dadb73ce2e8c91b43afe",
+   "probe": "HF model API cardData.license (raw/hf_license_probe.json)",
+   "download_log": "runtime/logs/fetch_klein.log: FETCH Comfy-Org/vae-text-encorder-for-flux-klein-4b/split_files/vae/flux2-vae.safetensors",
+   "file_embedded_license": "none (measured)",
+   "same_name_elsewhere": "Comfy-Org/flux2-dev also hosts a flux2-vae.safetensors under a NON-commercial license (flux-1-dev-non-commercial-license); the fetch log line above decides provenance for THIS installed copy",
+   "why_used": "the FLUX.2 VAE paired with the klein 4B distilled checkpoint"
+  }
+ ],
+ "nodes": [
+  {
+   "class_type": "LoadImage",
+   "defining_files": [
+    "nodes.py"
+   ],
+   "sha256": {
+    "nodes.py": "4678d41906fa63780816748b38d9d7bb7364e5504ea4be91b6d8fcb842f5d891"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "EmptyImage",
+   "defining_files": [
+    "nodes.py"
+   ],
+   "sha256": {
+    "nodes.py": "4678d41906fa63780816748b38d9d7bb7364e5504ea4be91b6d8fcb842f5d891"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "SaveImage",
+   "defining_files": [
+    "nodes.py"
+   ],
+   "sha256": {
+    "nodes.py": "4678d41906fa63780816748b38d9d7bb7364e5504ea4be91b6d8fcb842f5d891"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "GetImageSize",
+   "defining_files": [
+    "comfy_extras/nodes_images.py"
+   ],
+   "sha256": {
+    "comfy_extras/nodes_images.py": "35f289727897b7bfe7fb04a4b9fe420b61bbd8b55227f92198b6dd34a9be5e51"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "VAEEncode",
+   "defining_files": [
+    "nodes.py"
+   ],
+   "sha256": {
+    "nodes.py": "4678d41906fa63780816748b38d9d7bb7364e5504ea4be91b6d8fcb842f5d891"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "VAEDecode",
+   "defining_files": [
+    "nodes.py"
+   ],
+   "sha256": {
+    "nodes.py": "4678d41906fa63780816748b38d9d7bb7364e5504ea4be91b6d8fcb842f5d891"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "ImageCompositeMasked",
+   "defining_files": [
+    "comfy_extras/nodes_mask.py"
+   ],
+   "sha256": {
+    "comfy_extras/nodes_mask.py": "9b60550e7cd7ea8b2b38bb64ef7fd587a3c6cbb97a287c407d11b1a622fca5f7"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "InvertMask",
+   "defining_files": [
+    "comfy_extras/nodes_mask.py"
+   ],
+   "sha256": {
+    "comfy_extras/nodes_mask.py": "9b60550e7cd7ea8b2b38bb64ef7fd587a3c6cbb97a287c407d11b1a622fca5f7"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "ResizeImageMaskNode",
+   "defining_files": [
+    "comfy_extras/nodes_post_processing.py",
+    "comfy_extras/nodes_replacements.py"
+   ],
+   "sha256": {
+    "comfy_extras/nodes_post_processing.py": "5b468c80a8367354a5d0e7fc6a85061f3d04e6fe0a1b8244d1394ba253e46b93",
+    "comfy_extras/nodes_replacements.py": "f7e70ac130098e243f3c36987941e70244b320a7c5e3d5042434509be8974849"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "EmptyFlux2LatentImage",
+   "defining_files": [
+    "comfy_extras/nodes_flux.py"
+   ],
+   "sha256": {
+    "comfy_extras/nodes_flux.py": "a4917fd9d4aed2afdbdfc005a527b6381be942200054d7998477a16987e7aff9"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "Flux2Scheduler",
+   "defining_files": [
+    "comfy_extras/nodes_flux.py"
+   ],
+   "sha256": {
+    "comfy_extras/nodes_flux.py": "a4917fd9d4aed2afdbdfc005a527b6381be942200054d7998477a16987e7aff9"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "ReferenceLatent",
+   "defining_files": [
+    "comfy_extras/nodes_edit_model.py"
+   ],
+   "sha256": {
+    "comfy_extras/nodes_edit_model.py": "3773fd748c404758ee36a3bac24cfea6e10c1b9990fa388cc440c56db1dc6a4a"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "ConditioningZeroOut",
+   "defining_files": [
+    "nodes.py"
+   ],
+   "sha256": {
+    "nodes.py": "4678d41906fa63780816748b38d9d7bb7364e5504ea4be91b6d8fcb842f5d891"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "CLIPTextEncode",
+   "defining_files": [
+    "nodes.py"
+   ],
+   "sha256": {
+    "nodes.py": "4678d41906fa63780816748b38d9d7bb7364e5504ea4be91b6d8fcb842f5d891"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "UNETLoader",
+   "defining_files": [
+    "nodes.py"
+   ],
+   "sha256": {
+    "nodes.py": "4678d41906fa63780816748b38d9d7bb7364e5504ea4be91b6d8fcb842f5d891"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "CLIPLoader",
+   "defining_files": [
+    "nodes.py"
+   ],
+   "sha256": {
+    "nodes.py": "4678d41906fa63780816748b38d9d7bb7364e5504ea4be91b6d8fcb842f5d891"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "VAELoader",
+   "defining_files": [
+    "nodes.py"
+   ],
+   "sha256": {
+    "nodes.py": "4678d41906fa63780816748b38d9d7bb7364e5504ea4be91b6d8fcb842f5d891"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "SamplerCustomAdvanced",
+   "defining_files": [
+    "comfy_extras/nodes_custom_sampler.py"
+   ],
+   "sha256": {
+    "comfy_extras/nodes_custom_sampler.py": "913d776b5e696c70b77b8184f2af504533fbff2fad62a05cef4ecba87975f0bf"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "KSamplerSelect",
+   "defining_files": [
+    "comfy_extras/nodes_custom_sampler.py"
+   ],
+   "sha256": {
+    "comfy_extras/nodes_custom_sampler.py": "913d776b5e696c70b77b8184f2af504533fbff2fad62a05cef4ecba87975f0bf"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "RandomNoise",
+   "defining_files": [
+    "comfy_extras/nodes_custom_sampler.py"
+   ],
+   "sha256": {
+    "comfy_extras/nodes_custom_sampler.py": "913d776b5e696c70b77b8184f2af504533fbff2fad62a05cef4ecba87975f0bf"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  },
+  {
+   "class_type": "CFGGuider",
+   "defining_files": [
+    "comfy_extras/nodes_custom_sampler.py"
+   ],
+   "sha256": {
+    "comfy_extras/nodes_custom_sampler.py": "913d776b5e696c70b77b8184f2af504533fbff2fad62a05cef4ecba87975f0bf"
+   },
+   "runtime_head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+   "registered_in_object_info": true
+  }
+ ],
+ "runtime": {
+  "head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+  "porcelain_clean": true,
+  "source_read_only": true,
+  "version_file_sha256": "1103c6ccdac33468682e5d128b028fc0ae0139984f00820150b653c011053257",
+  "comfyui_dir": "C:/Users/Admin/Documents/Codex/work/mfv1/runtime/video14b/ComfyUI",
+  "models_root": "C:/Users/Admin/Documents/Codex/work/mfv1/runtime/video14b/models",
+  "license": "ComfyUI GPL-3.0 (LICENSE at the repo root, read this round)",
+  "isolation_recipe": "own base-directory (input/output/temp/user/custom_nodes under the MF-END-08 evidence root) + --models-directory pointing at the shared read-only model root + own port + --reserve-vram 1.0 + --disable-auto-launch; one job at a time",
+  "object_info_live_file": "raw/object_info_live.json",
+  "object_info_live_nodes": 959
+ },
+ "inputs": {
+  "staged_reference": {
+   "file": "ra_v1_ref_dan_choi.png",
+   "path": "C:/Users/Admin/Documents/Codex/work/mf-delivery-runs/20260927/20260927T163824Z/tasks/MF-END-08/runtime/input/ra_v1_ref_dan_choi.png",
+   "bytes": 247711,
+   "sha256": "271f1c5789ee8fb9022ab402d834c8f2d4e862f972a105060e457b68b0282496",
+   "dims": [
+    1024,
+    1024
+   ],
+   "mode": "RGBA (raw authored artwork byte-copy)",
+   "why_raw": "the GRAPH composites RGBA once on the declared neutral; staging the raw artwork is what exercises that policy"
+  },
+  "source_artwork": {
+   "path": "C:/Users/Admin/Documents/Codex/work/mf-tool-20260923/mf-p1-ui-build/presets/characters/dan_choi_standing.png",
+   "bytes": 247711,
+   "sha256": "271f1c5789ee8fb9022ab402d834c8f2d4e862f972a105060e457b68b0282496",
+   "dims": [
+    1024,
+    1024
+   ],
+   "mode": "RGBA",
+   "alpha_extrema": [
+    0,
+    255
+   ],
+   "fully_transparent_fraction": 0.84500599,
+   "frozen_reference": "this sha is the accepted proof's BOOK-P2 cast reference (P1_UNIT_MANIFESTS / shot_reskin FROZEN_EXAMPLES _FROZEN_REF_SHA)"
+  },
+  "neutral_rgb": [
+   128,
+   128,
+   128
+  ],
+  "alpha_formula": "out = mask*src + (1 - mask)*dst ; mask = InvertMask(1-alpha)"
+ },
+ "golden_run": {
+  "declared_gpu_jobs": 1,
+  "prefix_job_cpu_only": {
+   "note": "tensor-truth preview: reference intake only (LoadImage / composite / resize). NO model node in that graph, so it is not a GPU job",
+   "prompt_id": "9d830203-7139-4b24-87c0-598b8e3ef7b1",
+   "completed": true,
+   "wall_s": 1.531,
+   "pixel_comparison": {
+    "composite": {
+     "file": "ref_composite_00001_.png",
+     "dims": [
+      1024,
+      1024
+     ],
+     "pixels_sha256": "623e1b45e130b09144a5eccc1f53dbedd3ada7aa7d0c001ed73c722b8874d2db",
+     "expected_pixels_sha256": "623e1b45e130b09144a5eccc1f53dbedd3ada7aa7d0c001ed73c722b8874d2db",
+     "pixels_match_offline_expectation": true,
+     "proof_derived_delta": {
+      "differing_pixels": 0,
+      "max_abs_delta_0_255": 0
+     }
+    },
+    "resized": {
+     "file": "ref_resized_00001_.png",
+     "dims": [
+      768,
+      768
+     ],
+     "pixels_sha256": "57d4a50a1666f04f3955151482d529242b10e3b033f409ce44d14d905dc5eca2",
+     "expected_pixels_sha256": "57d4a50a1666f04f3955151482d529242b10e3b033f409ce44d14d905dc5eca2",
+     "expected_dims": [
+      768,
+      768
+     ],
+     "pixels_match_offline_expectation": true
+    }
+   }
+  },
+  "prompt_id": "f9106b2b-6406-42e0-847c-e9602905f7a6",
+  "completed": true,
+  "graph_object_sha256": "2b7ff22c7af9365d58049b91abb2c9ee120b9f2b470c7cab9d3e61dc4da774db",
+  "wall_s": 6.026,
+  "vram_peak_mib": 11591,
+  "gpu_util_peak_pct": 100,
+  "epoch": {
+   "instance_id": "1f2be4aa6f404dfb8849571003aaf5ad",
+   "pid": 17224,
+   "port": 8341,
+   "launched_at_unix": 1790575689.4276032,
+   "launched_at_utc": "2026-09-28T06:08:09Z",
+   "device": "[{\"name\": \"cuda:0 NVIDIA GeForce RTX 5070 : cudaMallocAsync\", \"type\": \"cuda\", \"index\": 0, \"vram_total\": 12820480000, \"vram_free\": 11571036160, \"torch_vram_total\": 0, \"torch_vram_free\": 0}]"
+  },
+  "shutdown": {
+   "phase": "POST_STOP_VERIFIED",
+   "pid": 17224,
+   "pre": {
+    "listening": true,
+    "error": null
+   },
+   "post": {
+    "listening": false,
+    "error": "TimeoutError('timed out')",
+    "errno": null
+   },
+   "pid_exists": false,
+   "tasklist_row": "INFO: No tasks are running which match the specified criteria.",
+   "stop_scope": "ONLY the pid this run launched (Popen handle)"
+  },
+  "server_log": "runtime/server.log",
+  "asset": {
+   "file": "dan_choi_back_00001_.png",
+   "path": "C:/Users/Admin/Documents/Codex/work/mf-delivery-runs/20260927/20260927T163824Z/tasks/MF-END-08/asset/dan_choi_back_00001_.png",
+   "bytes": 484788,
+   "sha256": "726e259e2c437bc1a8b601808844fd1ba2789ca358e6b8ba1f23fbd4489674c4",
+   "dims": [
+    1024,
+    1024
+   ],
+   "mode": "RGB",
+   "outputs": [
+    {
+     "node": "SAVE",
+     "filename": "dan_choi_back_00001_.png",
+     "subfolder": "mf_reference_asset_v1",
+     "type": "output",
+     "bytes": 484788,
+     "sha256": "726e259e2c437bc1a8b601808844fd1ba2789ca358e6b8ba1f23fbd4489674c4"
+    }
+   ]
+  },
+  "review": {
+   "artifact": "review.json",
+   "reviewer": "Hermes owner session (native vision: the image was rendered into the reviewer's context and inspected directly)",
+   "reviewed_at_utc": "2026-09-28T06:09:57Z",
+   "artifacts": {
+    "identity_reference": {
+     "file": "C:/Users/Admin/Documents/Codex/work/mf-delivery-runs/20260927/20260927T163824Z/tasks/MF-END-08/previews/ra_v1_ref_composited.png",
+     "dims": [
+      1024,
+      1024
+     ],
+     "mode": "RGB",
+     "sha256": "2ffc245346340b4cc95ffa4c5ac9f3ad3e4485927a655e6a47ab960e5c848969",
+     "bytes": 156508,
+     "near_neutral_128_fraction": 0.845826,
+     "near_black_fraction": 0.144261,
+     "mean_rgb": [
+      109.81,
+      109.83,
+      109.82
+     ]
+    },
+    "generated_asset": {
+     "file": "C:/Users/Admin/Documents/Codex/work/mf-delivery-runs/20260927/20260927T163824Z/tasks/MF-END-08/asset/dan_choi_back_00001_.png",
+     "dims": [
+      1024,
+      1024
+     ],
+     "mode": "RGB",
+     "sha256": "726e259e2c437bc1a8b601808844fd1ba2789ca358e6b8ba1f23fbd4489674c4",
+     "bytes": 484788,
+     "near_neutral_128_fraction": 0.000361,
+     "near_black_fraction": 0.248284,
+     "mean_rgb": [
+      140.46,
+      141.61,
+      143.61
+     ]
+    },
+    "side_by_side": "C:/Users/Admin/Documents/Codex/work/mf-delivery-runs/20260927/20260927T163824Z/tasks/MF-END-08/previews/review_side_by_side_ref_left_asset_right.png",
+    "detail_crop": "C:/Users/Admin/Documents/Codex/work/mf-delivery-runs/20260927/20260927T163824Z/tasks/MF-END-08/previews/review_asset_detail_upper.png"
+   },
+   "rubric": [
+    {
+     "criterion": "view == back (no face/eyes visible)",
+     "verdict": "PASS",
+     "observed": "the figure is drawn from directly behind: the head shows the back of the black cap plus a narrow pale rim of the back of the head; no eyes, no face, no facial features anywhere in the image"
+    },
+    {
+     "criterion": "identity preserved (same design elements)",
+     "verdict": "PASS",
+     "observed": "same black baseball cap with its brim to the left and the same two small dot marks, same black hoodie (now seen from its back, hood flat at the neck), same black trousers, same black sneakers with lace details, same tail curling out to the left, same monochrome palette"
+    },
+    {
+     "criterion": "clothes / proportions NOT changed between views",
+     "verdict": "PASS",
+     "observed": "no garment was swapped or recoloured; the head-to-body ratio, the sleeve/trouser shapes and the sneaker shapes read the same as the reference; the pose stays seated cross-legged"
+    },
+    {
+     "criterion": "style == flat black ink doodle on plain grey",
+     "verdict": "PASS",
+     "observed": "solid flat black fills with one thin outline on the same flat grey field, no gradients, no shading, no photographic texture"
+    },
+    {
+     "criterion": "no extra colours / props / text / watermark",
+     "verdict": "PASS",
+     "observed": "the only colours present are black, the pale head/hand tone and the neutral grey field; no STREET label (correctly hidden on the chest side), no watermark, no added background objects; the only held object is the same phone, now a small black shape held at the right hip"
+    },
+    {
+     "criterion": "declared output dimensions",
+     "verdict": "PASS",
+     "observed": "1024x1024 RGB PNG, equal to the declared canvas"
+    }
+   ],
+   "disclosed_deviations": [
+    "the two small cap marks that sit on the SIDE strap aperture in the reference were redrawn on the cap crown from this angle (still black-on-black; no identity break)",
+    "the pale area behind the cap reads as the back of the head/hood rim - the reference's pale face area is not visible from behind by construction",
+    "the arms and both hands are hidden behind the body; one hand and the phone are visible at the right hip, as the prompt requested"
+   ],
+   "verdict": "PASS",
+   "scope_note": "review covers view + identity + style + dimensions of THIS asset; it does not assert library ingest, alpha/background removal, or any QC beyond the declared rubric"
+  }
+ },
+ "evidence_root": "C:/Users/Admin/Documents/Codex/work/mf-delivery-runs/20260927/20260927T163824Z/tasks/MF-END-08"
+}
