@@ -16,6 +16,7 @@ import {
 	type PublicationStatus,
 } from "./index";
 import { CompareViewer, COMPARE_MODES, type CompareMode } from "./CompareViewer";
+import { DemoShotReview } from "./DemoShotReview";
 import { ApprovalPanel } from "./ApprovalPanel";
 import { CorrectionPanel } from "./CorrectionPanel";
 import { resolveDemoCompareConfig, useDemoCompare } from "./useDemoCompare";
@@ -402,6 +403,16 @@ export function DemoComparePanel({
 								})}
 								</section>
 								)}
+
+			{/* MF-END-24: before/after sync for published loops (backend URLs only) */}
+			{jobStatus?.published.map((lp) => (
+				<DemoShotReview
+					key={`shot-review-${lp.loop_id}`}
+					loopId={lp.loop_id}
+					originalUrl={`/api/v2/s09-demo-compare/source-content/${lp.loop_id}?fixtures_dir=${encodeURIComponent(fixturesDir ?? "tests/fixtures/s09_demo")}`}
+					resultUrl={lp.content_url}
+				/>
+			))}
 
 			{/* Persisted SegmentRenderRoute evidence (empty when none referenced) */}
 			{jobStatus && jobStatus.route_evidence.length > 0 && (

@@ -9,6 +9,7 @@
  */
 
 import type { ApplyStatus } from "./useApplyStatus";
+import { ApplyShotReview } from "./ApplyShotReview";
 
 const HELPER = "text-[11px] leading-snug text-gray-400";
 
@@ -146,6 +147,8 @@ export function ApplyProgress({ data, progress, currentChunk, isPolling, onRefre
       <p className={`mt-3 ${HELPER}`} data-testid="apply-plan-hash">
         Plan: <span className="font-mono">{data.plan_hash.slice(0, 12)}…</span> · plan_id {data.plan_id.slice(0, 8)}…
       </p>
+
+      <ApplyShotReview data={data} />
     </section>
   );
 }
