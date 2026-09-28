@@ -150,6 +150,66 @@ class PackVersionValidationData(BaseModel):
     errors: list[str]
 
 
+class ReferenceArtworkData(BaseModel):
+    """Public result of an authored reference-artwork ingest (MF-END-03).
+
+    Every identity field is server-derived: sha256/size/mime/dimensions come
+    from the VERIFIED bytes (never from the client), ``content_url`` is the
+    typed link to the existing asset content endpoint, and no filesystem path
+    is ever returned.
+    """
+
+    asset_id: str
+    version_id: str
+    character_id: str
+    workspace_id: str
+    reference_key: str
+    view: str
+    role: str
+    artifact_id: str
+    sha256: str
+    size_bytes: int
+    mime_type: str
+    width: int
+    height: int
+    decoded_mode: str
+    colour_type: int | None = None
+    has_alpha: bool = False
+    purpose: str
+    source_filename: str
+    replaced_existing: bool = False
+    created_at: datetime | None = None
+    content_url: str | None = None
+
+    @classmethod
+    def from_result(cls, result: Any) -> ReferenceArtworkData:
+        return cls(
+            asset_id=result.asset_id,
+            version_id=result.version_id,
+            character_id=result.character_id,
+            workspace_id=result.workspace_id,
+            reference_key=result.reference_key,
+            view=result.view,
+            role=result.role,
+            artifact_id=result.artifact_id,
+            sha256=result.sha256,
+            size_bytes=result.size_bytes,
+            mime_type=result.mime_type,
+            width=result.width,
+            height=result.height,
+            decoded_mode=result.decoded_mode,
+            colour_type=result.colour_type,
+            has_alpha=result.has_alpha,
+            purpose=result.purpose,
+            source_filename=result.source_filename,
+            replaced_existing=result.replaced_existing,
+            created_at=result.created_at,
+            content_url=asset_content_url(
+                result.character_id, result.version_id, result.asset_id
+            ),
+        )
+
+
 class CharacterData(BaseModel):
     id: str
     workspace_id: str

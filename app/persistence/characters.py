@@ -6,10 +6,13 @@ under the S06-T01 domain contract.
 
 from __future__ import annotations
 
+import hashlib
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from PIL import Image
 from sqlalchemy import func, select
@@ -18,6 +21,8 @@ from sqlalchemy.orm import Session, joinedload
 from app.persistence.artifacts import ManagedPathError, ManagedRoot, hash_file
 from app.persistence.models import (
     CORE_POSE_SLOTS,
+    PACK_CONTRACT_VERSION_LEGACY,
+    PACK_CONTRACT_VERSION_REFERENCE,
     Artifact,
     Character,
     CharacterAsset,
@@ -543,6 +548,142 @@ class CharacterRepository:
         self._session.flush()
         return _map_asset(asset)
 
+    def declare_reference_manifest(
+        self,
+        version_id: str,
+        workspace_id: str,
+        manifest: str | Mapping[str, Any],
+    ) -> PackVersionRecord:
+        """Declare the FROZEN requirement manifest of a reference pack (MF-END-04).
+
+        Write-once on a live draft: sets ``pack_contract_version`` to
+        ``reference_pack_v1`` and records the manifest text plus its SHA-256,
+        computed over the stored UTF-8 text and never re-derived later.  The
+        manifest is structurally validated here (version, contract, reference
+        keys, duplicates, capabilities) so a draft can never carry a
+        declaration that the publish gate must refuse outright; publication
+        re-validates it against the attached assets.
+
+        Raises:
+            PackVersionNotFoundError: version missing or foreign (404).
+            PackVersionImmutableError: version is not a live draft (409).
+            PackVersionConflictError: a manifest is already declared for this
+                version — the declaration is write-once (409).
+            ValueError: the manifest is not a structurally valid reference
+                manifest (422 semantics).
+        """
+        from app.workflow.character_validator import (  # noqa: PLC0415
+            PackContractBranch,
+            parse_reference_manifest,
+        )
+
+        version = self._session.scalar(
+            select(CharacterPackVersion).where(
+                CharacterPackVersion.id == version_id,
+                CharacterPackVersion.workspace_id == workspace_id,
+            )
+        )
+        if version is None:
+            raise PackVersionNotFoundError(f"Pack version {version_id!r} not found")
+
+        if version.status != "draft" or version.archived_at is not None:
+            raise PackVersionImmutableError(
+                "Cannot declare a reference manifest on a non-draft Pack "
+                f"Version (status={version.status!r})"
+            )
+        if version.requirement_manifest_json is not None:
+            raise PackVersionConflictError(
+                "A reference manifest is already declared for this Pack "
+                "Version (declaration is write-once)"
+            )
+
+        if isinstance(manifest, str):
+            text = manifest
+        elif isinstance(manifest, Mapping):
+            text = json.dumps(
+                dict(manifest),
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            )
+        else:
+            raise ValueError("manifest must be a JSON string or a mapping")
+
+        text_sha256 = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        parsed = parse_reference_manifest(
+            PackContractBranch(
+                pack_contract_version=PACK_CONTRACT_VERSION_REFERENCE,
+                requirement_manifest_json=text,
+                requirement_manifest_sha256=text_sha256,
+            )
+        )
+        if parsed.errors:
+            raise ValueError("invalid reference manifest: " + "; ".join(parsed.errors))
+
+        version.pack_contract_version = PACK_CONTRACT_VERSION_REFERENCE
+        version.requirement_manifest_json = text
+        version.requirement_manifest_sha256 = text_sha256
+        self._session.flush()
+        return _map_version(version)
+
+    def _reference_publish_snapshot(
+        self, version: CharacterPackVersion, manifest
+    ) -> str:
+        """Freeze the reviewed declaration at publish (MF-END-04.3).
+
+        Records the branch, the manifest identity and the EXACT per-key
+        artifact hashes that were validated, so a published reference pack is
+        provably the manifest that was reviewed.
+        """
+        record = _map_version(version)
+        attached = {asset.pose_slot: asset for asset in record.assets}
+        return json.dumps(
+            {
+                "validated_at": datetime.now(UTC).isoformat(),
+                "pack_contract_version": PACK_CONTRACT_VERSION_REFERENCE,
+                "manifest_version": manifest.manifest_version,
+                "requirement_manifest_sha256": version.requirement_manifest_sha256,
+                "required_keys": [req.key for req in manifest.requirements],
+                "references": [
+                    {
+                        "key": req.key,
+                        "artifact_id": attached[req.key].artifact_id,
+                        "artifact_sha256": attached[req.key].artifact_sha256,
+                    }
+                    for req in manifest.requirements
+                    if req.key in attached
+                ],
+                "asset_count": len(version.assets),
+            }
+        )
+
+    def _verify_frozen_reference_snapshot(self, version: CharacterPackVersion) -> None:
+        """Refuse when a published reference pack no longer matches its frozen
+        publish snapshot (the manifest is immutable after publish).
+
+        Raised as a 409-class conflict: the row state no longer matches
+        the frozen snapshot this publish call is asked to re-affirm.  (The
+        publish route translates PackVersionConflictError and
+        PublishValidationFailedError; PackVersionImmutableError is not part
+        of the publish route contract and would surface as an unmapped
+        error.)"""
+        try:
+            snapshot = json.loads(version.validation_json or "")
+        except ValueError as exc:
+            raise PackVersionConflictError(
+                "Published reference pack has no readable publish snapshot; "
+                "refusing to re-publish"
+            ) from exc
+        if (
+            snapshot.get("pack_contract_version") != PACK_CONTRACT_VERSION_REFERENCE
+            or snapshot.get("requirement_manifest_sha256")
+            != version.requirement_manifest_sha256
+        ):
+            raise PackVersionConflictError(
+                "Published reference pack manifest no longer matches the "
+                "frozen publish snapshot: mutation after publish is refused"
+            )
+
     def publish_pack_version(
         self, version_id: str, workspace_id: str, revision: int
     ) -> PackVersionRecord:
@@ -563,21 +704,45 @@ class CharacterRepository:
             )
 
         if version.status == "published":
+            # A published reference pack must still be the declared manifest
+            # that was frozen at publish; a mutated row is refused here.
+            if version.pack_contract_version == PACK_CONTRACT_VERSION_REFERENCE:
+                self._verify_frozen_reference_snapshot(version)
             return _map_version(version)
 
-        present_slots = {a.pose_slot for a in version.assets}
-        missing_slots = [slot for slot in CORE_POSE_SLOTS if slot not in present_slots]
-
-        # Full validation gate (S06-T03 correction).  The repository itself
-        # runs the complete validator — slot completeness, Artifact ready
-        # state, on-disk file existence, size/checksum integrity, image
-        # decode, alpha channel and resolution policy — so an invalid pack
-        # cannot publish through the API OR through a direct service call.
         from app.workflow.character_validator import (  # noqa: PLC0415 - avoids import cycle
+            PackContractBranch,
+            parse_reference_manifest,
+            reference_pack_completeness,
             validate_character_pack,
         )
 
-        errors = validate_character_pack(_map_version(version), self._storage_root)
+        branch = PackContractBranch(
+            pack_contract_version=(
+                version.pack_contract_version or PACK_CONTRACT_VERSION_LEGACY
+            ),
+            requirement_manifest_json=version.requirement_manifest_json,
+            requirement_manifest_sha256=version.requirement_manifest_sha256,
+        )
+        record = _map_version(version)
+
+        # Full validation gate (S06-T03 correction; reference branch
+        # MF-END-04).  The repository itself runs the complete validator —
+        # requirement completeness, Artifact ready state, on-disk file
+        # existence, size/checksum integrity, image decode, per-requirement
+        # transparency and resolution policy — so an invalid pack cannot
+        # publish through the API OR through a direct service call.
+        manifest = None
+        if branch.pack_contract_version == PACK_CONTRACT_VERSION_LEGACY:
+            present_slots = {a.pose_slot for a in version.assets}
+            missing_slots = [
+                slot for slot in CORE_POSE_SLOTS if slot not in present_slots
+            ]
+            errors = validate_character_pack(record, self._storage_root)
+        else:
+            manifest = parse_reference_manifest(branch)
+            _complete, missing_slots = reference_pack_completeness(record, manifest)
+            errors = validate_character_pack(record, self._storage_root, branch=branch)
         if errors:
             raise PublishValidationFailedError(
                 f"Cannot publish pack version: {'; '.join(errors)}",
@@ -587,11 +752,16 @@ class CharacterRepository:
 
         version.status = "published"
         version.published_at = datetime.now(UTC)
-        version.validation_json = json.dumps({
-            "validated_at": datetime.now(UTC).isoformat(),
-            "core_slots": list(CORE_POSE_SLOTS),
-            "asset_count": len(version.assets),
-        })
+        if manifest is not None:
+            version.validation_json = self._reference_publish_snapshot(
+                version, manifest
+            )
+        else:
+            version.validation_json = json.dumps({
+                "validated_at": datetime.now(UTC).isoformat(),
+                "core_slots": list(CORE_POSE_SLOTS),
+                "asset_count": len(version.assets),
+            })
         version.revision += 1
         self._session.flush()
 
@@ -732,26 +902,62 @@ class CharacterRepository:
         """Read-only draft validation using the SAME validator as publish.
 
         Runs :func:`app.workflow.character_validator.validate_character_pack`
-        — the authoritative publish gate — and returns slot completeness plus
-        the full actionable error list WITHOUT publishing or mutating the
-        pack.  No database writes are performed by this method.
+        — the authoritative publish gate, on the version's declared contract
+        branch (legacy six-slot or reference manifest) — and returns
+        requirement completeness plus the full actionable error list WITHOUT
+        publishing or mutating the pack.  No database writes are performed by
+        this method.
+
+        ``complete`` and validation validity are separate answers and are
+        never conflated: a pack can be ``complete`` and still carry errors
+        (and therefore stay unpublishable), and a pack missing a required
+        entry reports ``complete=False`` with every missing view/key named.
         """
         from app.workflow.character_validator import (  # noqa: PLC0415
+            PackContractBranch,
+            parse_reference_manifest,
+            reference_pack_completeness,
             validate_character_pack,
         )
 
-        version = self.get_pack_version(version_id, workspace_id)
+        version_row = self._session.scalar(
+            select(CharacterPackVersion)
+            .options(_ASSET_ARTIFACT_LOAD)
+            .where(
+                CharacterPackVersion.id == version_id,
+                CharacterPackVersion.workspace_id == workspace_id,
+            )
+        )
+        if version_row is None:
+            raise PackVersionNotFoundError(f"Pack version {version_id!r} not found")
+        version = _map_version(version_row)
 
-        present_slots = {a.pose_slot for a in version.assets}
-        missing_slots = [slot for slot in CORE_POSE_SLOTS if slot not in present_slots]
+        branch = PackContractBranch(
+            pack_contract_version=(
+                version_row.pack_contract_version or PACK_CONTRACT_VERSION_LEGACY
+            ),
+            requirement_manifest_json=version_row.requirement_manifest_json,
+            requirement_manifest_sha256=version_row.requirement_manifest_sha256,
+        )
 
-        errors = validate_character_pack(version, self._storage_root)
+        if branch.pack_contract_version == PACK_CONTRACT_VERSION_LEGACY:
+            present_slots = {a.pose_slot for a in version.assets}
+            missing_slots = [
+                slot for slot in CORE_POSE_SLOTS if slot not in present_slots
+            ]
+            errors = validate_character_pack(version, self._storage_root)
+            complete = not missing_slots
+        else:
+            manifest = parse_reference_manifest(branch)
+            complete, missing_slots = reference_pack_completeness(version, manifest)
+            errors = validate_character_pack(version, self._storage_root, branch=branch)
 
         return PackVersionValidationResult(
             version_id=version_id,
             character_id=version.character_id,
             workspace_id=workspace_id,
-            complete=not missing_slots,
+            complete=complete,
             missing_slots=missing_slots,
             errors=errors,
         )
+

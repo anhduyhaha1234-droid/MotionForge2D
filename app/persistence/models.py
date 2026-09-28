@@ -49,6 +49,10 @@ __all__ = [
     "OBJECT_KINDS",
     "OBJECT_KIND_CHECK_SQL",
     "OBJECT_KIND_PATTERN",
+    "PACK_CONTRACT_VERSION_CHECK_SQL",
+    "PACK_CONTRACT_VERSION_LEGACY",
+    "PACK_CONTRACT_VERSION_REFERENCE",
+    "PACK_CONTRACT_VERSIONS",
     "RENDERER_ROUTES",
     "RENDERER_ROUTE_CHECK_SQL",
     "RENDERER_ROUTE_PATTERN",
@@ -211,6 +215,32 @@ OBJECT_KIND_CHECK_SQL = (
 #: ``OBJECT_KINDS`` (F3 single authority — no duplicated regex literals).
 OBJECT_KIND_PATTERN = (
     "^(" + "|".join(_re.escape(k) for k in OBJECT_KINDS) + ")$"
+)
+
+#: Reference-pack contract branches for ``CharacterPackVersion`` (MF-END-02).
+#: ``legacy_six_slot_2d`` is the ORIGINAL six-pose pack contract: every
+#: pre-existing row keeps it through the column DEFAULT (user data is never
+#: rewritten).  ``reference_pack_v1`` packs carry a requirement manifest —
+#: the JSON body plus the sha256 of that exact body — and the DB-level
+#: invariants are ``ck_pack_version_contract`` /
+#: ``ck_pack_version_manifest_pair`` / ``ck_pack_version_manifest_sha256_len``
+#: / ``ck_pack_version_reference_manifest``.
+PACK_CONTRACT_VERSION_LEGACY = "legacy_six_slot_2d"
+PACK_CONTRACT_VERSION_REFERENCE = "reference_pack_v1"
+PACK_CONTRACT_VERSIONS = (
+    PACK_CONTRACT_VERSION_LEGACY,
+    PACK_CONTRACT_VERSION_REFERENCE,
+)
+#: SQL literal for the ``character_pack_version.pack_contract_version``
+#: CHECK, DERIVED from ``PACK_CONTRACT_VERSIONS`` (single authority).  The
+#: byte format (no space after each comma) deliberately matches the FROZEN
+#: migration snapshot in
+#: ``migrations/versions/f8b9c0d1e2f3_mf_reference_pack.py`` so the
+#: ``writable_schema`` CHECK-literal edit keeps finding its needle EXACTLY ONCE.
+PACK_CONTRACT_VERSION_CHECK_SQL = (
+    "pack_contract_version IN ("
+    + ",".join("'" + v + "'" for v in PACK_CONTRACT_VERSIONS)
+    + ")"
 )
 
 OCCURRENCE_CONFIDENCE_SOURCES = ("model", "detector", "user", "manual", "derived")
@@ -1015,7 +1045,13 @@ class Character(ArchivableMixin, Base):
 
 
 class CharacterPackVersion(ArchivableMixin, Base):
-    """Versioned pose pack for a Character."""
+    """Versioned pose pack for a Character.
+
+    ``pack_contract_version`` selects the pack contract branch: the legacy
+    six-slot 2D pack (``legacy_six_slot_2d`` — every pre-existing row) or the
+    reference pack (``reference_pack_v1``) that carries a requirement manifest
+    (``requirement_manifest_json`` + ``requirement_manifest_sha256``).
+    """
 
     __tablename__ = "character_pack_version"
     __table_args__ = (
@@ -1028,6 +1064,26 @@ class CharacterPackVersion(ArchivableMixin, Base):
             name="ck_pack_version_status",
         ),
         CheckConstraint("revision > 0", name="ck_pack_version_revision_positive"),
+        CheckConstraint(
+            PACK_CONTRACT_VERSION_CHECK_SQL, name="ck_pack_version_contract"
+        ),
+        CheckConstraint(
+            "(requirement_manifest_json IS NULL) = "
+            "(requirement_manifest_sha256 IS NULL)",
+            name="ck_pack_version_manifest_pair",
+        ),
+        CheckConstraint(
+            "requirement_manifest_sha256 IS NULL "
+            "OR length(requirement_manifest_sha256) = 64",
+            name="ck_pack_version_manifest_sha256_len",
+        ),
+        CheckConstraint(
+            "(pack_contract_version = 'legacy_six_slot_2d' "
+            "AND requirement_manifest_json IS NULL) "
+            "OR (pack_contract_version = 'reference_pack_v1' "
+            "AND requirement_manifest_json IS NOT NULL)",
+            name="ck_pack_version_reference_manifest",
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
@@ -1046,6 +1102,14 @@ class CharacterPackVersion(ArchivableMixin, Base):
     revision: Mapped[int] = mapped_column(
         Integer, default=1, server_default=sa_text("1"), nullable=False
     )
+    pack_contract_version: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default=PACK_CONTRACT_VERSION_LEGACY,
+        server_default=PACK_CONTRACT_VERSION_LEGACY,
+    )
+    requirement_manifest_json: Mapped[str | None] = mapped_column(Text)
+    requirement_manifest_sha256: Mapped[str | None] = mapped_column(String(64))
 
     character: Mapped[Character] = relationship(
         back_populates="versions",

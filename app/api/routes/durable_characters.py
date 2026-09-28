@@ -9,10 +9,10 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 
-from app.api.deps import SessionDep, get_managed_root
+from app.api.deps import SessionDep, get_config, get_managed_root
 from app.persistence import DEFAULT_WORKSPACE_ID
 from app.persistence.characters import (
     AssetContentError,
@@ -38,9 +38,11 @@ from app.schemas.characters import (
     PackVersionData,
     PackVersionValidationData,
     PublishVersionRequest,
+    ReferenceArtworkData,
     SetDefaultVersionRequest,
     asset_content_url,
 )
+from app.workflow import character_reference_ingest
 
 router = APIRouter(prefix="/api/v2/characters", tags=["durable-characters"])
 WORKSPACE_ID = DEFAULT_WORKSPACE_ID
@@ -367,3 +369,114 @@ def get_pack_version_validation(
         missing_slots=result.missing_slots,
         errors=result.errors,
     )
+
+# ── Authored reference-artwork ingest (MF-END-03) ────────────────────────────
+
+#: Typed ingest refusal -> (HTTP status, public code).  Lookup walks the
+#: exception MRO, so a specialised subclass can never fall through to its
+#: base family's status.
+_REFERENCE_ARTWORK_REFUSALS: dict[type, tuple[int, str]] = {
+    character_reference_ingest.ReferenceKeyRefusedError: (422, "REFERENCE_KEY_REFUSED"),
+    character_reference_ingest.ReferencePurposeRefusedError: (422, "INVALID_PURPOSE"),
+    character_reference_ingest.ReferenceFilenameRefusedError: (
+        422,
+        "REFERENCE_FILENAME_REFUSED",
+    ),
+    character_reference_ingest.ReferenceArtworkRefusedError: (
+        422,
+        "REFERENCE_ARTWORK_REFUSED",
+    ),
+    character_reference_ingest.ReferenceArtworkTooLargeError: (
+        413,
+        "REFERENCE_ARTWORK_TOO_LARGE",
+    ),
+    character_reference_ingest.ReferenceArtworkPayloadError: (
+        415,
+        "REFERENCE_ARTWORK_UNREADABLE",
+    ),
+    PackVersionNotFoundError: (404, "PACK_VERSION_NOT_FOUND"),
+    PackVersionImmutableError: (409, "PACK_VERSION_IMMUTABLE"),
+}
+
+
+def _reference_artwork_refusal(err: BaseException) -> tuple[int, str] | None:
+    """Map a typed ingest refusal to ``(status, code)``, else None."""
+    for klass in type(err).__mro__:
+        mapped = _REFERENCE_ARTWORK_REFUSALS.get(klass)
+        if mapped is not None:
+            return mapped
+    return None
+
+
+@router.post("/versions/{version_id:uuid}/reference-artwork", status_code=201)
+@router.post("/versions/{version_id:uuid}/reference-artwork/", status_code=201)
+def ingest_reference_artwork(
+    version_id: uuid.UUID,
+    file: Annotated[UploadFile, File(...)],
+    reference_key: Annotated[str, Form(...)],
+    session: SessionDep,
+    purpose: Annotated[str, Form()] = "artwork",
+    workspace_id: str = WORKSPACE_ID,
+) -> ReferenceArtworkData:
+    """Ingest authored RGB/RGBA reference artwork into a DRAFT pack version.
+
+    This is the FIRST public route that CREATES an authored artwork
+    ``Artifact`` (managed bytes + ready row with sha256/size/mime/dimensions)
+    and attaches it to the version under the namespaced reference key
+    ``<view>@<role>`` (e.g. ``front@character``).  It reuses the existing
+    ``character_asset`` rows, so no schema change is involved, and it returns
+    the artifact id, sha256, size, verified MIME, dimensions and provenance.
+
+    Admission is decided by the DECODED bytes plus the declared purpose —
+    never by the file extension: accepted colour representations are exactly
+    RGB (2) and RGBA (6), so a grey-looking RGB artwork is admitted while a
+    single-channel mask (mode ``L`` / PNG colour type 0) is refused and never
+    converted into artwork.
+
+    Failure semantics (fail closed, no filesystem paths in responses):
+    - 404: version missing or foreign to the workspace
+    - 409: version is not a draft (published/archived)
+    - 413: payload exceeds the configured byte ceiling
+    - 415: empty/corrupt/oversize-pixel payload that is not a decodable
+      allowlisted image
+    - 422: invalid reference key, mask purpose, mask/unsupported colour
+      representation, hostile filename
+    """
+    storage_root = get_managed_root()
+    cfg = get_config()
+    written: list[str] = []
+    try:
+        result = character_reference_ingest.ingest_reference_artwork(
+            session=session,
+            storage_root=storage_root,
+            workspace_id=workspace_id,
+            version_id=str(version_id),
+            reference_key=reference_key,
+            purpose=purpose,
+            filename=file.filename,
+            stream=file.file,
+            max_bytes=cfg.max_image_upload_bytes,
+            max_dimension=cfg.max_image_dimension,
+            max_pixels=cfg.max_image_pixels,
+            written=written,
+        )
+        session.commit()
+    except BaseException as err:
+        # Every failure path (service refusal, flush error, commit error)
+        # rolls the transaction back AND removes bytes this call wrote.
+        session.rollback()
+        character_reference_ingest.discard_written_files(storage_root, written)
+        mapped = _reference_artwork_refusal(err)
+        if mapped is None:
+            raise
+        status, code = mapped
+        code = getattr(err, "code", None) or code
+        raise HTTPException(
+            status,
+            detail={
+                "code": code,
+                "message": str(err),
+                "details": dict(getattr(err, "details", {}) or {}),
+            },
+        ) from err
+    return ReferenceArtworkData.from_result(result)
