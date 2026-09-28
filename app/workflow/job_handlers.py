@@ -293,6 +293,16 @@ def register_api_handlers(worker: Any) -> None:
         _render_handler_entry,
         declared_outputs=declared_outputs_for(JOB_TYPE_RENDER, {}),
     )
+    # MF-END-15: the durable shot-anchor job (resolve published refs → input
+    # readiness gate → engine run → managed anchor manifest) registers through
+    # its own owner module; its fail-closed output validator comes with the
+    # registration, so a completed anchor job always carries a verified
+    # manifest on disk.
+    from app.workflow.shot_anchor_jobs import (  # noqa: PLC0415
+        register_shot_anchor_handler,
+    )
+
+    register_shot_anchor_handler(worker)
 
 
 # Keep OUTPUT_PURPOSES referenced so the module documents the final-output
