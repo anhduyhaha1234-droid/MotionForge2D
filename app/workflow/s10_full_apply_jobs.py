@@ -92,6 +92,21 @@ except ImportError:  # pragma: no cover - defensive
     _run_shot_render: Any = None  # type: ignore[no-redef]
     _select_shot_profile: Any = None  # type: ignore[no-redef]
 
+try:
+    from app.services.shot_reskin_cache import (  # noqa: F401
+        ShotCacheRefusal as _ShotCacheRefusal,
+    )
+    from app.services.shot_reskin_cache import (
+        ShotReskinCache as _ShotReskinCache,
+    )
+    from app.services.shot_reskin_cache import (
+        run_cached_shot_render as _run_cached_shot_render,
+    )
+except ImportError:  # pragma: no cover - defensive
+    _ShotCacheRefusal: Any = None  # type: ignore[no-redef]
+    _ShotReskinCache: Any = None  # type: ignore[no-redef]
+    _run_cached_shot_render: Any = None  # type: ignore[no-redef]
+
 __all__ = [
     "JOB_TYPE_S10_FULL_APPLY",
     "S10_FULL_APPLY_STEP_CODE",
@@ -987,6 +1002,8 @@ def _render_shot_chunk_via_engine(
     authority: dict[str, Any],
     manifest: dict[str, Any],
     backend: dict[str, Any],
+    session_factory: Any = None,
+    retry: bool = False,
 ) -> tuple[Path, str, int, dict[str, Any]]:
     """Render one whole-shot/GROUP chunk through the shot-level engine (19.3).
 
@@ -1101,14 +1118,77 @@ def _render_shot_chunk_via_engine(
     }
     if backend.get("seed") is not None:
         request["parameters"]["seed"] = int(backend["seed"])
-    try:
-        result = _run_shot_render(managed_root=managed_root, request=request)
-    except Exception as exc:  # noqa: BLE001 — executor refusals are terminal here
-        code = getattr(exc, "code", None)
-        code_value = getattr(code, "value", None) or code
-        raise S10FullApplyJobError(
-            f"shot render refused/failed ({code_value or type(exc).__name__}): {exc}"
-        ) from exc
+    # MF-END-20: the shot render goes through the content-keyed cache.  A
+    # replay of an identical request NEVER issues a second engine POST; a
+    # restart AFTER submit (in-doubt) refuses instead of re-POSTing the same
+    # attempt, and a cancelled/superseded attempt never pins a late output.
+    cache_hit = False
+    cache_info: dict[str, Any] = {}
+    if session_factory is not None and _run_cached_shot_render is not None:
+        try:
+            outcome = _run_cached_shot_render(
+                session_factory=session_factory,
+                managed_root=managed_root,
+                workspace_id=workspace_id,
+                run_id=run_id,
+                request=request,
+                retry=bool(retry),
+                is_cancelled=None,
+                render=lambda: _run_shot_render(managed_root=managed_root, request=request),
+            )
+        except _ShotCacheRefusal as exc:
+            raise S10FullApplyJobError(
+                f"shot render cache refused ({exc.code.value}): {exc.detail}"
+            ) from exc
+        except Exception as exc:  # noqa: BLE001 — executor refusals are terminal here
+            code = getattr(exc, "code", None)
+            code_value = getattr(code, "value", None) or code
+            raise S10FullApplyJobError(
+                f"shot render refused/failed ({code_value or type(exc).__name__}): {exc}"
+            ) from exc
+        cache_hit = bool(outcome.get("cache_hit"))
+        cache_receipt = dict(outcome.get("receipt") or {})
+        cache_info = {
+            "hit": cache_hit,
+            "content_key": str(outcome.get("content_key") or ""),
+            "receipt_id": str(cache_receipt.get("receipt_id") or ""),
+            "attempt_row_id": str(cache_receipt.get("attempt_row_id") or ""),
+        }
+        if cache_hit:
+            rel = Path(str(cache_receipt.get("output_relative_path") or ""))
+            sha = str(cache_receipt.get("output_sha256") or "")
+            size = int(cache_receipt.get("output_size_bytes") or 0)
+            abs_hit = _lp(managed_root / rel)
+            if not rel.name or not abs_hit.is_file() or hash_file(abs_hit) != sha:
+                raise S10FullApplyJobError(
+                    f"cached shot render receipt is stale on disk: {rel} (fail closed)"
+                )
+            evidence = {
+                "decoded_sha256": str(cache_receipt.get("decoded_sha256") or ""),
+                "decoded_frame_count": int(cache_receipt.get("decoded_frame_count") or 0),
+                "fps_num": int(cache_receipt.get("fps_num") or fps_num),
+                "fps_den": int(cache_receipt.get("fps_den") or fps_den),
+                "layer_id": str(chunk.get("layer_id") or ""),
+                "shot_id": shot_id,
+                "route": "shot_group",
+                "effective_adapter": "comfy_shot_engine",
+                "prompt_id": str(cache_receipt.get("prompt_id") or ""),
+                "graph_object_sha256_submitted": str(
+                    cache_receipt.get("graph_object_sha256_submitted") or ""
+                ),
+                "cache": cache_info,
+            }
+            return rel, sha, size, evidence
+        result = dict(outcome.get("result") or {})
+    else:
+        try:
+            result = _run_shot_render(managed_root=managed_root, request=request)
+        except Exception as exc:  # noqa: BLE001 — executor refusals are terminal here
+            code = getattr(exc, "code", None)
+            code_value = getattr(code, "value", None) or code
+            raise S10FullApplyJobError(
+                f"shot render refused/failed ({code_value or type(exc).__name__}): {exc}"
+            ) from exc
     rel = Path(str(result["output_relative_path"]))
     sha = str(result["output_sha256"])
     size = int(result["output_size_bytes"])
@@ -1128,6 +1208,7 @@ def _render_shot_chunk_via_engine(
         "graph_object_sha256_submitted": str(result.get("graph_object_sha256_submitted") or ""),
         "shot_render_record": dict(result.get("record") or {}),
         "window": dict(result.get("window") or {}),
+        "cache": cache_info,
     }
     return rel, sha, size, evidence
 
@@ -1410,6 +1491,10 @@ def s10_full_apply_handler(ctx: WorkerContext) -> dict[str, Any]:
         raise
 
     _mark_run_status(session_factory, ws, run_id, "running")
+    # MF-END-20: a durable RETRY (pipeline attempt > 1) is the only writer
+    # allowed to supersede an in-doubt shot-cache submit; a bare restart of
+    # attempt 1 never re-POSTs.
+    pipeline_retry = int(getattr(ctx, "attempt", 1) or 1) > 1
     # MF-END-19: the run's frozen execution-backend manifest decides whether
     # each chunk renders through the shot-level engine (whole-shot/GROUP plan)
     # or keeps the legacy per-layer route executor.  Absent manifest => legacy.
@@ -1465,6 +1550,8 @@ def s10_full_apply_handler(ctx: WorkerContext) -> dict[str, Any]:
                     authority=authority,
                     manifest=manifest,
                     backend=backend_manifest,
+                    session_factory=session_factory,
+                    retry=pipeline_retry,
                 )
             else:
                 rel, sha, size, evidence = _render_chunk_via_real_executor(
@@ -1526,6 +1613,19 @@ def s10_full_apply_handler(ctx: WorkerContext) -> dict[str, Any]:
     except Exception:
         has_completed = False
     if not has_completed:
+        # MF-END-20: publication-time guard — the run's pinned shot receipts
+        # must still be byte-live.  A tampered/missing receipt artifact refuses
+        # the publication (replay never publishes drifted bytes).
+        if comfy_shot_mode and _ShotReskinCache is not None:
+            try:
+                with session_factory() as _guard_sess:
+                    _guard = _ShotReskinCache(_guard_sess, managed_root=managed_root)
+                    _guard.assert_run_receipts_live(workspace_id=ws, run_id=run_id)
+            except _ShotCacheRefusal as exc:
+                _mark_run_status(session_factory, ws, run_id, "failed")
+                raise S10FullApplyJobError(
+                    f"publication refused by the shot cache guard ({exc.code.value}): {exc.detail}"
+                ) from exc
         try:
             all_chunks = _list_chunks(session_factory, ws, run_id)
             # MF-END-19.4: the shot-level backend stitches frame-accurate whole-
