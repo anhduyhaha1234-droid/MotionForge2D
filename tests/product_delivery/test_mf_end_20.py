@@ -446,6 +446,105 @@ def test_mf20_2_publication_guard_blocks_drifted_receipt_bytes(tmp_path: Path) -
         assert receipt is not None and receipt["state"] == "invalidated"
 
 
+def test_mf20_2_publication_replay_does_not_duplicate(tmp_path: Path) -> None:
+    """Replaying the same (run, stitch bytes) yields ONE completed publication."""
+    from alembic import command
+    from alembic.config import Config
+
+    from app.persistence import create_engine_for_path, create_session_factory
+    from app.persistence.s10_full_apply import S10ApplyRepository
+
+    db = tmp_path / "pub.db"
+    cfg = Config(str(WT / "alembic.ini"))
+    cfg.set_main_option("script_location", str(WT / "migrations"))
+    cfg.set_main_option("sqlalchemy.url", f"sqlite:///{db.as_posix()}")
+    command.upgrade(cfg, "head")
+    sf = create_session_factory(create_engine_for_path(db))
+    managed = tmp_path / "managed"
+    stitch = _write_mp4(managed / "stitch" / "full.mp4", 10, seed=5)
+    stitch_sha = _sha_file(stitch)
+    cp_hash = "a" * 64
+    with sf() as s:
+        s.execute(text("INSERT OR IGNORE INTO workspace(id,name) VALUES ('default','default')"))
+        s.execute(
+            text("INSERT INTO project(id,workspace_id,name) VALUES ('p1','default','Proj')")
+        )
+        s.execute(
+            text(
+                "INSERT INTO video_item(id,project_id,title,position) VALUES ('v1','p1','Vid',0)"
+            )
+        )
+        s.execute(
+            text(
+                "INSERT INTO character(id,workspace_id,name,code) VALUES ('ch1','default','hero','hero1')"
+            )
+        )
+        s.execute(
+            text(
+                "INSERT INTO character_pack_version(id,character_id,workspace_id,version,status)"
+                " VALUES ('pv1','ch1','default',1,'published')"
+            )
+        )
+        s.execute(
+            text(
+                "INSERT INTO object_role(id,workspace_id,project_id,video_item_id,"
+                " source_generation,name,kind,status) VALUES"
+                " ('r1','default','p1','v1','1','role','character','confirmed')"
+            )
+        )
+        s.execute(
+            text(
+                "INSERT INTO reskin_config(id, workspace_id, project_id, object_role_id,"
+                " character_id, pack_version_id, params_json, revision) VALUES"
+                " ('rc1','default','p1','r1','ch1','pv1','{}',1)"
+            )
+        )
+        s.execute(
+            text(
+                "INSERT INTO apply_checkpoint(id, workspace_id, project_id, reskin_config_id,"
+                " reskin_config_revision, pack_version_ids_json, loop_hashes_json,"
+                " timebase_fingerprint, snapshot_json, checkpoint_hash, revision, created_at,"
+                " updated_at) VALUES ('cp1','default','p1','rc1',1,'[]','[]','30/1','{}',:h,1,"
+                " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+            ),
+            {"h": cp_hash},
+        )
+        s.execute(
+            text(
+                "INSERT INTO s10_full_apply_run(id, workspace_id, project_id, video_item_id,"
+                " apply_checkpoint_id, apply_checkpoint_hash, apply_checkpoint_revision, plan_id,"
+                " plan_hash, status, frame_count, fps_num, fps_den, chunk_config_json, attempt,"
+                " revision, created_at, updated_at) VALUES"
+                " ('run-1','default','p1','v1','cp1',:h,1,:pid,:ph,'completed',10,30,1,'{}',1,1,"
+                " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+            ),
+            {"h": cp_hash, "pid": "c" * 64, "ph": "b" * 64},
+        )
+        s.execute(
+            text(
+                "INSERT INTO artifact(id, workspace_id, kind, relative_path, state, sha256,"
+                " size_bytes, revision) VALUES"
+                " ('art-stitch','default','video','stitch/full.mp4','ready',:sha,:sz,1)"
+            ),
+            {"sha": stitch_sha, "sz": stitch.stat().st_size},
+        )
+        s.commit()
+        repo = S10ApplyRepository(s)
+        content_hash = hashlib.sha256(f"pub:run-1:{stitch_sha}".encode()).hexdigest()
+        pub1, created1 = repo.create_publication(
+            "default", "run-1", "art-stitch", content_hash, 10, {"frame_count": 10},
+            "cp1", cp_hash, 1, state="completed",
+        )
+        pub2, created2 = repo.create_publication(
+            "default", "run-1", "art-stitch", content_hash, 10, {"frame_count": 10},
+            "cp1", cp_hash, 1, state="completed",
+        )
+        s.commit()
+        assert created1 is True and created2 is False
+        assert pub1.id == pub2.id
+        assert len(repo.list_publications("default", "run-1")) == 1
+
+
 # ── 20.3 — cancel safety + retry lifecycle ───────────────────────────────────
 
 
