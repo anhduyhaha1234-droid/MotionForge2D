@@ -177,6 +177,13 @@
     "status": "COMPLETE_TECHNICAL",
     "scope": "BOOK case only, same unit/seed as the Wan baseline"
    },
+   "controlled_artifact": {
+    "graph_id": "controlled_shot_v1",
+    "graph_file": "app/media_workflows/controlled_shot_v1.json",
+    "manifest_file": "app/media_workflows/controlled_shot_v1.manifest.json",
+    "controlled_path_status": "UNSUPPORTED_ON_THIS_RUNTIME",
+    "decided_by": "MF-END-17"
+   },
    "eligibility": {
     "status": "INELIGIBLE",
     "blockers": [
@@ -201,8 +208,20 @@
     "why": "watermark-copy blocker (F4)"
    }
   ],
-  "end17_note": "no profile change is forced by speed; END-17 activates only if review rejects the Wan candidate or the masked-edit path is required",
+  "end17_note": "no profile change is forced by speed; END-17 resolved: activation trigger not met on the measured rows -> SKIPPED_NOT_NEEDED (not a test pass); the masked-edit path stays UNSUPPORTED (SCAIL-2 weights absent; VACE watermark blocker) - see controlled_shot_v1.manifest.json",
   "decided_by": "MF-END-16 worker per packet 16.4 (eligibility measured here; quality acceptance reserved)"
+ },
+ "controlled_shot": {
+  "artifact": "app/media_workflows/controlled_shot_v1.json",
+  "manifest": "app/media_workflows/controlled_shot_v1.manifest.json",
+  "activation": "SKIPPED_NOT_NEEDED",
+  "counts_as_test_pass": false,
+  "path_status": "UNSUPPORTED_ON_THIS_RUNTIME",
+  "candidates": {
+   "scail2_wan_scail": "BLOCKED_NO_WEIGHTS",
+   "vace_14b_fp16_book": "MEASURED_INELIGIBLE (copies the source watermark)"
+  },
+  "decided_by": "MF-END-17 worker (measured rows only; quality acceptance reserved)"
  },
  "claims": {
   "quality_accepted": false,
