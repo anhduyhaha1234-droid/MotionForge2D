@@ -55,7 +55,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.persistence.jobs import IdempotencyKeyInUse, StepInput
-from app.persistence.models import Artifact, VideoItem
+from app.persistence.models import Artifact, ProjectCastMapping, VideoItem
 from app.services import video_import
 from app.services.qc_checks.orchestrator import (
     OrchestratorSummary,
@@ -118,6 +118,12 @@ QC_RUN_BOOTSTRAP_CONFLICT = "QC_RUN_BOOTSTRAP_CONFLICT"
 QC_RUN_EVIDENCE_CHANGED = "QC_RUN_EVIDENCE_CHANGED"
 QC_RUN_DETECTOR_ERRORS = "QC_RUN_DETECTOR_ERRORS"
 QC_RUN_NO_SESSION = "QC_RUN_NO_SESSION"
+
+#: MF-END-23 additive contract identity of the OUTPUT-BOUND evidence identity.
+#: ORTHOGONAL to the frozen T03A policy and to the T03G read authority: this
+#: contract only widens WHAT the run identity covers (source + rendered output
+#: + cast), never how a verdict is computed.
+EVIDENCE_BINDING_SCHEMA = "mf-end-23/evidence-binding@1"
 
 
 class RunQcChecksError(Exception):
@@ -212,18 +218,158 @@ def source_artifact_fingerprint(
     return {"source_artifact_id": artifact_id, "source_sha256": sha256}
 
 
+def output_evidence_binding(
+    session: Session,
+    *,
+    workspace_id: str,
+    video_item_id: str,
+    project_id: str | None = None,
+) -> dict[str, Any]:
+    """The video's CURRENT output-bound evidence identity (MF-END-23).
+
+    Composes, from PERSISTED ROWS ONLY (no byte reads), the three facts a
+    check-run's validity depends on:
+
+    * ``source`` — the imported source artifact id + recorded sha256;
+    * ``render`` — the current rendered output row (:func:`output_render_row`
+      over ``app.services.qc_evidence.compose``: newest completed publication,
+      else the newest render-side artifact owned by the video), including its
+      publication/checkpoint identity; ``None`` when the video has no rendered
+      output distinct from its source;
+    * ``cast`` — every ProjectCastMapping row of the project (role →
+      character / immutable pack version / revision), digest-pinned.
+
+    ``digest`` content-addresses the whole binding.  ``resolver_error`` is
+    recorded (never swallowed) when a component cannot be resolved, so a
+    consumer can fail closed instead of reading a degraded binding as fresh.
+    """
+    from app.services.qc_evidence.compose import render_row  # lazy: no cycle
+
+    item = session.get(VideoItem, video_item_id)
+    resolved_project = project_id or (
+        str(item.project_id) if item is not None and item.project_id else None
+    )
+    source = source_artifact_fingerprint(session, video_item_id=video_item_id)
+
+    resolver_error: str | None = None
+    render: dict[str, Any] | None = None
+    if resolved_project:
+        try:
+            render = render_row(
+                session,
+                workspace_id=workspace_id,
+                project_id=resolved_project,
+                video_item_id=video_item_id,
+            )
+        except Exception as exc:  # noqa: BLE001 - recorded, never swallowed
+            resolver_error = f"{type(exc).__name__}: {exc}"
+    else:
+        resolver_error = "project_unresolved_for_video_item"
+
+    cast_rows = session.execute(
+        select(
+            ProjectCastMapping.object_role_id,
+            ProjectCastMapping.character_id,
+            ProjectCastMapping.pack_version_id,
+            ProjectCastMapping.revision,
+            ProjectCastMapping.id,
+        )
+        .where(
+            ProjectCastMapping.workspace_id == workspace_id,
+            ProjectCastMapping.project_id == str(resolved_project or ""),
+        )
+        .order_by(ProjectCastMapping.object_role_id, ProjectCastMapping.id)
+    ).all()
+    cast_block: dict[str, Any] = {
+        "roles": [
+            {
+                "object_role_id": str(row[0]),
+                "character_id": str(row[1]),
+                "pack_version_id": str(row[2]),
+                "revision": int(row[3]),
+                "mapping_id": str(row[4]),
+            }
+            for row in cast_rows
+        ]
+    }
+    cast_block["digest"] = _sha256(cast_block)
+
+    binding: dict[str, Any] = {
+        "schema": EVIDENCE_BINDING_SCHEMA,
+        "workspace_id": workspace_id,
+        "project_id": resolved_project,
+        "video_item_id": video_item_id,
+        "source": {
+            "artifact_id": source["source_artifact_id"],
+            "sha256": source["source_sha256"],
+        },
+        "render": render,
+        "cast": cast_block,
+        "resolver_error": resolver_error,
+    }
+    binding["digest"] = _sha256(binding)
+    return binding
+
+
 def evidence_fingerprint(
     session: Session,
     *,
     workspace_id: str,
     video_item_id: str,
     generation: str = "1",
+    project_id: str | None = None,
 ) -> str:
-    """Current video evidence fingerprint (source identity + generation).
+    """Current video evidence fingerprint — OUTPUT-BOUND (MF-END-23).
 
-    The fingerprint changes ONLY when the video's evidence-bearing source
-    changes (re-import / source replacement / generation bump) — exactly
-    the condition that makes a completed check-run STALE.
+    Additive contract ``mf-end-23/evidence-binding@1``: the identity a
+    check-run is valid for now covers the whole evidence chain the FULL band
+    actually measures, so a change ANYWHERE in it makes a completed run stale
+    instead of silently current:
+
+    * the imported SOURCE identity + generation (the pre-MF-END-23 identity,
+      kept bit-for-bit computable via :func:`legacy_evidence_fingerprint`);
+    * the CURRENT rendered OUTPUT (artifact id + recorded sha256 + the
+      completed publication's checkpoint identity), resolved through the
+      same disclosed precedence the evidence composer uses;
+    * the project CAST binding (every ProjectCastMapping row's role →
+      character/pack-version/revision).
+
+    The read authority (``app.persistence.qc_check_runs``) recomputes this
+    fingerprint before trusting a completion envelope, so a render change or
+    a cast change invalidates readiness (``not_run``) — and therefore blocks
+    export — with NO change to the policy or readiness authority itself.
+    """
+    binding = output_evidence_binding(
+        session,
+        workspace_id=workspace_id,
+        project_id=project_id,
+        video_item_id=video_item_id,
+    )
+    source = binding["source"]
+    return _sha256(
+        {
+            "schema": EVIDENCE_BINDING_SCHEMA,
+            "source_artifact_id": source["artifact_id"],
+            "source_sha256": source["sha256"],
+            "source_generation": generation,
+            "output_binding_digest": binding["digest"],
+        }
+    )
+
+
+def legacy_evidence_fingerprint(
+    session: Session,
+    *,
+    workspace_id: str,
+    video_item_id: str,
+    generation: str = "1",
+) -> str:
+    """The pre-MF-END-23 fingerprint formula (source identity + generation).
+
+    Kept computable — never used for authority — so the additive change is
+    provable in review: the legacy identity answers ONLY "did the source
+    change?", which is exactly the question that could no longer see a
+    render/cast change (MF-END-23 finding).
     """
     del workspace_id  # the persisted source identity is authoritative
     source = source_artifact_fingerprint(session, video_item_id=video_item_id)
@@ -565,6 +711,7 @@ def build_completion_block(
     detectors: Sequence[str],
     revisions: Mapping[str, str],
     summary: OrchestratorSummary,
+    evidence_binding: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Deterministic completion evidence recorded in JobAttempt result +
     step checkpoint (zero-item completion evidence included)."""
@@ -606,6 +753,9 @@ def build_completion_block(
         "scope_fingerprint": scope_fp,
         "detectors": list(detectors),
         "detector_revisions": dict(revisions),
+        "evidence_binding": (
+            dict(evidence_binding) if evidence_binding is not None else None
+        ),
         "summary": summary_block,
         "zero_item_completion": {
             # Reuse-safe: the flag is the detectors' REPORTED issue count
@@ -677,6 +827,7 @@ def qc_checks_handler(ctx: WorkerContext) -> dict[str, Any]:
             workspace_id=str(manifest.get("workspace_id") or ""),
             video_item_id=str(manifest.get("video_item_id") or ""),
             generation=source_generation,
+            project_id=str(manifest.get("project_id") or "") or None,
         )
         if current_fp != evidence_fp:
             raise RunQcChecksError(
@@ -747,6 +898,12 @@ def qc_checks_handler(ctx: WorkerContext) -> dict[str, Any]:
         source_fp = source_artifact_fingerprint(
             session, video_item_id=str(manifest.get("video_item_id") or "")
         )
+        binding_for_completion = output_evidence_binding(
+            session,
+            workspace_id=str(manifest.get("workspace_id") or ""),
+            project_id=str(manifest.get("project_id") or "") or None,
+            video_item_id=str(manifest.get("video_item_id") or ""),
+        )
 
     # Fail-closed completion: an errored / deadline-exhausted / cancelled
     # orchestrator run is NEVER recorded as a completed check-run — the
@@ -807,6 +964,7 @@ def qc_checks_handler(ctx: WorkerContext) -> dict[str, Any]:
         detectors=detectors,
         revisions=detector_revisions(detectors),
         summary=summary,
+        evidence_binding=binding_for_completion,
     )
     ctx.write_checkpoint(completion)
     return completion
@@ -1043,6 +1201,13 @@ def submit_run_qc_checks(
             workspace_id=workspace_id,
             video_item_id=video_item_id,
             generation=generation,
+            project_id=project_id,
+        )
+        binding = output_evidence_binding(
+            session,
+            workspace_id=workspace_id,
+            project_id=project_id,
+            video_item_id=video_item_id,
         )
         policy = policy_bundle()
         scope_fp = scope_fingerprint(scope)
@@ -1081,6 +1246,7 @@ def submit_run_qc_checks(
             "source_generation": generation,
             "source_artifact_id": source_fp["source_artifact_id"],
             "source_sha256": source_fp["source_sha256"],
+            "evidence_binding": binding,
             "deadline_sec": float(deadline_sec or DEFAULT_DEADLINE_SEC),
             "capture_cap_bytes": int(capture_cap_bytes or DEFAULT_CAPTURE_CAP_BYTES),
             "detector_args": {

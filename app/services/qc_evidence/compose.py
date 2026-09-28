@@ -35,12 +35,15 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.persistence.models import Artifact, ArtifactOwner
 from app.services.qc_evidence import observe as obs
 from app.services.qc_evidence import sources as src
 from app.services.qc_evidence.contract import FULL_BAND
 from app.services.qc_evidence.errors import (
+    QC_EVIDENCE_MISSING,
     QcEvidenceError,
     dependency,
     malformed,
@@ -96,6 +99,37 @@ ARGV_DETECTOR_ARGS_BUDGET_BYTES = 30000
 #: The measured ``CreateProcess`` ceiling of ONE argv item on this host.
 ARGV_CEILING_SPAWN_OK_BYTES = 32500
 ARGV_CEILING_WINERROR_206_BYTES = 32700
+
+#: MF-END-23 MEASURED transport fact (2026-09-28, probe + this host): the cost
+#: of one argument on the Windows command line is its QUOTE-ESCAPED length
+#: (``subprocess.list2cmdline``), not its raw JSON length — every ``"`` in the
+#: JSON costs an extra escape character.  Probe results for the runner's
+#: command shape (``python -c <script> <entry_point> <args>``): escaped args
+#: 25,001 B spawn while escaped 32,501 B raise ``WinError 206``; the runner's
+#: own command-line overhead (python.exe + the ``-c`` bootstrap script +
+#: entry point + separators) is ~1.9 KB and must be reserved BEFORE any
+#: attachment is measured as safe.
+ARGV_RUNNER_COMMANDLINE_OVERHEAD_BYTES = 2000
+
+# ── MF-END-23: output-bound QC evidence (publication + sealed observations) ──
+
+#: Additive contract identity of the OUTPUT BINDING stamped into every visual
+#: detector's argument set.  ORTHOGONAL to the frozen detector→input→producer
+#: table in :mod:`.contract` (nothing there changes) and to the policy /
+#: readiness authority: this contract only NAMES which rendered output the
+#: composed evidence was verified against — the END-01 pattern (a new,
+#: versioned, additive schema; existing closed code is never silently
+#: redefined).
+OUTPUT_BINDING_SCHEMA = "mf-end-23/output-binding@1"
+
+#: Additive contract identity of the TYPED VISIBILITY block carried when the
+#: output-observation producer (MF-END-21) has not published for this video:
+#: the band never reports a blanket "no evidence" — every absent dependency is
+#: named with its producer + persistence path.
+OUTPUT_VISIBILITY_SCHEMA = "mf-end-23/output-observations-visibility@1"
+
+#: Artifact-owner purposes that mean "a rendered-side artifact of this video".
+RENDER_OWNER_PURPOSES = ("result", "publication", "render")
 
 
 def _bounded_window(
@@ -437,6 +471,675 @@ def _observation_envelope(
         },
         "measure": measure,
     }
+
+
+# ── MF-END-23: output-bound evidence (publication + sealed observations) ─────
+
+
+def render_row(
+    session: Session, *, workspace_id: str, project_id: str, video_item_id: str
+) -> dict[str, Any] | None:
+    """Row-level identity of the video's CURRENT rendered output (MF-END-23).
+
+    Resolves through the SAME disclosed precedence the observation side uses
+    (``sources.render_result_artifact``): the newest completed full-apply
+    publication, else the newest render-side artifact owned by the video item
+    (owner purpose ``result`` / ``publication`` / ``render``).  ONLY PERSISTED
+    ROWS are read here — no bytes — so the resolver is cheap enough to run
+    inside the evidence fingerprint and the export gate; the byte-level
+    re-verification stays with :func:`sources.read_artifact`.
+
+    Returns ``None`` when the video has no rendered output distinct from its
+    imported source.  Rows that exist but are unusable (publication pointing
+    at a missing/foreign artifact row, non-ready state, absent sha256/size)
+    are reported in ``unusable`` instead of being silently skipped — the
+    caller must refuse, never fall back to the source.
+    """
+    repo = src.S10ApplyRepository(session)
+    runs = [
+        run
+        for run in repo.list_runs(workspace_id, project_id=project_id)
+        if str(run.video_item_id) == video_item_id
+    ]
+    completed = [run for run in runs if str(getattr(run, "status", "")) == "completed"]
+    newest_completed = completed[0] if completed else None
+    newer_uncompleted = bool(runs) and (
+        newest_completed is None or str(runs[0].id) != str(newest_completed.id)
+    )
+    runs_block = {
+        "total": len(runs),
+        "completed": len(completed),
+        "newer_uncompleted_run": newer_uncompleted,
+    }
+
+    publication: dict[str, Any] | None = None
+    artifact_id: str | None = None
+    role = "source_fallback_no_render"
+    unusable: str | None = None
+    if runs and newest_completed is None:
+        # A full-apply run EXISTS but none completed: there is no current
+        # rendered output to bind (the composer refuses the same state as
+        # QC_EVIDENCE_STALE — never falls back to an older artifact).
+        unusable = "no_completed_run"
+    elif newest_completed is not None:
+        publications = [
+            pub
+            for pub in repo.list_publications(workspace_id, newest_completed.id)
+            if str(pub.state) == "completed"
+        ]
+        if publications:
+            pub = publications[0]
+            publication = {
+                "publication_id": str(pub.id),
+                "run_id": str(newest_completed.id),
+                "checkpoint_id": str(pub.checkpoint_id),
+                "checkpoint_hash": str(pub.checkpoint_hash),
+                "content_hash": str(pub.content_hash),
+                "frame_count": int(pub.frame_count),
+            }
+            artifact_id = str(pub.artifact_id)
+            role = "publication"
+        else:
+            # Completed run WITHOUT a completed publication: the composer
+            # refuses this state (QC_EVIDENCE_STALE); the binding reports it
+            # instead of silently falling back to an older render.
+            unusable = "completed_run_without_publication"
+
+    owner_purposes: list[str] = []
+    if artifact_id is None and not runs:
+        # No full-apply run at all: the disclosed fallback is the newest
+        # render-side artifact owned by the video item (never the source).
+        rows = session.execute(
+            select(Artifact.id)
+            .join(ArtifactOwner, ArtifactOwner.artifact_id == Artifact.id)
+            .where(
+                Artifact.workspace_id == workspace_id,
+                Artifact.kind.in_(("video", "image")),
+                ArtifactOwner.owner_type == "video_item",
+                ArtifactOwner.owner_id == video_item_id,
+                ArtifactOwner.purpose.in_(RENDER_OWNER_PURPOSES),
+            )
+            .order_by(Artifact.created_at.desc(), Artifact.id.desc())
+        ).all()
+        if rows:
+            artifact_id = str(rows[0][0])
+            role = "owned_result_artifact"
+
+    if artifact_id is None and unusable is None:
+        return None
+    if artifact_id is None:
+        binding: dict[str, Any] = {
+            "schema": OUTPUT_BINDING_SCHEMA,
+            "role": role,
+            "runs": runs_block,
+            "publication": publication,
+            "artifact": None,
+            "unusable": unusable,
+        }
+        binding["digest"] = content_digest(binding)
+        return binding
+
+    artifact = session.get(Artifact, artifact_id)
+    owner_purposes = sorted(_artifact_purpose_list(session, artifact_id))
+    if artifact is None:
+        unusable = unusable or "artifact_row_missing"
+    elif str(artifact.workspace_id) != workspace_id:
+        unusable = unusable or "artifact_row_foreign_workspace"
+    elif str(artifact.state) != "ready":
+        unusable = unusable or "artifact_row_not_ready"
+    elif not artifact.sha256 or artifact.size_bytes is None:
+        unusable = unusable or "artifact_row_unverifiable"
+    elif owner_purposes and not set(owner_purposes) & set(RENDER_OWNER_PURPOSES):
+        unusable = unusable or "artifact_row_owner_purpose_mismatch"
+    binding: dict[str, Any] = {
+        "schema": OUTPUT_BINDING_SCHEMA,
+        "role": role,
+        "runs": runs_block,
+        "publication": publication,
+        "artifact": None
+        if artifact is None
+        else {
+            "artifact_id": str(artifact.id),
+            "kind": str(artifact.kind),
+            "state": str(artifact.state),
+            "sha256": (str(artifact.sha256) if artifact.sha256 else ""),
+            "size_bytes": (
+                int(artifact.size_bytes) if artifact.size_bytes is not None else None
+            ),
+            "relative_path": str(artifact.relative_path or ""),
+            "owner_purposes": owner_purposes,
+        },
+        "unusable": unusable,
+    }
+    binding["digest"] = content_digest(binding)
+    return binding
+
+
+def _artifact_purpose_list(session: Session, artifact_id: str) -> tuple[str, ...]:
+    """Owner purposes recorded for one artifact (may be empty: run-bound)."""
+    rows = session.execute(
+        select(ArtifactOwner.purpose).where(ArtifactOwner.artifact_id == artifact_id)
+    ).all()
+    return tuple(str(row[0]) for row in rows)
+
+
+def _source_sha(session: Session, scope: src.VideoScope) -> str:
+    """The video's current SOURCE artifact sha256, row-read (empty when unset)."""
+    if not scope.source_artifact_id:
+        return ""
+    row = session.get(Artifact, scope.source_artifact_id)
+    return str(row.sha256 or "") if row is not None else ""
+
+
+def compose_output_observations(
+    ctx: _Context,
+    detector: str,
+    *,
+    render_evidence: src.ArtifactEvidence,
+    render_role: str,
+    render_meta: Mapping[str, Any],
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None, dict[str, Any] | None]:
+    """Read + validate the sealed OUTPUT observations of the RIGHT publication.
+
+    Returns ``(payload, binding, visibility)``:
+
+    * the video's published rendered-observations artifact (MF-END-21) when it
+      exists AND binds to the CURRENT rendered output: the sealed payload is
+      returned with its binding (the observed side provenance);
+    * ``(None, None, visibility)`` when the producer has not published for this
+      video — a TYPED visibility block names the absent dependency (producer +
+      persistence), never a blanket "no evidence";
+    * evidence that EXISTS but is not current/readable (tampered, foreign,
+      malformed, bound to a different render/source/timebase) REFUSES with the
+      typed :class:`~app.services.qc_evidence.errors.QcEvidenceError` — it is
+      never silently skipped (the sources.py doctrine).
+    """
+    from app.services import rendered_observations as ro  # lazy: no import cycle
+
+    try:
+        evidence, payload = src.rendered_observations_artifact(
+            ctx.session, ctx.managed_root, ctx.scope, detector=detector
+        )
+    except QcEvidenceError as exc:
+        if exc.code != QC_EVIDENCE_MISSING:
+            raise
+        return (
+            None,
+            None,
+            {
+                "schema": OUTPUT_VISIBILITY_SCHEMA,
+                "detector": detector,
+                "state": "missing",
+                "code": exc.code,
+                "detail": exc.message,
+                "expected": (
+                    "a PUBLISHED rendered-observations artifact (MF-END-21) for "
+                    "this video item, bound to the current rendered output"
+                ),
+                "producer": "MF-END-21 observation pass over the rendered output",
+                "persistence": (
+                    "artifact(kind='document', owner_type='video_item', "
+                    "owner_id=video_item_id, purpose='rendered_observations')"
+                ),
+                "video_item_id": ctx.scope.video_item_id,
+            },
+        )
+
+    payload_out = payload.get("output")
+    output_block = payload_out if isinstance(payload_out, Mapping) else {}
+    output_role = str(output_block.get("role") or "")
+    output_sha = str(output_block.get("sha256") or "")
+    if output_role not in _OBSERVATION_PRODUCERS or not output_sha:
+        raise malformed(
+            detector,
+            "the sealed rendered-observations payload carries no rendered-output "
+            "identity (output.role/sha256) — it cannot be bound to this render",
+            artifact_id=evidence.artifact_id,
+        )
+    if payload.get("schema_version") != ro.OBSERVATIONS_SCHEMA_VERSION:
+        raise stale(
+            detector,
+            f"the sealed rendered-observations schema "
+            f"{payload.get('schema_version')!r} is not "
+            f"{ro.OBSERVATIONS_SCHEMA_VERSION!r} (the observation contract "
+            "moved on; this run would judge the output with stale evidence)",
+            artifact_id=evidence.artifact_id,
+        )
+    if output_sha != render_evidence.sha256:
+        raise stale(
+            detector,
+            "the sealed observations measure rendered output "
+            f"{output_sha[:16]}… but the CURRENT rendered output is "
+            f"{render_evidence.sha256[:16]}… — the render changed after the "
+            "observation pass (stale checkpoint), so the check is not current",
+            observation_output_sha256=output_sha,
+            current_render_sha256=render_evidence.sha256,
+        )
+    source_sha = _source_sha(ctx.session, ctx.scope)
+    bound_source = str(payload.get("source_sha256") or "")
+    if source_sha and bound_source and bound_source != source_sha:
+        raise stale(
+            detector,
+            "the sealed observations are bound to source "
+            f"{bound_source[:16]}… but this video's current source is "
+            f"{source_sha[:16]}… — the observation pass measured a different "
+            "render of a different source",
+            observation_source_sha256=bound_source,
+            current_source_sha256=source_sha,
+        )
+    expected_fps = f"{int(ctx.scope.fps_num)}/{int(ctx.scope.fps_den)}"
+    fps_rational = str(payload.get("fps_rational") or "")
+    if fps_rational != expected_fps:
+        raise stale(
+            detector,
+            f"the sealed observations use timebase {fps_rational!r} but this "
+            f"video's canonical timebase is {expected_fps!r} — the observation "
+            "pass ran in a different timebase",
+            observation_fps_rational=fps_rational,
+            canonical_fps_rational=expected_fps,
+        )
+    frame_map_digest = str(payload.get("frame_map_digest") or "")
+    span = payload.get("span")
+    if not frame_map_digest or not isinstance(span, Mapping):
+        raise malformed(
+            detector,
+            "the sealed observations carry no frame map (frame_map_digest/"
+            "span) — the source↔output frame mapping cannot be preserved",
+            artifact_id=evidence.artifact_id,
+        )
+    try:
+        span_start = int(span["start_frame"])
+        span_end = int(span["end_frame_exclusive"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise malformed(
+            detector,
+            f"the sealed observations span is not an exact frame interval: {exc}",
+            artifact_id=evidence.artifact_id,
+        ) from exc
+    frame_count = render_meta.get("frame_count")
+    if isinstance(frame_count, int) and span_end > int(frame_count):
+        raise stale(
+            detector,
+            f"the sealed observations span [0,{span_end}) extends beyond the "
+            f"publication's own frame count ({frame_count})",
+            observation_span_end=span_end,
+            publication_frame_count=int(frame_count),
+        )
+
+    binding = {
+        "schema": OUTPUT_BINDING_SCHEMA,
+        "detector": detector,
+        "artifact": evidence.provenance(),
+        "render": {
+            "role": render_role,
+            "artifact_id": render_evidence.artifact_id,
+            "sha256": render_evidence.sha256,
+            "publication": (
+                dict(render_meta) if render_role == "publication" else None
+            ),
+        },
+        "sealed": {
+            "schema_version": str(payload.get("schema_version")),
+            "digest": str(payload.get("digest") or ""),
+            "output": {"role": output_role, "sha256": output_sha},
+            "source_sha256": bound_source,
+            "fps_rational": fps_rational,
+            "span": {"start_frame": span_start, "end_frame_exclusive": span_end},
+            "frame_map_digest": frame_map_digest,
+            "production": bool(payload.get("production")),
+        },
+        "validation": {
+            "ownership": "video_item_scoped",
+            "freshness": "render_sha_match",
+            "timebase": expected_fps,
+            "bytes_reverified": True,
+        },
+    }
+    return payload, binding, None
+
+
+def output_evidence_status(
+    session: Session,
+    *,
+    managed_root: Path,
+    workspace_id: str,
+    project_id: str,
+    video_item_id: str,
+) -> dict[str, Any]:
+    """INDEPENDENT validation of the video's current output-observation evidence.
+
+    This is the export gate's own look at the persisted world — it does not
+    trust any recorded argument set: it re-resolves the CURRENT rendered
+    output row, reads the PUBLISHED rendered-observations artifact of this
+    video through the verifying reader (bytes re-hashed), and re-checks the
+    sealed payload against the frozen observation contract and the current
+    render/source/timebase.
+
+    Returns a typed status block — ``state`` ∈
+    ``{"valid", "missing", "tampered", "foreign", "stale", "malformed",
+    "missing_render", "unresolved"}`` — with the exact typed code, detail and
+    the identities that were compared.  It NEVER raises for a bad world: the
+    GATE must be able to report blocked-with-reason, and the caller decides.
+    """
+    from app.services import rendered_observations as ro  # lazy: no import cycle
+
+    status: dict[str, Any] = {
+        "schema": OUTPUT_VISIBILITY_SCHEMA,
+        "video_item_id": video_item_id,
+        "checked": {
+            "render": None,
+            "observations_artifact": None,
+            "sealed": None,
+        },
+    }
+    try:
+        render = render_row(
+            session,
+            workspace_id=workspace_id,
+            project_id=project_id,
+            video_item_id=video_item_id,
+        )
+    except Exception as exc:  # noqa: BLE001 - reported, never swallowed
+        status.update(
+            state="unresolved",
+            code="OUTPUT_STATUS_RESOLVER_ERROR",
+            detail=f"render row resolution failed: {type(exc).__name__}: {exc}",
+        )
+        return status
+    status["checked"]["render"] = render
+    if render is None:
+        status.update(
+            state="missing_render",
+            code="OUTPUT_STATUS_NO_RENDER",
+            detail=(
+                "the video has no rendered output distinct from its imported "
+                "source; there is no output to observe or export"
+            ),
+        )
+        return status
+    if render.get("unusable") is not None:
+        status.update(
+            state="stale",
+            code="OUTPUT_STATUS_RENDER_ROW_UNUSABLE",
+            detail=(
+                f"the current rendered-output row is unusable "
+                f"({render.get('unusable')!r}); the output cannot be exported "
+                "on unverified render bytes"
+            ),
+        )
+        return status
+    try:
+        scope = src.load_scope(
+            session,
+            workspace_id=workspace_id,
+            project_id=project_id,
+            video_item_id=video_item_id,
+        )
+    except QcEvidenceError as exc:
+        status.update(state="unresolved", code=exc.code, detail=exc.message)
+        return status
+    try:
+        evidence, payload = src.rendered_observations_artifact(
+            session, managed_root, scope, detector="output_evidence_status"
+        )
+    except QcEvidenceError as exc:
+        state = {
+            QC_EVIDENCE_MISSING: "missing",
+            "QC_EVIDENCE_STALE": "stale",
+            "QC_EVIDENCE_FOREIGN": "foreign",
+            "QC_EVIDENCE_MALFORMED": "malformed",
+            "QC_EVIDENCE_TAMPERED": "tampered",
+        }.get(exc.code, "unresolved")
+        status.update(state=state, code=exc.code, detail=exc.message)
+        return status
+
+    status["checked"]["observations_artifact"] = evidence.provenance()
+    try:
+        artifact = ro.RenderedObservationsArtifact.from_payload(payload)
+    except Exception as exc:  # noqa: BLE001 - typed refusal, never a crash
+        status.update(
+            state="malformed",
+            code="OUTPUT_STATUS_SEALED_UNREADABLE",
+            detail=f"sealed rendered-observations payload refused: {exc}",
+        )
+        return status
+    violations = list(ro.check_artifact(artifact))
+    render_artifact = render.get("artifact") or {}
+    output = artifact.output
+    output_sha = str(output.get("sha256") or "")
+    source_sha = _source_sha(session, scope)
+    expected_fps = (
+        f"{int(scope.fps_num)}/{int(scope.fps_den)}"
+        if scope.fps_num and scope.fps_den
+        else ""
+    )
+    sealed = {
+        "schema_version": artifact.schema_version,
+        "digest": artifact.digest,
+        "output": {"role": str(output.get("role") or ""), "sha256": output_sha},
+        "source_sha256": artifact.source_sha256,
+        "fps_rational": artifact.fps_rational,
+        "span": dict(artifact.span),
+        "frame_map_digest": artifact.frame_map_digest,
+        "production": bool(artifact.production),
+    }
+    status["checked"]["sealed"] = sealed
+    status["violations"] = violations
+    if violations:
+        status.update(
+            state="malformed",
+            code="OUTPUT_STATUS_SEALED_CONTRACT_VIOLATIONS",
+            detail="; ".join(violations),
+        )
+        return status
+    if output_sha != str(render_artifact.get("sha256") or ""):
+        status.update(
+            state="stale",
+            code="OUTPUT_STATUS_RENDER_CHANGED",
+            detail=(
+                "the sealed observations measured rendered output "
+                f"{output_sha[:16]}… but the CURRENT rendered output is "
+                f"{str(render_artifact.get('sha256') or '')[:16]}… — the render "
+                "changed after the observation pass"
+            ),
+        )
+        return status
+    if source_sha and artifact.source_sha256 and artifact.source_sha256 != source_sha:
+        status.update(
+            state="stale",
+            code="OUTPUT_STATUS_SOURCE_CHANGED",
+            detail=(
+                "the sealed observations are bound to source "
+                f"{artifact.source_sha256[:16]}… but the video's current source "
+                f"is {source_sha[:16]}…"
+            ),
+        )
+        return status
+    if expected_fps and artifact.fps_rational != expected_fps:
+        status.update(
+            state="stale",
+            code="OUTPUT_STATUS_TIMEBASE_CHANGED",
+            detail=(
+                f"the sealed observations use timebase {artifact.fps_rational!r} "
+                f"but the canonical timebase is {expected_fps!r}"
+            ),
+        )
+        return status
+    status["state"] = "valid"
+    status["code"] = ""
+    status["detail"] = (
+        "the published output observations bind to the CURRENT rendered output, "
+        "the current source and the canonical timebase"
+    )
+    return status
+
+
+def _attach_output_binding(
+    ctx: _Context, detector: str, args: dict[str, Any]
+) -> None:
+    """Bind ONE composed detector argument set to the current rendered output.
+
+    A detector whose composed set carries no rendered-output side (e.g. the
+    mask-pair ``edge_halo``) records ``not_applicable``.  A detector whose
+    render no longer matches the CURRENT row selection refuses (stale): the
+    composed values would otherwise be judged as "current" while describing a
+    superseded render.
+    """
+    render_keys = ("render_observation", "rendered_observation")
+    if not any(isinstance(args.get(key), dict) for key in render_keys):
+        args["output_observations_visibility"] = {
+            "schema": OUTPUT_VISIBILITY_SCHEMA,
+            "detector": detector,
+            "state": "not_applicable",
+            "detail": (
+                "this detector's composed evidence carries no rendered-output "
+                "side (it measures persisted mask pair geometry), so no "
+                "output-observation binding applies"
+            ),
+        }
+        return
+    render_evidence, render_role, render_meta = ctx.render(detector)
+    if render_role not in _OBSERVATION_PRODUCERS:
+        raise dependency(
+            detector,
+            "the composed evidence was measured on the imported source "
+            "(no rendered output exists), so no output observation can be "
+            "bound to this run",
+            fact="a rendered output artifact (publication or render-side "
+            "artifact owned by the video item)",
+            video_item_id=ctx.scope.video_item_id,
+        )
+    current = render_row(
+        ctx.session,
+        workspace_id=ctx.scope.workspace_id,
+        project_id=ctx.scope.project_id,
+        video_item_id=ctx.scope.video_item_id,
+    )
+    if current is None or current.get("unusable") is not None:
+        raise stale(
+            detector,
+            "the CURRENT rendered-output row is unusable "
+            f"({None if current is None else current.get('unusable')!r}) — the "
+            "render side of this check cannot be bound to a current output",
+            video_item_id=ctx.scope.video_item_id,
+        )
+    current_artifact = current.get("artifact") or {}
+    if (
+        str(current_artifact.get("artifact_id")) != render_evidence.artifact_id
+        or str(current_artifact.get("sha256")) != render_evidence.sha256
+    ):
+        raise stale(
+            detector,
+            "the render artifact this evidence was measured on is no longer "
+            "the video's CURRENT rendered output (a newer render exists) — "
+            "the check would judge a superseded render",
+            measured_artifact_id=render_evidence.artifact_id,
+            current_artifact_id=str(current_artifact.get("artifact_id")),
+        )
+    payload, binding, visibility = compose_output_observations(
+        ctx,
+        detector,
+        render_evidence=render_evidence,
+        render_role=render_role,
+        render_meta=render_meta,
+    )
+    if binding is not None:
+        binding["current_render_row_digest"] = str(current.get("digest") or "")
+    _attach_with_size_policy(
+        args, detector, payload=payload, binding=binding, visibility=visibility
+    )
+
+
+def _attach_with_size_policy(
+    args: dict[str, Any],
+    detector: str,
+    *,
+    payload: dict[str, Any] | None,
+    binding: dict[str, Any] | None,
+    visibility: dict[str, Any] | None,
+) -> None:
+    """Attach the output-side evidence under the MEASURED argv transport budget.
+
+    ``runner.py`` hands the whole argument set to the detector child as ONE
+    command-line item, and the cost of that item is its QUOTE-ESCAPED length
+    plus the runner's own ~2 KB command-line overhead (measured 2026-09-28:
+    escaped 25,001 B spawns, escaped 32,501 B raises ``FileNotFoundError
+    [WinError 206]``).  The policy is size-aware and NEVER raises on this
+    alone:
+
+    1. if the composed set already leaves no room (escaped + overhead over
+       the spawn ceiling), NOTHING is attached and the set stays
+       byte-identical to its pre-MF-END-23 form;
+    2. otherwise payload + binding are attached and re-measured; over the
+       documented budget the PAYLOAD is dropped (the binding stays — it is
+       what the gate reads);
+    3. if even the binding does not fit, it is dropped too.
+
+    No authority is lost by these drops: the export gate re-validates the
+    output evidence INDEPENDENTLY from persisted rows
+    (:func:`output_evidence_status`), so a transport limit can never turn
+    missing/stale evidence into a pass.
+    """
+    def _fits() -> bool:
+        return (
+            _argv_transport_bytes(args) + ARGV_RUNNER_COMMANDLINE_OVERHEAD_BYTES
+            <= ARGV_CEILING_SPAWN_OK_BYTES
+        )
+
+    if not _fits():
+        return
+    if payload is not None and binding is not None:
+        args["output_observations"] = payload
+        args["output_observations_binding"] = binding
+        transported = _argv_transport_bytes(args)
+        if not _fits():
+            del args["output_observations"]
+            binding["payload_transport"] = {
+                "included": False,
+                "reason": "over_argv_budget",
+                "measured_escaped_bytes": transported,
+                "limit_bytes": ARGV_DETECTOR_ARGS_BUDGET_BYTES,
+            }
+            transported = _argv_transport_bytes(args)
+        else:
+            binding["payload_transport"] = {
+                "included": True,
+                "measured_escaped_bytes": transported,
+                "limit_bytes": ARGV_DETECTOR_ARGS_BUDGET_BYTES,
+            }
+        if not _fits():
+            del args["output_observations_binding"]
+        return
+    if visibility is not None:
+        args["output_observations_visibility"] = visibility
+        if not _fits():
+            del args["output_observations_visibility"]
+
+
+def _argv_transport_bytes(value: Any) -> int:
+    """Quote-escaped command-line length of one argument (MEASURED rule).
+
+    ``subprocess.list2cmdline`` is exactly what CPython uses to build the
+    Windows command line, so this is the number ``CreateProcess`` sees — not
+    ``len(json.dumps(...))``, which under-reports by one character per quote
+    in the payload.
+    """
+    import subprocess
+
+    return len(subprocess.list2cmdline([_runner_argv_json(value)]))
+
+
+def _runner_argv_json(value: Any) -> str:
+    """The EXACT serialisation ``runner.py`` hands to the child process.
+
+    Mirrors ``app/services/qc_checks/runner.py`` line-for-line:
+    ``json.dumps(args or {}, separators=(",", ":"))`` — ``ensure_ascii`` left
+    at its default (True), so non-ASCII evidence text is escaped exactly the
+    way the child process receives it.  Measuring with a different
+    serialisation (e.g. ``ensure_ascii=False``) under-reports the transported
+    size and lets an unspawnable payload through (MF-END-23 measured this).
+    """
+    return json.dumps(value, separators=(",", ":"))
 
 
 # ── per-detector composers ───────────────────────────────────────────────────
@@ -2103,6 +2806,11 @@ def compose_visual_band(
                 name: exc.code for name, exc in failures.items()
             },
         ) from first
+    # MF-END-23: every composed set is bound to the CURRENT rendered output
+    # (or carries a TYPED visibility block when the output-observation
+    # producer has not published — never a blanket "no evidence").
+    for _name, _args in composed.items():
+        _attach_output_binding(ctx, _name, _args)
     for _name, args in composed.items():
         args["evidence_provenance"]["composed_digest"] = hashlib.sha256(
             content_digest({k: v for k, v in args.items() if k != "evidence_provenance"})
@@ -2115,6 +2823,12 @@ __all__ = [
     "CHECKPOINT_REF",
     "CROP_WINDOW_PX",
     "HALO_MARGIN_PX",
+    "OUTPUT_BINDING_SCHEMA",
+    "OUTPUT_VISIBILITY_SCHEMA",
+    "RENDER_OWNER_PURPOSES",
     "VISUAL_DETECTORS",
+    "compose_output_observations",
     "compose_visual_band",
+    "output_evidence_status",
+    "render_row",
 ]
