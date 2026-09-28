@@ -296,6 +296,19 @@ def _load_replacement_asset(managed_root: Path, manifest: dict[str, Any], layer_
     return abs_p
 
 
+def _replacement_asset_key(mapping_entry: dict[str, Any], layer_id: str) -> str:
+    """Resolve the manifest ``replacement_assets`` key for an occurrence layer.
+
+    The canonical job manifest keys ``replacement_assets`` by OBJECT ROLE id
+    (built by the submit route from ``role_mappings``) while occurrence-scoped
+    plans key chunks by the occurrence ``layer_id`` — two different id spaces
+    (DELTA-F4).  This is THE adapter for both resolution paths: the legacy
+    per-layer path (``_stage_layer_asset``) and the group-engine cast.  Legacy
+    role-as-layer mappings without a ``role_id`` keep working unchanged.
+    """
+    return str(mapping_entry.get("role_id") or layer_id)
+
+
 def _authoritative_mapping_by_layer(authority: dict[str, Any]) -> dict[str, dict[str, Any]]:
     """Normalize the authority mapping into {layer_id: entry} — no fabrication.
 
@@ -371,7 +384,7 @@ def _stage_layer_asset(
     assets by exactly that name (``assets_dir / f"{layer_id}.png"``).
     Returns the staging directory to use as ``assets_dir``.
     """
-    asset_key = str(mapping_entry.get("role_id") or layer_id)
+    asset_key = _replacement_asset_key(mapping_entry, layer_id)
     source_abs = _load_replacement_asset(managed_root, manifest, asset_key)
     src_hash = hash_file(source_abs)
     stage_dir = _lp(managed_root / f"s10_full_apply/{run_id}/_assets/{layer_id}")
@@ -1037,8 +1050,13 @@ def _render_shot_chunk_via_engine(
     for layer_id in member_layer_ids:
         if layer_id not in mapping_by_layer:
             raise S10FullApplyJobError(f"layer {layer_id!r} not present in authority mapping")
-        _load_replacement_asset(managed_root, manifest, layer_id)
-        entry = (manifest.get("replacement_assets") or {}).get(layer_id) or {}
+        # DELTA-F4: the manifest keys replacement_assets by OBJECT ROLE id while
+        # members are occurrence layer ids — translate through the frozen mapping
+        # entry exactly like the legacy per-layer adapter (`_stage_layer_asset`)
+        # instead of indexing the layer id space into the role-keyed manifest.
+        asset_key = _replacement_asset_key(mapping_by_layer[layer_id], layer_id)
+        _load_replacement_asset(managed_root, manifest, asset_key)
+        entry = (manifest.get("replacement_assets") or {}).get(asset_key) or {}
         cast.append(
             {
                 "role": layer_id,
