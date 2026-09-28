@@ -538,6 +538,20 @@ def test_mf18_2_install_refuses_wheel_record_mismatch(tmp_path: Path, dependency
     assert excinfo.value.code == "install_record_mismatch"
 
 
+def test_mf18_2_install_refuses_drifted_target_and_is_idempotent(
+    tmp_path: Path, dependency: Any
+) -> None:
+    target = tmp_path / "site_drifted"
+    BUILD.install_wheel(dependency.wheel, target)  # clean install
+    again = BUILD.install_wheel(dependency.wheel, target)  # same pinned bytes: idempotent
+    assert again["module_files_verified"] == 11
+    (target / "mf_comfy" / "adapter.py").write_bytes(b"# drifted\n")
+    with pytest.raises(BUILD.BuildRefusal) as excinfo:
+        BUILD.install_wheel(dependency.wheel, target)
+    assert excinfo.value.code == "install_target_conflict"
+    assert (target / "mf_comfy" / "adapter.py").read_bytes() == b"# drifted\n"
+
+
 def test_mf18_2_clean_env_imports_adapter_with_dependency(dependency: Any) -> None:
     """Acceptance: in a clean interpreter, the app adapter imports and is READY."""
     code = (

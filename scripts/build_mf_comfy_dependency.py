@@ -29,6 +29,7 @@ partial artifact:
 * ``install_file_set_mismatch``   — wheel/install holds undeclared members
 * ``install_content_mismatch``    — an installed module file does not match the pinned sha256/size
 * ``install_target_conflict``     — target already holds a different mf_comfy install
+* ``pip_install_failed``          — ``--pip-install`` ran pip, which returned non-zero
 
 No GPU, no network, no sys.path mutation: the wheel is built with the stdlib
 only, and the install is a verified RECORD-driven extraction.
@@ -252,9 +253,26 @@ def install_wheel(wheel: Path, target: Path) -> dict:
     """RECORD-verified extraction of the wheel into ``target``.
 
     Every member is hashed against the wheel's own RECORD before it is written;
-    undeclared members and digest mismatches refuse without installing.
+    undeclared members and digest mismatches refuse without installing.  A target
+    that already holds a DIFFERENT mf_comfy install is refused (never silently
+    overwritten); re-installing the same pinned bytes is idempotent.
     """
     target.mkdir(parents=True, exist_ok=True)
+    existing = target / MODULE_DIR
+    if existing.is_dir():
+        drifted = []
+        for path in sorted(existing.glob("*.py")):
+            want = PINNED_FILES.get(path.name)
+            data = path.read_bytes()
+            if (want is None or want[1] != len(data)
+                    or hashlib.sha256(data).hexdigest() != want[0]):
+                drifted.append(path.name)
+        if drifted:
+            _refuse(
+                "install_target_conflict",
+                f"{target} already holds a different mf_comfy install (drifted: {drifted}); "
+                "point --install-target at a clean directory or remove the old install",
+            )
     with zipfile.ZipFile(wheel) as zf:
         names = sorted(zf.namelist())
         dist_info = next(
