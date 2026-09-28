@@ -223,6 +223,61 @@ def _seed_graph_rows(factory: Any, artifacts: Path) -> tuple[dict[str, str], str
             ),
             {"id": "ca-" + uuid.uuid4().hex[:6], "pv": pv, "aid": asset_art},
         )
+        # DELTA-F4: a SECOND role (own pack version + asset + reskin config) so
+        # the group chunk carries members with DISTINCT roles — the real
+        # multi-role coverage for the layer->role replacement-asset adapter.
+        role2 = "role-" + uuid.uuid4().hex[:6]
+        pv2 = "pv-" + uuid.uuid4().hex[:6]
+        rc2 = "rc-" + uuid.uuid4().hex[:6]
+        s.execute(
+            text(
+                "INSERT INTO object_role(id,workspace_id,project_id,video_item_id,"
+                "source_generation,name,kind,status) "
+                "VALUES (:r,:w,:p,:v,'1','Rival','character','confirmed')"
+            ),
+            {"r": role2, "w": ws, "p": proj, "v": vid},
+        )
+        s.execute(
+            text(
+                "INSERT INTO character_pack_version(id,character_id,workspace_id,"
+                "version,status) VALUES (:pv,:c,:w,2,'published')"
+            ),
+            {"pv": pv2, "c": char, "w": ws},
+        )
+        asset2_rel = "s10_full_apply/_f1/" + vid + "/asset2.png"
+        asset2_abs = artifacts / asset2_rel
+        img2 = np.zeros((40, 40, 4), dtype=np.uint8)
+        hx2 = hashlib.sha256(pv2.encode()).hexdigest()
+        img2[:, :, 0] = int(hx2[0:2], 16)
+        img2[:, :, 1] = int(hx2[2:4], 16)
+        img2[:, :, 2] = int(hx2[4:6], 16)
+        img2[:, :, 3] = 255
+        cv2.imwrite(str(asset2_abs), img2)
+        asset2_art = "art-asset2-" + uuid.uuid4().hex[:6]
+        _insert_artifact(s, asset2_art, "image", asset2_rel, asset2_abs)
+        s.execute(
+            text(
+                "INSERT INTO character_asset(id,pack_version_id,workspace_id,"
+                "pose_slot,artifact_id) VALUES (:id,:pv,'default','base',:aid)"
+            ),
+            {"id": "ca2-" + uuid.uuid4().hex[:6], "pv": pv2, "aid": asset2_art},
+        )
+        s.execute(
+            text(
+                "INSERT INTO reskin_config(id,workspace_id,project_id,object_role_id,"
+                "character_id,pack_version_id,params_json,revision) "
+                "VALUES (:rc,:w,:p,:r,:c,:pv,:params,1)"
+            ),
+            {
+                "rc": rc2,
+                "w": ws,
+                "p": proj,
+                "r": role2,
+                "c": char,
+                "pv": pv2,
+                "params": json.dumps(params, sort_keys=True, separators=(",", ":")),
+            },
+        )
         s.commit()
         seed = {
             "workspace_id": ws,
@@ -231,6 +286,9 @@ def _seed_graph_rows(factory: Any, artifacts: Path) -> tuple[dict[str, str], str
             "pack_version_id": pv,
             "reskin_config_id": rc,
             "role_id": role,
+            "role2_id": role2,
+            "pack2_id": pv2,
+            "reskin_config2_id": rc2,
         }
     return seed, scene_pk
 
@@ -277,11 +335,35 @@ def _seed_checkpoint(factory: Any, artifacts: Path, seed: dict[str, str]) -> Non
             prompt={"boxes": [{"x": 0.05, "y": 0.05, "w": 0.40, "h": 0.40}]},
             mask_artifact_id=mask_art,
         )
+        # DELTA-F4: a SECOND occurrence segment (distinct role, distinct frame
+        # range — the segment identity is UNIQUE per role/scene/range) so the
+        # shot's group chunk carries TWO members with DIFFERENT roles; the
+        # layer ids stay occurrence ids distinct from both role ids.
+        seg_rec2, _sc2 = seg_repo.create_segment(
+            ws,
+            seed["project_id"],
+            seed["video_item_id"],
+            seed["role2_id"],
+            str(scene_id),
+            "Rival",
+            50,
+            99,
+            1650,
+            3300,
+            "1",
+            kind="character",
+            confidence_source="user",
+            segmentation={"boxes": [{"x": 0.50, "y": 0.50, "w": 0.30, "h": 0.30}]},
+            prompt={"boxes": [{"x": 0.55, "y": 0.55, "w": 0.40, "h": 0.40}]},
+            mask_artifact_id=mask_art,
+        )
+        # Manifest segments = EXACTLY the created occurrences (the real lock
+        # contract); both are active inside the single 0..99 shot.
         lock_repo = StructuralLockRepository(s)
         manifest_dict = {
             "frame_count": 100,
             "timebase": {"fps": 30.0, "time_base": "1/30", "start_time_ms": 0},
-            "shot_order": [str(seg_rec.id)],
+            "shot_order": [str(seg_rec.id), str(seg_rec2.id)],
             "fingerprints": {"z_order": h64("z"), "contacts": h64("c")},
             "segments": [
                 {
@@ -291,40 +373,50 @@ def _seed_checkpoint(factory: Any, artifacts: Path, seed: dict[str, str]) -> Non
                     "start_frame": 0,
                     "end_frame": 99,
                     "provenance": {"why": "delta-f1-fixture"},
-                }
+                },
+                {
+                    "occurrence_segment_id": str(seg_rec2.id),
+                    "route": "sprite_affine",
+                    "anchor": {"x": 0.5, "y": 0.5},
+                    "start_frame": 50,
+                    "end_frame": 99,
+                    "provenance": {"why": "delta-f1-fixture"},
+                },
             ],
             "policy_version": "structural-thresholds-v1",
         }
         man, _mc = lock_repo.create_manifest(
             ws, seed["project_id"], seed["video_item_id"], "1", manifest_dict
         )
-        lock_repo.record_render_route(
-            ws,
-            seed["project_id"],
-            seed["video_item_id"],
-            str(seg_rec.id),
-            "sprite_affine",
-            0.5,
-            0.5,
-            0,
-            99,
-            provenance={"why": "delta-f1-fixture"},
-            reasons=["delta-f1-fixture"],
-            structural_lock_manifest_id=man.id,
-        )
-        s.execute(
-            text(
-                "UPDATE reskin_config SET structural_lock_manifest_id=:m, "
-                "lock_policy_version=:p WHERE id=:rc"
-            ),
-            {"m": man.id, "p": man.policy_version, "rc": seed["reskin_config_id"]},
-        )
+        for seg in (seg_rec, seg_rec2):
+            lock_repo.record_render_route(
+                ws,
+                seed["project_id"],
+                seed["video_item_id"],
+                str(seg.id),
+                "sprite_affine",
+                0.5,
+                0.5,
+                0,
+                99,
+                provenance={"why": "delta-f1-fixture"},
+                reasons=["delta-f1-fixture"],
+                structural_lock_manifest_id=man.id,
+            )
+        for rc in (seed["reskin_config_id"], seed["reskin_config2_id"]):
+            s.execute(
+                text(
+                    "UPDATE reskin_config SET structural_lock_manifest_id=:m, "
+                    "lock_policy_version=:p WHERE id=:rc"
+                ),
+                {"m": man.id, "p": man.policy_version, "rc": rc},
+            )
         s.flush()
         record, created = S09ApprovalRepository(s).submit_checkpoint_v2(
             ws,
             reskin_config_id=str(seed["reskin_config_id"]),
             expected_reskin_revision=1,
-            pack_version_ids=[str(seed["pack_version_id"])],
+            pack_version_ids=[str(seed["pack_version_id"]), str(seed["pack2_id"])],
             note="delta-f1 fixture",
         )
         assert created is True
@@ -402,7 +494,14 @@ def _set_raw_members(db: Path, run_id: str, value: str | None) -> None:
 
 
 class _EngineWorld:
-    """Render-time world built from the PERSISTED row (engine at the boundary)."""
+    """Render-time world built from the PERSISTED row (engine at the boundary).
+
+    DELTA-F4: the manifest pins come from the REAL submit-route helper
+    (``_resolve_canonical_render_pins`` over the persisted v2 authority) and the
+    render authority is the REAL service output (``plan["render_authority"]``) —
+    never a hand-made manifest, so the fixture can no longer invent a key space
+    that the live route does not produce.
+    """
 
     def __init__(
         self,
@@ -410,50 +509,47 @@ class _EngineWorld:
         factory: Any,
         seed: dict[str, str],
         run_id: str,
+        plan: dict[str, Any],
     ) -> None:
         self.factory = factory
         self.seed = seed
         self.run_id = run_id
-        self.managed = tmp_path / "managed"
+        # The SAME managed root the persisted authority pins point into.
+        self.managed = tmp_path / "artifacts"
         self.calls: list[dict[str, Any]] = []
         row = jobs._list_chunks(factory, seed["workspace_id"], run_id)[0]
         self.chunk = row
         self.shot_id = str(row["shot_id"])
         self.members = [str(m) for m in (row.get("member_layer_ids") or [])]
-        member_ids = self.members or ["LAYER-FALLBACK"]
-        src = _write_mp4(self.managed / "src" / "source.mp4", 100, seed=7)
-        assets: dict[str, dict[str, Any]] = {}
-        for lid in member_ids:
-            p = self.managed / "assets" / (lid + ".png")
-            p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_bytes(b"\x89PNG" + b"asset" * 4)
-            assets[lid] = {
-                "artifact_id": "art-" + lid[:8],
-                "rel": "assets/" + lid + ".png",
-                "sha256": _sha_file(p),
-                "size_bytes": p.stat().st_size,
-            }
+        # Render authority = the REAL service output (layer_id AND role_id pins).
+        self.authority = plan["render_authority"]
+        mappings = (self.authority.get("mapping") or {}).get("mappings") or []
+        self.role_by_layer = {
+            str(m["layer_id"]): str(m.get("role_id") or "") for m in mappings
+        }
+        # Route-parity manifest: the REAL submit-route pin helper over the
+        # PERSISTED v2 authority — replacement_assets are role-keyed by
+        # construction (DELTA-F4: never hand-key them to the layer id space).
+        from app.api.routes import s10_full_apply as full_apply_routes
+        from app.services.s09_approval import S09ApprovalRepository
+
+        with factory() as s:
+            v2_authority = S09ApprovalRepository(s).full_apply_authority(
+                seed["checkpoint_id"], seed["workspace_id"]
+            )
+            pins = full_apply_routes._resolve_canonical_render_pins(
+                s,
+                workspace_id=seed["workspace_id"],
+                project_id=seed["project_id"],
+                video_item_id=seed["video_item_id"],
+                apply_checkpoint_id=seed["checkpoint_id"],
+                authority=v2_authority,
+                managed_root=self.managed,
+            )
         anchor = self.managed / "anchor" / "anchor_00001_.png"
         anchor.parent.mkdir(parents=True, exist_ok=True)
         anchor.write_bytes(b"\x89PNG" + b"anchor" * 4)
-        self.manifest = {
-            "managed_root": str(self.managed),
-            "source_media_rel": "src/source.mp4",
-            "source_media_sha256": _sha_file(src),
-            "source_media_size_bytes": src.stat().st_size,
-            "replacement_assets": assets,
-        }
-        self.authority = {
-            "mapping": [
-                {
-                    "layer_id": lid,
-                    "route": "sprite_affine",
-                    "affected_region": [0.1, 0.1, 0.3, 0.3],
-                    "pack_version": "pv-f1",
-                }
-                for lid in member_ids
-            ]
-        }
+        self.manifest = {"managed_root": str(self.managed), **pins}
         anchor_pin = {
             "relative_path": "anchor/anchor_00001_.png",
             "sha256": _sha_file(anchor),
@@ -578,7 +674,7 @@ def test_delta_f1_3_worker_reads_members_and_reaches_the_engine(
     factory, seed, _artifacts, scene_pk = _seed_world(tmp_path)
     run_id, plan = _submit(factory, seed, scene_pk)
     plan_members = list(plan["chunks"][0]["member_layer_ids"])
-    world = _EngineWorld(tmp_path, factory, seed, run_id)
+    world = _EngineWorld(tmp_path, factory, seed, run_id, plan)
     assert world.members == plan_members, "row must carry the planner's members"
 
     rel, sha, size, evidence = world.render(monkeypatch)
@@ -599,9 +695,9 @@ def test_delta_f1_4_missing_members_still_fail_closed_no_engine_calls(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     factory, seed, _artifacts, scene_pk = _seed_world(tmp_path)
-    run_id, _plan = _submit(factory, seed, scene_pk)
+    run_id, plan = _submit(factory, seed, scene_pk)
     _set_raw_members(tmp_path / "delta-f1.db", run_id, None)  # member-less row
-    world = _EngineWorld(tmp_path, factory, seed, run_id)
+    world = _EngineWorld(tmp_path, factory, seed, run_id, plan)
     assert world.members == []
 
     with pytest.raises(jobs.S10FullApplyJobError) as exc:
@@ -617,11 +713,11 @@ def test_delta_f1_5_corrupt_members_json_fails_closed_never_fabricates(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     factory, seed, _artifacts, scene_pk = _seed_world(tmp_path)
-    run_id, _plan = _submit(factory, seed, scene_pk)
+    run_id, plan = _submit(factory, seed, scene_pk)
     db = tmp_path / "delta-f1.db"
     # (a) unparsable JSON
     _set_raw_members(db, run_id, "{not a json array")
-    world = _EngineWorld(tmp_path, factory, seed, run_id)
+    world = _EngineWorld(tmp_path, factory, seed, run_id, plan)
     assert world.members == []
 
     with pytest.raises(jobs.S10FullApplyJobError) as exc:
@@ -633,7 +729,7 @@ def test_delta_f1_5_corrupt_members_json_fails_closed_never_fabricates(
     # (b) parseable array with a NON-string entry: all-or-nothing, never a
     # silently reduced cast
     _set_raw_members(db, run_id, '["a-layer", 5]')
-    world2 = _EngineWorld(tmp_path, factory, seed, run_id)
+    world2 = _EngineWorld(tmp_path, factory, seed, run_id, plan)
     assert world2.members == []
 
     with pytest.raises(jobs.S10FullApplyJobError) as exc2:
