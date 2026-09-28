@@ -313,10 +313,15 @@ class _Context:
         )
 
     def frames(
-        self, evidence: src.ArtifactEvidence, indices: list[int], detector: str
+        self,
+        evidence: src.ArtifactEvidence,
+        indices: list[int],
+        detector: str,
+        *,
+        limit: int | None = MAX_WINDOW_FRAMES,
     ) -> dict[int, list[list[float]]]:
         absolute = Path(self.managed_root) / evidence.relative_path
-        return decode_video_frames(absolute, indices, detector=detector)
+        return decode_video_frames(absolute, indices, detector=detector, limit=limit)
 
 
 def _identity(scope: src.VideoScope, detector: str) -> dict[str, Any]:
@@ -1322,8 +1327,16 @@ def _cut_drift(ctx: _Context) -> dict[str, Any]:
         for index in range(span[0], span[1] + 1):
             wanted.add(index - 1)
             wanted.add(index)
-    indices = sorted(wanted)[:MAX_WINDOW_FRAMES]
-    render_frames = ctx.frames(render, indices, detector)
+    # ── the DECODE WINDOW is the union of the per-boundary search windows ──
+    # Each span above is ALREADY bounded to ``budget`` frames around its own
+    # boundary, so the union is exactly what the annotation's boundaries need.
+    # A global cap applied to the SORTED union starves every boundary but the
+    # first one (measured on the real 3-scene 360f publication: the decode kept
+    # -1..22, so the boundary at frame 120 had ZERO decodable pairs and
+    # ``cut_drift`` refused ``no_measurable_frame_pair`` while the render
+    # carried a real cut at 120 with MAD 80.82).
+    indices = sorted(i for i in wanted if i >= 0)
+    render_frames = ctx.frames(render, indices, detector, limit=None)
     to_ms = _frame_ms(ctx, detector)
     observed_cuts: list[int] = []
     cut_observations: list[dict[str, Any]] = []
@@ -2080,6 +2093,495 @@ def _coverage_provenance_digest(report: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+# ── DELTA-F6 F-R4-2: the bounded identity TRANSPORT (measured ladder) ───────
+#
+# The composed identity set is handed to the frozen detector as ONE
+# command-line item (``runner.py`` -> ``sys.argv[2]``).  On the real 6-role
+# 640x360x360f publication the full set measured 63,327 B and the child could
+# not spawn at all (``FileNotFoundError [WinError 206]``): the QC band refused
+# ``QC_EVIDENCE_MALFORMED`` and the whole run stayed blocked.  Shipping MORE
+# evidence than the transport can carry is not evidence.
+#
+# The transport is therefore EXPLICIT and MEASURED:
+#
+# * the pixel payloads travel in their EXACT integral JSON form (a decoded gray
+#   matrix is integral; ``120`` is the same measurement as ``120.0`` and two
+#   characters shorter).  Digests and distances are computed on THAT form, so
+#   the composer's hashes and the detector's re-hash agree byte for byte;
+# * everything the FROZEN detector consumes (pixel payloads, per-frame metadata,
+#   the cast identity block, the row identities) is never reduced — the ladder
+#   only rewrites the COMPOSER-side evidence (hoisting duplicated facts into
+#   one place, replacing derived reports with their digest, summarising verdict
+#   records) and never invents or drops a measurement;
+# * every reduction is DISCLOSED in ``payload_budget`` (level, applied rules,
+#   measured escaped bytes) and the FULL pre-transport set is persisted as a
+#   JSON transport FILE under the managed root, digested into the argument set
+#   (file-based transport: the argv carries the digest-bound reference);
+# * a payload that fits at no level refuses with the typed
+#   ``QC_EVIDENCE_MALFORMED`` — the child is never handed a set it cannot spawn.
+
+#: Reserve of the quote-escaped command line kept free for the MF-END-23
+#: output binding/visibility block the band attaches AFTER the builders run.
+ARGV_OUTPUT_BINDING_RESERVE_BYTES = 1500
+
+#: Contract identity of the persisted full-evidence transport file.
+IDENTITY_TRANSPORT_SCHEMA = "delta-f6/identity-transport@1"
+
+#: Directory (under the managed root) the full composed evidence is persisted
+#: to whenever the transport had to reduce it.
+IDENTITY_TRANSPORT_DIR = "qc_evidence_transport"
+
+
+def _integral_pixels(matrix: Any) -> list[list[Any]]:
+    """The exact integral JSON form of a decoded gray matrix.
+
+    A decoded gray level IS an integer (0..255): the float form is the same
+    value with a ``.0`` suffix.  The integral form is used everywhere the
+    payload is hashed or transported, so no digest is computed over a
+    decoration the detector never sees.
+    """
+    return [
+        [int(value) if float(value).is_integer() else value for value in row]
+        for row in matrix
+    ]
+
+
+def _integral_crop(crop: Mapping[str, Any]) -> dict[str, Any]:
+    """Same crop with its pixel payload in the exact integral JSON form."""
+    return {
+        "pixels": _integral_pixels(crop["pixels"]),
+        "width": crop["width"],
+        "height": crop["height"],
+    }
+
+
+def _identity_transport_fits(args: Mapping[str, Any]) -> bool:
+    """True when the set spawns inside the measured Windows command line."""
+    return (
+        _argv_transport_bytes(args)
+        + ARGV_RUNNER_COMMANDLINE_OVERHEAD_BYTES
+        + ARGV_OUTPUT_BINDING_RESERVE_BYTES
+        <= ARGV_CEILING_SPAWN_OK_BYTES
+    )
+
+
+def _identity_transport_level1(args: dict[str, Any]) -> list[str]:
+    """Hoist facts that are recorded twice into the one place that owns them."""
+    applied: list[str] = []
+    dense = args.get("pin_coverage")
+    if isinstance(dense, dict) and "cast_coverage" in dense:
+        dense["pin_coverage_digest"] = content_digest(dense.pop("cast_coverage"))
+        dense["full_record_at"] = "cast_pin.cast_coverage"
+        applied.append("pin_coverage.cast_coverage->digest")
+    provenance = args.get("evidence_provenance") or {}
+    families = dict(provenance.get("families") or {})
+    artifact = dict(families.get("artifact") or {})
+    if "render_role_facts" in artifact:
+        artifact["render_role_facts"] = {
+            "digest": content_digest(artifact["render_role_facts"]),
+            "same_facts_at": "render_observation.producer_facts",
+        }
+        families["artifact"] = artifact
+        provenance["families"] = families
+        applied.append("provenance.render_role_facts->digest")
+    observation = args.get("render_observation") or {}
+    facts = dict(observation.get("producer_facts") or {})
+    frame_metadata = dict(facts.get("frame_metadata") or {})
+    if "per_chunk_evidence" in frame_metadata:
+        chunks = frame_metadata.pop("per_chunk_evidence")
+        frame_metadata["per_chunk_evidence_count"] = len(chunks)
+        frame_metadata["per_chunk_evidence_digest"] = content_digest(chunks)
+        applied.append("render_observation.per_chunk_evidence->digest")
+    if frame_metadata != (facts.get("frame_metadata") or {}):
+        facts["frame_metadata"] = frame_metadata
+        observation["producer_facts"] = facts
+    cast_pin = args.get("cast_pin") or {}
+    index_lists = False
+    for row in cast_pin.get("role_observations") or []:
+        frames = row.get("rendered_frames")
+        if isinstance(frames, list) and frames and isinstance(frames[0], dict):
+            row["rendered_frames"] = [frame["frame_index"] for frame in frames]
+            index_lists = True
+    if index_lists:
+        applied.append("cast_pin.role_observations.rendered_frames->indices")
+    measurement_drops = (
+        "segment_row_id",
+        "render_artifact_id",
+        "reference_artifact_sha256",
+        "reference_slot_source",
+        "reference_crop",
+        "crop_geometry",
+        "measured_on",
+    )
+    trimmed = False
+    for row in args.get("identity_measurements") or []:
+        for key in measurement_drops:
+            if key in row:
+                row.pop(key)
+                trimmed = True
+    if trimmed:
+        applied.append("identity_measurements[].derived_blocks->dropped")
+    return applied
+
+
+def _identity_transport_level2(args: dict[str, Any]) -> list[str]:
+    """Replace full policy records with their status/code/value summary."""
+    applied: list[str] = []
+    for row in args.get("identity_measurements") or []:
+        row["verdict"] = _verdict_summary(row.get("verdict"))
+    applied.append("identity_measurements[].verdict->summary")
+    coverage = args.get("measured_coverage") or {}
+    per_role = coverage.get("per_role") or {}
+    for role, row in per_role.items():
+        per_role[role] = {
+            "measured_distance_px": row.get("measured_distance_px"),
+            "verdict": _verdict_summary(row.get("verdict")),
+            "reference_artifact_id": row.get("reference_artifact_id"),
+            "frames_measured": list(row.get("frames_measured") or []),
+        }
+    applied.append("measured_coverage.per_role->measured_summary")
+    cast_pin = args.get("cast_pin") or {}
+    for row in cast_pin.get("role_observations") or []:
+        row["verdict"] = _verdict_summary(row.get("verdict"))
+    for row in cast_pin.get("cast_coverage") or []:
+        compatibility = row.pop("compatibility", None)
+        if isinstance(compatibility, dict):
+            row["compatible"] = compatibility.get("compatible")
+            row["compatibility_reasons"] = list(
+                compatibility.get("reasons") or []
+            )
+    applied.append("cast_pin.cast_coverage[].compatibility->verdict_summary")
+    return applied
+
+
+def _identity_transport_level3(args: dict[str, Any]) -> list[str]:
+    """Keep the measured facts of every role; derived detail travels digested."""
+    applied: list[str] = []
+    cast_pin = args.get("cast_pin") or {}
+    compact: list[dict[str, Any]] = []
+    for row in cast_pin.get("cast_coverage") or []:
+        reference = row.get("reference_artifact") or {}
+        compact.append(
+            {
+                "object_role_id": row.get("object_role_id"),
+                "character_id": row.get("character_id"),
+                "pack_version_id": row.get("pack_version_id"),
+                "pose_slot": row.get("pose_slot"),
+                "reference_artifact": {
+                    key: reference[key]
+                    for key in ("artifact_id", "sha256", "bytes_reverified")
+                    if key in reference
+                },
+                "segment_row_ids": list(row.get("segment_row_ids") or []),
+                "compatible": row.get("compatible"),
+                "compatibility_reasons": list(row.get("compatibility_reasons") or []),
+            }
+        )
+    cast_pin["cast_coverage"] = compact
+    observations: list[dict[str, Any]] = []
+    for row in cast_pin.get("role_observations") or []:
+        observations.append(
+            {
+                "object_role_id": row.get("object_role_id"),
+                "rendered_frames": list(row.get("rendered_frames") or []),
+                "measured_distance_px": row.get("measured_distance_px"),
+                "verdict": row.get("verdict"),
+            }
+        )
+    cast_pin["role_observations"] = observations
+    applied.append("cast_pin[].derived_fields->dropped")
+    observation = args.get("render_observation") or {}
+    facts = dict(observation.get("producer_facts") or {})
+    if facts:
+        observation["producer_facts"] = {
+            "digest": content_digest(facts),
+            "frame_count": facts.get("frame_count"),
+        }
+        applied.append("render_observation.producer_facts->digest")
+    provenance = args.get("evidence_provenance") or {}
+    derivations = provenance.get("derivations")
+    if isinstance(derivations, dict):
+        for key, value in list(derivations.items()):
+            if isinstance(value, str) and len(value) > 80:
+                derivations[key] = value[:80]
+        applied.append("provenance.derivations->trimmed")
+    return applied
+
+
+def _identity_transport_level4(args: dict[str, Any]) -> list[str]:
+    """Last level: per-role crops travel as a digested record + their metrics."""
+    applied: list[str] = []
+    for row in args.get("identity_measurements") or []:
+        frames = list(row.get("rendered_frames") or [])
+        row["rendered_frames_digest"] = content_digest(frames)
+        row["rendered_frames"] = [
+            {
+                "frame_index": frame.get("frame_index"),
+                "distance_to_own_reference_px": frame.get("distance_to_own_reference_px"),
+            }
+            for frame in frames
+        ]
+    applied.append("identity_measurements[].rendered_frames->metrics+digest")
+    provenance = args.get("evidence_provenance") or {}
+    families = dict(provenance.get("families") or {})
+    annotation = dict(families.get("annotation") or {})
+    for key, value in list(annotation.items()):
+        if isinstance(value, (dict, list)):
+            annotation[key] = {"digest": content_digest(value)}
+    if annotation:
+        families["annotation"] = annotation
+        provenance["families"] = families
+        applied.append("provenance.families.annotation->digest")
+    return applied
+
+
+def _identity_transport_level5(args: dict[str, Any]) -> list[str]:
+    """Deepest level: the per-role derived detail travels digested only.
+
+    Every MEASURED aggregate of every role is still carried (window,
+    distances, the frozen verdict summary, the role's reference identity);
+    what is replaced by a digest is the per-frame record itself — whose
+    sha256/geometry is either already re-derivable from the render artifact
+    named in ``render_observation`` or recoverable from the persisted full-set
+    file named in ``payload_budget.full_evidence_file``.
+    """
+    applied: list[str] = []
+    for row in args.get("identity_measurements") or []:
+        frames = list(row.get("rendered_frames") or [])
+        if frames and "rendered_frames_digest" not in row:
+            row["rendered_frames_digest"] = content_digest(frames)
+        row.pop("rendered_frames", None)
+    applied.append("identity_measurements[].rendered_frames->digest_only")
+    cast_pin = args.get("cast_pin") or {}
+    meta = cast_pin.get("expected_metadata")
+    if isinstance(meta, dict):
+        cast_pin["expected_metadata"] = {
+            key: meta[key]
+            for key in (
+                "object_role_id",
+                "pin_coverage_count",
+                "measured_coverage_count",
+            )
+            if key in meta
+        }
+    cast_pin.pop("cast_contract_scope", None)
+    cast_pin.pop("coverage_scope_meaning", None)
+    cast_pin.pop("primary_role_rule", None)
+    cast_pin.pop("measurement_note", None)
+    cast_pin.pop("cast_coverage_kind", None)
+    applied.append("cast_pin[].notes->dropped")
+    coverage = args.get("measured_coverage") or {}
+    per_role = coverage.get("per_role") or {}
+    for role, row in per_role.items():
+        per_role[role] = {
+            "measured_distance_px": row.get("measured_distance_px"),
+            "verdict": row.get("verdict"),
+            "reference_artifact_id": row.get("reference_artifact_id"),
+        }
+    coverage.pop("aggregate_rule", None)
+    coverage.pop("measured_on", None)
+    applied.append("measured_coverage[].notes->dropped")
+    provenance = args.get("evidence_provenance") or {}
+    families = dict(provenance.get("families") or {})
+    artifact = dict(families.get("artifact") or {})
+    for key, value in list(artifact.items()):
+        if isinstance(value, dict) and "artifact_id" in value:
+            artifact[key] = {
+                "artifact_id": value.get("artifact_id"),
+                "sha256": value.get("sha256"),
+                "bytes_reverified": value.get("bytes_reverified"),
+                "digest": content_digest(value),
+            }
+    families["artifact"] = artifact
+    provenance["families"] = families
+    applied.append("provenance.families.artifact->identity+digest")
+    return applied
+
+
+def _identity_transport_level6(args: dict[str, Any]) -> list[str]:
+    """Final level before refusal: aggregates + digests only, nowhere else.
+
+    Reached only by argument sets far past the spawn budget (the real 6-role
+    640x360x360f publication is one).  The detector's consumable core — the
+    pixel payloads, the per-frame metadata, the cast identity block and the row
+    identities — is still byte-identical to L0; everything else keeps its
+    MEASURED aggregate (distance, verdict summary, counts, ids) and replaces
+    each record with a digest that is recoverable from
+    ``payload_budget.full_evidence_file``.
+    """
+    applied: list[str] = []
+    frames = args.get("frames") or []
+    meta = (cast_pin_meta := (args.get("cast_pin") or {}).get("expected_metadata")) or {}
+    slim_meta = {
+        key: value
+        for key, value in dict(meta).items()
+        if key in ("object_role_id", "pin_coverage_count", "measured_coverage_count")
+    }
+    for row in frames:
+        if isinstance(row.get("metadata"), dict):
+            row["metadata"] = dict(slim_meta)
+    if slim_meta != meta:
+        cast_pin_meta.clear()
+        cast_pin_meta.update(slim_meta)
+    applied.append("frames[].metadata->detector_contract_fields")
+    cast_pin = args.get("cast_pin") or {}
+    compact = []
+    for row in cast_pin.get("cast_coverage") or []:
+        reference = row.get("reference_artifact") or {}
+        compact.append(
+            {
+                "object_role_id": row.get("object_role_id"),
+                "character_id": row.get("character_id"),
+                "pack_version_id": row.get("pack_version_id"),
+                "reference_artifact": {
+                    key: reference[key]
+                    for key in ("artifact_id", "sha256")
+                    if key in reference
+                },
+                "segment_row_ids": list(row.get("segment_row_ids") or []),
+            }
+        )
+    cast_pin["cast_coverage"] = compact
+    cast_pin["role_observations"] = [
+        {
+            "object_role_id": row.get("object_role_id"),
+            "rendered_frames": list(row.get("rendered_frames") or []),
+        }
+        for row in cast_pin.get("role_observations") or []
+    ]
+    cast_pin.pop("cast_contract_scope", None)
+    cast_pin.pop("compatibility_reasons", None)
+    applied.append("cast_pin[].reference_ids_only")
+    coverage = args.get("measured_coverage") or {}
+    per_role = coverage.get("per_role") or {}
+    for role, row in per_role.items():
+        per_role[role] = {
+            "measured_distance_px": row.get("measured_distance_px"),
+            "verdict": row.get("verdict"),
+        }
+    applied.append("measured_coverage.per_role->distance+verdict")
+    observation = args.get("render_observation") or {}
+    facts = observation.get("producer_facts")
+    if isinstance(facts, dict) and set(facts) != {"digest", "frame_count"}:
+        observation["producer_facts"] = {
+            "digest": content_digest(facts),
+            "frame_count": facts.get("frame_count"),
+        }
+    applied.append("render_observation.producer_facts->digest")
+    provenance = args.get("evidence_provenance") or {}
+    derivations = provenance.get("derivations")
+    if isinstance(derivations, dict):
+        provenance["derivations"] = {"digest": content_digest(derivations)}
+    families = dict(provenance.get("families") or {})
+    result = families.get("result")
+    if isinstance(result, dict):
+        families["result"] = {"digest": content_digest(result)}
+        provenance["families"] = families
+    applied.append("provenance.derivations+families.result->digest")
+    pin_coverage = args.get("pin_coverage") or {}
+    pin_coverage.pop("cast_coverage_digest", None)
+    pin_coverage.pop("meaning", None)
+    pin_coverage.pop("scope", None)
+    applied.append("pin_coverage.notes->dropped")
+    return applied
+
+
+_IDENTITY_TRANSPORT_LEVELS: tuple[
+    tuple[str, Callable[[dict[str, Any]], list[str]]], ...
+] = (
+    ("L1", _identity_transport_level1),
+    ("L2", _identity_transport_level2),
+    ("L3", _identity_transport_level3),
+    ("L4", _identity_transport_level4),
+    ("L5", _identity_transport_level5),
+    ("L6", _identity_transport_level6),
+)
+
+
+def _persist_transport_evidence(
+    ctx: _Context, detector: str, full_set: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Persist the FULL pre-transport set as the digest-bound evidence file."""
+    relative = f"{IDENTITY_TRANSPORT_DIR}/{ctx.scope.video_item_id}/{detector}.json"
+    absolute = Path(ctx.managed_root) / relative
+    absolute.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(
+        full_set, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+    absolute.write_bytes(payload)
+    return {
+        "schema": IDENTITY_TRANSPORT_SCHEMA,
+        "relative_path": relative,
+        "sha256": hashlib.sha256(payload).hexdigest(),
+        "size_bytes": len(payload),
+        "rule": "the FULL composed set (before transport reduction) is persisted "
+        "here and digested into this argument set; the reduced argv form is a "
+        "projection of these bytes",
+    }
+
+
+def _apply_identity_transport(ctx: _Context, detector: str, args: dict[str, Any]) -> None:
+    """Reduce the set to the measured spawn budget, disclosing every step.
+
+    The frozen detector's consumable core (pixel payloads, per-frame metadata,
+    the cast identity block, the row identities) is NEVER reduced; when even
+    the untouched core cannot spawn, the typed refusal below is raised instead
+    of handing the runner an unspawnable argument.
+    """
+    full_set = json.loads(json.dumps(args, sort_keys=True, ensure_ascii=False))
+    levels: list[dict[str, Any]] = []
+    reductions: list[str] = []
+    level_used = "L0"
+    if not _identity_transport_fits(args):
+        for name, reducer in _IDENTITY_TRANSPORT_LEVELS:
+            reductions.extend(reducer(args))
+            measured = _argv_transport_bytes(args)
+            levels.append({"level": name, "escaped_bytes": measured})
+            level_used = name
+            if _identity_transport_fits(args):
+                break
+    escaped = _argv_transport_bytes(args)
+    if not _identity_transport_fits(args):
+        raise malformed(
+            detector,
+            f"the composed argument set is {escaped} escaped B even after every "
+            "transport reduction, but the detector child process can only "
+            f"receive ~{ARGV_CEILING_SPAWN_OK_BYTES} B on the Windows command "
+            f"line (measured: {ARGV_CEILING_WINERROR_206_BYTES} B raises "
+            "WinError 206, 'The filename or extension is too long'): refuse "
+            "instead of handing the runner a payload it cannot spawn",
+            measured_escaped_bytes=escaped,
+            budget_bytes=ARGV_DETECTOR_ARGS_BUDGET_BYTES,
+            hard_cap_bytes=ARGV_CEILING_SPAWN_OK_BYTES,
+            transport_level=level_used,
+        )
+    transport_file: dict[str, Any] | None = None
+    if level_used != "L0":
+        transport_file = _persist_transport_evidence(ctx, detector, full_set)
+    args["payload_budget"] = {
+        "transport": "sys.argv[2] of the detector child process (runner.py)",
+        "measure": "quote-escaped length (subprocess.list2cmdline) + the "
+        "runner's command-line overhead + the output-binding reserve, against "
+        "the measured spawn ceiling",
+        "limit_bytes": ARGV_DETECTOR_ARGS_BUDGET_BYTES,
+        "hard_cap_bytes": ARGV_CEILING_SPAWN_OK_BYTES,
+        "runner_overhead_bytes": ARGV_RUNNER_COMMANDLINE_OVERHEAD_BYTES,
+        "binding_reserve_bytes": ARGV_OUTPUT_BINDING_RESERVE_BYTES,
+        "measured_escaped_bytes": escaped,
+        "within_limit": escaped <= ARGV_DETECTOR_ARGS_BUDGET_BYTES,
+        "transport_level": level_used,
+        "levels_tried": levels,
+        "reductions": reductions,
+        "pixel_form": "exact integral gray levels (the decoded matrix is "
+        "integral; every digest is computed on this form)",
+        "full_evidence_file": transport_file,
+        "rule": "the frozen detector's consumable core is never reduced; the "
+        "composer-side evidence is hoisted/digested/summarised only as far as "
+        "the measured spawn ceiling requires, and the full set is persisted "
+        "and digested when any reduction is applied",
+    }
+
+
 def _identity_drift(ctx: _Context) -> dict[str, Any]:
     detector = "identity_drift"
     segments = ctx.segments(detector)
@@ -2151,7 +2653,10 @@ def _identity_drift(ctx: _Context) -> dict[str, Any]:
                 reference_geometry=[int(reference_w), int(reference_h)],
                 window=[int(v) for v in role_window],
             )
-        reference_crop = crop_region(reference_matrix, role_window)
+        # the transported/hashed form of the reference crop: the decoded gray
+        # matrix is integral, and every digest below is computed on the EXACT
+        # bytes the detector re-hashes (see _integral_pixels).
+        reference_crop = _integral_pixels(crop_region(reference_matrix, role_window))
         role_indices = window_indices(
             int(role_segment.start_frame),
             int(role_segment.end_frame),
@@ -2160,7 +2665,7 @@ def _identity_drift(ctx: _Context) -> dict[str, Any]:
         role_frames = ctx.frames(render, role_indices, detector)
         rendered_frames: list[dict[str, Any]] = []
         for index in sorted(role_frames):
-            crop = _crop(role_frames[index], role_window)
+            crop = _integral_pixels(_crop(role_frames[index], role_window))
             rendered_frames.append(
                 {
                     "frame_index": int(index),
@@ -2499,36 +3004,15 @@ def _identity_drift(ctx: _Context) -> dict[str, Any]:
     )
     # ── the argv budget is a MEASURED, reported fact, not a promise ────────
     # ``runner.py`` serialises this set with ``separators=(",", ":")`` and hands
-    # it over as ``sys.argv[2]``; the budget is checked against THAT form.
-    transported_bytes = len(json.dumps(args, separators=(",", ":")))
-    pretty_bytes = len(json.dumps(args))
-    if transported_bytes > ARGV_CEILING_SPAWN_OK_BYTES:
-        raise malformed(
-            detector,
-            f"the composed argument set is {transported_bytes} B, but the "
-            f"detector child process can only receive ~"
-            f"{ARGV_CEILING_SPAWN_OK_BYTES} B on the Windows command line "
-            f"(measured: {ARGV_CEILING_WINERROR_206_BYTES} B raises WinError "
-            "206, 'The filename or extension is too long'): refuse instead of "
-            "handing the runner a payload it cannot spawn",
-            measured_bytes=transported_bytes,
-            budget_bytes=ARGV_DETECTOR_ARGS_BUDGET_BYTES,
-            hard_cap_bytes=ARGV_CEILING_SPAWN_OK_BYTES,
-        )
-    args["payload_budget"] = {
-        "transport": "sys.argv[2] of the detector child process (runner.py)",
-        "limit_bytes": ARGV_DETECTOR_ARGS_BUDGET_BYTES,
-        "measured_bytes": transported_bytes,
-        "within_limit": transported_bytes <= ARGV_DETECTOR_ARGS_BUDGET_BYTES,
-        "hard_cap_bytes": ARGV_CEILING_SPAWN_OK_BYTES,
-        "pretty_bytes_excluding_this_block": pretty_bytes,
-        "os_ceiling_measured_chars": [
-            ARGV_CEILING_SPAWN_OK_BYTES,
-            ARGV_CEILING_WINERROR_206_BYTES,
-        ],
-        "rule": "raw pixels once; coverage reports once; every other crop keeps "
-        "its sha256 + distance",
-    }
+    # it over as ``sys.argv[2]``; the budget is checked against the MEASURED
+    # quote-escaped form (plus the runner's own command-line overhead and the
+    # reserve for the output binding attached after the builders run).  The
+    # transport ladder hoists/digests the composer-side evidence only as far as
+    # that measured budget requires, discloses every reduction in
+    # ``payload_budget``, persists the FULL pre-transport set when it reduces,
+    # and refuses with the typed QC_EVIDENCE_MALFORMED when even the untouched
+    # detector core cannot spawn (never a silent oversized handover).
+    _apply_identity_transport(ctx, detector, args)
     return args
 
 def _edge_halo(ctx: _Context) -> dict[str, Any]:

@@ -99,16 +99,28 @@ def disc_radius_px(area: int) -> float:
 
 
 def decode_video_frames(
-    path: Path, frame_indices: Sequence[int], *, detector: str
+    path: Path,
+    frame_indices: Sequence[int],
+    *,
+    detector: str,
+    limit: int | None = MAX_WINDOW_FRAMES,
 ) -> dict[int, list[list[float]]]:
     """Decode specific frames of a persisted media artifact as gray matrices.
 
-    Bounded by :data:`MAX_WINDOW_FRAMES`.  Missing frames are OMITTED from the
+    ``limit`` is the decode BOUND: the default keeps the per-composition cap
+    (:data:`MAX_WINDOW_FRAMES`); a caller whose requested indices are ALREADY
+    bounded (the cut search decodes the union of per-boundary windows, each
+    bounded to the composition window) passes ``limit=None`` so the requested
+    window is decoded intact — a silent left-truncation of the requested set is
+    exactly the starvation DELTA-F6/F-R4-1 measured (the second boundary's
+    window was never decoded at all).  Missing frames are OMITTED from the
     result (the caller decides whether the omission is a refusal).
     """
     import cv2  # local import: only the measurement path needs OpenCV
 
-    wanted = sorted({int(i) for i in frame_indices})[:MAX_WINDOW_FRAMES]
+    wanted = sorted({int(i) for i in frame_indices})
+    if limit is not None:
+        wanted = wanted[: int(limit)]
     if not wanted:
         return {}
     out: dict[int, list[list[float]]] = {}
