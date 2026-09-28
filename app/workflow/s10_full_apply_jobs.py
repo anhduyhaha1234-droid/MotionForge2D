@@ -1799,11 +1799,28 @@ def _list_chunks(session_factory, ws: str, run_id: str) -> list[dict[str, Any]]:
     with session_factory() as s:
         rows = s.execute(
             sa_text(
-                "SELECT id, chunk_index, order_index, shot_id, layer_id, object_role_id, core_start_frame, core_end_frame, overlap_before, overlap_after, content_hash, state, attempt, artifact_id, verified, natural_key FROM s10_full_apply_chunk WHERE workspace_id=:ws AND run_id=:rid ORDER BY order_index, chunk_index"
+                "SELECT id, chunk_index, order_index, shot_id, layer_id, object_role_id, core_start_frame, core_end_frame, overlap_before, overlap_after, content_hash, state, attempt, artifact_id, verified, natural_key, member_layer_ids_json FROM s10_full_apply_chunk WHERE workspace_id=:ws AND run_id=:rid ORDER BY order_index, chunk_index"
             ),
             {"ws": ws, "rid": run_id},
         ).mappings().all()
-        return [dict(r) for r in rows]
+        out: list[dict[str, Any]] = []
+        for row in rows:
+            item = dict(row)
+            raw = item.pop("member_layer_ids_json", None)
+            members: list[str] = []
+            if raw:
+                try:
+                    parsed = json.loads(raw)
+                except (TypeError, ValueError):
+                    parsed = None
+                if isinstance(parsed, list):
+                    members = [str(m) for m in parsed if isinstance(m, str)]
+            # DELTA-F1: the worker reads the persisted whole-shot/GROUP
+            # membership; unreadable/absent values stay EMPTY so the
+            # comfy branch still fails closed (the guard is never widened).
+            item["member_layer_ids"] = members
+            out.append(item)
+        return out
 
 
 def _quarantine_chunk(session_factory, ws: str, ch: dict[str, Any], managed_root: Path | None = None) -> None:  # type: ignore[no-untyped-def]

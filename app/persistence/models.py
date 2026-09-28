@@ -3138,6 +3138,11 @@ class S10FullApplyChunk(TimestampMixin, Base):
     revision: Mapped[int] = mapped_column(
         Integer, default=1, server_default=sa_text("1"), nullable=False
     )
+    # DELTA-F1: the whole-shot/GROUP membership the planner froze for this
+    # chunk (canonical JSON array of layer ids, sorted+unique).  NULL = the
+    # legacy per-layer route (no group membership) — never silently defaulted
+    # for comfy chunks: the worker keeps failing closed on a missing value.
+    member_layer_ids_json: Mapped[str | None] = mapped_column(Text)
 
     run: Mapped[S10FullApplyRun] = relationship(back_populates="chunks")
     artifact: Mapped[Artifact | None] = relationship()

@@ -773,6 +773,9 @@ class FullApplyService:
                 overlap_after=int(ch.get("overlap_after", 0)),
                 layer_id=str(layer_id) if layer_id else None,
                 object_role_id=str(object_role_id) if object_role_id else None,
+                # DELTA-F1: persist the planner's whole-shot/GROUP membership
+                # with the chunk row (absent key => legacy per-layer chunk).
+                member_layer_ids=list(ch.get("member_layer_ids") or []) or None,
                 attempt=1,
                 natural_key=natural,
                 idempotency_key=idem,
@@ -895,6 +898,10 @@ class FullApplyService:
                 overlap_after=int(ch.overlap_after),
                 layer_id=ch.layer_id,
                 object_role_id=ch.object_role_id,
+                # DELTA-F1: a retry lineage must carry the same frozen group
+                # membership as its predecessor (or the comfy branch fails
+                # closed on a member-less successor).
+                member_layer_ids=list(ch.member_layer_ids) or None,
                 attempt=new_attempt,
                 natural_key=f"s10_chunk:{new_id}:{ch.chunk_index}:{new_attempt}",
                 idempotency_key=f"s10_chunk_idem:{new_id}:{ch.chunk_index}:{new_attempt}",
