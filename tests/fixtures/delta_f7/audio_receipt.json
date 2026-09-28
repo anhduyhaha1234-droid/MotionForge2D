@@ -1,0 +1,17 @@
+{
+ "status": 202,
+ "body": {
+  "job_id": "3a1dbde3-27df-4ce3-b2bd-61bfb0ce2101",
+  "reused": false,
+  "state": "queued",
+  "recheck_job_id": null,
+  "recheck_state": null
+ },
+ "at": "2026-09-28T20:10:00Z",
+ "recheck": {
+  "job_id": null,
+  "state": null
+ },
+ "job_id": "3a1dbde3-27df-4ce3-b2bd-61bfb0ce2101",
+ "final_state": "completed"
+}

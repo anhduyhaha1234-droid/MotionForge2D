@@ -1742,17 +1742,29 @@ def _build_source_reference(
         # else: fail-closed — reference raster unknown stays None; the
         # validator then measures same-raster (a real cross-raster case
         # scores low PSNR and FAILs). Never a fabricated raster.
-        audio_digest = probe_audio_digest(source, 0)
+        # DELTA-F7 — the APPROVED AUDIO identity is the server-resolved audio
+        # authority recorded at submit (manifest ``audio_source``: the
+        # publication itself, the attached original-audio artifact, or the
+        # VideoItem source artifact — exactly the file the assembly muxes).
+        # The publication is video-only by design; deriving the audio policy
+        # from it alone would demand a correctly-audio'd candidate stay
+        # silent (av_policy) and fail every honest export.
+        audio_authority = str(manifest.get("audio_source") or "") or source
+        audio_digest = (
+            probe_audio_digest(audio_authority, 0)
+            if Path(audio_authority).is_file()
+            else None
+        )
         if audio_digest is not None:
-            shape = probe_audio_shape(source, 0)
+            shape = probe_audio_shape(audio_authority, 0)
             channels, sample_rate = shape if shape is not None else (None, None)
             # The assembly layer re-encodes audio (AAC).  Content is compared
-            # against this immutable source with bounded vectorized windows;
-            # digest equality remains reserved for remux/copy.
+            # against this immutable authority with bounded vectorized
+            # windows; digest equality remains reserved for remux/copy.
             audio = AudioReference(
                 mode="transcode",
                 stream_index=0,
-                reference_path=source,
+                reference_path=audio_authority,
                 channels=channels,
                 sample_rate=sample_rate,
             )
