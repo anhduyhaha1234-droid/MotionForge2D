@@ -53,7 +53,11 @@ MIGRATIONS = PROJECT_ROOT / "migrations"
 
 #: Frozen identities of this round; the head is ALSO discovered live (see
 #: :func:`_live_heads`) so a newer revision stacked on top cannot silently
-#: re-point the chain assertions.
+#: re-point the chain assertions.  MF-END-05 (writer codex/mf-end-05-0928)
+#: stacked e5f6a7b8c9d0 on this revision: rows asserting "upgrade head
+#: lands on the migrated head" now follow :func:`_live_head()`, while
+#: every revision-identity and chain assertion stays pinned.  Impact is
+#: recorded in the MF-END-05 write-set guard disclosure before patching.
 NEW_REVISION = "f8b9c0d1e2f3"
 PREV_HEAD = "d4e5f6a7b8c9"
 WS = "ws-mf-end-02"
@@ -97,6 +101,19 @@ MANIFEST_SHA = hashlib.sha256(MANIFEST_JSON.encode("utf-8")).hexdigest()
 
 def _live_heads() -> list[str]:
     return list(ScriptDirectory(str(MIGRATIONS)).get_heads())
+
+
+def _live_head() -> str:
+    """The single live head.
+
+    MF-END-05 (writer codex/mf-end-05-0928) stacked e5f6a7b8c9d0 on
+    this suite's revision; rows asserting "upgrade head lands on the
+    migrated head" follow the live head discovery instead of the
+    frozen epoch id.
+    """
+    heads = _live_heads()
+    assert len(heads) == 1, f"expected exactly one head, got {heads}"
+    return heads[0]
 
 
 def _alembic_config(db: Path) -> Config:
@@ -308,7 +325,7 @@ def head_template(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """One REAL ``upgrade head`` run, reused by tests that only need head bytes."""
     db = tmp_path_factory.mktemp("mfe02-templates") / "head.db"
     _upgrade(db, "head")
-    assert _alembic_version(db) == NEW_REVISION
+    assert _alembic_version(db) == _live_head()
     return db
 
 
@@ -332,13 +349,28 @@ def _copy_template(template: Path, tmp_path: Path, name: str) -> Path:
 
 def test_micro_repro_sole_head_is_the_new_revision() -> None:
     heads = _live_heads()
-    assert heads == [NEW_REVISION], f"expected exactly one head, got {heads}"
+    assert len(heads) == 1, f"expected exactly one head, got {heads}"
     script = ScriptDirectory(str(MIGRATIONS))
     revision = script.get_revision(NEW_REVISION)
     assert revision.down_revision == PREV_HEAD, (
         f"new revision must chain the live head {PREV_HEAD}, "
         f"got {revision.down_revision!r}"
     )
+    # MF-END-05: the sole head is this revision or a LINEAR descendant of
+    # it (e5f6a7b8c9d0 stacked on top); the chain itself must stay linear.
+    cursor = script.get_revision(heads[0])
+    visited: set[str] = set()
+    while cursor is not None and cursor.revision != NEW_REVISION:
+        assert cursor.revision not in visited, (
+            f"migration graph cycles at {cursor.revision}"
+        )
+        visited.add(cursor.revision)
+        cursor = (
+            script.get_revision(cursor.down_revision)
+            if cursor.down_revision
+            else None
+        )
+    assert cursor is not None, f"{NEW_REVISION} must remain in the live head chain"
 
 
 def test_micro_repro_previous_head_has_exactly_one_child() -> None:
@@ -368,7 +400,7 @@ def test_micro_repro_orm_table_carries_branch_columns_and_checks() -> None:
 def test_fresh_upgrade_adds_branch_columns_and_checks(tmp_path: Path) -> None:
     db = tmp_path / "fresh.db"
     _upgrade(db, "head")
-    assert _alembic_version(db) == NEW_REVISION
+    assert _alembic_version(db) == _live_head()
 
     info = _column_info(db)
     assert info["pack_contract_version"]["notnull"] == 1
@@ -396,7 +428,7 @@ def test_upgrade_from_previous_head_preserves_legacy_rows_and_round_trips(
     assert len(rows_before) == 1
 
     _upgrade(db, "head")
-    assert _alembic_version(db) == NEW_REVISION
+    assert _alembic_version(db) == _live_head()
 
     rows_after = _rows(db)
     assert rows_after == rows_before, "original columns must be byte-identical"
@@ -423,7 +455,7 @@ def test_upgrade_from_previous_head_preserves_legacy_rows_and_round_trips(
 
     # round trip: upgrade again -> legacy row still reads legacy_six_slot_2d
     _upgrade(db, "head")
-    assert _alembic_version(db) == NEW_REVISION
+    assert _alembic_version(db) == _live_head()
     assert _rows(db) == rows_before
     assert _rows(db, ("id",) + BRANCH_COLUMNS) == [
         (ids["version"], PACK_CONTRACT_VERSION_LEGACY, None, None)
@@ -600,6 +632,12 @@ def test_negative_downgrade_with_reference_row_refused_zero_mutation(
     tmp_path: Path, head_template: Path
 ) -> None:
     db = _copy_template(head_template, tmp_path, "neg-downgrade.db")
+    # MF-END-05: head_template now carries the stacked successor revision;
+    # this row tests the END-02 downgrade refusal, so pin the copy to THIS
+    # suite's revision first (the stacked revision holds no rows to refuse).
+    if _alembic_version(db) != NEW_REVISION:
+        _downgrade(db, NEW_REVISION)
+        assert _alembic_version(db) == NEW_REVISION
     _seed_legacy(db, "downgrade")
     _insert_reference_row_orm(db, "pack-ref-downgrade", version=2)
 
