@@ -36,7 +36,8 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-from typing import Any, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -50,6 +51,7 @@ from app.services.qc_checks.thresholds import (
     classify,
     get_threshold,
 )
+from app.services.qc_evidence import measure as qcm
 
 #: Registry identity (T03A contract — the runner resolves module:detect).
 DETECTOR_NAME = "trajectory_drift"
@@ -293,3 +295,406 @@ _ = register_detector(
         "classified against the frozen T03A threshold policy"
     ),
 )
+
+
+# ── MF-END-22.1/22.2/22.3: SOURCE motion vs OUTPUT observations (U09/U11) ────
+#
+# Motion preservation is a CROSS-SOURCE comparison: the source trace comes
+# from the real MF-END-12 role track (preferred) or from the MF-END-13 camera
+# window fact's MEASURED rate (the basis is recorded either way), the output
+# trace from the MF-END-21 observations — never from the source side itself.
+#
+# Defects (hard dominates):
+# - ``QC_COMPARISON_MOTION_STATIC`` (hard): the source moves above the static
+#   floor and the OUTPUT is frozen (no measurable motion at all) — the silent
+#   / static output U11 forbids;
+# - ``QC_COMPARISON_MOTION_LOST`` (hard) / ``QC_COMPARISON_MOTION_ATTENUATED``
+#   (soft): the frozen motion-attenuation policy (level-2/level-4 measured raw
+#   values) classifies ``1 - output_motion / source_motion``;
+# - ``QC_COMPARISON_FRAME_SHIFT`` (hard/soft by the frozen band): the output
+#   moves at the WRONG TIME (best matching step shift in frames).
+
+COMPARISON_DETECTOR_NAME = "trajectory_drift_comparison"
+
+
+def _round9(value: float) -> float:
+    return round(float(value), 9)
+
+
+def _centre_of(item: Mapping[str, Any]) -> tuple[float, float] | None:
+    centre = item.get("centroid")
+    if isinstance(centre, (list, tuple)) and len(centre) == 2:
+        try:
+            x, y = float(centre[0]), float(centre[1])
+        except (TypeError, ValueError):
+            return None
+        if math.isfinite(x) and math.isfinite(y):
+            return (x, y)
+    box = qcm.bbox_of(item)
+    return qcm.bbox_center(box) if box is not None else None
+
+
+def _source_trace(
+    ctx: dict[str, Any], args: dict[str, Any]
+) -> tuple[list[tuple[int, float, float]], str, dict[str, Any]]:
+    """The SOURCE motion trace: MF-END-12 track first, camera fact second."""
+    role = str(args.get("source_role_id") or "")
+    detail: dict[str, Any] = {}
+    tracks = ctx.get("source_tracks") or {}
+    if not role:
+        for candidate in tracks.get("tracks") or []:
+            if str(candidate.get("kind")) == "person":
+                role = str(candidate.get("role_id"))
+                break
+    trace: list[tuple[int, float, float]] = []
+    if role:
+        track = qcm.track_by_role(tracks, role)
+        if track is not None:
+            rows = qcm.granted_rows(track)
+            for frame in sorted(rows):
+                centre = _centre_of(rows[frame])
+                if centre is not None:
+                    trace.append((int(frame), centre[0], centre[1]))
+            detail["source_role_id"] = role
+            detail["source_instance_id"] = str(track.get("instance_id") or "")
+    if trace:
+        return trace, f"mf12_track:{role}", detail
+
+    window_id = str(args.get("source_window_id") or "")
+    fact: dict[str, Any] | None = None
+    for candidate in ctx["facts"].get("camera") or []:
+        if not window_id or str(candidate.get("window_id")) == window_id:
+            fact = dict(candidate)
+            break
+    if fact is None:
+        return [], "", detail
+    span = fact.get("span") or {}
+    frames = int(span.get("end_frame_exclusive", 0)) - int(span.get("start_frame", 0))
+    motion = fact.get("content_motion") or {}
+    rate: float | None = None
+    rate_key = ""
+    if isinstance(motion, Mapping):
+        for key in ("mean_px_per_frame", "total_px", "magnitude_px"):
+            if motion.get(key) is not None:
+                value = float(motion[key])
+                rate = value if key == "mean_px_per_frame" or frames <= 0 else value / float(frames)
+                rate_key = key
+                break
+    if str(fact.get("classification") or "") == "static":
+        rate = 0.0
+        rate_key = "classification_static"
+    if rate is None:
+        return [], "", {"camera_window_id": fact.get("window_id")}
+    trace = [(int(span.get("start_frame", 0)) + i, float(i) * rate, 0.0) for i in range(frames)]
+    detail.update(
+        {
+            "camera_window_id": fact.get("window_id"),
+            "camera_classification": fact.get("classification"),
+            "camera_rate_px_per_frame": _round9(rate),
+            "camera_rate_key": rate_key,
+        }
+    )
+    return trace, f"mf13_camera_window:{fact.get('window_id')}:{rate_key}", detail
+
+
+def _output_trace(
+    ctx: dict[str, Any], args: dict[str, Any], source_role: str
+) -> tuple[list[tuple[int, float, float]], dict[str, Any] | None, str]:
+    """The OUTPUT motion trace from the MF-END-21 observations."""
+    role = str(args.get("output_role_id") or source_role or "")
+    track: dict[str, Any] | None = None
+    if role:
+        track = qcm.track_by_role(ctx["observations"], role)
+    if track is None:
+        for candidate in ctx["observations"].get("tracks") or []:
+            if (candidate.get("role_match") or {}).get("state") == "matched":
+                track = dict(candidate)
+                role = str(candidate.get("role_id"))
+                break
+    if track is None:
+        return [], None, role
+    rows = qcm.output_rows(ctx, role)
+    assert rows is not None  # the track exists, so its rows resolve
+    trace: list[tuple[int, float, float]] = []
+    for frame in sorted(rows["rows"]):
+        centre = _centre_of(rows["rows"][frame])
+        if centre is not None:
+            trace.append((int(frame), centre[0], centre[1]))
+    return trace, track, role
+
+
+def compare_motion_facts(args: dict[str, Any]) -> dict[str, Any]:
+    """Compare the source motion with the output observations (U09/U11).
+
+    ``args`` is the shared comparator schema plus optional
+    ``source_role_id`` / ``source_window_id`` / ``output_role_id``.
+    """
+    ctx, refusals = qcm.comparison_context(args)
+    if refusals:
+        verdict = qcm.compare_verdict(
+            [], blocked=refusals, appearance=args.get("appearance")
+        )
+        return qcm.comparison_result(
+            detector=COMPARISON_DETECTOR_NAME,
+            reason_code=DETECTOR_NAME,
+            verdict=verdict,
+            items=[],
+            uncertain=[],
+            blocked=refusals,
+            checked=[],
+            ctx={},
+            extra={"refusals": refusals},
+        )
+
+    items: list[dict[str, Any]] = []
+    uncertain: list[dict[str, Any]] = []
+    blocked: list[dict[str, Any]] = []
+    checked: list[dict[str, Any]] = []
+
+    source_trace, source_basis, source_detail = _source_trace(ctx, args)
+    output_trace, output_track, output_role = _output_trace(
+        ctx, args, str(source_detail.get("source_role_id") or "")
+    )
+    span = ctx["facts"].get("source") or {}
+    span_start = int((span.get("span") or {}).get("start_frame", 0))
+    span_end = int((span.get("span") or {}).get("end_frame_exclusive", span_start))
+    window_frames = list(range(span_start, span_end))
+
+    if not source_trace:
+        uncertain.append(
+            {
+                "code": qcm.CODE_COMPARISON_NOT_OBSERVED,
+                "role_id": str(source_detail.get("source_role_id") or ""),
+                "frames": window_frames,
+                "detail": (
+                    "no SOURCE motion trace is available (no sealed MF-END-12 "
+                    "track supplied and no measurable camera window fact); the "
+                    "motion comparison cannot be made and is not guessed"
+                ),
+            }
+        )
+    if output_track is None:
+        blocked.append(
+            {
+                "code": qcm.CODE_COMPARISON_NOT_OBSERVED,
+                "role_id": output_role,
+                "frames": window_frames,
+                "detail": (
+                    f"the output carries no observation track for role "
+                    f"{output_role!r}; the motion comparison cannot be made"
+                ),
+                "output_refusal": qcm.refused_role(ctx["observations"], output_role),
+            }
+        )
+    if not source_trace or output_track is None:
+        verdict = qcm.compare_verdict(
+            items,
+            uncertain=uncertain,
+            blocked=blocked,
+            appearance=args.get("appearance"),
+        )
+        return qcm.comparison_result(
+            detector=COMPARISON_DETECTOR_NAME,
+            reason_code=DETECTOR_NAME,
+            verdict=verdict,
+            items=items,
+            uncertain=uncertain,
+            blocked=blocked,
+            checked=checked,
+            ctx=ctx,
+        )
+
+    source_series = [(x, y) for _, x, y in source_trace]
+    output_series = [(x, y) for _, x, y in output_trace]
+    source_rate = qcm.motion_px_per_frame(source_series)
+    output_rate = qcm.motion_px_per_frame(output_series)
+    output_frames = [frame for frame, _, _ in output_trace]
+    evidence: dict[str, Any] = {
+        "source_basis": source_basis,
+        "output_role_id": output_role,
+        "output_segment_id": str(output_track.get("segment_id") or ""),
+        "output_instance_id": str(output_track.get("instance_id") or ""),
+        "window": {"start_frame": span_start, "end_frame_exclusive": span_end},
+        "measured": {
+            "source_trace_points": len(source_trace),
+            "output_trace_points": len(output_trace),
+            "source_px_per_frame": _round9(source_rate),
+            "output_px_per_frame": _round9(output_rate),
+        },
+        "static_floor_px_per_frame": qcm.COMPARISON_STATIC_MAX_PX_PER_FRAME,
+        "source_detail": source_detail,
+        "mapping": ctx.get("mapping"),
+        "measure": (
+            "mean centroid step (px/frame) of the source trace vs the output "
+            "observations' centroids, mapped onto the same source frames"
+        ),
+    }
+    frozen_output = output_rate < qcm.COMPARISON_STATIC_MAX_PX_PER_FRAME
+    if source_rate < qcm.COMPARISON_STATIC_MAX_PX_PER_FRAME:
+        checked.append(
+            {
+                "status": qcm.VERDICT_PASS,
+                "note": "source is static; a static output is consistent",
+                "window": evidence["window"],
+            }
+        )
+        if frozen_output:
+            evidence["measured"]["frozen_output"] = True
+    elif frozen_output:
+        ratio = qcm.measure_motion_attenuation(source_series, output_series)
+        items.append(
+            qcm.comparison_item(
+                metric=qcm.METRIC_MOTION_ATTENUATION,
+                code=qcm.CODE_MOTION_STATIC,
+                level=qcm.LEVEL_HARD,
+                severity="blocker",
+                role_id=output_role,
+                frames=output_frames,
+                detail=(
+                    f"the SOURCE moves {_round9(source_rate)} px/frame but the "
+                    f"OUTPUT is frozen ({_round9(output_rate)} px/frame < "
+                    f"{qcm.COMPARISON_STATIC_MAX_PX_PER_FRAME}) — a silent/static "
+                    "output where the source has motion (U11)"
+                ),
+                evidence={**evidence, "attenuation_ratio": _round9(ratio or 0.0)},
+            )
+        )
+        checked.append({"status": qcm.VERDICT_FAIL, "window": evidence["window"]})
+    else:
+        ratio = qcm.measure_motion_attenuation(source_series, output_series)
+        if ratio is None:
+            uncertain.append(
+                {
+                    "code": qcm.CODE_COMPARISON_NOT_OBSERVED,
+                    "role_id": output_role,
+                    "frames": output_frames,
+                    "detail": "the source motion is not measurable; no attenuation",
+                }
+            )
+        else:
+            status, code = qcm.classify_comparison(
+                qcm.METRIC_MOTION_ATTENUATION, ratio
+            )
+            if status == "invalid":
+                uncertain.append(
+                    {
+                        "code": qcm.CODE_COMPARISON_INVALID,
+                        "role_id": output_role,
+                        "frames": output_frames,
+                        "detail": (
+                            f"measured attenuation {_round9(ratio)} is outside the "
+                            "frozen calibrated envelope — pipeline fault"
+                        ),
+                    }
+                )
+            elif status == "blocker":
+                items.append(
+                    qcm.comparison_item(
+                        metric=qcm.METRIC_MOTION_ATTENUATION,
+                        code=qcm.CODE_MOTION_LOST,
+                        level=qcm.LEVEL_HARD,
+                        severity="blocker",
+                        role_id=output_role,
+                        frames=output_frames,
+                        detail=(
+                            f"the output lost the source motion (attenuation "
+                            f"{_round9(ratio)} >= blocker boundary)"
+                        ),
+                        evidence={**evidence, "attenuation_ratio": _round9(ratio)},
+                    )
+                )
+            elif status == "warning":
+                items.append(
+                    qcm.comparison_item(
+                        metric=qcm.METRIC_MOTION_ATTENUATION,
+                        code=qcm.CODE_MOTION_ATTENUATED,
+                        level=qcm.LEVEL_SOFT,
+                        severity="warning",
+                        role_id=output_role,
+                        frames=output_frames,
+                        detail=(
+                            f"the output motion is attenuated (attenuation "
+                            f"{_round9(ratio)} inside the warning band)"
+                        ),
+                        evidence={**evidence, "attenuation_ratio": _round9(ratio)},
+                    )
+                )
+            else:
+                checked.append(
+                    {
+                        "status": qcm.VERDICT_PASS,
+                        "attenuation_ratio": _round9(ratio),
+                        "window": evidence["window"],
+                    }
+                )
+
+    if len(source_trace) >= 2 and len(output_trace) >= 2:
+        source_steps = qcm.step_series([x for _, x, _ in source_trace])
+        output_steps = qcm.step_series([x for _, x, _ in output_trace])
+        shift = qcm.measure_frame_shift(source_steps, output_steps)
+        status, code = qcm.classify_comparison(qcm.METRIC_FRAME_SHIFT, float(shift))
+        shift_evidence = {
+            **evidence,
+            "measured": {
+                **evidence["measured"],
+                "best_frame_shift_frames": int(shift),
+                "tolerance_frames": int(
+                    qcm.comparison_threshold(qcm.METRIC_FRAME_SHIFT)["warning_boundary"]
+                ),
+            },
+            "measure": (
+                "the source and output step series are aligned over all shifts "
+                "(+ = the output happens LATER); the best matching shift is "
+                "classified against the frozen time policy"
+            ),
+        }
+        if status == "blocker":
+            items.append(
+                qcm.comparison_item(
+                    metric=qcm.METRIC_FRAME_SHIFT,
+                    code=qcm.CODE_FRAME_SHIFT,
+                    level=qcm.LEVEL_HARD,
+                    severity="blocker",
+                    role_id=output_role,
+                    frames=output_frames,
+                    detail=(
+                        f"the output motion happens {shift} frame(s) away from the "
+                        "source motion (hard timing defect)"
+                    ),
+                    evidence=shift_evidence,
+                )
+            )
+        elif status == "warning":
+            items.append(
+                qcm.comparison_item(
+                    metric=qcm.METRIC_FRAME_SHIFT,
+                    code=qcm.CODE_FRAME_SHIFT,
+                    level=qcm.LEVEL_SOFT,
+                    severity="warning",
+                    role_id=output_role,
+                    frames=output_frames,
+                    detail=(
+                        f"the output motion is {shift} frame(s) offset from the "
+                        "source motion (inside the warning band)"
+                    ),
+                    evidence=shift_evidence,
+                )
+            )
+        else:
+            checked.append(
+                {"status": qcm.VERDICT_PASS, "frame_shift_frames": int(shift)}
+            )
+
+    verdict = qcm.compare_verdict(
+        items, uncertain=uncertain, blocked=blocked, appearance=args.get("appearance")
+    )
+    return qcm.comparison_result(
+        detector=COMPARISON_DETECTOR_NAME,
+        reason_code=DETECTOR_NAME,
+        verdict=verdict,
+        items=items,
+        uncertain=uncertain,
+        blocked=blocked,
+        checked=checked,
+        ctx=ctx,
+    )

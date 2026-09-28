@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 import { api, ApiError, type PickerPackItem, type CompatibilityEvaluateResponse, type ProjectCastData } from "@/lib/api";
 import { LibraryPicker } from "./LibraryPicker";
 import { CompatibilityWarnings } from "./CompatibilityWarnings";
+import { CastRecommendationPanel } from "@/features/reference-library";
 
 interface ProjectCastPickerProps {
   projectId: string;
@@ -158,6 +159,15 @@ export function ProjectCastPicker({ projectId, objectRoleId, mappingId, currentR
 
   return (
     <div className="flex flex-col gap-4" data-testid="project-cast-picker">
+      {/* MF-END-10: gợi ý bộ từ kho + MỘT thao tác xác nhận (đọc-only cho tới khi xác nhận). */}
+      <CastRecommendationPanel
+        objectRoleId={objectRoleId}
+        projectId={projectId}
+        onConfirmed={() => {
+          void fetchPinned();
+        }}
+      />
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <LibraryPicker pinnedVersionId={pinnedVersionId} selectedVersionId={selected?.id ?? null} onSelect={handleSelect} />
 

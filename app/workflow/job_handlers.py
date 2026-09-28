@@ -19,11 +19,16 @@ from typing import Any
 
 from app.persistence.artifacts import ManagedRoot, hash_file
 from app.workflow.durable_worker import OUTPUT_PURPOSES, WorkerContext
+from app.workflow.reference_asset_jobs import (
+    JOB_TYPE_REFERENCE_ASSET,
+    register_reference_asset_handler,
+)
 
 __all__ = [
     "JOB_TYPE_INGEST",
     "JOB_TYPE_PROPAGATE",
     "JOB_TYPE_PREVIEW",
+    "JOB_TYPE_REFERENCE_ASSET",
     "JOB_TYPE_RENDER",
     "declared_outputs_for",
     "register_api_handlers",
@@ -293,6 +298,20 @@ def register_api_handlers(worker: Any) -> None:
         _render_handler_entry,
         declared_outputs=declared_outputs_for(JOB_TYPE_RENDER, {}),
     )
+    # MF-END-15: the durable shot-anchor job (resolve published refs → input
+    # readiness gate → engine run → managed anchor manifest) registers through
+    # its own owner module; its fail-closed output validator comes with the
+    # registration, so a completed anchor job always carries a verified
+    # manifest on disk.
+    from app.workflow.shot_anchor_jobs import (  # noqa: PLC0415
+        register_shot_anchor_handler,
+    )
+
+    register_shot_anchor_handler(worker)
+
+    # MF-END-09: the reference-asset generation job (own declared-output
+    # validator inside the module; no static declared-output paths).
+    register_reference_asset_handler(worker)
 
 
 # Keep OUTPUT_PURPOSES referenced so the module documents the final-output

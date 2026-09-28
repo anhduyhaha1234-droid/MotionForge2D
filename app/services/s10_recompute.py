@@ -831,6 +831,189 @@ class S10RecomputeService:
                 out.append({"raw": str(r["provenance_json"])})
         return out
 
+    # ── MF-END-20: reopen/retry/cancel race-safe state (all-row counts, ─────
+    #    bounded joins) — read-only, idempotent, never a per-row query loop ──
+
+    REOPEN_MAX_STATEMENTS = 3
+
+    def reopen_state(self, *, workspace_id: str, run_id: str) -> dict[str, Any]:
+        """Reopen the run's recompute ledger: ALL rows, bounded statements.
+
+        Exactly 3 bounded statements regardless of chunk/correction count —
+        one LEFT JOIN ``s10_full_apply_chunk`` x ``s10_recompute_provenance``,
+        one aggregate over ``s10_recompute_record``, one read over
+        ``s10_recompute_checkpoint``.  Every chunk (verified/pending/failed),
+        every correction and every checkpoint row is counted exactly once, so
+        a retry/cancel race can never make the reopen lose or double-count a
+        row; re-running the read is idempotent (same shape, same numbers).
+        """
+        planned = getattr(self, "REOPEN_MAX_STATEMENTS", 3)
+        chunk_rows = self._session.execute(
+            sa_text(
+                "SELECT c.id AS chunk_id, c.shot_id, c.state AS chunk_state, c.verified, "
+                "c.attempt, c.artifact_id, c.core_start_frame, c.core_end_frame, "
+                "p.correction_id AS provenance_correction_id "
+                "FROM s10_full_apply_chunk c "
+                "LEFT JOIN s10_recompute_provenance p "
+                "  ON p.chunk_id = c.id AND p.workspace_id = c.workspace_id "
+                "WHERE c.workspace_id=:ws AND c.run_id=:rid "
+                "ORDER BY c.order_index, c.chunk_index, p.correction_id"
+            ),
+            {"ws": workspace_id, "rid": run_id},
+        ).mappings().all()
+        record_rows = self._session.execute(
+            sa_text(
+                "SELECT correction_id, correction_kind, affected_chunk_ids_json, result_hash, "
+                "revision_before, revision_after "
+                "FROM s10_recompute_record WHERE workspace_id=:ws AND run_id=:rid "
+                "ORDER BY created_at, correction_id"
+            ),
+            {"ws": workspace_id, "rid": run_id},
+        ).mappings().all()
+        checkpoint_rows = self._session.execute(
+            sa_text(
+                "SELECT correction_id, next_index, completed, executed_json "
+                "FROM s10_recompute_checkpoint WHERE workspace_id=:ws AND run_id=:rid"
+            ),
+            {"ws": workspace_id, "rid": run_id},
+        ).mappings().all()
+        statements_used = 3
+        assert statements_used <= planned, "reopen_state must stay bounded"
+        chunks: dict[str, dict[str, Any]] = {}
+        provenance_links = 0
+        for row in chunk_rows:
+            cid = str(row["chunk_id"])
+            entry = chunks.get(cid)
+            if entry is None:
+                entry = {
+                    "chunk_id": cid,
+                    "shot_id": str(row["shot_id"] or ""),
+                    "state": str(row["chunk_state"] or ""),
+                    "verified": int(row["verified"] or 0),
+                    "attempt": int(row["attempt"] or 0),
+                    "artifact_id": row["artifact_id"],
+                    "corrections": [],
+                }
+                chunks[cid] = entry
+            if row["provenance_correction_id"]:
+                provenance_links += 1
+                entry["corrections"].append(str(row["provenance_correction_id"]))
+        by_state: dict[str, int] = {}
+        per_shot: dict[str, dict[str, int]] = {}
+        for entry in chunks.values():
+            state_key = entry["state"] or "unknown"
+            by_state[state_key] = by_state.get(state_key, 0) + 1
+            shot = entry["shot_id"] or "unknown"
+            shot_entry = per_shot.setdefault(shot, {"chunks": 0, "verified": 0})
+            shot_entry["chunks"] += 1
+            shot_entry["verified"] += 1 if entry["verified"] == 1 else 0
+        corrections = int(len(record_rows))
+        affected_total = 0
+        kinds: dict[str, int] = {}
+        for row in record_rows:
+            kind = str(row["correction_kind"] or "")
+            kinds[kind] = kinds.get(kind, 0) + 1
+            try:
+                affected_ids = json.loads(str(row["affected_chunk_ids_json"]))
+            except (TypeError, ValueError):
+                affected_ids = []
+            affected_total += len(affected_ids)
+        checkpoints = {
+            "total": int(len(checkpoint_rows)),
+            "completed": sum(1 for r in checkpoint_rows if int(r["completed"] or 0) == 1),
+        }
+        return {
+            "schema_version": "mf.s10_recompute.reopen.v1",
+            "workspace_id": workspace_id,
+            "run_id": run_id,
+            "statements_used": statements_used,
+            "statements_max": planned,
+            "chunks": {
+                "total": len(chunks),
+                "by_state": by_state,
+                "verified": sum(1 for c in chunks.values() if c["verified"] == 1),
+            },
+            "per_shot": per_shot,
+            "corrections": {"total": corrections, "kinds": kinds, "affected_total": affected_total},
+            "checkpoints": checkpoints,
+            "provenance_links": provenance_links,
+            "rows_total": len(chunks) + corrections + int(len(checkpoint_rows)),
+        }
+
+    def preservation_report(
+        self, *, workspace_id: str, run_id: str, correction_id: str
+    ) -> dict[str, Any]:
+        """Per-shot artifact hashes of every chunk OUTSIDE a correction closure.
+
+        Bounded joins: the affected set comes from the durable recompute record
+        (1 read) and one LEFT JOIN ``s10_full_apply_chunk`` x ``artifact``
+        resolves every affected/preserved chunk's exact artifact hash in a
+        single statement.  Callers compare the returned preserved hashes
+        before/after ``execute_partial`` to prove that every OTHER shot kept
+        its exact output (shot khác hash giữ).
+        """
+        rec = self._session.execute(
+            sa_text(
+                "SELECT * FROM s10_recompute_record WHERE workspace_id=:ws AND correction_id=:cid"
+            ),
+            {"ws": workspace_id, "cid": correction_id},
+        ).mappings().first()
+        if rec is None:
+            raise S10RecomputeNotFoundError(f"correction {correction_id!r} not found")
+        if str(rec["run_id"]) != run_id:
+            raise S10RecomputeOwnershipError(
+                f"correction {correction_id!r} belongs to run {rec['run_id']!r}, not {run_id!r}"
+            )
+        affected_set = set(json.loads(str(rec["affected_chunk_ids_json"])))
+        rows = self._session.execute(
+            sa_text(
+                "SELECT c.id AS chunk_id, c.shot_id, c.state AS chunk_state, c.verified, "
+                "c.attempt, a.sha256 AS artifact_sha256, a.relative_path, a.size_bytes "
+                "FROM s10_full_apply_chunk c "
+                "LEFT JOIN artifact a ON a.id = c.artifact_id AND a.workspace_id = c.workspace_id "
+                "WHERE c.workspace_id=:ws AND c.run_id=:rid "
+                "ORDER BY c.order_index, c.chunk_index"
+            ),
+            {"ws": workspace_id, "rid": run_id},
+        ).mappings().all()
+        affected: dict[str, list[str]] = {}
+        preserved: dict[str, list[str]] = {}
+        preserved_rows = 0
+        affected_rows = 0
+        for row in rows:
+            cid = str(row["chunk_id"])
+            shot = str(row["shot_id"] or "unknown")
+            target = affected if cid in affected_set else preserved
+            if cid in affected_set:
+                affected_rows += 1
+            else:
+                preserved_rows += 1
+            sha = str(row["artifact_sha256"] or "")
+            if sha:
+                bucket = target.setdefault(shot, [])
+                if sha not in bucket:
+                    bucket.append(sha)
+        for bucket in affected.values():
+            bucket.sort()
+        for bucket in preserved.values():
+            bucket.sort()
+        return {
+            "schema_version": "mf.s10_recompute.preservation.v1",
+            "workspace_id": workspace_id,
+            "run_id": run_id,
+            "correction_id": correction_id,
+            "result_hash": str(rec["result_hash"]),
+            "affected_chunk_ids": sorted(affected_set),
+            "affected": affected,
+            "preserved": preserved,
+            "counts": {
+                "chunks_total": len(rows),
+                "affected_chunks": affected_rows,
+                "preserved_chunks": preserved_rows,
+            },
+            "statements_used": 2,
+        }
+
     def execute_partial(
         self,
         *,
@@ -873,19 +1056,23 @@ class S10RecomputeService:
                 return {"correction_id": correction_id, "completed": True, "executed": executed, "resumed": True}
         if next_idx < 0 or next_idx > len(affected_sorted):
             raise S10RecomputeParamsError("checkpoint next_index out of range")
-        # Need chunk rows for content_hash
+        # MF-END-20: chunk rows for content_hash — ONE bounded query for the
+        # whole run (never a per-chunk SELECT loop); a missing affected row
+        # still fails closed below with the typed error.
         chunk_map: dict[str, dict[str, Any]] = {}
+        _rows = self._session.execute(
+            sa_text(
+                "SELECT id, content_hash, shot_id, layer_id, core_start_frame, core_end_frame, attempt, artifact_id, chunk_index, order_index, overlap_before, overlap_after FROM s10_full_apply_chunk "
+                "WHERE workspace_id=:ws AND run_id=:rid"
+            ),
+            {"ws": workspace_id, "rid": run_id},
+        ).mappings().all()
+        _by_id = {str(r["id"]): dict(r) for r in _rows}
         for cid in affected_sorted:
-            row = self._session.execute(
-                sa_text(
-                    "SELECT id, content_hash, shot_id, layer_id, core_start_frame, core_end_frame, attempt, artifact_id, chunk_index, order_index, overlap_before, overlap_after FROM s10_full_apply_chunk "
-                    "WHERE id=:cid AND workspace_id=:ws"
-                ),
-                {"cid": cid, "ws": workspace_id},
-            ).mappings().first()
+            row = _by_id.get(cid)
             if row is None:
                 raise S10RecomputeNotFoundError(f"chunk {cid!r} not found")
-            chunk_map[cid] = dict(row)
+            chunk_map[cid] = row
         from app.persistence.artifacts import ManagedRoot  # noqa: PLC0415
 
         # C4: resolve the durable APPLIED correction authority + immutable job

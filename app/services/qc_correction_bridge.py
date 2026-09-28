@@ -31,7 +31,12 @@ from typing import Any, Callable, Mapping, NoReturn
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.persistence.models import ProjectCastMapping, RENDERER_ROUTES
+from app.persistence.models import (
+    RENDERER_ROUTES,
+    ProjectCastMapping,
+    S10FullApplyChunk,
+    S10FullApplyRun,
+)
 from app.persistence.object_correction import (
     CorrectionConflictError,
     CorrectionRecord,
@@ -76,6 +81,8 @@ __all__ = [
     "CorrectionChainResult",
     "classify_rerun_scope",
     "role_changed_guard",
+    "shot_correction_intent",
+    "ShotCorrectionIntent",
     "build_correction_request",
     "preview_for_item",
     "run_correction_chain",
@@ -770,7 +777,195 @@ def submit_recheck_run(
     )
 
 
-# ── stale-evidence reopen (GAP-8, 3 anchors — ReskinConfig NEVER) ──────────
+# ── MF-END-23: finding → SHOT correction intent ─────────────────────────────
+
+
+@dataclass(frozen=True)
+class ShotCorrectionIntent:
+    """A finding resolved onto the SHOT(s) a targeted correction must re-render.
+
+    ``shots`` carries every persisted chunk whose core span contains part of
+    the finding's frame window — the correction intent names the exact
+    ``shot_id`` set (and their frame spans + chunk ids) so the rerun touches
+    ONLY the shot(s) that actually contain the finding.  A finding whose frame
+    window cannot be resolved, or which lies outside every persisted shot, is
+    REFUSED (``CORRECTION_SHOT_UNRESOLVED``) — a shot is never guessed.
+    """
+
+    workspace_id: str
+    project_id: str
+    video_item_id: str
+    window: dict[str, int]
+    shots: list[dict[str, Any]]
+    render_artifact_id: str | None
+    render_sha256: str | None
+    anchor: dict[str, Any]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "kind": "shot_correction",
+            "schema": "mf-end-23/shot-correction-intent@1",
+            "workspace_id": self.workspace_id,
+            "project_id": self.project_id,
+            "video_item_id": self.video_item_id,
+            "window": dict(self.window),
+            "shots": [dict(shot) for shot in self.shots],
+            "render_artifact_id": self.render_artifact_id,
+            "render_sha256": self.render_sha256,
+            "anchor": dict(self.anchor),
+        }
+
+
+def _finding_window(item: QCItemRecord) -> tuple[int, int] | None:
+    """The finding's frame window from STRUCTURED evidence (typed, no parsing).
+
+    Accepted shapes, in order: ``frame_start``/``frame_end`` (inclusive),
+    ``window.{start_frame,end_frame_exclusive}``, ``frames[]`` (min..max),
+    and — when only a segment anchor exists — the segment's own frame span.
+    Wrong-typed values are treated as absent, never coerced.
+    """
+    evidence = item.evidence if isinstance(item.evidence, dict) else {}
+    start = _int_anchor(evidence, "frame_start")
+    end = _int_anchor(evidence, "frame_end")
+    if start is not None and end is not None and end >= start:
+        return start, end
+    window = evidence.get("window")
+    if isinstance(window, dict):
+        w_start = _int_anchor(window, "start_frame")
+        w_end = _int_anchor(window, "end_frame_exclusive")
+        if w_start is not None and w_end is not None and w_end > w_start:
+            return w_start, w_end - 1
+    frames = evidence.get("frames")
+    if isinstance(frames, list) and frames:
+        ints = [int(v) for v in frames if isinstance(v, (int, float))]
+        if ints:
+            return min(ints), max(ints)
+    return None
+
+
+def shot_correction_intent(
+    session: Session, item: QCItemRecord, *, workspace_id: str
+) -> ShotCorrectionIntent:
+    """Map ONE QC finding onto the SHOT(s) a targeted correction must touch.
+
+    Resolution rules (fail-closed, no guessing):
+
+    * the finding's frame window comes from its STRUCTURED evidence
+      (:func:`_finding_window`); a segment anchor may supply it through the
+      segment's own frame span;
+    * the shot inventory is the newest persisted S10 full-apply run of the
+      video with chunk rows (core spans); the intent carries every chunk
+      whose ``[core_start_frame, core_end_frame]`` INTERSECTS the window;
+    * no window ⇒ ``CORRECTION_SHOT_UNRESOLVED``; no intersecting shot ⇒
+      ``CORRECTION_SHOT_UNRESOLVED`` (the finding is not attributable to any
+      rendered shot — it is NOT routed to a whole-video rerun).
+
+    The intent also pins the CURRENT rendered-output identity so the caller
+    can detect a stale finding before spending a render.
+    """
+    window = _finding_window(item)
+    if window is None:
+        evidence_map = item.evidence if isinstance(item.evidence, dict) else {}
+        seg_id = _segment_id(item, evidence_map)
+        if seg_id is not None:
+            segment = _segment_record(session, workspace_id, seg_id)
+            if segment is not None:
+                window = (
+                    int(segment.start_frame),
+                    max(int(segment.start_frame), int(segment.end_frame) - 1),
+                )
+    if window is None:
+        raise QcCorrectionBridgeError(
+            "CORRECTION_SHOT_UNRESOLVED",
+            "QC item không mang frame window có cấu trúc (frame_start/frame_end, "
+            "window, frames[]) và không suy được từ segment anchor — không thể "
+            "xác định shot cần correction (không đoán shot).",
+        )
+    w_start, w_end = window
+    run = session.scalars(
+        select(S10FullApplyRun)
+        .where(
+            S10FullApplyRun.workspace_id == workspace_id,
+            S10FullApplyRun.video_item_id == item.video_item_id,
+        )
+        .order_by(S10FullApplyRun.created_at.desc(), S10FullApplyRun.id)
+        .limit(1)
+    ).first()
+    if run is None:
+        raise QcCorrectionBridgeError(
+            "CORRECTION_SHOT_UNRESOLVED",
+            f"video {item.video_item_id!r} chưa có S10 full-apply run nào để "
+            "biết shot inventory — không thể neo correction vào shot.",
+        )
+    chunks = session.scalars(
+        select(S10FullApplyChunk)
+        .where(S10FullApplyChunk.run_id == run.id)
+        .order_by(S10FullApplyChunk.shot_id, S10FullApplyChunk.chunk_index)
+    ).all()
+    by_shot: dict[str, dict[str, Any]] = {}
+    for chunk in chunks:
+        c_start = int(chunk.core_start_frame)
+        c_end = int(chunk.core_end_frame)
+        if c_end < w_start or c_start > w_end:
+            continue
+        shot_id = str(chunk.shot_id)
+        entry = by_shot.setdefault(
+            shot_id,
+            {
+                "shot_id": shot_id,
+                "run_id": str(run.id),
+                "core_start_frame": c_start,
+                "core_end_frame": c_end,
+                "chunk_ids": [],
+                "layer_ids": [],
+            },
+        )
+        entry["core_start_frame"] = min(entry["core_start_frame"], c_start)
+        entry["core_end_frame"] = max(entry["core_end_frame"], c_end)
+        entry["chunk_ids"].append(str(chunk.id))
+        if chunk.layer_id:
+            entry["layer_ids"].append(str(chunk.layer_id))
+    if not by_shot:
+        raise QcCorrectionBridgeError(
+            "CORRECTION_SHOT_UNRESOLVED",
+            f"finding window [{w_start},{w_end}] không giao với shot nào của run "
+            f"{run.id!r} — không route correction vào shot không chứa finding.",
+        )
+    from app.services.qc_evidence.compose import render_row  # lazy: no cycle
+
+    render: dict[str, Any] | None = None
+    try:
+        render = render_row(
+            session,
+            workspace_id=workspace_id,
+            project_id=item.project_id,
+            video_item_id=item.video_item_id,
+        )
+    except Exception:  # noqa: BLE001 - the intent stays usable without it
+        render = None
+    evidence = item.evidence if isinstance(item.evidence, dict) else {}
+    anchor = {
+        "role_id": _str_anchor(evidence, _EV_OBJECT_ROLE_ID)
+        or _str_anchor(evidence, "role_id"),
+        "occurrence_id": _str_anchor(evidence, _EV_OCCURRENCE_ID),
+        "segment_id": _segment_id(item, evidence),
+    }
+    render_artifact = (render or {}).get("artifact") or {}
+    return ShotCorrectionIntent(
+        workspace_id=workspace_id,
+        project_id=str(item.project_id),
+        video_item_id=str(item.video_item_id),
+        window={"start_frame": w_start, "end_frame": w_end},
+        shots=[by_shot[key] for key in sorted(by_shot)],
+        render_artifact_id=(
+            str(render_artifact.get("artifact_id")) if render_artifact else None
+        ),
+        render_sha256=(str(render_artifact.get("sha256")) if render_artifact else None),
+        anchor=anchor,
+    )
+
+
+# ── stale-evidence reopen (GAP-8 anchors + MF-END-23 render anchor) ─────────
 
 def check_stale_evidence(
     session: Session, item: QCItemRecord, *, workspace_id: str
@@ -879,6 +1074,56 @@ def check_stale_evidence(
                 reason=(
                     f"cast revision đã đổi {cast_revision} -> "
                     f"{int(mapping.revision)} — evidence cast của QC item stale"
+                ),
+            )
+
+    # MF-END-23 4th anchor: the RENDERED OUTPUT the finding was observed on.
+    # Typed keys only (``render_artifact_id`` / ``render_sha256``); absent keys
+    # are NOT an anchor (never coerced, never invented).  When present, the
+    # item's recorded render must still be the CURRENT rendered output —
+    # otherwise the finding describes a superseded checkpoint and a rerun on
+    # the new output must re-check it first (fail-closed when the current
+    # output cannot be resolved).
+    recorded_render = _str_anchor(evidence, "render_artifact_id")
+    recorded_render_sha = _str_anchor(evidence, "render_sha256")
+    if recorded_render is not None or recorded_render_sha is not None:
+        from app.services.qc_evidence.compose import render_row  # lazy: no cycle
+
+        try:
+            current = render_row(
+                session,
+                workspace_id=workspace_id,
+                project_id=item.project_id,
+                video_item_id=item.video_item_id,
+            )
+        except Exception as err:  # noqa: BLE001 - fail closed, typed reason
+            return StaleCheckResult(
+                stale=True,
+                anchor="render_changed",
+                reason=(
+                    f"không đọc được rendered output hiện tại ({err}) — evidence "
+                    "render của QC item không xác minh được (fail closed)"
+                ),
+            )
+        current_artifact = (current or {}).get("artifact") or {}
+        current_id = str(current_artifact.get("artifact_id") or "")
+        current_sha = str(current_artifact.get("sha256") or "")
+        if (
+            current is None
+            or current.get("unusable") is not None
+            or (recorded_render or "") != current_id
+            or (recorded_render_sha or "") != current_sha
+        ):
+            return StaleCheckResult(
+                stale=True,
+                anchor="render_changed",
+                superseded_by_id=current_id or None,
+                reason=(
+                    "rendered output đã đổi kể từ lúc QC item được tạo "
+                    f"(recorded={recorded_render or '∅'}/{str(recorded_render_sha or '∅')[:12]} "
+                    f"-> current={current_id or '∅'}/{current_sha[:12]} hoặc "
+                    "render row không dùng được) — evidence stale; recheck trước "
+                    "khi correction."
                 ),
             )
 

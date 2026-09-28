@@ -142,6 +142,9 @@ export function LibraryPicker({ pinnedVersionId, selectedVersionId, onSelect, au
           >
             Xóa bộ lọc
           </button>
+          <span className="text-[11px] text-gray-400">
+            Nhấn Xóa bộ lọc để xem lại toàn bộ pack đã xuất bản.
+          </span>
         </div>
       )}
 

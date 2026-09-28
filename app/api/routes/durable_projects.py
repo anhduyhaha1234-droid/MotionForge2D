@@ -29,7 +29,8 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.api.deps import get_project_service
 from app.persistence import (
@@ -47,6 +48,15 @@ from app.schemas import (
     ProjectListResponse,
     ProjectStatus,
     ProjectUpdate,
+)
+from app.services.series_batch import (
+    SeriesBatchCastError,
+    SeriesBatchCastMissing,
+    SeriesBatchError,
+    SeriesBatchInputError,
+    SeriesBatchNotFound,
+    SeriesBatchService,
+    SeriesBatchStaleRun,
 )
 
 router = APIRouter(prefix="/api/v2/projects", tags=["durable-projects"])
@@ -224,3 +234,145 @@ def archive_project(
     except ProjectConflictError as err:
         raise HTTPException(409, str(err)) from err
     return _to_dto(record)
+
+
+# ── MF-END-27: series batch (queue >=2 videos, ONE pinned cast pack) ────────
+#
+# The batch adds NO queue and NO table: it schedules the EXISTING durable
+# export authority (MF-END-26 submit → the MF-END-15 idempotent job) one
+# heavy stage at a time, after proving every video shares ONE cast pack.
+# Restart is replay: the same body converges on the same runs/jobs.
+
+
+class SeriesBatchCreateRequest(BaseModel):
+    """Body for queueing or advancing a series batch.
+
+    ``exports`` maps a batch video id to the S12 export submit payload that
+    the EXISTING export authority validates — the batch never invents export
+    identities.  ``measured`` optionally carries a REAL measurement for the
+    throughput/RAM block; when omitted every metric stays ``unmeasured``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    video_item_ids: list[str] = Field(min_length=2)
+    exports: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    generation: str = "1"
+    measured: dict[str, Any] | None = None
+
+
+class SeriesBatchCancelRequest(BaseModel):
+    """Body for cancelling EXACTLY one video of a batch."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    video_item_ids: list[str] = Field(min_length=2)
+    video_item_id: str
+    generation: str = "1"
+
+
+def _batch_service() -> SeriesBatchService:
+    from app.api.deps import get_job_service  # noqa: PLC0415
+
+    job_service = get_job_service()
+    session_factory = job_service.session_factory
+    if session_factory is None:
+        raise HTTPException(503, "durable job service has no session factory")
+    return SeriesBatchService(session_factory, job_service=job_service)
+
+
+def _batch_http(err: SeriesBatchError) -> HTTPException:
+    if isinstance(err, SeriesBatchNotFound):
+        return HTTPException(404, err.as_dict())
+    if isinstance(err, SeriesBatchCastMissing):
+        return HTTPException(422, err.as_dict())
+    if isinstance(err, SeriesBatchCastError):
+        return HTTPException(409, err.as_dict())
+    if isinstance(err, SeriesBatchStaleRun):
+        return HTTPException(409, err.as_dict())
+    if isinstance(err, SeriesBatchInputError):
+        return HTTPException(422, err.as_dict())
+    return HTTPException(500, err.as_dict())
+
+
+@router.post("/{project_id:uuid}/series-batches", status_code=202)
+def create_series_batch(
+    project_id: uuid.UUID,
+    body: SeriesBatchCreateRequest,
+    workspace_id: str = WORKSPACE_ID,
+) -> dict[str, Any]:
+    """Queue the batch: CPU prepare first, then heavy submits one at a time."""
+    service = _batch_service()
+    try:
+        return service.create_batch(
+            workspace_id=workspace_id,
+            project_id=str(project_id),
+            video_item_ids=body.video_item_ids,
+            exports=body.exports,
+            generation=body.generation,
+            measured=body.measured,
+        )
+    except SeriesBatchError as err:
+        raise _batch_http(err) from err
+
+
+@router.get("/{project_id:uuid}/series-batches")
+def get_series_batch(
+    project_id: uuid.UUID,
+    video_item_ids: str = Query(..., min_length=1),
+    generation: str = "1",
+    workspace_id: str = WORKSPACE_ID,
+) -> dict[str, Any]:
+    """Read the batch view over the durable rows (no submissions)."""
+    service = _batch_service()
+    videos = [part.strip() for part in video_item_ids.split(",") if part.strip()]
+    try:
+        return service.get_batch(
+            workspace_id=workspace_id,
+            project_id=str(project_id),
+            video_item_ids=videos,
+            generation=generation,
+        )
+    except SeriesBatchError as err:
+        raise _batch_http(err) from err
+
+
+@router.post("/{project_id:uuid}/series-batches/advance")
+def advance_series_batch(
+    project_id: uuid.UUID,
+    body: SeriesBatchCreateRequest,
+    workspace_id: str = WORKSPACE_ID,
+) -> dict[str, Any]:
+    """Re-verify the cast pin, then admit the NEXT eligible heavy submit."""
+    service = _batch_service()
+    try:
+        return service.advance(
+            workspace_id=workspace_id,
+            project_id=str(project_id),
+            video_item_ids=body.video_item_ids,
+            exports=body.exports,
+            generation=body.generation,
+            measured=body.measured,
+        )
+    except SeriesBatchError as err:
+        raise _batch_http(err) from err
+
+
+@router.post("/{project_id:uuid}/series-batches/cancel")
+def cancel_series_batch_video(
+    project_id: uuid.UUID,
+    body: SeriesBatchCancelRequest,
+    workspace_id: str = WORKSPACE_ID,
+) -> dict[str, Any]:
+    """Cancel exactly ONE video's durable job; the other videos are untouched."""
+    service = _batch_service()
+    try:
+        return service.cancel_video(
+            workspace_id=workspace_id,
+            project_id=str(project_id),
+            video_item_ids=body.video_item_ids,
+            video_item_id=body.video_item_id,
+            generation=body.generation,
+        )
+    except SeriesBatchError as err:
+        raise _batch_http(err) from err

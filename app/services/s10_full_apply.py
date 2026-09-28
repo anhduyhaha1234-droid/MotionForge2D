@@ -584,6 +584,7 @@ class FullApplyService:
         mapping: dict[str, Any] | list[dict[str, Any]] | None = None,
         compatibility_policy: dict[str, Any] | None = None,
         chunk_config: dict[str, Any] | None = None,
+        execution_backend: dict[str, Any] | None = None,
         chunk_frames: int | None = None,
         overlap_frames: int | None = None,
         fps_num: int | None = None,
@@ -605,6 +606,24 @@ class FullApplyService:
             _reject_non_finite(compatibility_policy)
         if chunk_config is not None:
             _reject_non_finite(chunk_config)
+
+        # MF-END-19.1: the execution-backend manifest is a first-class argument.
+        # It rides INSIDE chunk_config so the deterministic planner (the existing
+        # S10 authority) validates it, the plan hash binds it and the run row
+        # persists it — the worker re-derives it before any render.  A duplicate
+        # that disagrees with chunk_config, or a non-object, fails closed here;
+        # every other validation happens in the frozen schema via the planner.
+        if execution_backend is not None:
+            if not isinstance(execution_backend, dict):
+                raise FullApplyServiceError("execution_backend must be an object")
+            merged = dict(chunk_config or {})
+            if "execution_backend" in merged and merged["execution_backend"] != execution_backend:
+                raise FullApplyServiceError(
+                    "chunk_config.execution_backend conflicts with the execution_backend argument"
+                )
+            merged["execution_backend"] = execution_backend
+            _reject_non_finite(merged)
+            chunk_config = merged
 
         # ── Server-side canonical v2 authority (C8) — fail-closed BEFORE planner/enqueue ──
         # Load checkpoint row server-side and verify hash/revision/cross-project.

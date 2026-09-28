@@ -77,6 +77,36 @@ try:
 except ImportError:
     _S10StructuralCompareService: Any = None  # type: ignore[no-redef]
 
+try:
+    from app.services.shot_reskin_executor import (
+        ShotRenderRefusal as _ShotRenderRefusal,
+    )
+    from app.services.shot_reskin_executor import (
+        run_shot_render as _run_shot_render,
+    )
+    from app.services.shot_reskin_executor import (
+        select_profile as _select_shot_profile,
+    )
+except ImportError:  # pragma: no cover - defensive
+    _ShotRenderRefusal: Any = None  # type: ignore[no-redef]
+    _run_shot_render: Any = None  # type: ignore[no-redef]
+    _select_shot_profile: Any = None  # type: ignore[no-redef]
+
+try:
+    from app.services.shot_reskin_cache import (  # noqa: F401
+        ShotCacheRefusal as _ShotCacheRefusal,
+    )
+    from app.services.shot_reskin_cache import (
+        ShotReskinCache as _ShotReskinCache,
+    )
+    from app.services.shot_reskin_cache import (
+        run_cached_shot_render as _run_cached_shot_render,
+    )
+except ImportError:  # pragma: no cover - defensive
+    _ShotCacheRefusal: Any = None  # type: ignore[no-redef]
+    _ShotReskinCache: Any = None  # type: ignore[no-redef]
+    _run_cached_shot_render: Any = None  # type: ignore[no-redef]
+
 __all__ = [
     "JOB_TYPE_S10_FULL_APPLY",
     "S10_FULL_APPLY_STEP_CODE",
@@ -913,6 +943,423 @@ def _stitch_verified_chunks(
     return stitch_rel, sha, size, metadata
 
 
+# ── MF-END-19: shot-level (comfy) execution branch ───────────────────────────
+
+
+def _execution_backend_of(run_row: dict[str, Any]) -> dict[str, Any]:
+    """The run's validated execution-backend manifest ({} => legacy default)."""
+    cfg = run_row.get("chunk_config") or {}
+    if isinstance(cfg, dict):
+        backend = cfg.get("execution_backend")
+        if isinstance(backend, dict):
+            return dict(backend)
+    return {}
+
+
+def _shot_anchor_pin(backend: dict[str, Any], shot_id: str) -> dict[str, Any]:
+    """The shot's digest-pinned start anchor from the frozen backend manifest."""
+    anchors = backend.get("shot_anchors")
+    if not isinstance(anchors, dict) or shot_id not in anchors:
+        raise S10FullApplyJobError(
+            f"the run's execution backend pins no start anchor for shot {shot_id!r} "
+            "(shot_anchors[shot_id] is a frozen plan input; fail closed)"
+        )
+    entry = anchors.get(shot_id)
+    if not isinstance(entry, dict):
+        raise S10FullApplyJobError(f"shot_anchors[{shot_id!r}] must be an object")
+    return entry
+
+
+def _shot_chunk_identity(chunk: dict[str, Any]) -> tuple[str, str]:
+    """The canonical (shot_id, chunk_id) of one plan chunk row (fail closed).
+
+    The DB row carries the planner's canonical ``ck_...`` id inside
+    ``natural_key`` (``s10_chunk:<run>:<ck_...>``); a row with neither
+    identity refuses — the comfy branch never invents an id.
+    """
+    shot_id = str(chunk.get("shot_id") or "")
+    chunk_id = str(chunk.get("chunk_id") or "")
+    if not chunk_id:
+        natural = str(chunk.get("natural_key") or "")
+        if natural.startswith("s10_chunk:"):
+            chunk_id = natural.split(":", 2)[-1]
+    if not shot_id or not chunk_id:
+        raise S10FullApplyJobError("comfy chunk lacks shot_id/chunk_id identity")
+    return shot_id, chunk_id
+
+
+def _render_shot_chunk_via_engine(
+    *,
+    managed_root: Path,
+    run_id: str,
+    chunk: dict[str, Any],
+    chunk_index: int,
+    fps_num: int,
+    fps_den: int,
+    workspace_id: str,
+    project_id: str,
+    video_item_id: str,
+    authority: dict[str, Any],
+    manifest: dict[str, Any],
+    backend: dict[str, Any],
+    session_factory: Any = None,
+    retry: bool = False,
+) -> tuple[Path, str, int, dict[str, Any]]:
+    """Render one whole-shot/GROUP chunk through the shot-level engine (19.3).
+
+    All identities come from the verified plan/authority; the request carries
+    INPUTS ONLY (the outputs/prompt_id come from the engine call itself, never
+    from the payload).  The executor writes the durable execution record
+    (prompt_id + output hashes) and this function re-verifies the produced
+    bytes before returning the frozen evidence shape.
+    """
+    if _run_shot_render is None or _select_shot_profile is None:
+        raise S10FullApplyJobError("shot_reskin_executor not available")
+    shot_id, chunk_id = _shot_chunk_identity(chunk)
+    core_start = int(chunk.get("core_start_frame", 0))
+    core_end = int(chunk.get("core_end_frame", core_start))
+    if core_end < core_start:
+        raise S10FullApplyJobError(f"bad core range {core_start}-{core_end}")
+    member_layer_ids = [str(m) for m in (chunk.get("member_layer_ids") or [])]
+    if not member_layer_ids:
+        raise S10FullApplyJobError(
+            f"comfy chunk {chunk_id!r} carries no member_layer_ids (the whole-shot/group "
+            "plan is required; fail closed)"
+        )
+    mapping_by_layer = _authoritative_mapping_by_layer(authority)
+    _ = chunk_index
+    # Source media must exist + be digest-pinned (fail closed before staging).
+    _load_source_media(managed_root, manifest)
+    source_sha = str(manifest["source_media_sha256"]).lower()
+    source_size = manifest.get("source_media_size_bytes")
+    source_artifact_id = str(manifest.get("source_artifact_id") or source_sha[:32])
+    cast: list[dict[str, Any]] = []
+    for layer_id in member_layer_ids:
+        if layer_id not in mapping_by_layer:
+            raise S10FullApplyJobError(f"layer {layer_id!r} not present in authority mapping")
+        _load_replacement_asset(managed_root, manifest, layer_id)
+        entry = (manifest.get("replacement_assets") or {}).get(layer_id) or {}
+        cast.append(
+            {
+                "role": layer_id,
+                "character_id": str(mapping_by_layer[layer_id].get("role_id") or layer_id),
+                "pack_version_id": str(mapping_by_layer[layer_id]["pack_version"]),
+                "references": [
+                    {
+                        "key": f"{layer_id}@base",
+                        "artifact_id": str(entry.get("artifact_id") or ""),
+                        "kind": "image",
+                        "sha256": str(entry.get("sha256") or "").lower(),
+                        "store_relative_path": str(entry.get("rel") or ""),
+                        "size_bytes": entry.get("size_bytes"),
+                    }
+                ],
+            }
+        )
+    anchor_entry = _shot_anchor_pin(backend, shot_id)
+    anchor_rel = str(anchor_entry.get("relative_path") or "")
+    anchor_sha = str(anchor_entry.get("sha256") or "")
+    if not anchor_rel or len(anchor_sha) != 64:
+        raise S10FullApplyJobError(
+            f"shot {shot_id!r} anchor pin is incomplete (relative_path+sha256 required)"
+        )
+    prompt = (backend.get("shot_prompts") or {}).get(shot_id)
+    if not isinstance(prompt, str) or not prompt:
+        raise S10FullApplyJobError(
+            f"shot {shot_id!r} has no frozen prompt in the run's execution backend "
+            "(fail closed)"
+        )
+    profile = _select_shot_profile(str(backend.get("profile_id") or ""))
+    params = profile.get("params") or {}
+    dims = list(params.get("native_output_dims") or [640, 368])
+    request: dict[str, Any] = {
+        "workspace_id": workspace_id,
+        "project_id": project_id,
+        "video_id": video_item_id,
+        "shot_id": shot_id,
+        "chunk_id": chunk_id,
+        "attempt_id": f"shot-{run_id[:8]}-{chunk_id[:12]}",
+        "backend": backend,
+        "graph": {
+            "file": str(backend.get("graph_file") or profile.get("graph_file") or ""),
+            "file_sha256": str(backend.get("graph_sha256") or ""),
+        },
+        "parameters": {
+            "prompt": prompt,
+            "filename_prefix": f"s10_full_apply/{run_id}/{shot_id}",
+        },
+        "staged_inputs": {"anchor": {"relative_path": anchor_rel, "sha256": anchor_sha}},
+        "anchor": {"relative_path": anchor_rel, "sha256": anchor_sha},
+        "cast": cast,
+        "source": {
+            "artifact_id": source_artifact_id,
+            "sha256": source_sha,
+            "relative_path": str(manifest.get("source_media_rel") or ""),
+            "size_bytes": source_size if isinstance(source_size, int) else None,
+            "fps": {"num": fps_num, "den": fps_den},
+            "span": {"start_frame": core_start, "end_frame_exclusive": core_end + 1},
+        },
+        "output_contract": {
+            "width": int(dims[0]),
+            "height": int(dims[1]),
+            "fps_num": fps_num,
+            "fps_den": fps_den,
+            "frame_count": core_end - core_start + 1,
+            "container": "mp4",
+            "video_codec": "h264",
+            "audio": {"mode": "source_remux", "source_artifact_id": source_artifact_id},
+        },
+        "budget": {
+            "resource_class": "gpu_12gb",
+            "max_wall_seconds": float(manifest.get("shot_render_max_wall_s") or 900.0),
+        },
+        "require_accepted_anchor": bool(backend.get("require_accepted_anchor")),
+        "anchor_identity_digest": None,
+    }
+    if backend.get("seed") is not None:
+        request["parameters"]["seed"] = int(backend["seed"])
+    # MF-END-20: the shot render goes through the content-keyed cache.  A
+    # replay of an identical request NEVER issues a second engine POST; a
+    # restart AFTER submit (in-doubt) refuses instead of re-POSTing the same
+    # attempt, and a cancelled/superseded attempt never pins a late output.
+    cache_hit = False
+    cache_info: dict[str, Any] = {}
+    if session_factory is not None and _run_cached_shot_render is not None:
+        try:
+            outcome = _run_cached_shot_render(
+                session_factory=session_factory,
+                managed_root=managed_root,
+                workspace_id=workspace_id,
+                run_id=run_id,
+                request=request,
+                retry=bool(retry),
+                is_cancelled=None,
+                render=lambda: _run_shot_render(managed_root=managed_root, request=request),
+            )
+        except _ShotCacheRefusal as exc:
+            raise S10FullApplyJobError(
+                f"shot render cache refused ({exc.code.value}): {exc.detail}"
+            ) from exc
+        except Exception as exc:  # noqa: BLE001 — executor refusals are terminal here
+            code = getattr(exc, "code", None)
+            code_value = getattr(code, "value", None) or code
+            raise S10FullApplyJobError(
+                f"shot render refused/failed ({code_value or type(exc).__name__}): {exc}"
+            ) from exc
+        cache_hit = bool(outcome.get("cache_hit"))
+        cache_receipt = dict(outcome.get("receipt") or {})
+        cache_info = {
+            "hit": cache_hit,
+            "content_key": str(outcome.get("content_key") or ""),
+            "receipt_id": str(cache_receipt.get("receipt_id") or ""),
+            "attempt_row_id": str(cache_receipt.get("attempt_row_id") or ""),
+        }
+        if cache_hit:
+            rel = Path(str(cache_receipt.get("output_relative_path") or ""))
+            sha = str(cache_receipt.get("output_sha256") or "")
+            size = int(cache_receipt.get("output_size_bytes") or 0)
+            abs_hit = _lp(managed_root / rel)
+            if not rel.name or not abs_hit.is_file() or hash_file(abs_hit) != sha:
+                raise S10FullApplyJobError(
+                    f"cached shot render receipt is stale on disk: {rel} (fail closed)"
+                )
+            evidence = {
+                "decoded_sha256": str(cache_receipt.get("decoded_sha256") or ""),
+                "decoded_frame_count": int(cache_receipt.get("decoded_frame_count") or 0),
+                "fps_num": int(cache_receipt.get("fps_num") or fps_num),
+                "fps_den": int(cache_receipt.get("fps_den") or fps_den),
+                "layer_id": str(chunk.get("layer_id") or ""),
+                "shot_id": shot_id,
+                "route": "shot_group",
+                "effective_adapter": "comfy_shot_engine",
+                "prompt_id": str(cache_receipt.get("prompt_id") or ""),
+                "graph_object_sha256_submitted": str(
+                    cache_receipt.get("graph_object_sha256_submitted") or ""
+                ),
+                "cache": cache_info,
+            }
+            return rel, sha, size, evidence
+        result = dict(outcome.get("result") or {})
+    else:
+        try:
+            result = _run_shot_render(managed_root=managed_root, request=request)
+        except Exception as exc:  # noqa: BLE001 — executor refusals are terminal here
+            code = getattr(exc, "code", None)
+            code_value = getattr(code, "value", None) or code
+            raise S10FullApplyJobError(
+                f"shot render refused/failed ({code_value or type(exc).__name__}): {exc}"
+            ) from exc
+    rel = Path(str(result["output_relative_path"]))
+    sha = str(result["output_sha256"])
+    size = int(result["output_size_bytes"])
+    abs_out = _lp(managed_root / rel)
+    if not abs_out.is_file() or hash_file(abs_out) != sha:
+        raise S10FullApplyJobError(f"shot render output vanished/drifted: {rel}")
+    evidence = {
+        "decoded_sha256": str(result["decoded_sha256"]),
+        "decoded_frame_count": int(result["decoded_frame_count"]),
+        "fps_num": int(result["fps_num"]),
+        "fps_den": int(result["fps_den"]),
+        "layer_id": str(chunk.get("layer_id") or ""),
+        "shot_id": shot_id,
+        "route": "shot_group",
+        "effective_adapter": "comfy_shot_engine",
+        "prompt_id": str(result.get("prompt_id") or ""),
+        "graph_object_sha256_submitted": str(result.get("graph_object_sha256_submitted") or ""),
+        "shot_render_record": dict(result.get("record") or {}),
+        "window": dict(result.get("window") or {}),
+        "cache": cache_info,
+    }
+    return rel, sha, size, evidence
+
+
+def _stitch_shot_chunks(
+    *,
+    managed_root: Path,
+    run_id: str,
+    chunks: list[dict[str, Any]],
+    session_factory: Any,
+    ws: str,
+    fps_num: int,
+    fps_den: int,
+    authority: dict[str, Any] | None = None,
+    manifest: dict[str, Any] | None = None,
+    frame_count: int | None = None,
+) -> tuple[Path, str, int, dict[str, Any]]:
+    """Stitch verified whole-shot chunks into one playable MP4 (19.4).
+
+    Frame-accurate timeline assembly: every frame covered by a verified chunk
+    comes from that chunk's generated bytes; ranges with no active chunk keep
+    the SOURCE frames verbatim.  Publication-grade gates: EVERY chunk of the
+    run must be present + verified + byte-usable (missing/stale/invalid =>
+    fail closed, zero publication), at least one frame must be GENERATED, and
+    the stitched file must NOT be the source bytes — the source is never
+    returned as a successful output.
+    """
+    from app.services.renderer_routes.composite import (  # noqa: PLC0415
+        canonical_frame_sha256,
+        decode_rgb_frames,
+        write_frames_mp4,
+    )
+
+    if not isinstance(authority, dict) or not isinstance(manifest, dict):
+        raise S10FullApplyJobError(
+            "STITCH_CHUNK_EVIDENCE_MISSING: stitching requires the frozen authority "
+            "+ manifest pins (fail closed)"
+        )
+    ordered = sorted(
+        chunks, key=lambda c: (int(c.get("core_start_frame", 0)), str(c.get("chunk_id")))
+    )
+    if not ordered:
+        raise S10FullApplyJobError("STITCH_NO_CHUNKS: zero chunks cannot publish")
+    source_media = _load_source_media(managed_root, manifest)
+    src_frames = list(decode_rgb_frames(source_media))
+    expected = int(frame_count or 0) or len(src_frames)
+    if len(src_frames) != expected:
+        raise S10FullApplyJobError(
+            f"STITCH_FRAME_COVERAGE_MISMATCH: source decodes to {len(src_frames)} "
+            f"frames; timeline frame_count is {expected}"
+        )
+    timeline: list[Any] = [None] * expected
+    per_chunk: list[dict[str, Any]] = []
+    for ch in ordered:
+        chunk_id = str(ch.get("chunk_id"))
+        if not bool(ch.get("verified")):
+            raise S10FullApplyJobError(
+                f"STITCH_CHUNK_NOT_VERIFIED: chunk {chunk_id} is not verified "
+                "(missing required chunk; fail closed)"
+            )
+        if not _chunk_artifact_usable(
+            session_factory, ws, ch, managed_root, fps_num, fps_den
+        ):
+            raise S10FullApplyJobError(
+                f"STITCH_CHUNK_ARTIFACT_INVALID: chunk {chunk_id} artifact is "
+                "missing/tampered/stale (fail closed)"
+            )
+        with session_factory() as s:
+            row = s.execute(
+                sa_text(
+                    "SELECT relative_path, sha256, size_bytes FROM artifact WHERE id=:aid"
+                ),
+                {"aid": str(ch.get("artifact_id"))},
+            ).mappings().first()
+        if row is None:
+            raise S10FullApplyJobError(
+                f"STITCH_CHUNK_ARTIFACT_INVALID: no artifact row for chunk {chunk_id}"
+            )
+        if str(row["sha256"]) == hash_file(source_media):
+            raise S10FullApplyJobError(
+                f"STITCH_CHUNK_IS_SOURCE: chunk {chunk_id} bytes are the source media "
+                "itself — the source is never returned as the output (fail closed)"
+            )
+        abs_chunk = _lp(managed_root / str(row["relative_path"]))
+        frames = list(decode_rgb_frames(abs_chunk))
+        c_start = int(ch.get("core_start_frame"))
+        c_end = int(ch.get("core_end_frame"))
+        want = c_end - c_start + 1
+        if len(frames) != want:
+            raise S10FullApplyJobError(
+                f"STITCH_FRAME_COVERAGE_MISMATCH: chunk {chunk_id} decodes to "
+                f"{len(frames)} frames; core range wants {want}"
+            )
+        for i, frame in enumerate(frames):
+            idx = c_start + i
+            if idx < 0 or idx >= expected:
+                raise S10FullApplyJobError(
+                    f"STITCH_FRAME_COVERAGE_MISMATCH: chunk {chunk_id} frame {idx} "
+                    f"is outside the timeline ({expected} frames)"
+                )
+            if timeline[idx] is not None:
+                raise S10FullApplyJobError(
+                    f"STITCH_FRAME_OVERLAP: frame {idx} is covered by more than one "
+                    "chunk (fail closed)"
+                )
+            timeline[idx] = frame
+        per_chunk.append(
+            {
+                "chunk_id": chunk_id,
+                "shot_id": ch.get("shot_id"),
+                "core_start_frame": c_start,
+                "core_end_frame": c_end,
+                "artifact_sha256": str(row["sha256"]),
+                "artifact_size_bytes": int(row["size_bytes"] or 0),
+                "decoded_frame_count": len(frames),
+                "decoded_sha256": canonical_frame_sha256(frames),
+            }
+        )
+    generated = sum(1 for f in timeline if f is not None)
+    if generated <= 0:
+        raise S10FullApplyJobError(
+            "STITCH_NO_GENERATED_FRAMES: every frame would be source — refusing to "
+            "publish the source as the output"
+        )
+    for idx, frame in enumerate(timeline):
+        if frame is None:
+            timeline[idx] = src_frames[idx]
+    rel = Path(f"s10_full_apply/{run_id}/stitch_shot_chunks.mp4")
+    abs_out = _lp(managed_root / rel)
+    abs_out.parent.mkdir(parents=True, exist_ok=True)
+    write_frames_mp4(timeline, abs_out, fps=float(fps_num) / float(fps_den))
+    if not abs_out.is_file() or abs_out.stat().st_size <= 0:
+        raise S10FullApplyJobError("STITCH_OUTPUT_MISSING: stitched file was not written")
+    stitch_sha = hash_file(abs_out)
+    if stitch_sha == hash_file(source_media):
+        raise S10FullApplyJobError(
+            "STITCH_SOURCE_RETURNED_AS_OUTPUT: the stitched output is byte-identical "
+            "to the source media (fail closed)"
+        )
+    meta = {
+        "frame_count": expected,
+        "fps_num": fps_num,
+        "fps_den": fps_den,
+        "generated_frames": generated,
+        "source_frames_verbatim": expected - generated,
+        "per_chunk_evidence": per_chunk,
+        "backend": "comfy_shot_engine",
+    }
+    return rel, stitch_sha, abs_out.stat().st_size, meta
+
+
 def s10_full_apply_handler(ctx: WorkerContext) -> dict[str, Any]:
     """Durable step handler — real chunk execution with checkpoint/resume + stitch + publication.
 
@@ -1015,6 +1462,18 @@ def s10_full_apply_handler(ctx: WorkerContext) -> dict[str, Any]:
             "production manifest must not carry stop_after_chunk (caller crash-hook injection rejected)"
         )
 
+    # MF-END-19.4: prompt ids / outputs / publications NEVER come from the
+    # payload, the job manifest or a checkpoint — the engine call produces
+    # them.  A manifest that tries to carry an output bypasses the public
+    # render authority and is rejected before any work.
+    for _forbidden in ("prompt_id", "render_outputs", "output_artifact", "publications"):
+        if _forbidden in manifest:
+            _mark_run_status(session_factory, ws, run_id, "failed")
+            raise S10FullApplyJobError(
+                f"manifest must not carry {_forbidden!r} — prompt ids/outputs/"
+                "publications come from the engine call, never from the payload"
+            )
+
     # C4: verify the canonical server-side render authority + plan pin BEFORE
     # work.  C8: the worker ALSO re-derives the authority fingerprint from the
     # persisted v2 row (fence mutation/tamper before render/publication).
@@ -1032,6 +1491,15 @@ def s10_full_apply_handler(ctx: WorkerContext) -> dict[str, Any]:
         raise
 
     _mark_run_status(session_factory, ws, run_id, "running")
+    # MF-END-20: a durable RETRY (pipeline attempt > 1) is the only writer
+    # allowed to supersede an in-doubt shot-cache submit; a bare restart of
+    # attempt 1 never re-POSTs.
+    pipeline_retry = int(getattr(ctx, "attempt", 1) or 1) > 1
+    # MF-END-19: the run's frozen execution-backend manifest decides whether
+    # each chunk renders through the shot-level engine (whole-shot/GROUP plan)
+    # or keeps the legacy per-layer route executor.  Absent manifest => legacy.
+    backend_manifest = _execution_backend_of(run_row)
+    comfy_shot_mode = str(backend_manifest.get("backend") or "") == "comfy_shot_engine"
     chunks = _list_chunks(session_factory, ws, run_id)
     if not chunks:
         # C1-F5: empty run is fail-closed/non-completed — never mark completed.
@@ -1068,19 +1536,37 @@ def s10_full_apply_handler(ctx: WorkerContext) -> dict[str, Any]:
         _mark_chunk_state(session_factory, ws, chunk_id, "running")
 
         try:
-            rel, sha, size, evidence = _render_chunk_via_real_executor(
-                managed_root=managed_root,
-                run_id=run_id,
-                chunk=ch,
-                chunk_index=idx,
-                fps_num=fps_num,
-                fps_den=fps_den,
-                workspace_id=ws,
-                project_id=project_id,
-                video_item_id=video_item_id,
-                authority=authority,
-                manifest=manifest,
-            )
+            if comfy_shot_mode:
+                rel, sha, size, evidence = _render_shot_chunk_via_engine(
+                    managed_root=managed_root,
+                    run_id=run_id,
+                    chunk=ch,
+                    chunk_index=idx,
+                    fps_num=fps_num,
+                    fps_den=fps_den,
+                    workspace_id=ws,
+                    project_id=project_id,
+                    video_item_id=video_item_id,
+                    authority=authority,
+                    manifest=manifest,
+                    backend=backend_manifest,
+                    session_factory=session_factory,
+                    retry=pipeline_retry,
+                )
+            else:
+                rel, sha, size, evidence = _render_chunk_via_real_executor(
+                    managed_root=managed_root,
+                    run_id=run_id,
+                    chunk=ch,
+                    chunk_index=idx,
+                    fps_num=fps_num,
+                    fps_den=fps_den,
+                    workspace_id=ws,
+                    project_id=project_id,
+                    video_item_id=video_item_id,
+                    authority=authority,
+                    manifest=manifest,
+                )
         except S10FullApplyJobError:
             _mark_chunk_state(session_factory, ws, chunk_id, "failed")
             _mark_run_status(session_factory, ws, run_id, "failed")
@@ -1127,9 +1613,27 @@ def s10_full_apply_handler(ctx: WorkerContext) -> dict[str, Any]:
     except Exception:
         has_completed = False
     if not has_completed:
+        # MF-END-20: publication-time guard — the run's pinned shot receipts
+        # must still be byte-live.  A tampered/missing receipt artifact refuses
+        # the publication (replay never publishes drifted bytes).
+        if comfy_shot_mode and _ShotReskinCache is not None:
+            try:
+                with session_factory() as _guard_sess:
+                    _guard = _ShotReskinCache(_guard_sess, managed_root=managed_root)
+                    _guard.assert_run_receipts_live(workspace_id=ws, run_id=run_id)
+            except _ShotCacheRefusal as exc:
+                _mark_run_status(session_factory, ws, run_id, "failed")
+                raise S10FullApplyJobError(
+                    f"publication refused by the shot cache guard ({exc.code.value}): {exc.detail}"
+                ) from exc
         try:
             all_chunks = _list_chunks(session_factory, ws, run_id)
-            stitch_rel, stitch_sha, stitch_size, stitch_meta = _stitch_verified_chunks(
+            # MF-END-19.4: the shot-level backend stitches frame-accurate whole-
+            # shot chunks (every required chunk present + verified, never the
+            # source as the output); the legacy backend keeps the per-layer
+            # composition contract.
+            _stitch_fn = _stitch_shot_chunks if comfy_shot_mode else _stitch_verified_chunks
+            stitch_rel, stitch_sha, stitch_size, stitch_meta = _stitch_fn(
                 managed_root=managed_root,
                 run_id=run_id,
                 chunks=all_chunks,
@@ -1295,7 +1799,7 @@ def _list_chunks(session_factory, ws: str, run_id: str) -> list[dict[str, Any]]:
     with session_factory() as s:
         rows = s.execute(
             sa_text(
-                "SELECT id, chunk_index, order_index, shot_id, layer_id, object_role_id, core_start_frame, core_end_frame, overlap_before, overlap_after, content_hash, state, attempt, artifact_id, verified FROM s10_full_apply_chunk WHERE workspace_id=:ws AND run_id=:rid ORDER BY order_index, chunk_index"
+                "SELECT id, chunk_index, order_index, shot_id, layer_id, object_role_id, core_start_frame, core_end_frame, overlap_before, overlap_after, content_hash, state, attempt, artifact_id, verified, natural_key FROM s10_full_apply_chunk WHERE workspace_id=:ws AND run_id=:rid ORDER BY order_index, chunk_index"
             ),
             {"ws": ws, "rid": run_id},
         ).mappings().all()

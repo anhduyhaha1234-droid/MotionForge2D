@@ -1113,6 +1113,288 @@ export const PACK_STATUS_LABELS: Record<PackStatus, string> = {
 
 // ─── API Functions ──────────────────────────────────────────────────────────
 
+// ── Journey (import → objects/cast → demo → apply → review → export) ───────
+//
+// ONE deterministic mapping from REAL backend state to the production
+// journey: which step the user is on, the context-preserving href of the next
+// actionable step, and — when a step's dependencies are not met — the simple
+// missing-requirement sentence the UI shows instead of letting the user walk
+// into a dead end.  Pure + dependency-free on purpose: the CI node battery
+// executes THESE functions verbatim over real backend payloads (no
+// re-implementation, no mock).
+
+export type JourneyStageKey =
+  | "import"
+  | "objects"
+  | "demo"
+  | "apply"
+  | "review"
+  | "export";
+
+/** done = the step's outcome exists; current = actionable next; blocked = missing deps. */
+export type JourneyStageStatus = "done" | "current" | "blocked";
+
+export interface JourneyStageView {
+  key: JourneyStageKey;
+  label: string;
+  /** Short VN helper describing what the step does (rendered under the action). */
+  helper: string;
+  status: JourneyStageStatus;
+  /** Context-preserving href — null while the step is blocked (fail closed). */
+  href: string | null;
+  /** Simple missing-requirement sentence — null when the step is open. */
+  missing: string | null;
+}
+
+export interface JourneyContext {
+  projectId: string;
+  workspaceId?: string;
+  /** Durable video item of the analyzed source (null before import completes). */
+  videoItemId?: string | null;
+  /** GET /api/projects/{id}/analyze → chain_status (real chain truth). */
+  analyzeChainStatus?: string | null;
+  /** GET /api/v2/project-cast → total mappings (cast pinned for this project). */
+  castMappingCount?: number | null;
+  /** GET /api/v2/s09-approvals → total checkpoints (demo approval exists). */
+  approvalCount?: number | null;
+  /** Last full-apply run pointer for THIS project (URL/localStorage). */
+  applyRunId?: string | null;
+  /** GET /api/v2/full-apply/{run_id} → status (only when a pointer exists). */
+  applyRunStatus?: string | null;
+  /** Server truth: latest COMPLETED full apply (export context / apply status). */
+  fullApplyRunId?: string | null;
+  /** Existing export run for this project+video (context current_run / storage). */
+  exportRunId?: string | null;
+}
+
+const MISSING_NO_VIDEO = "Thiếu: video item từ bước Nhập & Phân tích.";
+const MISSING_NO_CAST =
+  "Thiếu: ghim bộ nhân vật cho các vai (bước Chọn đối tượng).";
+const MISSING_NO_APPROVAL =
+  "Thiếu: checkpoint duyệt Demo (bước So sánh & duyệt Demo).";
+const MISSING_NO_RUN = "Thiếu: lượt Apply đã chạy (bước Áp dụng).";
+const MISSING_NO_PUBLICATION =
+  "Thiếu: lượt Apply hoàn tất có publication (bước Áp dụng).";
+
+function _q(params: Record<string, string>): string {
+  return Object.entries(params)
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+    .join("&");
+}
+
+/** /import-analyze?project=<id> — the approved import chain for this project. */
+export function buildImportHref(projectId: string): string {
+  return `/import-analyze?${_q({ project: projectId })}`;
+}
+
+/** /object-gallery?project=<id>&video=<id> — selection EXPLICIT at click time. */
+export function buildObjectsHref(projectId: string, videoItemId: string): string {
+  return `/object-gallery?${_q({ project: projectId, video: videoItemId })}`;
+}
+
+/** /demo-compare — the demo comparison / approval surface. */
+export function buildDemoHref(): string {
+  return "/demo-compare";
+}
+
+/** /apply?project=<id>[&run_id=<id>] — resume the last known run. */
+export function buildApplyHref(projectId: string, applyRunId?: string | null): string {
+  const params: Record<string, string> = { project: projectId };
+  if (applyRunId) params.run_id = applyRunId;
+  return `/apply?${_q(params)}`;
+}
+
+/** /projects/<id>/review — the QC review queue of this project. */
+export function buildReviewHref(projectId: string): string {
+  return `/projects/${encodeURIComponent(projectId)}/review`;
+}
+
+/** /export?project=&video=&workspace=[&run=] — export scoped to one video. */
+export function buildExportHref(
+  projectId: string,
+  videoItemId: string,
+  workspaceId = "default",
+  exportRunId?: string | null,
+): string {
+  const params: Record<string, string> = {
+    project: projectId,
+    video: videoItemId,
+    workspace: workspaceId,
+  };
+  if (exportRunId) params.run = exportRunId;
+  return `/export?${_q(params)}`;
+}
+
+function _stage(
+  key: JourneyStageKey,
+  label: string,
+  helper: string,
+  status: JourneyStageStatus,
+  href: string | null,
+  missing: string | null = null,
+): JourneyStageView {
+  return { key, label, helper, status, href, missing };
+}
+
+/**
+ * Map real backend state → the six journey steps.
+ *
+ * Fail closed: a step whose dependency is missing is ``blocked`` with a
+ * ``missing`` sentence and NO href — the UI must not open it.  ``current``
+ * is the first actionable step in journey order.
+ */
+export function buildJourneyStages(ctx: JourneyContext): JourneyStageView[] {
+  const hasVideo = typeof ctx.videoItemId === "string" && ctx.videoItemId.length > 0;
+  const castDone = (ctx.castMappingCount ?? 0) > 0;
+  const demoDone = (ctx.approvalCount ?? 0) > 0;
+  const applyDone =
+    ctx.applyRunStatus === "completed" ||
+    (typeof ctx.fullApplyRunId === "string" && ctx.fullApplyRunId.length > 0);
+  const exportDone = typeof ctx.exportRunId === "string" && ctx.exportRunId.length > 0;
+  // Chain unreadable (durable-only project without a legacy chain): a
+  // downstream outcome (cast / approval / apply) can only exist if the source
+  // was imported AND analyzed — infer "done" from that evidence, never guess.
+  const chainUnknown = (ctx.analyzeChainStatus ?? null) === null;
+  const importDone =
+    ctx.analyzeChainStatus === "completed" ||
+    (chainUnknown && (castDone || demoDone || applyDone));
+
+  const videoItemId = hasVideo ? (ctx.videoItemId as string) : "";
+  const workspaceId = ctx.workspaceId ?? "default";
+
+  const stages: JourneyStageView[] = [];
+
+  stages.push(
+    _stage(
+      "import",
+      "Nhập & Phân tích",
+      "Tải MP4 nguồn và chạy chuỗi nhập nguồn → proxy → phát hiện cảnh.",
+      importDone ? "done" : "current",
+      buildImportHref(ctx.projectId),
+    ),
+  );
+
+  if (!hasVideo) {
+    stages.push(
+      _stage("objects", "Chọn đối tượng", "Gán vai và ghim bộ nhân vật từ kho cho video này.", "blocked", null, MISSING_NO_VIDEO),
+      _stage("demo", "So sánh & duyệt Demo", "Xem so sánh và tạo checkpoint duyệt Demo trước khi Apply.", "blocked", null, MISSING_NO_VIDEO),
+      _stage("apply", "Áp dụng (Full Apply)", "Chạy Apply toàn bộ video từ checkpoint duyệt Demo.", "blocked", null, MISSING_NO_VIDEO),
+      _stage("review", "Duyệt QC", "Mở hàng đợi QC — xem issue và vị trí lỗi.", "blocked", null, MISSING_NO_VIDEO),
+      _stage("export", "Xuất video", "Xuất MP4 thật từ lượt Apply đã hoàn tất.", "blocked", null, MISSING_NO_VIDEO),
+    );
+    return stages;
+  }
+
+  stages.push(
+    _stage(
+      "objects",
+      "Chọn đối tượng",
+      "Gán vai và ghim bộ nhân vật từ kho cho video này.",
+      castDone ? "done" : "current",
+      buildObjectsHref(ctx.projectId, videoItemId),
+    ),
+  );
+
+  if (!castDone) {
+    stages.push(
+      _stage("demo", "So sánh & duyệt Demo", "Xem so sánh và tạo checkpoint duyệt Demo trước khi Apply.", "blocked", null, MISSING_NO_CAST),
+      _stage("apply", "Áp dụng (Full Apply)", "Chạy Apply toàn bộ video từ checkpoint duyệt Demo.", "blocked", null, MISSING_NO_CAST),
+      _stage("review", "Duyệt QC", "Mở hàng đợi QC — xem issue và vị trí lỗi.", "blocked", null, MISSING_NO_CAST),
+      _stage("export", "Xuất video", "Xuất MP4 thật từ lượt Apply đã hoàn tất.", "blocked", null, MISSING_NO_CAST),
+    );
+    return stages;
+  }
+
+  stages.push(
+    _stage(
+      "demo",
+      "So sánh & duyệt Demo",
+      "Xem so sánh và tạo checkpoint duyệt Demo trước khi Apply.",
+      demoDone ? "done" : "current",
+      buildDemoHref(),
+    ),
+  );
+
+  if (!demoDone) {
+    stages.push(
+      _stage("apply", "Áp dụng (Full Apply)", "Chạy Apply toàn bộ video từ checkpoint duyệt Demo.", "blocked", null, MISSING_NO_APPROVAL),
+      _stage("review", "Duyệt QC", "Mở hàng đợi QC — xem issue và vị trí lỗi.", "blocked", null, MISSING_NO_APPROVAL),
+      _stage("export", "Xuất video", "Xuất MP4 thật từ lượt Apply đã hoàn tất.", "blocked", null, MISSING_NO_APPROVAL),
+    );
+    return stages;
+  }
+
+  stages.push(
+    _stage(
+      "apply",
+      "Áp dụng (Full Apply)",
+      "Chạy Apply toàn bộ video từ checkpoint duyệt Demo.",
+      applyDone ? "done" : "current",
+      buildApplyHref(ctx.projectId, ctx.applyRunId ?? null),
+    ),
+  );
+
+  const runKnown =
+    (typeof ctx.applyRunId === "string" && ctx.applyRunId.length > 0) ||
+    (typeof ctx.fullApplyRunId === "string" && ctx.fullApplyRunId.length > 0);
+  if (!runKnown) {
+    stages.push(
+      _stage("review", "Duyệt QC", "Mở hàng đợi QC — xem issue và vị trí lỗi.", "blocked", null, MISSING_NO_RUN),
+      _stage("export", "Xuất video", "Xuất MP4 thật từ lượt Apply đã hoàn tất.", "blocked", null, MISSING_NO_RUN),
+    );
+    return stages;
+  }
+
+  stages.push(
+    _stage(
+      "review",
+      "Duyệt QC",
+      "Mở hàng đợi QC — xem issue và vị trí lỗi.",
+      applyDone ? "done" : "current",
+      buildReviewHref(ctx.projectId),
+    ),
+  );
+
+  if (!applyDone) {
+    stages.push(
+      _stage("export", "Xuất video", "Xuất MP4 thật từ lượt Apply đã hoàn tất.", "blocked", null, MISSING_NO_PUBLICATION),
+    );
+    return stages;
+  }
+
+  stages.push(
+    _stage(
+      "export",
+      "Xuất video",
+      "Xuất MP4 thật từ lượt Apply đã hoàn tất.",
+      exportDone ? "done" : "current",
+      buildExportHref(ctx.projectId, videoItemId, workspaceId, ctx.exportRunId ?? null),
+    ),
+  );
+
+  return stages;
+}
+
+/** First actionable step in journey order (null when everything is done). */
+export function journeyNextStage(stages: JourneyStageView[]): JourneyStageView | null {
+  for (const stage of stages) {
+    if (stage.status === "current" && stage.href) return stage;
+  }
+  return null;
+}
+
+/**
+ * Index for a StageRail-style progress bar: the first ``current`` step, else
+ * the first blocked step (honest "stuck here"), else the last step.
+ */
+export function journeyCurrentIndex(stages: JourneyStageView[]): number {
+  const current = stages.findIndex((s) => s.status === "current");
+  if (current >= 0) return current;
+  const blocked = stages.findIndex((s) => s.status === "blocked");
+  if (blocked >= 0) return blocked;
+  return Math.max(0, stages.length - 1);
+}
+
 export const api = {
   // Projects
   createProject: (name: string) =>

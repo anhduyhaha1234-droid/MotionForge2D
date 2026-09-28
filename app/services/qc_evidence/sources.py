@@ -16,6 +16,7 @@ does not match is ``QC_EVIDENCE_TAMPERED`` — never a silent pass.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -768,6 +769,63 @@ def pin_reference(pin: Mapping[str, Any]) -> ArtifactEvidence:
         )
     return evidence
 
+
+
+#: Managed-artifact purpose of the sealed RENDERED observations (MF-END-21):
+#: the output-side mask/track record measured on the render pixels.
+RENDERED_OBSERVATIONS_PURPOSE = "rendered_observations"
+
+
+def rendered_observations_artifact(
+    session: Session, managed_root: Path, scope: VideoScope, *, detector: str
+) -> tuple[ArtifactEvidence, dict[str, Any]]:
+    """The video's newest PUBLISHED rendered-observations payload.
+
+    Returns the verified artifact bytes + the parsed payload object.  A
+    missing publication is ``QC_EVIDENCE_MISSING``; published bytes that are
+    not a JSON object are ``QC_EVIDENCE_MALFORMED`` (a published observation
+    record that cannot be read is never silently skipped).  Byte integrity is
+    the usual :func:`read_artifact` contract: the file is re-hashed against
+    the recorded sha256/size before the payload is used.
+    """
+    rows = session.execute(
+        select(ArtifactOwner.artifact_id)
+        .join(Artifact, Artifact.id == ArtifactOwner.artifact_id)
+        .where(
+            Artifact.workspace_id == scope.workspace_id,
+            Artifact.kind == "document",
+            Artifact.state == _READY,
+            ArtifactOwner.owner_type == "video_item",
+            ArtifactOwner.owner_id == scope.video_item_id,
+            ArtifactOwner.purpose == RENDERED_OBSERVATIONS_PURPOSE,
+        )
+        .order_by(Artifact.created_at.desc(), Artifact.id)
+    ).all()
+    if not rows:
+        raise missing(
+            detector,
+            "the video has no published rendered-observations artifact; the "
+            "output-side observation (MF-END-21) was never produced for it",
+            video_item_id=scope.video_item_id,
+        )
+    evidence = read_artifact(
+        session, managed_root, scope, str(rows[0][0]), detector=detector
+    )
+    try:
+        payload = json.loads(evidence.data.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise malformed(
+            detector,
+            f"published rendered-observations bytes are not JSON: {exc}",
+            artifact_id=evidence.artifact_id,
+        ) from exc
+    if not isinstance(payload, dict):
+        raise malformed(
+            detector,
+            "published rendered-observations payload is not a JSON object",
+            artifact_id=evidence.artifact_id,
+        )
+    return evidence, payload
 
 
 def manifest_segments(manifest: LockManifestRecord) -> list[dict[str, Any]]:
