@@ -524,6 +524,72 @@ def stacking_order(
     return bottom + ordered
 
 
+def mask_support_separation(
+    frame: Any,
+    mask: Any,
+    *,
+    halo_px: int = 4,
+    detector: str = _SCOPE,
+) -> dict[str, Any]:
+    """Measured pixel support of a CLAIMED mask on the decoded frame bytes.
+
+    A claimed mask is supported when the pixels it covers look DIFFERENT from
+    the ring of pixels immediately around it (``halo_px`` rows/columns outside
+    the mask's own bbox): a claim whose inside and outside have the same
+    measured appearance is not an observation of these pixels — it is an
+    unsupported guess, and the caller must refuse it.  Both sides are measured
+    on the frame's own bytes; no source-side value is used.
+
+    ``separation`` is ``None`` (with a typed ``reason``) when no support can
+    be measured at all (empty mask / no measurable ring) — never defaulted to
+    a green value.
+    """
+    array = _gray(frame, detector=detector)
+    block = np.asarray(mask).astype(bool)
+    if block.ndim != 2 or block.shape != array.shape:
+        raise malformed(
+            detector,
+            f"claimed mask {block.shape} does not match the frame "
+            f"{array.shape}; its support cannot be measured",
+        )
+    payload: dict[str, Any] = {
+        "inside_px": 0,
+        "ring_px": 0,
+        "inside_mean": None,
+        "outside_mean": None,
+        "separation": None,
+        "reason": "no_inside_px",
+        "halo_px": int(max(0, int(halo_px))),
+        "definition": "|mean(frame[mask]) - mean(frame[ring])| where ring is "
+        "the mask bbox widened by halo_px (clamped to the frame) minus the "
+        "mask itself, all measured on this decoded frame",
+    }
+    if not block.any():
+        return payload
+    ys, xs = np.nonzero(block)
+    x0, y0 = int(xs.min()), int(ys.min())
+    x1, y1 = int(xs.max()) + 1, int(ys.max()) + 1
+    height, width = int(array.shape[0]), int(array.shape[1])
+    halo = int(payload["halo_px"])
+    gx0, gy0 = max(0, x0 - halo), max(0, y0 - halo)
+    gx1, gy1 = min(width, x1 + halo), min(height, y1 + halo)
+    window = np.zeros_like(block)
+    window[gy0:gy1, gx0:gx1] = True
+    ring = window & ~block
+    payload["inside_px"] = int(block.sum())
+    payload["ring_px"] = int(ring.sum())
+    if payload["ring_px"] == 0:
+        payload["reason"] = "no_measurable_ring"
+        return payload
+    inside_mean = float(array[block].mean())
+    outside_mean = float(array[ring].mean())
+    payload["inside_mean"] = round(inside_mean, 9)
+    payload["outside_mean"] = round(outside_mean, 9)
+    payload["separation"] = round(abs(inside_mean - outside_mean), 9)
+    payload["reason"] = None if payload["separation"] > 0.0 else "no_separation"
+    return payload
+
+
 __all__ = [
     "CUT_DOMINANCE_FACTOR",
     "CUT_SUPPORT_FRAMES",
@@ -538,6 +604,7 @@ __all__ = [
     "clamp_region",
     "frame_delta",
     "grown_region",
+    "mask_support_separation",
     "measured_stacking",
     "observed_boundary",
     "rendered_object_bbox",
