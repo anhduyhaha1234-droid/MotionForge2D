@@ -52,12 +52,14 @@ import hashlib
 import json
 from typing import Any
 
+from app.services import source_interaction_facts as sif
 from app.services.qc_checks.registry import DetectorSpec, register_detector
 from app.services.qc_checks.thresholds import (
     STATUS_BLOCKER,
     classify,
     get_threshold,
 )
+from app.services.qc_evidence import measure as qcm
 
 DETECTOR_NAME = "contact_break"
 DETECTOR_REVISION = "1.0.0"
@@ -293,4 +295,319 @@ def register(*, version: str = DETECTOR_REVISION) -> DetectorSpec:
             "render-overlap after expiry; min vertical gap classified "
             "against the frozen T03A policy (px)"
         ),
+    )
+
+
+# ── MF-END-22.1/22.3/22.4: SOURCE contact facts vs OUTPUT observations ───────
+#
+# The comparison consumes the SEALED source facts (MF-END-13) and the SEALED
+# output observations (MF-END-21); it never re-derives either side and refuses
+# (typed UNKNOWN/BLOCKED) when a side is missing or ambiguous.  A source
+# contact (person <-> prop interval, measured on the SOURCE pixels) must be
+# reproduced by the OUTPUT observations with the source side's own
+# definitions: bbox edge gap <= 8 px and (grasp) containment >= 0.55.
+#
+# Defect taxonomy (hard dominates — the appearance of the output can never
+# compensate it):
+# - ``QC_COMPARISON_CONTACT_OWNER_CHANGED`` (hard): the declared contact is
+#   broken in the output AND another role now holds the object (the BOOK
+#   changed owner);
+# - ``QC_COMPARISON_CONTACT_LOST`` (hard): the declared contact is broken and
+#   no other role holds the object;
+# - ``QC_COMPARISON_CONTACT_WEAKENED`` (soft): the contact attenuated into the
+#   frozen warning band, or a grasp that is no longer contained.
+
+COMPARISON_DETECTOR_NAME = "contact_break_comparison"
+
+
+def _round9(value: float) -> float:
+    return round(float(value), 9)
+
+
+def _owner_shift(
+    ctx: dict[str, Any],
+    *,
+    subject_role: str,
+    object_role: str,
+    object_rows: dict[int, Any],
+    frames: list[int],
+    declared_gap: float,
+) -> dict[str, Any] | None:
+    """The closest OTHER output role to the object, when it beats the subject."""
+    best: dict[str, Any] | None = None
+    for track in ctx["observations"].get("tracks") or []:
+        role_id = str(track.get("role_id") or "")
+        if not role_id or role_id in (subject_role, object_role):
+            continue
+        other = qcm.output_rows(ctx, role_id)
+        if other is None:
+            continue
+        other_gap = qcm.measure_contact_gap_px(other["rows"], object_rows, frames)
+        if other_gap is None:
+            continue
+        candidate = {
+            "role_id": role_id,
+            "gap_px": _round9(other_gap),
+            "beats_declared": bool(
+                other_gap < declared_gap
+                and other_gap <= qcm.COMPARISON_CONTACT_MAX_GAP_PX
+            ),
+        }
+        if best is None or candidate["gap_px"] < best["gap_px"]:
+            best = candidate
+    if best is None or not best["beats_declared"]:
+        return best
+    return best
+
+
+def compare_contact_facts(args: dict[str, Any]) -> dict[str, Any]:
+    """Compare the source contact facts with the output observations.
+
+    ``args`` (JSON-safe):
+
+    ``{source_facts: <MF-END-13 sealed payload>,
+       output_observations: <MF-END-21 sealed payload>,
+       source_tracks: <MF-END-12 sealed payload> | absent,
+       frame_map: {source_to_output: {...}} | absent,
+       appearance: {...} | absent}``
+
+    Returns the shared comparison envelope (verdict + typed items).
+    """
+    ctx, refusals = qcm.comparison_context(args)
+    if refusals:
+        verdict = qcm.compare_verdict(
+            [], blocked=refusals, appearance=args.get("appearance")
+        )
+        return qcm.comparison_result(
+            detector=COMPARISON_DETECTOR_NAME,
+            reason_code=DETECTOR_NAME,
+            verdict=verdict,
+            items=[],
+            uncertain=[],
+            blocked=refusals,
+            checked=[],
+            ctx={},
+            extra={"refusals": refusals},
+        )
+
+    items: list[dict[str, Any]] = []
+    uncertain: list[dict[str, Any]] = []
+    blocked: list[dict[str, Any]] = []
+    checked: list[dict[str, Any]] = []
+
+    for fact in ctx["facts"].get("contacts") or []:
+        if not isinstance(fact, dict):
+            continue
+        subject_role = str(fact.get("subject_role_id") or "")
+        object_role = str(fact.get("object_role_id") or "")
+        kind = str(fact.get("kind") or "")
+        start = int(fact.get("start_frame", 0))
+        end = int(fact.get("end_frame", start))
+        frames = list(range(start, end))
+        core = {
+            "subject_role_id": subject_role,
+            "object_role_id": object_role,
+            "kind": kind,
+            "span": [start, end],
+        }
+        subject = qcm.output_rows(ctx, subject_role)
+        obj = qcm.output_rows(ctx, object_role)
+        if subject is None or obj is None:
+            absent = subject_role if subject is None else object_role
+            refusal = qcm.refused_role(ctx["observations"], absent)
+            blocked.append(
+                {
+                    "code": qcm.CODE_COMPARISON_NOT_OBSERVED,
+                    "role_id": absent,
+                    "frames": [start, end - 1],
+                    "fact": core,
+                    "detail": (
+                        "the output carries no usable observation track for role "
+                        f"{absent!r}; the declared contact cannot be compared"
+                    ),
+                    "output_refusal": refusal,
+                }
+            )
+            checked.append({**core, "status": qcm.VERDICT_BLOCKED})
+            continue
+        measured = [
+            frame
+            for frame in frames
+            if qcm.bbox_of(subject["rows"].get(frame) or {}) is not None
+            and qcm.bbox_of(obj["rows"].get(frame) or {}) is not None
+        ]
+        record: dict[str, Any] = {
+            **core,
+            "measured_frames": measured,
+            "missing": {
+                "subject": sorted(set(subject["missing"]["gap_frames"]) & set(frames)),
+                "object": sorted(set(obj["missing"]["gap_frames"]) & set(frames)),
+                "object_occluded": sorted(set(obj["occluded_frames"]) & set(frames)),
+            },
+        }
+        if not measured:
+            uncertain.append(
+                {
+                    "code": qcm.CODE_COMPARISON_NOT_OBSERVED,
+                    "role_id": subject_role,
+                    "frames": [start, end - 1],
+                    "fact": core,
+                    "detail": (
+                        "no frame of the declared contact window carries measured "
+                        "boxes on BOTH instances in the output; nothing is guessed"
+                    ),
+                }
+            )
+            checked.append({**record, "status": qcm.VERDICT_UNKNOWN})
+            continue
+
+        gap = qcm.measure_contact_gap_px(subject["rows"], obj["rows"], measured)
+        # containment(subject_box, object_box) — the source side's own
+        # direction (fraction of the OBJECT's box covered by the subject).
+        containment = qcm.measure_containment_mean(
+            subject["rows"], obj["rows"], measured
+        )
+        assert gap is not None  # measured frames guarantee a value
+        status, code = qcm.classify_comparison(qcm.METRIC_CONTACT_GAP, gap)
+        evidence = {
+            "fact": core,
+            "measured_frames": measured,
+            "measured_min_gap_px": _round9(gap),
+            "measured_mean_containment": (
+                _round9(containment) if containment is not None else None
+            ),
+            "missing": record["missing"],
+            "thresholds": {
+                "contact_max_gap_px": qcm.COMPARISON_CONTACT_MAX_GAP_PX,
+                "contact_min_containment": qcm.COMPARISON_CONTACT_MIN_CONTAINMENT,
+                "policy": qcm.comparison_threshold(qcm.METRIC_CONTACT_GAP),
+            },
+            "mapping": ctx.get("mapping"),
+            "measure": (
+                "edge-to-edge bbox gap between the two instances' OUTPUT "
+                "observations over the declared source frames; a grasp also "
+                "requires the object's box to sit inside the subject's box"
+            ),
+        }
+        if status == "invalid":
+            uncertain.append(
+                {
+                    "code": qcm.CODE_COMPARISON_INVALID,
+                    "role_id": subject_role,
+                    "frames": measured,
+                    "fact": core,
+                    "detail": (
+                        f"measured contact gap {gap!r} px is outside the frozen "
+                        "calibrated envelope — a pipeline fault, not a QC claim"
+                    ),
+                }
+            )
+            checked.append({**record, "status": qcm.VERDICT_UNKNOWN})
+            continue
+        if status == "blocker":
+            owner = _owner_shift(
+                ctx,
+                subject_role=subject_role,
+                object_role=object_role,
+                object_rows=obj["rows"],
+                frames=measured,
+                declared_gap=gap,
+            )
+            if owner is not None and owner.get("beats_declared"):
+                items.append(
+                    qcm.comparison_item(
+                        metric=qcm.METRIC_CONTACT_GAP,
+                        code=qcm.CODE_CONTACT_OWNER_CHANGED,
+                        level=qcm.LEVEL_HARD,
+                        severity="blocker",
+                        role_id=subject_role,
+                        frames=measured,
+                        detail=(
+                            f"the declared contact {subject_role!r}<->{object_role!r} "
+                            f"is broken in the output (min gap {_round9(gap)} px) and "
+                            f"{owner['role_id']!r} is now the closest role to the "
+                            f"object (gap {owner['gap_px']} px): the object changed "
+                            "owner"
+                        ),
+                        evidence={**evidence, "owner_candidate": owner},
+                    )
+                )
+                checked.append({**record, "status": qcm.VERDICT_FAIL})
+                continue
+            items.append(
+                qcm.comparison_item(
+                    metric=qcm.METRIC_CONTACT_GAP,
+                    code=qcm.CODE_CONTACT_LOST,
+                    level=qcm.LEVEL_HARD,
+                    severity="blocker",
+                    role_id=subject_role,
+                    frames=measured,
+                    detail=(
+                        f"the declared contact {subject_role!r}<->{object_role!r} is "
+                        f"not reproduced by the output (min measured gap "
+                        f"{_round9(gap)} px >= blocker boundary); no other role "
+                        "holds the object"
+                    ),
+                    evidence={**evidence, "owner_candidate": owner},
+                )
+            )
+            checked.append({**record, "status": qcm.VERDICT_FAIL})
+            continue
+        if status == "warning":
+            items.append(
+                qcm.comparison_item(
+                    metric=qcm.METRIC_CONTACT_GAP,
+                    code=qcm.CODE_CONTACT_WEAKENED,
+                    level=qcm.LEVEL_SOFT,
+                    severity="warning",
+                    role_id=subject_role,
+                    frames=measured,
+                    detail=(
+                        f"the declared contact {subject_role!r}<->{object_role!r} "
+                        f"attenuated in the output (min measured gap "
+                        f"{_round9(gap)} px inside the warning band)"
+                    ),
+                    evidence=evidence,
+                )
+            )
+            checked.append({**record, "status": qcm.VERDICT_WARN})
+            continue
+        if (
+            kind == sif.CONTACT_KIND_GRASP
+            and containment is not None
+            and containment < qcm.COMPARISON_CONTACT_MIN_CONTAINMENT
+        ):
+            items.append(
+                qcm.comparison_item(
+                    metric=qcm.METRIC_CONTACT_GAP,
+                    code=qcm.CODE_CONTACT_WEAKENED,
+                    level=qcm.LEVEL_SOFT,
+                    severity="warning",
+                    role_id=subject_role,
+                    frames=measured,
+                    detail=(
+                        "the declared GRASP is no longer contained in the output "
+                        f"(mean containment {_round9(containment)} < "
+                        f"{qcm.COMPARISON_CONTACT_MIN_CONTAINMENT}) — the contact "
+                        "shape changed"
+                    ),
+                    evidence=evidence,
+                )
+            )
+            checked.append({**record, "status": qcm.VERDICT_WARN})
+            continue
+        checked.append({**record, "status": qcm.VERDICT_PASS})
+
+    verdict = qcm.compare_verdict(
+        items, uncertain=uncertain, blocked=blocked, appearance=args.get("appearance")
+    )
+    return qcm.comparison_result(
+        detector=COMPARISON_DETECTOR_NAME,
+        reason_code=DETECTOR_NAME,
+        verdict=verdict,
+        items=items,
+        uncertain=uncertain,
+        blocked=blocked,
+        checked=checked,
+        ctx=ctx,
     )

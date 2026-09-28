@@ -41,6 +41,7 @@ from app.services.qc_checks.thresholds import (
     get_threshold,
     load_policy,
 )
+from app.services.qc_evidence import measure as qcm
 
 REASON_CODE = "identity_drift"
 CATEGORY = "identity_drift"
@@ -319,3 +320,248 @@ register_detector(
         "fail-closed metadata/cast-pin flip blocker (S11-T03D)."
     ),
 )
+
+
+# ── MF-END-22.1/22.4: SOURCE identity expectations vs OUTPUT observations ────
+#
+# The identity comparison asks one binary question per role: is the role's
+# instance still linked to its declared identity in the OUTPUT observations
+# (MF-END-21 ``role_match``, measured against the pinned cast reference
+# pixels)?  An UNMATCHED link (the output pixels no longer match the role's
+# reference) is a hard identity loss (the TURN symptom); an AMBIGUOUS match or
+# a missing reference is not a defect but MISSING INFORMATION — it is reported
+# as a typed UNKNOWN and never guessed into a pass or a fail.
+
+COMPARISON_DETECTOR_NAME = "identity_drift_comparison"
+
+
+def compare_identity_facts(args: dict[str, Any]) -> dict[str, Any]:
+    """Compare the roles' identity links with the source expectations.
+
+    ``args`` is the shared comparator schema plus optional ``expected_roles``
+    (the source-side cast list); without it the expected roles are read from
+    the output artifact's declared segments and from the source facts.
+    """
+    from app.services import rendered_observations as ro  # lazy: typed reasons
+
+    ctx, refusals = qcm.comparison_context(args)
+    if refusals:
+        verdict = qcm.compare_verdict(
+            [], blocked=refusals, appearance=args.get("appearance")
+        )
+        return qcm.comparison_result(
+            detector=COMPARISON_DETECTOR_NAME,
+            reason_code=REASON_CODE,
+            verdict=verdict,
+            items=[],
+            uncertain=[],
+            blocked=refusals,
+            checked=[],
+            ctx={},
+            extra={"refusals": refusals},
+        )
+
+    observations = ctx["observations"]
+    expected: list[str] = []
+    for role in args.get("expected_roles") or []:
+        role_id = str(role)
+        if role_id and role_id not in expected:
+            expected.append(role_id)
+    if not expected:
+        for segment in observations.get("segments") or []:
+            role_id = str(segment.get("role_id") or "")
+            if role_id and role_id not in expected:
+                expected.append(role_id)
+        for fact in ctx["facts"].get("contacts") or []:
+            for key in ("subject_role_id", "object_role_id"):
+                role_id = str(fact.get(key) or "")
+                if role_id and role_id not in expected:
+                    expected.append(role_id)
+        for fact in ctx["facts"].get("occlusions") or []:
+            for key in ("occluder_role_id", "occludee_role_id"):
+                role_id = str(fact.get(key) or "")
+                if role_id and role_id not in expected:
+                    expected.append(role_id)
+
+    span = observations.get("span") or {}
+    span_start = int(span.get("start_frame", 0))
+    span_end = int(span.get("end_frame_exclusive", span_start))
+    window_frames = list(range(span_start, span_end))
+
+    items: list[dict[str, Any]] = []
+    uncertain: list[dict[str, Any]] = []
+    blocked: list[dict[str, Any]] = []
+    checked: list[dict[str, Any]] = []
+
+    for role in expected:
+        track = qcm.track_by_role(observations, role)
+        if track is None:
+            refusal = qcm.refused_role(observations, role)
+            ratio = qcm.measure_unlinked_ratio(["unknown"] * max(1, len(window_frames)))
+            status, _code = qcm.classify_comparison(qcm.METRIC_IDENTITY_UNLINKED, ratio)
+            level = qcm.LEVEL_HARD if status == "blocker" else qcm.LEVEL_SOFT
+            items.append(
+                qcm.comparison_item(
+                    metric=qcm.METRIC_IDENTITY_UNLINKED,
+                    code=qcm.CODE_IDENTITY_LOST,
+                    level=level,
+                    severity="blocker" if level == qcm.LEVEL_HARD else "warning",
+                    role_id=role,
+                    frames=window_frames,
+                    detail=(
+                        f"the output carries NO observation track for the expected "
+                        f"role {role!r} — the role's identity is lost in the render"
+                    ),
+                    evidence={
+                        "output_refusal": refusal,
+                        "measured": {"unlinked_ratio": ratio},
+                        "thresholds": qcm.comparison_threshold(
+                            qcm.METRIC_IDENTITY_UNLINKED
+                        ),
+                        "measure": (
+                            "the expected role has no usable output instance: "
+                            "every frame of the output window is unlinked"
+                        ),
+                    },
+                )
+            )
+            checked.append({"role_id": role, "status": qcm.VERDICT_FAIL})
+            continue
+
+        match = dict(track.get("role_match") or {})
+        state = str(match.get("state") or "")
+        reason = match.get("reason")
+        linked_role = match.get("role_id")
+        track_start = int(track.get("start_frame", span_start))
+        track_end = int(track.get("end_frame", span_end))
+        role_frames = list(range(track_start, track_end)) or window_frames
+        states = ["matched" if state == ro.MATCH_MATCHED else "unknown"] * len(
+            role_frames
+        )
+        ratio = qcm.measure_unlinked_ratio(states)
+        status, _code = qcm.classify_comparison(qcm.METRIC_IDENTITY_UNLINKED, ratio)
+        base_evidence = {
+            "role_id": role,
+            "segment_id": str(track.get("segment_id") or ""),
+            "instance_id": str(track.get("instance_id") or ""),
+            "measured": {
+                "unlinked_ratio": ratio,
+                "role_match_state": state,
+                "role_match_reason": reason,
+                "linked_role_id": linked_role,
+                "best_distance": match.get("best_distance"),
+                "match_max_distance": match.get("match_max_distance"),
+            },
+            "thresholds": qcm.comparison_threshold(qcm.METRIC_IDENTITY_UNLINKED),
+            "frames": role_frames,
+            "mapping": ctx.get("mapping"),
+            "measure": (
+                "the MF-END-21 role link is measured against the role's PINNED "
+                "cast reference pixels; the unlinked frame ratio is classified "
+                "against the frozen identity policy"
+            ),
+        }
+        if state == ro.MATCH_MATCHED and (
+            linked_role == role or match.get("agrees_with_declared_role") is True
+        ):
+            flags = [
+                dict(flag)
+                for flag in track.get("flags") or []
+                if str(flag.get("code")) == ro.FLAG_UNSTABLE_LINK
+            ]
+            if flags:
+                items.append(
+                    qcm.comparison_item(
+                        metric=qcm.METRIC_IDENTITY_UNLINKED,
+                        code=qcm.CODE_IDENTITY_WEAK,
+                        level=qcm.LEVEL_SOFT,
+                        severity="warning",
+                        role_id=role,
+                        frames=[
+                            int(flag["frame"])
+                            for flag in flags
+                            if flag.get("frame") is not None
+                        ]
+                        or role_frames,
+                        detail=(
+                            f"the identity link of {role!r} is unstable in the "
+                            f"output ({len(flags)} unstable link frame(s))"
+                        ),
+                        evidence={**base_evidence, "unstable_links": flags},
+                    )
+                )
+                checked.append({"role_id": role, "status": qcm.VERDICT_WARN})
+                continue
+            checked.append({"role_id": role, "status": qcm.VERDICT_PASS})
+            continue
+        if state == ro.MATCH_MATCHED:
+            items.append(
+                qcm.comparison_item(
+                    metric=qcm.METRIC_IDENTITY_UNLINKED,
+                    code=qcm.CODE_IDENTITY_LOST,
+                    level=qcm.LEVEL_HARD,
+                    severity="blocker",
+                    role_id=role,
+                    frames=role_frames,
+                    detail=(
+                        f"the output instance of {role!r} is linked to a DIFFERENT "
+                        f"identity {linked_role!r} — the role has been substituted"
+                    ),
+                    evidence=base_evidence,
+                )
+            )
+            checked.append({"role_id": role, "status": qcm.VERDICT_FAIL})
+            continue
+        if reason in (ro.UNKNOWN_REASON_AMBIGUOUS, ro.UNKNOWN_REASON_NO_REFERENCE):
+            uncertain.append(
+                {
+                    "code": qcm.CODE_COMPARISON_UNKNOWN,
+                    "role_id": role,
+                    "frames": role_frames,
+                    "detail": (
+                        f"the identity link of {role!r} is a TYPED UNKNOWN on the "
+                        f"output (reason={reason!r}); the comparison refuses to "
+                        "guess an identity verdict"
+                    ),
+                    "evidence": base_evidence,
+                }
+            )
+            checked.append({"role_id": role, "status": qcm.VERDICT_UNKNOWN})
+            continue
+        items.append(
+            qcm.comparison_item(
+                metric=qcm.METRIC_IDENTITY_UNLINKED,
+                code=qcm.CODE_IDENTITY_LOST,
+                level=qcm.LEVEL_HARD if status == "blocker" else qcm.LEVEL_SOFT,
+                severity="blocker" if status == "blocker" else "warning",
+                role_id=role,
+                frames=role_frames,
+                detail=(
+                    f"the output instance of {role!r} does not match its pinned "
+                    f"identity (reason={reason!r}, best distance "
+                    f"{match.get('best_distance')!r} > max "
+                    f"{match.get('match_max_distance')!r})"
+                ),
+                evidence=base_evidence,
+            )
+        )
+        checked.append(
+            {
+                "role_id": role,
+                "status": qcm.VERDICT_FAIL if status == "blocker" else qcm.VERDICT_WARN,
+            }
+        )
+
+    verdict = qcm.compare_verdict(
+        items, uncertain=uncertain, blocked=blocked, appearance=args.get("appearance")
+    )
+    return qcm.comparison_result(
+        detector=COMPARISON_DETECTOR_NAME,
+        reason_code=REASON_CODE,
+        verdict=verdict,
+        items=items,
+        uncertain=uncertain,
+        blocked=blocked,
+        checked=checked,
+        ctx=ctx,
+    )
