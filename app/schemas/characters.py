@@ -252,3 +252,78 @@ class CharacterListResponse(BaseModel):
     offset: int
     total: int
     characters: list[CharacterData]
+
+
+class ReferenceAssetJobRequest(BaseModel):
+    """Submit one reference-asset generation intent (MF-END-09).
+
+    ``reference_key`` is the missing ``<view>@<role>`` the job must create;
+    ``view_prompt`` must name that view (the graph prompt is validated, never
+    invented).  ``source_reference_key`` defaults to the pack convention
+    ``front@character`` when omitted.
+    """
+
+    reference_key: str = Field(..., min_length=3, max_length=64)
+    view_prompt: str = Field(..., min_length=20, max_length=2000)
+    source_reference_key: str | None = Field(None, min_length=3, max_length=64)
+    style_version: str | None = Field(None, max_length=64)
+    seed: int | None = Field(None, ge=0, lt=2**63)
+    idempotency_key: str | None = Field(None, min_length=8, max_length=120)
+    input_generation: str | None = Field(None, min_length=1, max_length=120)
+
+
+class ReferenceAssetJobRetryRequest(BaseModel):
+    """Retry a terminal reference-asset job (new input generation)."""
+
+    input_generation: str | None = Field(None, min_length=1, max_length=120)
+
+
+class ReferenceAssetJobSubmitData(BaseModel):
+    """Public result of an intent registration (no engine work yet)."""
+
+    job: ReferenceAssetJobData
+    content_key: str
+    reference_key: str
+    view: str
+    role: str
+    duplicate: bool = False
+
+
+class ReferenceAssetJobData(BaseModel):
+    """Durable status of one reference-asset generation job."""
+
+    job_id: str
+    state: str
+    progress: float = 0.0
+    message: str = ""
+    job_type: str = ""
+    content_key: str | None = None
+    reference_key: str | None = None
+    view: str | None = None
+    role: str | None = None
+    duplicate: bool = False
+
+    @classmethod
+    def from_info(
+        cls,
+        info: Any,
+        *,
+        content_key: str | None = None,
+        reference_key: str | None = None,
+        view: str | None = None,
+        role: str | None = None,
+        duplicate: bool = False,
+    ) -> ReferenceAssetJobData:
+        state = getattr(info, "state", "")
+        return cls(
+            job_id=str(info.job_id),
+            state=str(getattr(state, "value", state)),
+            progress=float(getattr(info, "progress", 0.0) or 0.0),
+            message=str(getattr(info, "message", "") or ""),
+            job_type=str(getattr(info, "job_type", "") or ""),
+            content_key=content_key,
+            reference_key=reference_key,
+            view=view,
+            role=role,
+            duplicate=duplicate,
+        )
