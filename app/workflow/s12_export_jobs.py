@@ -57,6 +57,103 @@ class S12ExportLineageError(S12ExportSubmitError):
         super().__init__(f"{self.code}: {message}")
 
 
+# ── MF-END-26: export-gate refusal + server-owned original audio ────────────
+#
+# Every S12 export leg CONSUMES the additive ``mf-end-23/export-gate@1``
+# report (``app/persistence/readiness.py``) through the preflight's ONE
+# consumption contract — no second gate is defined here.  Uniform rule: a
+# gate verdict of ``blocked`` refuses the export at submit, at retry and at
+# PRE-PUBLISH.  ``not_run`` (no completed CURRENT full-scope QC run at all)
+# is owned by the readiness authority every leg already consumes; it is
+# never duplicated.
+#
+# Audio (26.1/26.2): the stitch's audio source is SERVER-OWNED — resolved
+# from the SAME completed-publication artifact the export renders from and
+# probed for real (codec / sample-rate / channels / exact duration /
+# timebase) before it is recorded in the run manifest.  A source without an
+# audio stream stays honestly silent — no audio is ever fabricated.
+
+#: Gate video status meaning "no completed CURRENT full-scope run exists".
+_GATE_VIDEO_NOT_RUN = "not_run"
+
+
+def export_gate_refusal(
+    session: Any,
+    *,
+    workspace_id: str,
+    project_id: str,
+    video_item_id: str,
+) -> str | None:
+    """Typed refusal message when the MF-END-23 gate is BLOCKED, else None.
+
+    Read-only.  Only an EXPLICIT gate verdict of ``blocked`` refuses; a
+    ``not_run`` verdict (no completed CURRENT full-scope run) is owned by the
+    readiness authority every leg already consumes, and a gate that cannot be
+    resolved (environment/runtime-root guard, unreadable rows) is NOT turned
+    into a fabricated refusal here — the preflight authority check still
+    fails closed on it (``resolve_export_authority``), and the standing
+    readiness/source contract keeps gating the submit/publish legs.
+    """
+    from app.persistence.readiness import compute_export_gate  # noqa: PLC0415
+    from app.services.s12_export.preflight import (  # noqa: PLC0415
+        export_gate_consumption,
+    )
+
+    try:
+        record = compute_export_gate(
+            session, workspace_id=workspace_id, project_id=project_id
+        )
+    except Exception:  # noqa: BLE001 — no verdict: readiness authority owns it
+        return None
+    verdict = export_gate_consumption(record, video_item_id)
+    if verdict.passed or verdict.video_status == _GATE_VIDEO_NOT_RUN:
+        return None
+    return f"{verdict.reason}: {verdict.detail}"
+
+
+def resolve_original_audio_source(
+    source_path: str | Path,
+) -> tuple[str | None, dict[str, Any]]:
+    """Server-owned original-audio resolution for the export stitch (26.2).
+
+    Probes the export source (the completed Full Apply publication artifact —
+    the SAME artifact the chunks render from) through the original-audio
+    remux engine's bounded probe.  Returns ``(audio_path_or_None,
+    provenance)``: the path is the source itself (the stitch remuxes its
+    canonical first audio stream once onto the stitched timeline), and the
+    provenance records the measured shape for the run manifest.
+    """
+    from app.services.original_audio_remux import (  # noqa: PLC0415
+        OriginalAudioRemuxError,
+        probe_original_audio,
+    )
+
+    base: dict[str, Any] = {"source": "completed_publication_artifact"}
+    try:
+        probe = probe_original_audio(source_path)
+    except OriginalAudioRemuxError as exc:
+        return None, {**base, "mode": "absent", "reason": f"probe failed closed: {exc.code}"}
+    except Exception as exc:  # noqa: BLE001 — never crash the submit leg
+        return None, {
+            **base,
+            "mode": "absent",
+            "reason": f"probe error: {type(exc).__name__}",
+        }
+    if not probe.present:
+        return None, {**base, "mode": "absent", "detail": probe.detail}
+    return str(source_path), {
+        **base,
+        "mode": "source_remux",
+        "codec": probe.codec,
+        "sample_rate": probe.sample_rate,
+        "channels": probe.channels,
+        "duration": probe.duration,
+        "time_base": probe.time_base,
+        "stream_index": probe.stream_index,
+        "container": probe.container,
+    }
+
+
 # ── Durable Job discovery / classification (R6 F01 union identity) ───────
 #
 # ONE discovery/classification contract resolves which durable Job (if
@@ -351,7 +448,33 @@ def submit_export_job(
     if frame_count < 1:
         raise S12ExportSubmitError("frame_count must be >= 1")
 
+    # 26.1/26.2 — the stitch's audio source is SERVER-OWNED: resolved from
+    # the same completed-publication artifact the export renders from and
+    # probed before it enters the manifest (never a loose/client file).
+    audio_value: str | None
+    audio_provenance: dict[str, Any]
+    if audio_source:
+        audio_value = str(audio_source)
+        audio_provenance = {
+            "mode": "explicit",
+            "source": "caller-supplied (legacy compatibility)",
+        }
+    else:
+        audio_value, audio_provenance = resolve_original_audio_source(source_path)
+
     with factory() as session:
+        # 26.3 — the MF-END-23 export gate is consumed BEFORE any mutation:
+        # a BLOCKED gate refuses the (re)enqueue with a typed message and
+        # zero rows written.
+        refusal = export_gate_refusal(
+            session,
+            workspace_id=workspace_id,
+            project_id=project_id,
+            video_item_id=video_item_id,
+        )
+        if refusal is not None:
+            session.rollback()
+            raise S12ExportSubmitError(refusal)
         repo = S12ExportRepository(session)
         try:
             run, created = repo.create_run(
@@ -390,10 +513,21 @@ def submit_export_job(
             "chunk_dir": chunk_dir,
             "scratch_dir": scratch_dir,
             "output_path": output_path,
-            "audio_source": audio_source,
+            "audio_source": audio_value,
+            "audio_provenance": audio_provenance,
             "max_frames_per_chunk": int(chunk_config.get("max_frames", 120)),
             "overlap_frames": int(chunk_config.get("overlap", 4)),
-            "expected_sha256": expected_sha256,
+            # MF-END-26: the caller-supplied ``expected_sha256`` is the
+            # APPROVED-ARTIFACT identity (source reference), NEVER a
+            # pre-render OUTPUT identity.  The S12 assembly re-encodes
+            # (stitch + AAC), so the validator's output identity must be the
+            # server-MEASURED candidate sha (psnr mode); asserting the source
+            # sha as the output sha made every re-encoded export fail the
+            # ``provenance`` probe (typed FAIL, retryable).  The approved sha
+            # is kept under its own audit key.
+            "expected_sha256": None,
+            "authority_sha256": None,
+            "approved_artifact_sha256": str(expected_sha256 or ""),
             "fps_num": int(fps_num),
             "fps_den": int(fps_den),
         }
@@ -523,10 +657,16 @@ def submit_retry_export_job(
             "chunk_dir": chunk_dir,
             "scratch_dir": scratch_dir,
             "output_path": output_path,
-            "audio_source": audio_source,
+            "audio_source": audio_value,
+            "audio_provenance": audio_provenance,
             "max_frames_per_chunk": int(chunk_config.get("max_frames", 120)),
             "overlap_frames": int(chunk_config.get("overlap", 4)),
-            "expected_sha256": expected_sha256,
+            # MF-END-26: same mapping as the initial submit — the approved
+            # artifact sha is audit-only; the output identity is the
+            # server-MEASURED candidate sha (psnr mode).
+            "expected_sha256": None,
+            "authority_sha256": None,
+            "approved_artifact_sha256": str(expected_sha256 or ""),
             "fps_num": int(fps_num),
             "fps_den": int(fps_den),
             "manifest_id": run.manifest_id,
@@ -604,8 +744,40 @@ def submit_retry_export_job(
             session.commit()
             return repo.get_run(run.id), job_service._job_info(job_record), False
 
+    # 26.1/26.2 — retry keeps the predecessor's material audio identity when
+    # it was recorded; a legacy predecessor without one gets the server-owned
+    # resolution (never a loose/client file).
+    audio_value: str | None
+    audio_provenance: dict[str, Any]
+    if audio_source:
+        audio_value = str(audio_source)
+        audio_provenance = {
+            "mode": "explicit",
+            "source": "predecessor manifest (material identity preserved)",
+        }
+    else:
+        audio_value, audio_provenance = resolve_original_audio_source(source_path)
+
     with factory() as session:
         repo = S12ExportRepository(session)
+        # 26.3 — same gate consumption as the initial submit: a BLOCKED gate
+        # refuses the retry with a typed message and zero rows written.  The
+        # predecessor row supplies the video identity; an unreadable
+        # predecessor cannot be retried at all (lineage refusal below).
+        try:
+            predecessor = repo.get_run(predecessor_run_id)
+        except Exception:  # noqa: BLE001 — lineage refusal owns this case
+            predecessor = None
+        if predecessor is not None:
+            refusal = export_gate_refusal(
+                session,
+                workspace_id=workspace_id,
+                project_id=project_id,
+                video_item_id=str(predecessor.video_item_id),
+            )
+            if refusal is not None:
+                session.rollback()
+                raise S12ExportSubmitError(refusal)
         try:
             run, created = repo.create_successor_run(
                 predecessor_run_id,
@@ -803,6 +975,19 @@ def _s12_export_handler(ctx: Any) -> dict[str, Any]:
         try:
             ExportRunner(repo, cfg).resume()
             session.commit()
+            # 26.3 — pre-publish re-check of the MF-END-23 export gate: a
+            # gate that turned BLOCKED while the run was queued/rendering
+            # must never publish.  The refusal lands the run ``failed``
+            # (retryable) and the candidate stays in the PRIVATE scratch —
+            # no public output is ever written from a blocked gate.
+            refusal = export_gate_refusal(
+                session,
+                workspace_id=workspace_id,
+                project_id=project_id,
+                video_item_id=str(manifest["video_item_id"]),
+            )
+            if refusal is not None:
+                raise S12ExportSubmitError(f"pre-publish {refusal}")
             outcome = publish_export_run(
                 session,
                 run_id=run_id,

@@ -114,6 +114,13 @@ class ExportAuthority:
     source_width: int | None = None
     source_height: int | None = None
     source_origin: str = "unproven"  # proved-native | upscale | unproven
+    # ── MF-END-23 export gate (MF-END-26 consumes; never redefined) ──
+    export_gate_ok: bool = False
+    export_gate_schema: str = ""
+    export_gate_status: str = ""
+    export_gate_video_status: str = ""
+    export_gate_codes: tuple[str, ...] = ()
+    export_gate_detail: str = ""
     # ── aggregate ───────────────────────────────────────────────────
     checks: tuple[ExportAuthorityCheck, ...] = field(default_factory=tuple)
     resolved: bool = False
@@ -317,6 +324,41 @@ def resolve_export_context(
         current_run_attempt=int(current_run.attempt) if current_run else None,
         reasons=tuple(dict.fromkeys(reasons)),
     )
+
+
+def _consume_export_gate(
+    session: Session,
+    *,
+    workspace_id: str,
+    project_id: str,
+    video_item_id: str,
+) -> Any:
+    """Resolve + interpret the MF-END-23 export gate for ONE video (26.3).
+
+    Read-only consume of the additive ``mf-end-23/export-gate@1`` report.
+    Any failure to resolve the gate fails CLOSED as a refused consumption
+    (never a silent pass, never a crash of the authority/preflight call).
+    """
+    from app.persistence.readiness import compute_export_gate  # noqa: PLC0415
+    from app.services.s12_export.preflight import (  # noqa: PLC0415
+        ExportGateConsumption,
+        export_gate_consumption,
+    )
+
+    try:
+        record = compute_export_gate(
+            session, workspace_id=workspace_id, project_id=project_id
+        )
+    except Exception as exc:  # noqa: BLE001 — typed, fail closed
+        return ExportGateConsumption(
+            passed=False,
+            reason="S12_EXPORT_NOT_READY",
+            detail=(
+                "export gate resolution failed closed: "
+                f"{type(exc).__name__}: {exc}"
+            ),
+        )
+    return export_gate_consumption(record, video_item_id)
 
 
 def resolve_export_authority(
@@ -568,6 +610,35 @@ def resolve_export_authority(
         )
     )
 
+    # ── MF-END-23 export gate consumption (MF-END-26, read-only) ────
+    # The gate (``mf-end-23/export-gate@1``) is RESOLVED by its own module and
+    # only INTERPRETED here through the preflight's consumption contract — no
+    # second gate is defined in the S12 layer.  The verdict is appended as an
+    # additive authority check: the preflight route recomputes ``eligible``
+    # from the full check list, so a ``blocked`` gate refuses the preflight
+    # with the gate's own typed code preserved in the detail.
+    #
+    # ``resolved`` intentionally keeps its pre-gate definition: the submit
+    # leg's 409 contract (readiness/source/lock pins) is unchanged, and the
+    # gate's ``blocked`` refusals at submit/retry/publish are enforced
+    # explicitly in ``app/workflow/s12_export_jobs.py`` (typed, zero
+    # mutation).  A ``not_run`` gate is owned by the readiness authority at
+    # every leg (``S12_EXPORT_NOT_READY``).
+    gate = _consume_export_gate(
+        session,
+        workspace_id=workspace_id,
+        project_id=project_id,
+        video_item_id=video_item_id,
+    )
+    checks.append(
+        ExportAuthorityCheck(
+            "export_gate",
+            gate.passed,
+            gate.reason,
+            gate.detail,
+        )
+    )
+
     resolved = (
         project_ok
         and video_ok
@@ -605,6 +676,12 @@ def resolve_export_authority(
         source_width=width,
         source_height=height,
         source_origin=origin,
+        export_gate_ok=gate.passed,
+        export_gate_schema=gate.schema,
+        export_gate_status=gate.gate_status,
+        export_gate_video_status=gate.video_status,
+        export_gate_codes=gate.codes,
+        export_gate_detail=gate.detail,
         checks=tuple(checks),
         resolved=resolved,
     )

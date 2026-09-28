@@ -11,6 +11,7 @@ from __future__ import annotations
 import subprocess
 import time
 from dataclasses import dataclass, field
+from typing import Any
 
 from app.schemas.s12_export import (
     S12_EXPORT_CONTRACT_VERSION,
@@ -28,9 +29,13 @@ __all__ = [
     "PREFLIGHT_PROFILES",
     "PROFILE_ENCODERS",
     "ESTIMATE_BPP",
+    "EXPORT_GATE_SCHEMA",
+    "GATE_REASON_NOT_RUN",
+    "ExportGateConsumption",
     "PreflightContext",
     "evaluate_preflight",
     "classify_source_kind",
+    "export_gate_consumption",
     "probe_encoder_support",
 ]
 
@@ -216,6 +221,168 @@ def classify_source_kind(ctx: PreflightContext) -> SourceKind:
     if ctx.source_width is not None and ctx.source_height is not None:
         return "upscale_4k"
     return "below_4k"
+
+
+# ── MF-END-23 export gate consumption (MF-END-26) ───────────────────────────
+#
+# The S12 export preflight CONSUMES the additive ``mf-end-23/export-gate@1``
+# report (``app/persistence/readiness.py``) — it never defines a second gate.
+# The gate's OWN typed violation codes stay verbatim in the check detail; the
+# check ``reason`` is mapped onto the CLOSED preflight vocabulary frozen in
+# ``app/schemas/s12_export.py`` (later tasks must reuse those codes).
+#
+# Enforcement rule (single, uniform at every S12 leg): a gate verdict of
+# ``blocked`` refuses the export.  A verdict of ``not_run`` means NO completed
+# CURRENT full-scope QC run exists at all — that refusal is owned by the
+# readiness authority (``S12_EXPORT_NOT_READY``), which every leg already
+# consumes; the gate adds the output-bound band/binding/output-evidence
+# enforcement on top of it.
+
+#: The one export-gate schema this module consumes (identity pin, not a copy).
+EXPORT_GATE_SCHEMA = "mf-end-23/export-gate@1"
+
+#: Reason for a gate that ran but has no completed CURRENT full-scope run.
+GATE_REASON_NOT_RUN = "S12_EXPORT_NOT_READY"
+
+#: Gate violation code → CLOSED preflight reason code.  Anything unmapped
+#: fails closed to ``S12_EXPORT_NOT_READY`` (never a silent pass).
+_GATE_REASON_BY_CODE: dict[str, str] = {
+    "EXPORT_BLOCKED_READINESS": "S12_EXPORT_NOT_READY",
+    "EXPORT_BLOCKED_JOB_UNREADABLE": "S12_EXPORT_NOT_READY",
+    "EXPORT_BLOCKED_BAND_MISMATCH": "S12_EXPORT_NOT_READY",
+    "EXPORT_BLOCKED_DETECTOR_UNKNOWN": "S12_EXPORT_NOT_READY",
+    "EXPORT_BLOCKED_DETECTOR_REVISION": "S12_EXPORT_NOT_READY",
+    "EXPORT_BLOCKED_BINDING_MISSING": "S12_EXPORT_NOT_READY",
+    "EXPORT_BLOCKED_BINDING_TAMPER": "S12_EXPORT_NOT_READY",
+    "EXPORT_BLOCKED_STALE_SOURCE": "S12_EXPORT_SOURCE_STALE",
+    "EXPORT_BLOCKED_STALE_RENDER": "S12_EXPORT_STALE_CHECKPOINT",
+    "EXPORT_BLOCKED_STALE_CAST": "S12_EXPORT_STALE_CHECKPOINT",
+    "EXPORT_BLOCKED_OUTPUT_EVIDENCE": "S12_EXPORT_NOT_READY",
+}
+
+#: Gate video statuses (from ``app/persistence/readiness.py``).
+_GATE_STATUS_READY = "ready"
+_GATE_STATUS_BLOCKED = "blocked"
+_GATE_STATUS_NOT_RUN = "not_run"
+
+
+@dataclass(frozen=True)
+class ExportGateConsumption:
+    """One video's export-gate verdict expressed in preflight vocabulary."""
+
+    passed: bool
+    reason: str
+    detail: str
+    schema: str = ""
+    schema_ok: bool = False
+    gate_status: str = ""
+    video_status: str = ""
+    codes: tuple[str, ...] = ()
+
+
+def export_gate_consumption(record: Any, video_item_id: str) -> ExportGateConsumption:
+    """Consume an ``mf-end-23/export-gate@1`` record for ONE video.
+
+    Pure and read-only: the gate is resolved elsewhere (server-owned) and the
+    record is only INTERPRETED here.  Fail-closed cases (unknown schema,
+    missing video row, unreadable record) all refuse with a typed reason;
+    the gate's own codes are preserved verbatim inside ``detail``.
+    """
+    if record is None:
+        return ExportGateConsumption(
+            passed=False,
+            reason=GATE_REASON_NOT_RUN,
+            detail="export gate record unavailable (fail closed)",
+        )
+    schema = str(getattr(record, "schema", "") or "")
+    gate_status = str(getattr(record, "status", "") or "")
+    videos = list(getattr(record, "videos", None) or [])
+    video = next(
+        (
+            v
+            for v in videos
+            if str(getattr(v, "video_item_id", "") or "") == str(video_item_id)
+        ),
+        None,
+    )
+    schema_ok = schema == EXPORT_GATE_SCHEMA
+    if video is None:
+        return ExportGateConsumption(
+            passed=False,
+            reason=GATE_REASON_NOT_RUN,
+            detail=(
+                f"video {video_item_id!r} is absent from the export gate report "
+                f"(schema={schema!r}, status={gate_status!r}) — fail closed"
+            ),
+            schema=schema,
+            schema_ok=schema_ok,
+            gate_status=gate_status,
+        )
+    violations = list(getattr(video, "violations", None) or [])
+    codes = tuple(str(getattr(b, "code", "") or "") for b in violations)
+    video_status = str(getattr(video, "status", "") or "")
+    if not schema_ok:
+        return ExportGateConsumption(
+            passed=False,
+            reason=GATE_REASON_NOT_RUN,
+            detail=(
+                f"export gate schema {schema!r} != {EXPORT_GATE_SCHEMA!r} — "
+                "unknown contract, fail closed"
+            ),
+            schema=schema,
+            schema_ok=False,
+            gate_status=gate_status,
+            video_status=video_status,
+            codes=codes,
+        )
+    if video_status == _GATE_STATUS_READY and not codes:
+        return ExportGateConsumption(
+            passed=True,
+            reason="S12_EXPORT_OK",
+            detail=(
+                f"export gate ready ({EXPORT_GATE_SCHEMA}; "
+                f"binding={getattr(video, 'binding_state', '')!r}, "
+                f"output={getattr(video, 'output_state', '')!r})"
+            ),
+            schema=schema,
+            schema_ok=True,
+            gate_status=gate_status,
+            video_status=video_status,
+        )
+    if video_status == _GATE_STATUS_NOT_RUN:
+        return ExportGateConsumption(
+            passed=False,
+            reason=GATE_REASON_NOT_RUN,
+            detail=(
+                "export gate not_run: no completed CURRENT full-scope QC run "
+                f"({getattr(video, 'check_state_detail', '')}) — the readiness "
+                "authority carries this refusal"
+            ),
+            schema=schema,
+            schema_ok=True,
+            gate_status=gate_status,
+            video_status=video_status,
+            codes=codes,
+        )
+    # blocked (or any inconsistent ready-with-violations row): refuse.
+    reason = _GATE_REASON_BY_CODE.get(codes[0] if codes else "", GATE_REASON_NOT_RUN)
+    first_detail = ""
+    if violations:
+        first_detail = str(getattr(violations[0], "detail", "") or "")
+    detail = (
+        f"export gate blocked ({EXPORT_GATE_SCHEMA}; status={video_status!r}; "
+        f"codes={list(codes)}; first={first_detail})"
+    )
+    return ExportGateConsumption(
+        passed=False,
+        reason=reason,
+        detail=detail,
+        schema=schema,
+        schema_ok=True,
+        gate_status=gate_status,
+        video_status=video_status,
+        codes=codes,
+    )
 
 
 def _check(
