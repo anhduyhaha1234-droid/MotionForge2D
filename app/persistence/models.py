@@ -112,6 +112,8 @@ __all__ = [
     "Scene",
     "SceneGraphContact",
     "ProjectCastMapping",
+    "SeriesCastSnapshot",
+    "SeriesCastSnapshotEntry",
     "ApplyCheckpoint",
     "ReskinConfig",
     "StructuralLockManifest",
@@ -2275,6 +2277,142 @@ class ProjectCastMapping(TimestampMixin, Base):
     workspace: Mapped[Workspace] = relationship()
     project: Mapped[Project] = relationship()
     object_role: Mapped[ObjectRole] = relationship()
+    character: Mapped[Character] = relationship()
+
+class SeriesCastSnapshot(TimestampMixin, Base):
+    """MF-END-05 series cast snapshot — the durable "series pin".
+
+    The series is the production container (``project``) that owns its video
+    items.  A snapshot is an immutable, versioned freeze of the
+    ``role_key -> cast`` bindings that every video of the series reuses.
+    Rows are INSERT-only: changing a cast member creates
+    ``snapshot_index + 1``; nothing ever rewrites an existing snapshot, so a
+    pin made for an old video can never move underneath it.
+
+    The snapshot never clones the character library — every entry references
+    the immutable ``character`` / ``character_pack_version`` rows by FK and
+    stores only frozen digests (manifest sha256 + the canonical per-key
+    reference list).
+
+    ``entries_sha256`` is the sha256 over the canonical JSON serialization of
+    all entries (sorted by ``role_key``); readers recompute it and refuse
+    (fail closed) when the stored digest does not match.
+    """
+
+    __tablename__ = "series_cast_snapshot"
+    __table_args__ = (
+        UniqueConstraint(
+            "project_id",
+            "snapshot_index",
+            name="uq_series_cast_snapshot_project_index",
+        ),
+        CheckConstraint(
+            "snapshot_index >= 1", name="ck_series_cast_snapshot_index_positive"
+        ),
+        CheckConstraint(
+            "length(entries_sha256) = 64",
+            name="ck_series_cast_snapshot_entries_sha_len",
+        ),
+        CheckConstraint(
+            "revision > 0", name="ck_series_cast_snapshot_revision_positive"
+        ),
+        Index("ix_series_cast_snapshot_workspace", "workspace_id"),
+        Index("ix_series_cast_snapshot_project", "project_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    project_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("project.id", ondelete="RESTRICT"), nullable=False
+    )
+    snapshot_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    entries_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+
+    workspace: Mapped[Workspace] = relationship()
+    project: Mapped[Project] = relationship()
+    entries: Mapped[list[SeriesCastSnapshotEntry]] = relationship(
+        back_populates="snapshot", order_by="SeriesCastSnapshotEntry.role_key"
+    )
+
+
+class SeriesCastSnapshotEntry(TimestampMixin, Base):
+    """One frozen ``role_key -> character / pack version / manifest / style``.
+
+    ``pack_contract_version`` + ``manifest_sha256`` freeze the reference-pack
+    branch of ``character_pack_version`` (MF-END-02) at freeze time:
+    ``legacy_six_slot_2d`` carries no manifest, ``reference_pack_v1`` requires
+    one.  ``references_json`` freezes the canonical per-key asset list
+    (``pose_slot``, ``artifact_id``, ``sha256``) so a later library edit is
+    detectable as staleness instead of silently flowing into old projects.
+    """
+
+    __tablename__ = "series_cast_snapshot_entry"
+    __table_args__ = (
+        UniqueConstraint(
+            "snapshot_id", "role_key", name="uq_series_cast_entry_snapshot_role"
+        ),
+        CheckConstraint(
+            "length(role_key) BETWEEN 1 AND 64",
+            name="ck_series_cast_entry_role_key_len",
+        ),
+        CheckConstraint(
+            PACK_CONTRACT_VERSION_CHECK_SQL, name="ck_series_cast_entry_contract"
+        ),
+        CheckConstraint(
+            "(pack_contract_version = 'legacy_six_slot_2d' "
+            "AND manifest_sha256 IS NULL) "
+            "OR (pack_contract_version = 'reference_pack_v1' "
+            "AND manifest_sha256 IS NOT NULL)",
+            name="ck_series_cast_entry_manifest_branch",
+        ),
+        CheckConstraint(
+            "manifest_sha256 IS NULL OR length(manifest_sha256) = 64",
+            name="ck_series_cast_entry_manifest_sha_len",
+        ),
+        CheckConstraint(
+            "style_version IS NULL OR length(style_version) BETWEEN 1 AND 64",
+            name="ck_series_cast_entry_style_len",
+        ),
+        CheckConstraint(
+            "length(references_json) > 0",
+            name="ck_series_cast_entry_refs_nonempty",
+        ),
+        CheckConstraint(
+            "revision > 0", name="ck_series_cast_entry_revision_positive"
+        ),
+        Index("ix_series_cast_entry_snapshot", "snapshot_id"),
+        Index("ix_series_cast_entry_workspace", "workspace_id"),
+        Index("ix_series_cast_entry_pack_version", "pack_version_id"),
+        Index("ix_series_cast_entry_character", "character_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
+    snapshot_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("series_cast_snapshot.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("workspace.id", ondelete="RESTRICT"), nullable=False
+    )
+    role_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    character_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("character.id", ondelete="RESTRICT"), nullable=False
+    )
+    pack_version_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("character_pack_version.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    pack_contract_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    manifest_sha256: Mapped[str | None] = mapped_column(String(64))
+    style_version: Mapped[str | None] = mapped_column(String(64))
+    references_json: Mapped[str] = mapped_column(Text, nullable=False)
+
+    snapshot: Mapped[SeriesCastSnapshot] = relationship(back_populates="entries")
+    workspace: Mapped[Workspace] = relationship()
     character: Mapped[Character] = relationship()
     pack_version: Mapped[CharacterPackVersion] = relationship()
 
