@@ -81,6 +81,23 @@ sampler is configured, else 0 (not measured — the engine's own
 set for artifact kinds the contract allows to ever be published; acceptance/
 publication themselves stay with the app (S10/S12).
 
+Terminal media shape (measured; DELTA-F2): a terminal node's result is recorded
+under a bucket whose NAME moved between ComfyUI versions.  On 0.37.0 (pin
+73c9bad4; MF-DEMO-E2E ``raw/history_shot1.json``, prompt ``f8f000f9-``…, status
+success) the ``SaveVideo`` node returns ``ui.PreviewVideo``, whose
+``as_dict()`` is ``{"images": […], "animated": (True,)}`` — a RENDERED VIDEO
+lands in the ``images`` bucket flagged animated — while other pins publish a
+real ``videos`` bucket.  The pinned engine can pin only ONE bucket per declared
+node (and its own ``_MEDIA_OF_KIND`` table refuses ``images`` + ``video``), so
+a terminal video is declared in the engine's server-decides form (empty bucket
++ the measured media family) and the app classifies what the server actually
+published: a ``videos`` entry is the video (legacy pins, kept), and an
+``images``/``gifs`` entry counts as the video only when the server flagged it
+``animated`` (the 0.37 shape) and the container is a video container.  An
+animation-bucket entry without that proof is never classified as the video the
+terminal declared: the record keeps the bytes, and the caller's main-artifact
+gate refuses the shot instead of accepting an unproven shape.
+
 No GPU work happens in this module or its tests: the engine's HTTP transport is
 the process boundary, and tests drive a fake transport at exactly that boundary.
 """
@@ -169,9 +186,26 @@ ENGINE_ATTRIBUTES_REQUIRED = (
 )
 
 _STATE_SUBDIR = Path("media_engine") / "comfy_shot_engine"
-_TERMINAL_KIND_MAP = {"image": ("images", "image"), "video": ("videos", "video"),
+#: App terminal kind → the engine declaration this node is submitted with.
+#: ``image``/``audio`` pin the bucket their measured pins publish into.
+#: ``video`` declares the engine's server-decides form (empty bucket) because
+#: the bucket a pinned ComfyUI writes a video into moved between versions (see
+#: the module docstring) and the engine's own contract table refuses ``images``
+#: + ``video``.  The media family stays pinned — the engine checks it against
+#: the suffix of the file it stages.
+_TERMINAL_KIND_MAP = {"image": ("images", "image"), "video": ("", "video"),
                       "audio": ("audio", "audio")}
 _ENGINE_KIND_TO_APP = {"images": "image", "gifs": "image", "videos": "video", "audio": "audio"}
+
+#: Buckets in which ComfyUI publishes an ALREADY-ENCODED animation: the measured
+#: 0.37 SaveVideo shape lands in ``images`` with ``animated`` set.  A pin that
+#: publishes a real ``videos`` bucket is handled by ``_ENGINE_KIND_TO_APP``.
+_ANIMATION_BUCKETS = ("images", "gifs")
+
+#: Containers the pinned engine stages as video (mirrors its ``VIDEO_SUFFIXES``
+#: at MF-COMFY R28 / 70f7180): the app never classifies an artifact as a video
+#: that the engine would not have staged as one.
+_VIDEO_CONTAINER_SUFFIXES = (".mp4", ".webm", ".mkv", ".mov", ".avi", ".gif")
 
 #: Engine failures returned as a failed record (terminal execution faults).
 _ENGINE_TERMINAL_FAULT_CODES = frozenset({
@@ -382,6 +416,78 @@ def _load_engine() -> Any:
 
 def _safe_component(value: str) -> str:
     return re.sub(r"[^0-9A-Za-z._-]", "_", value or "") or "unknown"
+
+
+def _published_animation_proof(entry: dict, node_ids: set[str]) -> set[tuple[str, str]]:
+    """``{(bucket, filename)}`` this history entry flags ``animated`` on the nodes.
+
+    ComfyUI publishes a node's UI output as ``{bucket: [items…], "animated":
+    [bool, …]}`` with the flags aligned to the bucket list — measured on 0.37.0,
+    where ``comfy_api.latest._ui.PreviewVideo.as_dict()`` returns
+    ``{"images": […], "animated": (True,)}`` for SaveVideo.  Only an aligned,
+    explicitly-true flag is proof: a missing/short flag list or a false flag is an
+    UNPROVEN shape and is never upgraded to the video a terminal declared.
+    """
+    outputs = (entry or {}).get("outputs")
+    if not isinstance(outputs, dict):
+        return set()
+    proven: set[tuple[str, str]] = set()
+    for node_id in sorted(node_ids):
+        node_out = outputs.get(str(node_id))
+        if not isinstance(node_out, dict):
+            continue
+        flags = node_out.get("animated")
+        if not isinstance(flags, (list, tuple)):
+            continue
+        for bucket in _ANIMATION_BUCKETS:
+            items = node_out.get(bucket)
+            if not isinstance(items, list):
+                continue
+            for index, item in enumerate(items):
+                if index >= len(flags) or flags[index] is not True:
+                    continue
+                if isinstance(item, dict) and item.get("filename"):
+                    proven.add((bucket, str(item["filename"])))
+    return proven
+
+
+def _video_container(filename: str) -> bool:
+    return Path(str(filename)).suffix.lower() in _VIDEO_CONTAINER_SUFFIXES
+
+
+def _video_publish_shape(
+    *,
+    bucket: str,
+    filename: str,
+    node_id: str,
+    declared_video_nodes: set[str],
+    proven_animated: set[tuple[str, str]],
+) -> bool:
+    """Does this staged entry carry the video a video terminal declared?
+
+    Only animation-bucket entries can need this: a ``videos`` bucket entry is the
+    video by itself (legacy pins).  An ``images``/``gifs`` entry counts as the
+    declared video only when the node WAS declared a video terminal, the server
+    flagged that exact entry ``animated`` (the measured 0.37 shape) and the
+    container is a video container.  Anything else stays the bucket's own kind —
+    an unproven animation-bucket entry is never the video.
+    """
+    if bucket not in _ANIMATION_BUCKETS or node_id not in declared_video_nodes:
+        return False
+    if not _video_container(filename):
+        return False
+    return (bucket, filename) in proven_animated
+
+
+def _proof_evidence(proof: dict[str, Any]) -> dict[str, Any]:
+    """JSON-able shape proof (sets → sorted ``bucket:filename`` strings)."""
+    return {
+        "declared_video_nodes": list(proof.get("declared_video_nodes") or ()),
+        "required_for": list(proof.get("required_for") or ()),
+        "source": str(proof.get("source") or ""),
+        "proven_animated": sorted(f"{bucket}:{filename}"
+                                  for bucket, filename in (proof.get("proven") or ())),
+    }
 
 
 class ComfyShotEngine:
@@ -797,7 +903,20 @@ class ComfyShotEngine:
                 "never sent — reconcile before retrying",
             )
 
-        record = self._compose_record(binding, out, decoded_facts=decoded_facts)
+        try:
+            video_proof = self._video_shape_proof(adapter, out, terminal_outputs)
+        except ComfyEngineRefusal as exc:
+            self._write_evidence(attempt_id, {
+                "status": "refused",
+                "prompt_id": out.prompt_id,
+                "counters": self._counters(adapter),
+                "refusal": exc.as_dict(),
+                "reservation": out.reservation,
+            })
+            raise
+        record = self._compose_record(
+            binding, out, decoded_facts=decoded_facts, video_proof=video_proof
+        )
         info = {
             "attempt_id": attempt_id,
             "status": out.status,
@@ -819,6 +938,7 @@ class ComfyShotEngine:
             "resources": out.resources,
             "notes": list(out.notes),
             "reservation": out.reservation,
+            "video_shape_proof": _proof_evidence(video_proof),
             "info": info,
         })
         return record, info
@@ -872,14 +992,76 @@ class ComfyShotEngine:
             "interrupt_refusals": int(adapter.interrupt_refusals),
         }
 
+    def _video_shape_proof(
+        self,
+        adapter: Any,
+        out: Any,
+        terminal_outputs: dict[str, dict[str, Any]] | None,
+    ) -> dict[str, Any]:
+        """Prove the animation flags of the entries a VIDEO terminal published.
+
+        Needed only when this attempt staged an artifact from an animation bucket
+        (``images``/``gifs``) on a node the app declared as a video terminal: such
+        an entry is the declared video only when the server flagged it ``animated``
+        (the measured 0.37 SaveVideo shape), while a ``videos`` bucket entry is the
+        video by itself (the legacy-pin shape, kept).  The flags come from this
+        prompt's own history entry — the entry the engine just validated — and a
+        read that cannot be made is refused typed instead of guessed around.
+        """
+        declared = {
+            str(node): str((conf or {}).get("kind") or "")
+            for node, conf in (terminal_outputs or {}).items()
+        }
+        declared_video_nodes = {node for node, kind in declared.items() if kind == "video"}
+        proof: dict[str, Any] = {
+            "declared_video_nodes": sorted(declared_video_nodes),
+            "required_for": [],
+            "source": "not-needed",
+            "proven": set(),
+        }
+        for staged in out.artifacts or ():
+            node_id = str(staged.get("node_id"))
+            bucket = str(staged.get("kind"))
+            if node_id in declared_video_nodes and bucket in _ANIMATION_BUCKETS:
+                proof["required_for"].append(
+                    {"node_id": node_id, "bucket": bucket,
+                     "filename": str(staged.get("filename") or "")}
+                )
+        if not proof["required_for"]:
+            return proof
+        prompt_id = str(out.prompt_id or "")
+        try:
+            history = adapter.transport.history(prompt_id)
+        except Exception as exc:  # noqa: BLE001 — the transport is the boundary
+            raise ComfyEngineRefusal(
+                ComfyEngineRefusalCode.ENGINE_REFUSED,
+                f"the completed attempt published {proof['required_for']} in an "
+                f"animation bucket; proving the server flagged them animated needs "
+                f"this prompt's history entry and the read failed: "
+                f"{type(exc).__name__}:{exc}",
+                engine_code="MF_COMFY_TRANSPORT_ERROR",
+                retryable=True,
+            ) from exc
+        entry = history.get(prompt_id) if isinstance(history, dict) else None
+        entry = entry if isinstance(entry, dict) else {}
+        proof["source"] = "history"
+        proof["proven"] = _published_animation_proof(
+            entry, {str(item["node_id"]) for item in proof["required_for"]}
+        )
+        return proof
+
     def _compose_record(
         self,
         binding: EngineInputBinding,
         out: Any,
         *,
         decoded_facts: EngineDecodedFacts | None,
+        video_proof: dict[str, Any] | None = None,
     ) -> ShotExecutionRecord:
         contract = binding.output_contract
+        proof = video_proof or {}
+        proven_animated: set[tuple[str, str]] = set(proof.get("proven") or ())
+        declared_video_nodes: set[str] = set(proof.get("declared_video_nodes") or ())
         if decoded_facts is None:
             if contract.stream_timebase_num is None or contract.stream_timebase_den is None:
                 raise ComfyEngineRefusal(
@@ -904,8 +1086,16 @@ class ComfyShotEngine:
                     f"engine staged {staged_path} outside the managed root "
                     f"{self.managed_root}",
                 ) from exc
-            app_kind = _ENGINE_KIND_TO_APP[str(staged["kind"])]
-            suffix = Path(str(staged["filename"])).suffix.lower().lstrip(".")
+            bucket = str(staged["kind"])
+            filename = str(staged["filename"])
+            app_kind = _ENGINE_KIND_TO_APP[bucket]
+            if _video_publish_shape(
+                bucket=bucket, filename=filename, node_id=str(staged.get("node_id")),
+                declared_video_nodes=declared_video_nodes,
+                proven_animated=proven_animated,
+            ):
+                app_kind = "video"
+            suffix = Path(filename).suffix.lower().lstrip(".")
             artifacts.append(
                 EngineArtifactOutput(
                     artifact_id=f"{binding.identity.attempt_id}:{staged['node_id']}:"
@@ -957,8 +1147,14 @@ def _normalize_terminal_outputs(
     """App-side terminal declaration → the engine's ``RunSpec.terminal_outputs`` shape.
 
     App kinds are ``image`` / ``video`` / ``audio``; the engine keys artifacts by
-    ComfyUI bucket (``images`` / ``videos`` / ``audio``) and checks the declared
-    ``media_type`` against the filename suffix it staged.
+    ComfyUI bucket and checks the declared ``media_type`` against the filename
+    suffix it staged.  A video terminal declares the engine's server-decides form
+    (empty bucket + ``media_type video``) because the bucket a pinned ComfyUI
+    publishes a video into is version detail (``videos`` on older pins,
+    ``images`` + animated on 0.37 — see the module docstring) while the video
+    media family is what must hold.  An empty kind is the engine's own normalized
+    form for a node whose media the server output decides, so the declaration
+    stays a contract the pinned engine validates instead of a guess.
     """
     normalized: dict[str, dict[str, Any]] = {}
     for node_id, conf in (declared or {}).items():
