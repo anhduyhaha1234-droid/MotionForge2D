@@ -39,6 +39,13 @@ from app.persistence.project_cast import (
     ProjectCastNotFoundError,
     ProjectCastOwnershipError,
     ProjectCastRepository,
+    SeriesCastConflictError,
+    SeriesCastEntryInput,
+    SeriesCastNotFoundError,
+    SeriesCastOwnershipError,
+    SeriesCastRepository,
+    SeriesCastSnapshotRecord,
+    SeriesCastStaleError,
     evaluate_compatibility,
 )
 from app.schemas.project_cast import (
@@ -50,6 +57,14 @@ from app.schemas.project_cast import (
     ProjectCastData,
     ProjectCastListResponse,
     ProjectCastUpdateRequest,
+    SeriesCastApplyEntryData,
+    SeriesCastApplyRequest,
+    SeriesCastApplyResponse,
+    SeriesCastEntryData,
+    SeriesCastReferenceData,
+    SeriesCastSnapshotCreateRequest,
+    SeriesCastSnapshotData,
+    SeriesCastSnapshotListResponse,
 )
 
 router = APIRouter(prefix="/api/v2/project-cast", tags=["project-cast"])
@@ -294,3 +309,196 @@ def delete_mapping(
         session.rollback()
         raise HTTPException(409, str(err)) from err
     return Response(status_code=204)
+
+
+# ── MF-END-05: series cast snapshot ("series pin") ───────────────────────────
+#
+# The durable freeze ("snapshot") and the copy-to-new-video operation ride the
+# EXISTING per-video cast authority (ProjectCastRepository.create_mapping);
+# these routes are the strict API boundary over app.persistence.project_cast.
+
+
+def _series_snapshot_data(record: SeriesCastSnapshotRecord) -> SeriesCastSnapshotData:
+    return SeriesCastSnapshotData(
+        id=record.id,
+        workspace_id=record.workspace_id,
+        project_id=record.project_id,
+        snapshot_index=record.snapshot_index,
+        entries_sha256=record.entries_sha256,
+        created_at=record.created_at,
+        updated_at=record.updated_at,
+        entries=[
+            SeriesCastEntryData(
+                role_key=entry.role_key,
+                character_id=entry.character_id,
+                pack_version_id=entry.pack_version_id,
+                pack_contract_version=entry.pack_contract_version,
+                manifest_sha256=entry.manifest_sha256,
+                style_version=entry.style_version,
+                references=[
+                    SeriesCastReferenceData(
+                        pose_slot=ref.pose_slot,
+                        artifact_id=ref.artifact_id,
+                        sha256=ref.sha256,
+                    )
+                    for ref in entry.references
+                ],
+            )
+            for entry in record.entries
+        ],
+    )
+
+
+@router.post("/series-cast/snapshots", status_code=201)
+@router.post("/series-cast/snapshots/", status_code=201)
+def freeze_series_cast_snapshot(
+    body: SeriesCastSnapshotCreateRequest,
+    session: SessionDep,
+    response: Response,
+) -> SeriesCastSnapshotData:
+    repo = SeriesCastRepository(session)
+    try:
+        record, created = repo.freeze_snapshot(
+            workspace_id=WORKSPACE_ID,
+            project_id=body.project_id,
+            entries=[
+                SeriesCastEntryInput(
+                    role_key=entry.role_key,
+                    character_id=entry.character_id,
+                    pack_version_id=entry.pack_version_id,
+                    style_version=entry.style_version,
+                )
+                for entry in body.entries
+            ],
+        )
+        session.commit()
+    except SeriesCastOwnershipError as err:
+        session.rollback()
+        raise HTTPException(404, str(err)) from err
+    except SeriesCastConflictError as err:
+        session.rollback()
+        raise HTTPException(409, str(err)) from err
+    except SeriesCastNotFoundError as err:
+        session.rollback()
+        raise HTTPException(404, str(err)) from err
+    except ValueError as err:
+        session.rollback()
+        raise HTTPException(422, str(err)) from err
+    except IntegrityError as err:
+        session.rollback()
+        raise HTTPException(409, "series cast snapshot conflict") from err
+    if not created:
+        response.status_code = 200
+    return _series_snapshot_data(record)
+
+
+@router.get("/series-cast/snapshots", status_code=200)
+@router.get("/series-cast/snapshots/", status_code=200)
+def list_series_cast_snapshots(
+    session: SessionDep,
+    project_id: Annotated[str | None, Query(max_length=36)] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> SeriesCastSnapshotListResponse:
+    repo = SeriesCastRepository(session)
+    try:
+        records, total = repo.list_snapshots(
+            workspace_id=WORKSPACE_ID,
+            project_id=project_id,
+            limit=limit,
+            offset=offset,
+        )
+    except SeriesCastNotFoundError as err:
+        raise HTTPException(404, str(err)) from err
+    return SeriesCastSnapshotListResponse(
+        workspace_id=WORKSPACE_ID,
+        project_id=project_id,
+        limit=limit,
+        offset=offset,
+        total=total,
+        snapshots=[_series_snapshot_data(record) for record in records],
+    )
+
+
+@router.get("/series-cast/snapshots/{snapshot_id:uuid}", status_code=200)
+@router.get("/series-cast/snapshots/{snapshot_id:uuid}/", status_code=200)
+def get_series_cast_snapshot(
+    snapshot_id: uuid.UUID,
+    session: SessionDep,
+) -> SeriesCastSnapshotData:
+    repo = SeriesCastRepository(session)
+    try:
+        record = repo.get_snapshot(str(snapshot_id), WORKSPACE_ID)
+    except SeriesCastNotFoundError as err:
+        raise HTTPException(404, str(err)) from err
+    except SeriesCastConflictError as err:
+        # fail closed: a snapshot whose stored digest does not match its
+        # entries is refused, never silently returned.
+        raise HTTPException(409, str(err)) from err
+    return _series_snapshot_data(record)
+
+
+@router.post("/series-cast/snapshots/{snapshot_id:uuid}/apply", status_code=200)
+@router.post("/series-cast/snapshots/{snapshot_id:uuid}/apply/", status_code=200)
+def apply_series_cast_snapshot(
+    snapshot_id: uuid.UUID,
+    body: SeriesCastApplyRequest,
+    session: SessionDep,
+) -> SeriesCastApplyResponse:
+    repo = SeriesCastRepository(session)
+    try:
+        result = repo.apply_snapshot_to_video(
+            snapshot_id=str(snapshot_id),
+            workspace_id=WORKSPACE_ID,
+            video_item_id=body.video_item_id,
+            resolutions=[
+                (resolution.role_key, resolution.object_role_id)
+                for resolution in body.resolutions
+            ],
+        )
+        session.commit()
+    except SeriesCastStaleError as err:
+        session.rollback()
+        raise HTTPException(409, str(err)) from err
+    except ProjectCastOwnershipError as err:
+        # covers SeriesCastOwnershipError AND the base ownership refusal that
+        # the EXISTING cast service raises from inside create_mapping.
+        session.rollback()
+        raise HTTPException(404, str(err)) from err
+    except ProjectCastConflictError as err:
+        # stale-before-conflict ordering above; covers SeriesCastConflictError
+        # and the base compatibility/idempotency refusals of the existing
+        # cast service.
+        session.rollback()
+        raise HTTPException(409, str(err)) from err
+    except ProjectCastNotFoundError as err:
+        session.rollback()
+        raise HTTPException(404, str(err)) from err
+    except ValueError as err:
+        session.rollback()
+        raise HTTPException(422, str(err)) from err
+    except IntegrityError as err:
+        session.rollback()
+        raise HTTPException(409, "series cast apply conflict") from err
+    created = sum(1 for entry in result.entries if entry.created)
+    return SeriesCastApplyResponse(
+        snapshot_id=result.snapshot_id,
+        workspace_id=result.workspace_id,
+        project_id=result.project_id,
+        video_item_id=result.video_item_id,
+        entries_sha256=result.entries_sha256,
+        applied=[
+            SeriesCastApplyEntryData(
+                role_key=entry.role_key,
+                object_role_id=entry.object_role_id,
+                mapping_id=entry.mapping_id,
+                character_id=entry.character_id,
+                pack_version_id=entry.pack_version_id,
+                manifest_sha256=entry.manifest_sha256,
+                created=entry.created,
+            )
+            for entry in result.entries
+        ],
+        created_count=created,
+        replayed_count=len(result.entries) - created,
+    )

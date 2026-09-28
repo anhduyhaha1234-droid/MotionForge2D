@@ -177,4 +177,131 @@ class CompatibilityEvaluateResponse(BaseModel):
     current_revision: int | None = None
     workspace_id: str
 
+
+# ── MF-END-05: series cast snapshot ("series pin") DTOs ───────────────────────
+
+#: A role key is a stable, series-scoped identifier for one cast slot
+#: (e.g. ``ROLE-BOOK-P1``) — it is what makes a frozen pin reusable by the
+#: next video of the series; ids never stand in for roles across videos.
+SERIES_ROLE_KEY_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$"
+
+
+class SeriesCastEntryRequest(_StrictModel):
+    """One requested ``role_key -> character / pack version / style`` binding."""
+
+    role_key: str = Field(
+        ..., min_length=1, max_length=64, pattern=SERIES_ROLE_KEY_PATTERN
+    )
+    character_id: str = Field(..., min_length=1, max_length=36)
+    pack_version_id: str = Field(..., min_length=1, max_length=36)
+    style_version: str | None = Field(None, min_length=1, max_length=64)
+
+
+class SeriesCastSnapshotCreateRequest(_StrictModel):
+    """Freeze the series cast set (INSERT-only; a change = a new snapshot)."""
+
+    project_id: str = Field(..., min_length=1, max_length=36)
+    entries: list[SeriesCastEntryRequest] = Field(..., min_length=1, max_length=64)
+
+
+class SeriesCastReferenceData(BaseModel):
+    """One frozen per-key asset reference (``pose_slot`` / artifact / sha)."""
+
+    pose_slot: str
+    artifact_id: str
+    sha256: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SeriesCastEntryData(BaseModel):
+    """Frozen entry as read back from the durable snapshot."""
+
+    role_key: str
+    character_id: str
+    pack_version_id: str
+    pack_contract_version: str
+    manifest_sha256: str | None = None
+    style_version: str | None = None
+    references: list[SeriesCastReferenceData]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SeriesCastSnapshotData(BaseModel):
+    """A frozen series cast snapshot (immutable, versioned by index)."""
+
+    id: str
+    workspace_id: str
+    project_id: str
+    snapshot_index: int
+    entries_sha256: str
+    created_at: datetime
+    updated_at: datetime
+    entries: list[SeriesCastEntryData]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SeriesCastSnapshotListResponse(BaseModel):
+    """Paginated snapshots, newest index first per project."""
+
+    workspace_id: str
+    project_id: str | None = None
+    limit: int
+    offset: int
+    total: int
+    snapshots: list[SeriesCastSnapshotData]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SeriesCastResolutionRequest(_StrictModel):
+    """Map one frozen ``role_key`` onto the target video's object role."""
+
+    role_key: str = Field(
+        ..., min_length=1, max_length=64, pattern=SERIES_ROLE_KEY_PATTERN
+    )
+    object_role_id: str = Field(..., min_length=1, max_length=36)
+
+
+class SeriesCastApplyRequest(_StrictModel):
+    """Copy a frozen snapshot onto a new video of the same series.
+
+    The WHOLE set is required — every snapshot ``role_key`` must be resolved
+    exactly once, so a shared series cast is never half-applied silently.
+    """
+
+    video_item_id: str = Field(..., min_length=1, max_length=36)
+    resolutions: list[SeriesCastResolutionRequest] = Field(..., min_length=1, max_length=64)
+
+
+class SeriesCastApplyEntryData(BaseModel):
+    """One copied pin (the mapping row written by the existing service)."""
+
+    role_key: str
+    object_role_id: str
+    mapping_id: str
+    character_id: str
+    pack_version_id: str
+    manifest_sha256: str | None = None
+    created: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SeriesCastApplyResponse(BaseModel):
+    """Result of copying a series snapshot onto one video."""
+
+    snapshot_id: str
+    workspace_id: str
+    project_id: str
+    video_item_id: str
+    entries_sha256: str
+    applied: list[SeriesCastApplyEntryData]
+    created_count: int
+    replayed_count: int
+
+    model_config = ConfigDict(from_attributes=True)
+
     model_config = ConfigDict(from_attributes=True)
