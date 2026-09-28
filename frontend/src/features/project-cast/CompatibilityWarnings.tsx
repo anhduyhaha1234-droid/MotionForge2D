@@ -52,6 +52,7 @@ export function CompatibilityWarnings({ result, loading, error, onRetry }: Props
             Thử lại
           </button>
         )}
+        <p className="text-[11px] text-gray-400">Nhấn Thử lại để kiểm tra lại tương thích.</p>
       </div>
     );
   }
@@ -92,7 +93,7 @@ export function CompatibilityWarnings({ result, loading, error, onRetry }: Props
           <li key={r} className="flex flex-col gap-0.5 p-2 bg-gray-800 rounded border border-gray-700" data-testid={`compat-reason-${r}`}>
             <span className="text-sm text-gray-200">{VI_LABEL[r] ?? r}</span>
             <span className="text-[11px] text-gray-400">{VI_HELP[r] ?? ""}</span>
-            <span className="text-[10px] text-gray-500 font-mono">{r}</span>
+            <span className="text-[11px] text-gray-400 font-mono">{r}</span>
           </li>
         ))}
       </ul>
@@ -125,6 +126,7 @@ export function CompatibilityWarnings({ result, loading, error, onRetry }: Props
           Kiểm tra lại
         </button>
       )}
+      <p className="text-[11px] text-gray-400">Nhấn Kiểm tra lại để đánh giá lại pack đang chọn.</p>
     </div>
   );
 }

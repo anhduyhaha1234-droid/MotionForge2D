@@ -26,6 +26,7 @@ import {
   CHARACTER_STATUS_LABELS,
   PACK_STATUS_LABELS,
 } from "@/lib/api";
+import { ReferenceViewBoard } from "@/features/reference-library";
 
 const date = (value: string) =>
   new Intl.DateTimeFormat("vi-VN", { dateStyle: "medium" }).format(new Date(value));
@@ -352,6 +353,21 @@ function CharacterDetail({
               <PoseSlotTile key={slot} version={selectedVersion} slot={slot} />
             ))}
           </div>
+
+          <ReferenceViewBoard
+            versionId={selectedVersion.id}
+            versionNumber={selectedVersion.version}
+            versionStatus={selectedVersion.status}
+            assets={selectedVersion.assets}
+            onChanged={() => {
+              void queryClient.invalidateQueries({
+                queryKey: ["character-versions", character.id],
+              });
+              void queryClient.invalidateQueries({
+                queryKey: ["character-validation", selectedVersion.id],
+              });
+            }}
+          />
 
           <div className="mt-5 rounded-lg border border-[var(--surface-800)] bg-[var(--surface-850)] p-4">
             <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">

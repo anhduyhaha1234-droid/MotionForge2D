@@ -12,7 +12,7 @@ from typing import Annotated
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 
-from app.api.deps import SessionDep, get_config, get_managed_root
+from app.api.deps import SessionDep, get_config, get_job_service, get_managed_root
 from app.persistence import DEFAULT_WORKSPACE_ID
 from app.persistence.characters import (
     AssetContentError,
@@ -39,10 +39,14 @@ from app.schemas.characters import (
     PackVersionValidationData,
     PublishVersionRequest,
     ReferenceArtworkData,
+    ReferenceAssetJobData,
+    ReferenceAssetJobRequest,
+    ReferenceAssetJobRetryRequest,
+    ReferenceAssetJobSubmitData,
     SetDefaultVersionRequest,
     asset_content_url,
 )
-from app.workflow import character_reference_ingest
+from app.workflow import character_reference_ingest, reference_asset_jobs
 
 router = APIRouter(prefix="/api/v2/characters", tags=["durable-characters"])
 WORKSPACE_ID = DEFAULT_WORKSPACE_ID
@@ -480,3 +484,126 @@ def ingest_reference_artwork(
             },
         ) from err
     return ReferenceArtworkData.from_result(result)
+
+
+# ── Reference-asset generation jobs (MF-END-09) ──────────────────────────────
+
+#: Typed refusal code -> HTTP status (fail closed; unlisted codes are 422).
+_REFERENCE_ASSET_REFUSAL_STATUS: dict[str, int] = {
+    "mf_end09_version_not_found": 404,
+    "mf_end09_version_not_draft": 409,
+    "mf_end09_target_key_present": 409,
+    "mf_end09_source_hash_mismatch": 409,
+    "mf_end09_job_not_found": 404,
+    "mf_end09_job_not_retryable": 409,
+    "mf_end09_idempotency_conflict": 409,
+    "mf_end09_graph_pin_mismatch": 500,
+    "mf_end09_receipt_incomplete": 500,
+}
+
+
+def _reference_asset_refusal(err: reference_asset_jobs.ReferenceAssetJobError) -> HTTPException:
+    status = _REFERENCE_ASSET_REFUSAL_STATUS.get(err.code.value, 422)
+    return HTTPException(status, detail=err.as_dict())
+
+
+def _require_reference_asset_job(job_id: str):
+    info = get_job_service().get_job(job_id)
+    if info is None or str(info.job_type or "") != reference_asset_jobs.JOB_TYPE_REFERENCE_ASSET:
+        raise HTTPException(404, detail={"code": "mf_end09_job_not_found", "job_id": job_id})
+    return info
+
+
+@router.post("/versions/{version_id:uuid}/reference-asset-jobs", status_code=202)
+@router.post("/versions/{version_id:uuid}/reference-asset-jobs/", status_code=202)
+def submit_reference_asset_job(
+    version_id: uuid.UUID,
+    body: ReferenceAssetJobRequest,
+    session: SessionDep,
+    workspace_id: str = WORKSPACE_ID,
+) -> ReferenceAssetJobSubmitData:
+    """Register ONE durable reference-asset generation intent (async).
+
+    The request only validates the live draft pack and inserts the Job row:
+    no engine work and no library write happens inside this request.  The
+    worker drives graph G1 and the managed ingest; poll the job status for
+    progress, the generated asset (draft only) and the cache key.
+    """
+    repo = CharacterRepository(session, storage_root=get_managed_root())
+    try:
+        version = repo.get_pack_version(str(version_id), workspace_id)
+    except PackVersionNotFoundError as err:
+        raise HTTPException(404, str(err)) from err
+    try:
+        result = reference_asset_jobs.submit_reference_asset_job(
+            job_service=get_job_service(),
+            workspace_id=workspace_id,
+            character_id=str(version.character_id),
+            version_id=str(version_id),
+            reference_key=body.reference_key,
+            view_prompt=body.view_prompt,
+            source_reference_key=body.source_reference_key,
+            style_version=body.style_version,
+            seed=body.seed,
+            idempotency_key=body.idempotency_key,
+            input_generation=body.input_generation,
+        )
+    except reference_asset_jobs.ReferenceAssetJobError as err:
+        raise _reference_asset_refusal(err) from err
+    return ReferenceAssetJobSubmitData(
+        job=ReferenceAssetJobData.from_info(result.job),
+        content_key=result.content_key,
+        reference_key=result.reference_key,
+        view=result.view,
+        role=result.role,
+        duplicate=result.duplicate,
+    )
+
+
+@router.get("/reference-asset-jobs/{job_id}")
+@router.get("/reference-asset-jobs/{job_id}/")
+def get_reference_asset_job(job_id: str) -> ReferenceAssetJobData:
+    """Durable status of one reference-asset job (reference jobs only)."""
+    return ReferenceAssetJobData.from_info(_require_reference_asset_job(job_id))
+
+
+@router.post("/reference-asset-jobs/{job_id}/cancel")
+@router.post("/reference-asset-jobs/{job_id}/cancel/")
+def cancel_reference_asset_job(job_id: str) -> dict[str, object]:
+    """Durably request cancellation; the attempt identity is preserved."""
+    _require_reference_asset_job(job_id)
+    job_svc = get_job_service()
+    if not job_svc.cancel_job(job_id):
+        info = job_svc.get_job(job_id)
+        raise HTTPException(400, f"Cannot cancel job in state: {info.state.value}")
+    return {"status": "cancel_requested", "job_id": job_id}
+
+
+@router.post("/reference-asset-jobs/{job_id}/retry", status_code=202)
+@router.post("/reference-asset-jobs/{job_id}/retry/", status_code=202)
+def retry_reference_asset_job(
+    job_id: str,
+    body: ReferenceAssetJobRetryRequest,
+) -> ReferenceAssetJobSubmitData:
+    """Retry a TERMINAL reference-asset job as a new input generation.
+
+    The content key (identity/view/style/graph) is unchanged, so a terminal
+    receipt is replayed with zero engine submits instead of generating again.
+    """
+    _require_reference_asset_job(job_id)
+    try:
+        result = reference_asset_jobs.resubmit_reference_asset_job(
+            job_service=get_job_service(),
+            job_id=job_id,
+            input_generation=body.input_generation,
+        )
+    except reference_asset_jobs.ReferenceAssetJobError as err:
+        raise _reference_asset_refusal(err) from err
+    return ReferenceAssetJobSubmitData(
+        job=ReferenceAssetJobData.from_info(result.job),
+        content_key=result.content_key,
+        reference_key=result.reference_key,
+        view=result.view,
+        role=result.role,
+        duplicate=result.duplicate,
+    )

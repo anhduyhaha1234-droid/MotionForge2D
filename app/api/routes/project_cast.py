@@ -23,16 +23,18 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import Session, joinedload
 
-from app.api.deps import SessionDep
+from app.api.deps import SessionDep, get_managed_root
 from app.persistence import DEFAULT_WORKSPACE_ID
 from app.persistence.models import (
     Character,
     CharacterPackVersion,
+    ObjectRole,
+    ProjectCastMapping,
 )
 from app.persistence.project_cast import (
     ProjectCastConflictError,
@@ -48,7 +50,18 @@ from app.persistence.project_cast import (
     SeriesCastStaleError,
     evaluate_compatibility,
 )
+from app.schemas.cast_recommendation import (
+    CastCandidateData,
+    CastRecommendationRequest,
+    CastRecommendationResult,
+    CastRoleRequirement,
+    RoleRecommendationData,
+)
 from app.schemas.project_cast import (
+    CastConfirmRequest,
+    CastConfirmResponse,
+    CastConfirmTraceData,
+    CastConfirmWarningData,
     CompatibilityEvaluateRequest,
     CompatibilityEvaluateResponse,
     PickerPackItem,
@@ -65,6 +78,12 @@ from app.schemas.project_cast import (
     SeriesCastSnapshotCreateRequest,
     SeriesCastSnapshotData,
     SeriesCastSnapshotListResponse,
+)
+from app.services.cast_recommendation import (
+    AdvisoryClient,
+    CastRecommendationInputError,
+    CastRecommendationNotFoundError,
+    recommend_cast,
 )
 
 router = APIRouter(prefix="/api/v2/project-cast", tags=["project-cast"])
@@ -501,4 +520,344 @@ def apply_series_cast_snapshot(
         ],
         created_count=created,
         replayed_count=len(result.entries) - created,
+    )
+
+
+# ── MF-END-07: recommendation (read-only) + confirm (guarded mutation) ───────
+#
+# The suggestion route surfaces the MF-END-06 service verbatim: role
+# requirements and the series pin are read from the SERVER (never supplied by
+# the client), nothing is written and no job is enqueued.  The confirm route
+# re-derives that recommendation from the live state and refuses (typed 409,
+# zero mutation) whenever the user's trace no longer matches it — only then
+# does it write through the EXISTING ProjectCastRepository authority.
+
+
+def get_cast_advisory_client() -> AdvisoryClient | None:
+    """Advisory client for the suggestion route: None = the pinned default.
+
+    Exposed as a dependency so a test (or an embedding host) can override it
+    and prove that no advisory call happens on paths that do not need one.
+    """
+    return None
+
+
+CastAdvisoryDep = Annotated[AdvisoryClient | None, Depends(get_cast_advisory_client)]
+
+
+@router.post("/recommendations", status_code=200)
+@router.post("/recommendations/", status_code=200)
+def recommend_cast_route(
+    body: CastRecommendationRequest,
+    session: SessionDep,
+    advisory_client: CastAdvisoryDep,
+) -> CastRecommendationResult:
+    """Suggest a cast set for one video (READ-ONLY: never mutates a pin)."""
+    try:
+        return recommend_cast(
+            session,
+            WORKSPACE_ID,
+            body,
+            advisory_client=advisory_client,
+            managed_root=get_managed_root(),
+        )
+    except CastRecommendationNotFoundError as err:
+        raise HTTPException(404, str(err)) from err
+    except CastRecommendationInputError as err:
+        raise HTTPException(422, str(err)) from err
+
+
+def _match_trace_role(
+    plan: CastRecommendationResult, body: CastConfirmRequest
+) -> RoleRecommendationData:
+    """Resolve the role the trace names — 409 when it is not this video's role."""
+    trace = body.recommendation
+    role = next((item for item in plan.roles if item.role_key == trace.role_key), None)
+    if role is None:
+        raise HTTPException(
+            409,
+            f"recommendation trace role_key {trace.role_key!r} is not one of this "
+            "video's server-derived cast requirements",
+        )
+    if role.object_role_id != body.object_role_id:
+        raise HTTPException(
+            409,
+            f"recommendation trace role_key {trace.role_key!r} maps to object role "
+            f"{role.object_role_id!r}, not {body.object_role_id!r}",
+        )
+    return role
+
+
+def _confirm_basis(
+    session: Session, body: CastConfirmRequest
+) -> tuple[CastRecommendationResult, RoleRecommendationData]:
+    """Re-derive the LIVE recommendation basis for the trace being confirmed.
+
+    The trace's view / capability / style claims are fed back as an explicit
+    requirement (the kind always comes from the live role — a client never
+    supplies it), so the confirm validates against the SAME deterministic
+    filter the user was shown and can report the real missing assets for the
+    chosen pack.
+    """
+    trace = body.recommendation
+    requirements: list[CastRoleRequirement] | None = None
+    if trace.required_views or trace.required_capabilities or trace.style_version:
+        base_plan = recommend_cast(
+            session,
+            WORKSPACE_ID,
+            CastRecommendationRequest(video_item_id=body.video_item_id, advisory="off"),
+        )
+        base_role = _match_trace_role(base_plan, body)
+        requirements = [
+            CastRoleRequirement(
+                role_key=trace.role_key,
+                kind=base_role.kind,
+                object_role_id=body.object_role_id,
+                required_views=list(trace.required_views),
+                required_capabilities=list(trace.required_capabilities),
+                style_version=trace.style_version,
+            )
+        ]
+    plan = recommend_cast(
+        session,
+        WORKSPACE_ID,
+        CastRecommendationRequest(
+            video_item_id=body.video_item_id,
+            requirements=requirements,
+            advisory="off",
+        ),
+    )
+    return plan, _match_trace_role(plan, body)
+
+
+def _require_fresh_series_basis(
+    body: CastConfirmRequest,
+    role: RoleRecommendationData,
+    candidate: CastCandidateData,
+) -> None:
+    """The trace's frozen snapshot must BE the live series pin (else 409)."""
+    trace = body.recommendation
+    pin = role.series_pin
+    if (
+        trace.selection_mode != "series_pin"
+        or trace.series_snapshot_id != candidate.snapshot_id
+        or trace.series_snapshot_index != candidate.snapshot_index
+        or (pin is not None and trace.series_entries_sha256 != pin.entries_sha256)
+    ):
+        raise HTTPException(
+            409,
+            "stale recommendation basis: the live series pin for role "
+            f"{trace.role_key!r} is snapshot {candidate.snapshot_id!r} "
+            f"(index {candidate.snapshot_index}), not snapshot "
+            f"{trace.series_snapshot_id!r} (index {trace.series_snapshot_index})",
+        )
+
+
+@router.post("/recommendations/confirm", status_code=201)
+@router.post("/recommendations/confirm/", status_code=201)
+def confirm_recommendation_route(
+    body: CastConfirmRequest,
+    session: SessionDep,
+    response: Response,
+) -> CastConfirmResponse:
+    """Confirm ONE recommended choice — the only mutating path of this API.
+
+    A mutation requires: the trace still matching the LIVE recommendation, the
+    chosen pack being a live candidate, and (when an existing pin is replaced)
+    an explicit matching ``expected_revision``.  Every refusal returns
+    404/409/422 with ZERO mutation, and the write itself rides the existing
+    cast repository — no new store, no new job type, no new table.
+    """
+    trace = body.recommendation
+    role_row = session.get(ObjectRole, body.object_role_id)
+    if (
+        role_row is None
+        or role_row.workspace_id != WORKSPACE_ID
+        or role_row.video_item_id != body.video_item_id
+    ):
+        raise HTTPException(
+            404,
+            f"object role {body.object_role_id!r} does not belong to this video "
+            "in this workspace",
+        )
+    plan, role = _confirm_basis(session, body)
+    if trace.selected_pack_version_id != body.pack_version_id:
+        raise HTTPException(
+            409,
+            "confirmed pack_version_id does not match the recommendation trace "
+            f"proposal {trace.selected_pack_version_id!r}",
+        )
+    candidate = next(
+        (item for item in role.candidates if item.pack_version_id == body.pack_version_id),
+        None,
+    )
+    if candidate is None:
+        excluded = next(
+            (
+                item
+                for item in role.filtered
+                if item.pack_version_id == body.pack_version_id
+            ),
+            None,
+        )
+        detail = (
+            "; ".join(f"{reason.code}: {reason.detail}" for reason in excluded.reasons)
+            if excluded is not None
+            else "the pack is not among this role's live candidates"
+        )
+        raise HTTPException(
+            409,
+            f"pack {body.pack_version_id!r} is not a live candidate for role "
+            f"{trace.role_key!r} ({detail})",
+        )
+    if candidate.character_id != body.character_id:
+        raise HTTPException(
+            409,
+            "character_id does not match the recommended candidate's character "
+            f"{candidate.character_id!r}",
+        )
+    if candidate.source == "series_snapshot":
+        _require_fresh_series_basis(body, role, candidate)
+    elif trace.selection_mode == "series_pin":
+        raise HTTPException(
+            409,
+            "stale recommendation basis: the frozen series entry this trace was "
+            "derived from is no longer the live series pin for this role",
+        )
+    if candidate.live_ok is False:
+        raise HTTPException(
+            409,
+            "stale recommendation basis: the frozen series entry no longer matches "
+            "the live library (" + "; ".join(candidate.live_problems) + ")",
+        )
+    repo = ProjectCastRepository(session)
+    existing = session.scalar(
+        select(ProjectCastMapping).where(
+            ProjectCastMapping.workspace_id == WORKSPACE_ID,
+            ProjectCastMapping.project_id == plan.project_id,
+            ProjectCastMapping.object_role_id == body.object_role_id,
+        )
+    )
+    created = False
+    replayed = False
+    try:
+        if existing is not None and (
+            existing.character_id == body.character_id
+            and existing.pack_version_id == body.pack_version_id
+        ):
+            # Idempotent replay: this choice is already pinned — zero mutation.
+            record = repo.get_mapping(str(existing.id), WORKSPACE_ID)
+            replayed = True
+        else:
+            if existing is None:
+                record, created = repo.create_mapping(
+                    workspace_id=WORKSPACE_ID,
+                    project_id=plan.project_id,
+                    object_role_id=body.object_role_id,
+                    character_id=body.character_id,
+                    pack_version_id=body.pack_version_id,
+                    idempotency_key=body.idempotency_key,
+                    fallback_acknowledged=body.fallback_acknowledged,
+                )
+            else:
+                if body.expected_revision is None:
+                    raise HTTPException(
+                        422,
+                        "expected_revision is required to replace the existing pin "
+                        f"of role {body.object_role_id!r}",
+                    )
+                record = repo.update_mapping(
+                    str(existing.id),
+                    WORKSPACE_ID,
+                    expected_revision=body.expected_revision,
+                    character_id=body.character_id,
+                    pack_version_id=body.pack_version_id,
+                    fallback_acknowledged=body.fallback_acknowledged,
+                )
+            session.commit()
+    except HTTPException:
+        session.rollback()
+        raise
+    except ProjectCastOwnershipError as err:
+        session.rollback()
+        raise HTTPException(404, str(err)) from err
+    except ProjectCastConflictError as err:
+        session.rollback()
+        raise HTTPException(409, str(err)) from err
+    except ProjectCastNotFoundError as err:
+        session.rollback()
+        raise HTTPException(404, str(err)) from err
+    except ValueError as err:
+        session.rollback()
+        raise HTTPException(422, str(err)) from err
+    except IntegrityError as err:
+        session.rollback()
+        raise HTTPException(409, "cast confirm conflict") from err
+    if not created:
+        response.status_code = 200
+    warnings: list[CastConfirmWarningData] = []
+    if candidate.missing_views:
+        warnings.append(
+            CastConfirmWarningData(
+                code="missing_required_views",
+                detail=(
+                    "the chosen pack does not cover required views: "
+                    + ", ".join(candidate.missing_views)
+                ),
+                action=(
+                    "create the missing assets before rendering; the generation "
+                    "plan below is the actionable list"
+                ),
+            )
+        )
+    if candidate.missing_capabilities:
+        warnings.append(
+            CastConfirmWarningData(
+                code="missing_required_capabilities",
+                detail=(
+                    "the chosen pack does not declare: "
+                    + ", ".join(candidate.missing_capabilities)
+                ),
+                action=(
+                    "confirm a pack that declares the capability or extend this one"
+                ),
+            )
+        )
+    if role.generation.required:
+        warnings.append(
+            CastConfirmWarningData(
+                code="generation_plan_required",
+                detail=role.generation.note,
+                action=(
+                    "hand this plan to the generation flow (assets are created "
+                    "only when missing)"
+                ),
+            )
+        )
+    return CastConfirmResponse(
+        workspace_id=WORKSPACE_ID,
+        project_id=plan.project_id,
+        mapping=ProjectCastData.from_record(record),
+        trace=CastConfirmTraceData(
+            role_key=trace.role_key,
+            selection_mode=trace.selection_mode,
+            selected_pack_version_id=trace.selected_pack_version_id,
+            verified_source=(
+                "series_pin"
+                if candidate.source == "series_snapshot"
+                else "library_candidate"
+            ),
+            snapshot_id=candidate.snapshot_id,
+            snapshot_index=candidate.snapshot_index,
+            entries_sha256=(
+                role.series_pin.entries_sha256 if role.series_pin is not None else None
+            ),
+        ),
+        warnings=warnings,
+        missing_views=list(candidate.missing_views),
+        generation=role.generation,
+        created=created,
+        replayed=replayed,
+        mutations=0 if replayed else 1,
+        read_only=False,
     )
