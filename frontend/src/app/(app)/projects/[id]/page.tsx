@@ -24,13 +24,56 @@ import { AlertTriangle, FolderOpen, RefreshCw } from "lucide-react";
 import {
   api,
   ApiError,
+  buildJourneyStages,
+  journeyCurrentIndex,
+  journeyNextStage,
   type DurableProjectData,
+  type JourneyStageView,
   type ProjectData,
   type ProjectVideoItem,
 } from "@/lib/api";
+import { listApprovals } from "@/features/demo";
+import { exportContext } from "@/lib/s12-export-api";
 import { ReadinessPanel } from "@/components/readiness/ReadinessPanel";
 
 type DetailPhase = "loading" | "error" | "not-found" | "ready";
+
+/** localStorage pointers written by the /apply and /export routes. */
+const STORAGE_APPLY_RUN = "s10:apply:lastRunId";
+const STORAGE_APPLY_PROJECT = "s10:apply:lastProjectId";
+
+/** Journey rail state — statuses/hrefs come from the pure journey mapping. */
+interface JourneyState {
+  loading: boolean;
+  stages: JourneyStageView[];
+  error: string | null;
+}
+
+function readExportPointer(
+  projectId: string,
+  videoItemId: string,
+  workspaceId: string,
+): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(
+      `s12:export:${workspaceId}:${projectId}:${videoItemId}:run`,
+    );
+  } catch {
+    return null;
+  }
+}
+
+function readApplyPointer(projectId: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const storedProject = localStorage.getItem(STORAGE_APPLY_PROJECT);
+    if (storedProject && storedProject !== projectId) return null;
+    return localStorage.getItem(STORAGE_APPLY_RUN);
+  } catch {
+    return null;
+  }
+}
 
 interface VideoRow {
   video_item_id: string;
@@ -107,6 +150,84 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     loadingVideos: false,
   });
 
+  const [journey, setJourney] = useState<JourneyState>({
+    loading: true,
+    stages: [],
+    error: null,
+  });
+
+  /**
+   * Journey rail — every input is a REAL backend read (analyze chain, cast
+   * mappings, demo approvals, apply run status, export context).  A failed
+   * read stays null so the pure mapping fails closed (blocked + missing
+   * sentence) instead of opening a step whose dependencies are unknown.
+   */
+  const loadJourney = useCallback(
+    async (projectId: string, videoItemId: string | null) => {
+      setJourney({ loading: true, stages: [], error: null });
+      try {
+        const chainP = api
+          .getAnalyzeChain(projectId)
+          .catch(() => null);
+        const castP = api
+          .listProjectCastMappings(projectId)
+          .then((r) => r.total)
+          .catch(() => null);
+        const approvalP = listApprovals({ projectId })
+          .then((r) => r.total)
+          .catch(() => null);
+        const applyPointer = readApplyPointer(projectId);
+        const applyP = applyPointer
+          ? api
+              .getS10FullApplyStatus(applyPointer, "default", projectId)
+              .then((r) => ({ runId: applyPointer, status: r.status }))
+              .catch(() => ({ runId: applyPointer, status: null }))
+          : Promise.resolve({ runId: null, status: null });
+        const exportPointer =
+          videoItemId !== null
+            ? readExportPointer(projectId, videoItemId, "default")
+            : null;
+        const contextP =
+          videoItemId !== null
+            ? exportContext(projectId, videoItemId).catch(() => null)
+            : Promise.resolve(null);
+
+        const [chain, castCount, approvalCount, apply, context] = await Promise.all([
+          chainP,
+          castP,
+          approvalP,
+          applyP,
+          contextP,
+        ]);
+
+        const chainVideoItemId =
+          chain && typeof chain.video_item_id === "string" ? chain.video_item_id : null;
+        const resolvedVideo = videoItemId ?? chainVideoItemId;
+
+        const stages = buildJourneyStages({
+          projectId,
+          workspaceId: "default",
+          videoItemId: resolvedVideo,
+          analyzeChainStatus: chain ? chain.chain_status : null,
+          castMappingCount: castCount,
+          approvalCount,
+          applyRunId: apply.runId,
+          applyRunStatus: apply.status,
+          fullApplyRunId: context ? context.full_apply_run_id : null,
+          exportRunId: exportPointer ?? (context?.current_run?.run_id ?? null),
+        });
+        setJourney({ loading: false, stages, error: null });
+      } catch (err) {
+        setJourney({
+          loading: false,
+          stages: [],
+          error: err instanceof Error ? err.message : "Không thể tính hành trình.",
+        });
+      }
+    },
+    [],
+  );
+
   const load = useCallback(async () => {
     setState({
       phase: "loading",
@@ -116,6 +237,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       videosError: null,
       loadingVideos: false,
     });
+    setJourney({ loading: true, stages: [], error: null });
     try {
       // 1) Resolve identity from the durable backend first, legacy second.
       let durable: DurableProjectData | null = null;
@@ -196,6 +318,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           }
         }
         setState((prev) => ({ ...prev, videos, videosError: null, loadingVideos: false }));
+        // Journey rail: real per-project reads over the resolved video item.
+        void loadJourney(
+          durable ? durable.project_id : id,
+          videos.length > 0 ? videos[0].video_item_id : null,
+        );
       } catch (err) {
         setState((prev) => ({
           ...prev,
@@ -219,7 +346,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         loadingVideos: false,
       });
     }
-  }, [id]);
+  }, [id, loadJourney]);
 
   useEffect(() => {
     void load();
@@ -302,6 +429,20 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   }
 
   const project = state.project;
+  const nextStage = journeyNextStage(journey.stages);
+  const currentIndex = journeyCurrentIndex(journey.stages);
+  const applyStage = journey.stages.find((s) => s.key === "apply") ?? null;
+  const exportStage = journey.stages.find((s) => s.key === "export") ?? null;
+  const stageChip: Record<string, string> = {
+    done: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    current: "bg-indigo-500/10 text-indigo-300 border-indigo-500/30",
+    blocked: "bg-amber-500/10 text-amber-300 border-amber-500/30",
+  };
+  const stageChipLabel: Record<string, string> = {
+    done: "Đã xong",
+    current: "Bước hiện tại",
+    blocked: "Bị chặn",
+  };
   return (
     <div className="min-h-full bg-zinc-950 text-zinc-100 p-4 sm:p-6 space-y-6 max-w-6xl mx-auto overflow-x-hidden">
       {/* Top Breadcrumb & Actions */}
@@ -360,6 +501,104 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
+      {/* Journey rail — import → cast → demo → apply → review → export (MF-END-25) */}
+      <section
+        data-testid="project-journey"
+        aria-label="Hành trình sản xuất"
+        className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-6 space-y-4"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-semibold text-zinc-100">Hành trình sản xuất</h2>
+            <p className="text-xs text-zinc-400">
+              Sáu bước thật từ nhập nguồn tới xuất video. Trạng thái đọc từ máy chủ; bước
+              thiếu điều kiện sẽ bị khóa kèm lý do cụ thể.
+            </p>
+          </div>
+          {!journey.loading && journey.stages.length > 0 && (
+            <span className="text-[11px] text-gray-400" data-testid="journey-position">
+              Bước {currentIndex + 1}/{journey.stages.length}
+            </span>
+          )}
+        </div>
+
+        {journey.loading ? (
+          <div className="space-y-2" aria-busy="true" data-testid="journey-loading">
+            <div className="h-20 animate-pulse rounded-lg bg-zinc-800" />
+            <p className="text-[11px] text-gray-400">
+              Đang đọc trạng thái hành trình từ máy chủ…
+            </p>
+          </div>
+        ) : journey.error ? (
+          <div role="alert" className="space-y-2" data-testid="journey-error">
+            <p className="text-sm text-red-300">Không thể tính hành trình: {journey.error}</p>
+            <p className="text-[11px] text-gray-400">
+              Tải lại trang để đọc lại trạng thái thật từ máy chủ.
+            </p>
+          </div>
+        ) : (
+          <>
+            <ol
+              className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3"
+              data-testid="journey-stages"
+              aria-label="Các bước của hành trình sản xuất"
+            >
+              {journey.stages.map((stage, index) => (
+                <li
+                  key={stage.key}
+                  data-testid={`journey-stage-${stage.key}`}
+                  className={`space-y-1 rounded-lg border p-3 ${
+                    stage.status === "blocked"
+                      ? "border-amber-500/30 bg-amber-500/5"
+                      : "border-zinc-800 bg-zinc-950/40"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium text-zinc-200">
+                      {index + 1}. {stage.label}
+                    </span>
+                    <span
+                      className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${stageChip[stage.status]}`}
+                    >
+                      {stageChipLabel[stage.status]}
+                    </span>
+                  </div>
+                  <p className="text-[11px] leading-snug text-gray-400">{stage.helper}</p>
+                  {stage.href ? (
+                    <Link
+                      href={stage.href}
+                      data-testid={`journey-open-${stage.key}`}
+                      className="inline-flex min-h-8 items-center rounded border border-zinc-700 bg-zinc-900 px-3 text-xs font-medium text-zinc-100 transition hover:bg-zinc-800"
+                    >
+                      Mở bước này →
+                    </Link>
+                  ) : (
+                    <p
+                      className="text-[11px] font-medium text-amber-300"
+                      data-testid={`journey-missing-${stage.key}`}
+                    >
+                      {stage.missing}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ol>
+            {nextStage && (
+              <div className="flex flex-col items-start gap-1">
+                <Link
+                  href={nextStage.href as string}
+                  data-testid="journey-next"
+                  className="inline-flex min-h-9 items-center rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500"
+                >
+                  Tiếp tục: {nextStage.label} →
+                </Link>
+                <p className="text-[11px] text-gray-400">{nextStage.helper}</p>
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
       {/* Video Items Section */}
       <div className="space-y-4 min-w-0">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -386,14 +625,58 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                       </p>
                     </div>
                     <div className="flex flex-col items-start gap-1">
-                      <Link
-                        href={`/apply?project=${encodeURIComponent(project.id)}`}
-                        className="inline-flex min-h-9 items-center rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500"
-                        data-testid="project-go-apply"
-                      >
-                        Áp dụng toàn bộ video (Full Apply) →
-                      </Link>
-                      <p className="text-[11px] text-gray-400">Mở luồng Apply — cần checkpoint duyệt Demo trước.</p>
+                      {applyStage?.href ? (
+                        <Link
+                          href={applyStage.href}
+                          className="inline-flex min-h-9 items-center rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500"
+                          data-testid="project-go-apply"
+                        >
+                          Áp dụng toàn bộ video (Full Apply) →
+                        </Link>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled
+                          aria-disabled="true"
+                          title={applyStage?.missing ?? "Chưa đủ điều kiện để Apply"}
+                          className="inline-flex min-h-9 cursor-not-allowed items-center rounded-lg bg-zinc-800 px-4 py-1.5 text-xs font-semibold text-zinc-500"
+                          data-testid="project-go-apply"
+                        >
+                          Áp dụng toàn bộ video (Full Apply)
+                        </button>
+                      )}
+                      <p className="text-[11px] text-gray-400">
+                        {applyStage?.href
+                          ? "Mở luồng Apply — checkpoint duyệt Demo đã có."
+                          : (applyStage?.missing ?? "Đang đọc điều kiện Apply từ máy chủ…")}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-start gap-1">
+                      {exportStage?.href ? (
+                        <Link
+                          href={exportStage.href}
+                          className="inline-flex min-h-9 items-center rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-1.5 text-xs font-semibold text-zinc-100 hover:bg-zinc-800"
+                          data-testid="project-go-export"
+                        >
+                          Xuất video (Export) →
+                        </Link>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled
+                          aria-disabled="true"
+                          title={exportStage?.missing ?? "Chưa đủ điều kiện để xuất video"}
+                          className="inline-flex min-h-9 cursor-not-allowed items-center rounded-lg bg-zinc-800 px-4 py-1.5 text-xs font-semibold text-zinc-500"
+                          data-testid="project-go-export"
+                        >
+                          Xuất video (Export)
+                        </button>
+                      )}
+                      <p className="text-[11px] text-gray-400">
+                        {exportStage?.href
+                          ? "Mở luồng Export — xuất MP4 từ lượt Apply đã hoàn tất."
+                          : (exportStage?.missing ?? "Đang đọc điều kiện Export từ máy chủ…")}
+                      </p>
                     </div>
         </div>
 

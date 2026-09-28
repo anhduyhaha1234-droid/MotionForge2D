@@ -16,8 +16,9 @@
  */
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, buildExportHref, buildReviewHref } from "@/lib/api";
 import { ApplyCard } from "@/features/apply/ApplyCard";
 import { ApplyProgress } from "@/features/apply/ApplyProgress";
 import { ApplyEvidenceLinks, type StructuralEvidenceView } from "@/features/apply/ApplyEvidenceLinks";
@@ -353,9 +354,63 @@ function ApplyRoute() {
           </div>
         )}
 
+        {/* ── Next steps after a completed run (journey context) ─────── */}
+        {status.data && (
+          <div className="rounded border border-gray-700 bg-gray-900/40 p-4" data-testid="apply-next-steps">
+            <h3 className="text-sm font-medium text-gray-100">Bước kế tiếp</h3>
+            <p className={HELPER}>
+              Hành trình dùng đúng project/video của run hiện tại — không cần nhập tay.
+            </p>
+            {isTerminalCompleted ? (
+              <div className="mt-3 flex flex-wrap gap-4">
+                <div className="flex flex-col items-start gap-1">
+                  <Link
+                    href={buildExportHref(
+                      status.data.project_id,
+                      status.data.video_item_id,
+                      "default",
+                      status.data.run_id,
+                    )}
+                    data-testid="apply-go-export"
+                    className="inline-flex min-h-9 items-center rounded bg-cyan-700 px-4 py-1.5 text-xs font-medium text-white hover:bg-cyan-600"
+                  >
+                    Xuất video (Export) →
+                  </Link>
+                  <p className={HELPER}>Mở luồng Export cho đúng project/video của run này.</p>
+                </div>
+                <div className="flex flex-col items-start gap-1">
+                  <Link
+                    href={buildReviewHref(status.data.project_id)}
+                    data-testid="apply-go-review"
+                    className="inline-flex min-h-9 items-center rounded border border-gray-700 bg-gray-800 px-4 py-1.5 text-xs font-medium text-gray-200 hover:bg-gray-700"
+                  >
+                    Duyệt QC (hàng đợi) →
+                  </Link>
+                  <p className={HELPER}>Xem issue kiểm tra chất lượng và vị trí lỗi của dự án.</p>
+                </div>
+                <div className="flex flex-col items-start gap-1">
+                  <Link
+                    href={`/projects/${encodeURIComponent(status.data.project_id)}`}
+                    data-testid="apply-go-project"
+                    className="inline-flex min-h-9 items-center rounded border border-gray-700 bg-gray-800 px-4 py-1.5 text-xs font-medium text-gray-200 hover:bg-gray-700"
+                  >
+                    Về dự án (hành trình) →
+                  </Link>
+                  <p className={HELPER}>Xem lại toàn bộ hành trình sản xuất của dự án.</p>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-2 text-xs text-amber-300" data-testid="apply-next-blocked">
+                Chưa mở Export/Duyệt QC: cần run ở trạng thái completed (hiện tại:{" "}
+                {status.data.status}).
+              </p>
+            )}
+          </div>
+        )}
+
         <footer className="rounded border border-gray-800 p-3">
           <p className={HELPER}>Giao diện hỗ trợ mobile 390px, dark theme, mọi trạng thái loading/empty/error/stale/conflict đều có thông báo rõ ràng.</p>
-          <p className="mt-1 font-mono text-[11px] text-gray-500">S10-T04B — nguồn duy nhất là backend API (GET /api/v2/full-apply/… + POST structural-compare).</p>
+          <p className="mt-1 font-mono text-[11px] text-gray-400">S10-T04B — nguồn duy nhất là backend API (GET /api/v2/full-apply/… + POST structural-compare).</p>
         </footer>
       </div>
     </div>

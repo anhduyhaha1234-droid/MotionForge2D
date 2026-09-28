@@ -31,6 +31,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Boxes } from "lucide-react";
 import {
@@ -446,6 +447,15 @@ export function ImportAnalyzePanel({ projectId, onTerminal }: ImportAnalyzePanel
           className="space-y-4 rounded-2xl border border-[var(--surface-800)] bg-[var(--surface-900)] p-6 shadow-panel"
         >
           <div
+            role="button"
+            tabIndex={0}
+            aria-label="Chọn tệp video nguồn"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                fileInputRef.current?.click();
+              }
+            }}
             onDragOver={(e) => {
               e.preventDefault();
               setIsDragging(true);
@@ -773,6 +783,18 @@ export function ImportAnalyzePanel({ projectId, onTerminal }: ImportAnalyzePanel
               </p>
             </div>
           )}
+          <div className="flex flex-col items-start gap-1">
+            <Link
+              href={`/projects/${encodeURIComponent(projectId)}`}
+              data-testid="import-go-project"
+              className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[var(--surface-700)] px-4 text-sm font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-800)]"
+            >
+              Về dự án (hành trình sản xuất)
+            </Link>
+            <p className="text-[11px] text-[var(--text-muted)]">
+              Mở trang dự án — hành trình đọc trạng thái thật và chỉ mở bước kế khi đủ điều kiện.
+            </p>
+          </div>
         </section>
       )}
 
