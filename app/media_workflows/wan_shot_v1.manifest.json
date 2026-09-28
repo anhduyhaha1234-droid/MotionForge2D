@@ -1,0 +1,555 @@
+{
+ "schema_version": "mf.wan_shot.manifest.v1",
+ "graph_id": "wan_shot_v1",
+ "generated_at_utc": "2026-09-28T08:40:31Z",
+ "workflow": {
+  "graph_file": "app/media_workflows/wan_shot_v1.json",
+  "graph_file_sha256": "c08c64df713b65bb6a244ba13c75dcb5941638cfe6d1ead25d6fca4bbbae630e",
+  "graph_file_bytes": 48965,
+  "graph_object_sha256": "2bc25d7b847bf13b0af25243a4bb578d37ef302ec8878344e90eae425c981c9b",
+  "node_count": 63,
+  "template_file": "mf_animate2_book4s.shim.api.json",
+  "template_path": "C:/Users/Admin/Documents/Codex/2026-09-11/tr-x20/outputs/mf-reskin-correction-20260922/20260922T0955Z/VIDEO14B/waveB/workflows/mf_animate2_book4s.shim.api.json",
+  "template_sha256": "6e92d82b20cb2d9b1e6a9fe0e8d9cddc88ea81fdf4151ef4c6b62e21cf158fa5",
+  "template_sha256_16": "6e92d82b20cb2d9b",
+  "accepted_predecessor_graph": {
+   "file": "graphs/animate2_book.p3b.api.json",
+   "sha256": "b2ab500748d5163797ccef71e6ed9e078682440a656afd6ae4ab4cf43234a36d"
+  },
+  "pinned_variant_graph": {
+   "file": "graphs/animate2_book.p6nocache.api.json",
+   "sha256": "4247f9e8b233da4b6213c3254b637abd4d2e6c17b307b32cddb9b7b17bbd4759"
+  },
+  "graph_delta_vs_run_graph": "identical to graphs/animate2_book.p6nocache.api.json except nodes 246/292 filename_prefix (output naming only; does not enter computation)",
+  "prompt_freeze": {
+   "BOOK": {
+    "sha256": "540d16b7b7300c40b3768bd589e963b03bf400e8aa6010ef2068d2161676bd9d",
+    "chars": 493,
+    "node": "672:582",
+    "text": "Character Description: a 2D cel-shaded illustration of a seated older reader holding an open book, redesigned with new clothing, new hair and a new flat colour palette; Background description: the same room redrawn as 2D illustration with new wall colour, new furniture design and a new lighting tint.\nKeep the composition, the camera, the body poses, the hand grip on the book, the prop placement and the second person exactly where they are; change who and what they are, not where they are."
+   },
+   "TURN": {
+    "sha256": "eca92d5eb298827aa7ffb61874efa07c4fe28ba0d3aa59c8d8aac77ff88bca2d",
+    "chars": 1518,
+    "node": "672:582",
+    "text": "Reference image 1 is the exact frame to redraw. Redraw it as a flat 2D cel-shaded animation illustration in a flat colour palette: solid flat colour fills, one hard shadow tone per shape, thin clean outlines, no gradients, no photographic texture, no 3D rendering. Keep the identical composition, camera, scale and aspect ratio of reference image 1 and keep every contact between bodies and objects. Keep the frame edges exactly as they are, including the thin black band at the very top and the very bottom: do not crop, do not zoom, do not letterbox, do not add borders. This shot is a prop/detail shot: reference image 1 and reference image 2 show NO person at all - a single printed form lies flat, filling the frame, on a plain brown/orange background, with the flat blue edge of a binder at the left. Redraw exactly that: the same printed form in the same position and the same size, the same ruled lines and the same unreadable letterhead blocks as flat shapes, the same plain brown/orange background with its soft edge, and the same flat blue binder edge at the left with the same angle and the same width. Do not add a person, a hand, a face or a figure to this shot. The number of people must not change: do not add or remove a person, do not add a face, a head or a hand that reference image 1 does not already show, and do not move any person. No added text, no captions, no subtitles, no logo, no watermark: the video watermark in the bottom-left corner of reference image 1 must not appear in the result."
+   },
+   "OCC_SEG1": {
+    "sha256": "b2a1e176eaaa3f4df07c927921c6a7fbb64d9ca0c9d2705d17be7e5038f33516",
+    "chars": 1692,
+    "node": "672:582",
+    "text": "Reference image 1 is the exact frame to redraw. Redraw it as a flat 2D cel-shaded animation illustration in a flat colour palette: solid flat colour fills, one hard shadow tone per shape, thin clean outlines, no gradients, no photographic texture, no 3D rendering. Keep the identical composition, camera, scale and aspect ratio of reference image 1 and keep every contact between bodies and objects. Keep the frame edges exactly as they are, including the thin black band at the very top and the very bottom: do not crop, do not zoom, do not letterbox, do not add borders. This shot is a prop/detail shot taken at the start of the OCC window: reference image 1 and reference image 2 show the same printed form filling the frame on a white/pale background, the flat blue binder edge at the left, and a single dark hand holding a black pen, writing on the document from the right side. No full figure and no face is visible anywhere in this shot at this index. Redraw exactly that: the same printed form with its ruled lines and unreadable letterhead blocks as flat shapes, the same blue binder edge, and the same single dark writing hand with the same black pen at the same angle, in the same position. Do not add a person, a second hand, a face or a seated figure to this shot - the figure that appears later in this window is NOT part of this frame. The number of people must not change: do not add or remove a person, do not add a face, a head or a hand that reference image 1 does not already show, and do not move any person. No added text, no captions, no subtitles, no logo, no watermark: the video watermark in the bottom-left corner of reference image 1 must not appear in the result."
+   },
+   "OCC_SEG2": {
+    "sha256": "dd00d8acee0e3ce1d4f9b73e25bc283310717bac5a63a0f96d9c5ca22ac65c53",
+    "chars": 700,
+    "node": "672:582",
+    "text": "Reference image 1 is the exact frame to redraw. Redraw it as a flat 2D cel-shaded animation illustration of the SAME shot: a young man sitting at a table and facing the camera, short pale grey hair, a dark grey jacket over a black shirt, holding a bright blue book open with both hands at his chest. A cream cup with a light blue straw stands on the white table top that has a reddish-brown front edge. Behind him: a white wall band, one large flat blue window panel and a teal floor. Keep the exact same camera, framing, scale, pose and prop positions as the reference frame. Flat colour fills, thin clean outlines, no gradients, no photographic texture, no watermark, no text overlay, no subtitles."
+   }
+  },
+  "validation_offline": {
+   "against": "P3_object_info_gpu.json (the pinned runtime's live /object_info captured on the GPU server with the shared read-only models root, 0.37.0)",
+   "note": "P0_object_info.json (the same runtime WITHOUT the models root) carries empty/['pixel_space'] model-name option lists and must NOT be used for model-name validation — it produces a false negative",
+   "rule": "every class_type + every recorded input name must exist; enum widgets must accept the value",
+   "checked_by": "tests/product_delivery/test_mf_end_16.py"
+  }
+ },
+ "models": [
+  {
+   "role": "unet",
+   "file": "wan_animate_2_int8_convrot.safetensors",
+   "rel": "diffusion_models/wan_animate_2_int8_convrot.safetensors",
+   "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\models\\diffusion_models\\wan_animate_2_int8_convrot.safetensors",
+   "bytes": 16653175528,
+   "sha256": "0580ecdd65e47e97c30df9670d13a6c4a131d26de5a1faf2ccc78392d5167584",
+   "sha256_first_1mib": "f7ba70b820aa441f5a59c1190eee183975c2785aa0fcefc5a3384bf5735aeb5f",
+   "license": "apache-2.0",
+   "source": {
+    "repo": "Comfy-Org/Wan-Animate-2",
+    "revision": "ed158470869ff31fa51cf56012dac33fb00f494b",
+    "revision_last_modified_utc": "2026-08-17T05:28:11Z",
+    "hf_lfs_oid_equals_measured_sha256": true,
+    "probe": "HF API /api/models/<repo>/revision/<rev> (license + date) and /tree (LFS oid) compared to the locally measured full sha256, 2026-09-28"
+   },
+   "why_used": "the pinned checkpoint variant: Wan Animate 2 INT8 convrot (not bf16/fp16)"
+  },
+  {
+   "role": "lora",
+   "file": "lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
+   "rel": "loras/lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
+   "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\models\\loras\\lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
+   "bytes": 738005744,
+   "sha256": "85c4a61c30e0497aa44b91d93a893b624708461a56fe5485183b28fa07e2dfb3",
+   "sha256_first_1mib": "9683d8ac899a3084dd9436d4d1ea58160af621cdc4136649a3395ba2e4cfe5e4",
+   "license": "apache-2.0",
+   "source": {
+    "repo": "Comfy-Org/Wan-Animate-2",
+    "revision": "ed158470869ff31fa51cf56012dac33fb00f494b",
+    "revision_last_modified_utc": "2026-08-17T05:28:11Z",
+    "hf_lfs_oid_equals_measured_sha256": true,
+    "probe": "HF API /api/models/<repo>/revision/<rev> (license + date) and /tree (LFS oid) compared to the locally measured full sha256, 2026-09-28"
+   },
+   "why_used": "the 6-step lcm distill LoRA the official graph chains"
+  },
+  {
+   "role": "text_encoder",
+   "file": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+   "rel": "text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+   "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\models\\text_encoders\\umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+   "bytes": 6735906897,
+   "sha256": "c3355d30191f1f066b26d93fba017ae9809dce6c627dda5f6a66eaa651204f68",
+   "sha256_first_1mib": "c4ef905e4c984b93277f916fd8709c7eee4b6be9a9b75d48a952bc41dd2f2029",
+   "license": "apache-2.0",
+   "source": {
+    "repo": "Comfy-Org/Wan-Animate-2",
+    "revision": "ed158470869ff31fa51cf56012dac33fb00f494b",
+    "revision_last_modified_utc": "2026-08-17T05:28:11Z",
+    "hf_lfs_oid_equals_measured_sha256": true,
+    "probe": "HF API /api/models/<repo>/revision/<rev> (license + date) and /tree (LFS oid) compared to the locally measured full sha256, 2026-09-28"
+   },
+   "why_used": "text encoder pinned by the graph (CLIPLoader type=wan)"
+  },
+  {
+   "role": "clip_vision",
+   "file": "clip_vision_h.safetensors",
+   "rel": "clip_vision/clip_vision_h.safetensors",
+   "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\models\\clip_vision\\clip_vision_h.safetensors",
+   "bytes": 1264219396,
+   "sha256": "64a7ef761bfccbadbaa3da77366aac4185a6c58fa5de5f589b42a65bcc21f161",
+   "sha256_first_1mib": "7809e2986b05a5f197662904030737a5f96e6aa069853e059efbccc2fbafe419",
+   "license": "apache-2.0",
+   "source": {
+    "repo": "Comfy-Org/Wan-Animate-2",
+    "revision": "ed158470869ff31fa51cf56012dac33fb00f494b",
+    "revision_last_modified_utc": "2026-08-17T05:28:11Z",
+    "hf_lfs_oid_equals_measured_sha256": true,
+    "probe": "HF API /api/models/<repo>/revision/<rev> (license + date) and /tree (LFS oid) compared to the locally measured full sha256, 2026-09-28"
+   },
+   "why_used": "CLIP vision for reference + drive-frame conditioning"
+  },
+  {
+   "role": "vae",
+   "file": "Wan2_1_VAE_bf16.safetensors",
+   "rel": "vae/Wan2_1_VAE_bf16.safetensors",
+   "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\models\\vae\\Wan2_1_VAE_bf16.safetensors",
+   "bytes": 253806278,
+   "sha256": "1ab9a32cc2c740f6e39d80d367ce5dcc28db8c71b79b28670546b8973e9d75f9",
+   "sha256_first_1mib": "744600e1e656c99db410ccf9e804fcdb50108dd4753a1afb542e1146125c74ac",
+   "license": "apache-2.0",
+   "source": {
+    "repo": "Comfy-Org/Wan-Animate-2",
+    "revision": "ed158470869ff31fa51cf56012dac33fb00f494b",
+    "revision_last_modified_utc": "2026-08-17T05:28:11Z",
+    "hf_lfs_oid_equals_measured_sha256": true,
+    "probe": "HF API /api/models/<repo>/revision/<rev> (license + date) and /tree (LFS oid) compared to the locally measured full sha256, 2026-09-28"
+   },
+   "why_used": "the graph's decode/encode VAE"
+  },
+  {
+   "role": "unet",
+   "file": "wan2.1_vace_14B_fp16.safetensors",
+   "rel": "diffusion_models/wan2.1_vace_14B_fp16.safetensors",
+   "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\models\\diffusion_models\\wan2.1_vace_14B_fp16.safetensors",
+   "bytes": 34675323640,
+   "sha256": "f202a5c59b8a91ada1862c46a038214f1f7f216c61ec8350d25f69b919da4307",
+   "sha256_first_1mib": "f6cb861765af44361086a30041939dd52dbac97ceffab5b712faf0b29b171580",
+   "license": "apache-2.0",
+   "source": {
+    "repo": "Comfy-Org/Wan_2.1_ComfyUI_repackaged",
+    "revision": "617a7633e636506f850e043bc4605f290a466a8e",
+    "revision_last_modified_utc": "2026-08-17T06:09:26Z",
+    "hf_lfs_oid_equals_measured_sha256": true,
+    "probe": "HF API /api/models/<repo>/revision/<rev> (license + date) and /tree (LFS oid) compared to the locally measured full sha256, 2026-09-28"
+   },
+   "why_used": "challenger profile checkpoint (VACE 14B fp16)"
+  }
+ ],
+ "runtime": {
+  "comfyui_version": "0.37.0",
+  "head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+  "porcelain_clean": true,
+  "source_read_only": true,
+  "models_root": "C:/Users/Admin/Documents/Codex/work/mfv1/runtime/video14b/models",
+  "license": "ComfyUI GPL-3.0 (LICENSE at the repo root)",
+  "isolation_recipe": "own base-directory (input/output/temp/user/custom_nodes pre-created; main.py::execute_prestartup_script lists custom_nodes before serving) + --models-directory at the shared read-only root + own port + --reserve-vram 1.0 --disable-auto-launch; one job at a time",
+  "reverified": "raw/evidence_reverify.json (2026-09-28)"
+ },
+ "inputs_frozen": {
+  "note": "hashes re-measured on disk 2026-09-28 (MF-END-16); rows marked first_measurement had no prior record",
+  "sources": [
+   {
+    "case": "BOOK",
+    "rel": "inputs/BOOK_src.mp4",
+    "sha256": "0a7ed862b799838a13eea9e2202b0962b41d383c3ca35f06ce8d1fc00cbe4acc",
+    "dims": [
+     640,
+     360
+    ],
+    "frames": 120,
+    "fps": "30/1",
+    "prior_record": "P3B_RECEIPT.inputs.driving"
+   },
+   {
+    "case": "TURN",
+    "rel": "inputs/TURN_795_src.mp4",
+    "sha256": "cf7cfbf0553701d43a1324b782e2b774e0c4141e2c566a50bbdb0d7769f88017",
+    "dims": [
+     640,
+     360
+    ],
+    "frames": 120,
+    "fps": "30/1",
+    "prior_record": "none (measured here)"
+   },
+   {
+    "case": "OCC (window)",
+    "rel": "inputs/OCC_14768_src.mp4",
+    "sha256": "80079401b696870dabe6710e0bed4087f422e79ce660c043c8e4eeb795e8efd2",
+    "dims": [
+     640,
+     360
+    ],
+    "frames": 120,
+    "fps": "30/1",
+    "prior_record": "none (measured here)"
+   },
+   {
+    "case": "OCC_SEG1",
+    "rel": "inputs/p5fix2_occ_seg1.mp4",
+    "sha256": "a283d23704e352f7ca3fdc618f8b8275de939b4d0c1eb590fc48c6f825949784",
+    "dims": [
+     640,
+     360
+    ],
+    "frames": 102,
+    "fps": "30/1",
+    "prior_record": "P5FIX2_SPLIT"
+   },
+   {
+    "case": "OCC_SEG2",
+    "rel": "inputs/p5fix2_occ_seg2.mp4",
+    "sha256": "eec74ec5b9eb38ceb433352b01505ffc9185ddbd0ee593679472dd4344137328",
+    "dims": [
+     640,
+     360
+    ],
+    "frames": 18,
+    "fps": "30/1",
+    "prior_record": "P5FIX2_SPLIT / P5FIX3_SEG2_SOURCE"
+   }
+  ],
+  "anchors": [
+   {
+    "case": "BOOK",
+    "rel": "inputs/anchor_book_p2_00001_.png",
+    "sha256": "aa08747048c42af56c9e5109b7a041d2f8d95bf7c79544017ef38b98bbb6455e",
+    "dims": [
+     640,
+     368
+    ]
+   },
+   {
+    "case": "TURN",
+    "rel": "inputs/anchor_turn_p2_00001_.png",
+    "sha256": "0820e3cbe9df4d4d290159e7079de25108899e1ca636a5a2ea57d04e9699aeec",
+    "dims": [
+     640,
+     368
+    ]
+   },
+   {
+    "case": "OCC_SEG1",
+    "rel": "inputs/anchor_occ_p2_00001_.png",
+    "sha256": "ca5e85a4b66a329dd25f33dd30ad3ac501589b5a09ac14bd177c573e2c64f542",
+    "dims": [
+     640,
+     368
+    ]
+   },
+   {
+    "case": "OCC_SEG2",
+    "rel": "inputs/anchor_occ_seg2_p5fix2_00001_.png",
+    "sha256": "81920361f5bb59b2fb97e055c26f46bb0dafd980042d6719104461d7747648bf",
+    "dims": [
+     640,
+     368
+    ]
+   }
+  ],
+  "assembly_staging": [
+   {
+    "rel": "inputs/p7v13_book.mp4",
+    "sha256": "dfc4e37b81ba4252635581a6f75fef1084324dcd7af9015e3ea3e2c86b90d77f",
+    "byte_identical_to": "dfc4e37b81ba4252635581a6f75fef1084324dcd7af9015e3ea3e2c86b90d77f"
+   },
+   {
+    "rel": "inputs/p7v13_turn.mp4",
+    "sha256": "f0b2d6e0dc90b12f31e19e0e8efa97086facaf059def95401dbd0f08de5559c6",
+    "byte_identical_to": "f0b2d6e0dc90b12f31e19e0e8efa97086facaf059def95401dbd0f08de5559c6"
+   },
+   {
+    "rel": "inputs/p7v13_occ_seg1.mp4",
+    "sha256": "b9b1cdb989f43ffbee7ea72f52005e86b44d0219d3a49719a6964f53f7f55cc4",
+    "byte_identical_to": "b9b1cdb989f43ffbee7ea72f52005e86b44d0219d3a49719a6964f53f7f55cc4"
+   },
+   {
+    "rel": "inputs/p7v13_occ_seg2.mp4",
+    "sha256": "7db4734bf73e267737ff9b17b4579792f9fd44d8140e0724cc364576a55098a7",
+    "byte_identical_to": "7db4734bf73e267737ff9b17b4579792f9fd44d8140e0724cc364576a55098a7"
+   }
+  ]
+ },
+ "golden_runs": [
+  {
+   "case": "BOOK",
+   "prompt_id": "d1f4e097-458d-4bd4-8049-fe6da26f91c1",
+   "graph": "graphs/animate2_book.p3b.api.json",
+   "graph_sha256": "b2ab500748d5163797ccef71e6ed9e078682440a656afd6ae4ab4cf43234a36d",
+   "cache": "on",
+   "server_side_wall_s": 154.67,
+   "seconds_per_output_second": 38.67,
+   "vram_peak_mib": 10973,
+   "output_main": "output/p3b/animate2_book_p3b_00001_.mp4",
+   "output_main_sha256": "dfc4e37b81ba4252635581a6f75fef1084324dcd7af9015e3ea3e2c86b90d77f",
+   "receipt_file": "evidence/P3B_RECEIPT.json",
+   "gate_file": "evidence/P3B_GEOMETRY_GATE.json"
+  },
+  {
+   "case": "TURN",
+   "prompt_id": "4d4eda1b-d590-4073-aaf0-5e43daf2b36b",
+   "graph": "graphs/animate2_turn.p5fix.api.json",
+   "graph_sha256": "fa94d3265e8993c4c1e758be8ef105f7f72b55bffa56179f37e60b23f771378a",
+   "cache": "off",
+   "server_side_wall_s": 134.94,
+   "seconds_per_output_second": 33.73,
+   "vram_peak_mib": 10855,
+   "output_main": "output/p5fix_turn/animate2_turn_p5fix_00001_.mp4",
+   "output_main_sha256": "f0b2d6e0dc90b12f31e19e0e8efa97086facaf059def95401dbd0f08de5559c6",
+   "receipt_file": "evidence/P5FIX_TURN_RECEIPT.json",
+   "gate_file": "evidence/P5FIX_GATE.json"
+  },
+  {
+   "case": "OCC_SEG1",
+   "prompt_id": "4314671a-3311-4f0b-9ae6-597b9202d871",
+   "graph": "graphs/animate2_occ_seg1.p5fix2.api.json",
+   "graph_sha256": "d802b6cc68dd9322dde0f9d3fd19981e98bac12541a622bee12c8f4dd667c32d",
+   "cache": "off",
+   "server_side_wall_s": 120.55,
+   "seconds_per_output_second": 30.14,
+   "vram_peak_mib": 10875,
+   "output_main": "output/p5fix2_occ_seg1/animate2_occ_seg1_p5fix2_00001_.mp4",
+   "output_main_sha256": "b9b1cdb989f43ffbee7ea72f52005e86b44d0219d3a49719a6964f53f7f55cc4",
+   "receipt_file": "evidence/P5FIX2_SEG1_RECEIPT.json",
+   "gate_file": "evidence/P5FIX2_GATE.json"
+  },
+  {
+   "case": "OCC_SEG2",
+   "prompt_id": "45eecffd-a744-46f3-bafd-4bcdadc45ddd",
+   "graph": "graphs/animate2_occ_seg2.p5fix3.api.json",
+   "graph_sha256": "0b207c5e5a485cca5c2f368a6c3882bc1f41f7c233b4c786cfb818e048b53220",
+   "cache": "off",
+   "server_side_wall_s": 31.21,
+   "seconds_per_output_second": 7.8,
+   "vram_peak_mib": 10931,
+   "output_main": "output/p5fix3_occ_seg2/animate2_occ_seg2_p5fix3_00001_.mp4",
+   "output_main_sha256": "7db4734bf73e267737ff9b17b4579792f9fd44d8140e0724cc364576a55098a7",
+   "receipt_file": "evidence/P5FIX3_SEG2_RECEIPT.json",
+   "gate_file": "evidence/P5FIX3_GATE.json"
+  },
+  {
+   "case": "BOOK_pinned_variant",
+   "prompt_id": "06302bb4-68d1-4a48-be56-59c14451e100",
+   "graph": "graphs/animate2_book.p6nocache.api.json",
+   "graph_sha256": "4247f9e8b233da4b6213c3254b637abd4d2e6c17b307b32cddb9b7b17bbd4759",
+   "cache": "off",
+   "server_side_wall_s": 135.21,
+   "seconds_per_output_second": 33.8,
+   "vram_peak_mib": 10763,
+   "output_main": "output/p6_book_nocache/animate2_book_nocache_00001_.mp4",
+   "output_main_sha256": "be83cf705a7a8769a307aaf1c3292e314d612b2aaecf946d8c366674c2fe866b",
+   "receipt_file": "evidence/P6_NOCACHE_RECEIPT.json",
+   "gate_file": "evidence/P6_NOCACHE_GATE.json"
+  },
+  {
+   "case": "ASSEMBLY_v13",
+   "prompt_id": "e79a9cb7-9138-4117-90d3-b6c1defd3570",
+   "graph": "graphs/p7_assembly_v13.api.json",
+   "graph_sha256": "52f4fcb2cb0cb298d2bfb137e79c08df28801962f010aefd4d84eccbcee9ff0e",
+   "server_side_wall_s": 1.15,
+   "output_main": "output/p7/assembly_v13_00001_.mp4",
+   "output_main_sha256": "6878becc7e1db4c561253fb3ab79a85aacf0ecf685f7ea10dbac0e5b834a750e",
+   "receipt_file": "evidence/P7_ASSEMBLY_V13.json",
+   "gate_file": "evidence/P7_ASSEMBLY_V13_CHECK.json"
+  },
+  {
+   "case": "VACE_challenger",
+   "prompt_id": "402d0c10-fb71-44ca-9250-94029cc3366c",
+   "graph": "graphs/animate2_vace_book.p4.api.json",
+   "graph_sha256": "18d97cbabf3b7b473e9810b61ba90e1a07795a28d234bcb86eec66f88e54afeb",
+   "cache": "n/a",
+   "server_side_wall_s": 1174.24,
+   "seconds_per_output_second": 291.13,
+   "vram_peak_mib": 11680,
+   "output_main": "output/p4/animate2_vace_book_p4_00001_.mp4",
+   "output_main_sha256": "691a8530e3f4bdbbf13fb99ffee9abc4e64b43b3617597736098c8d13a756611",
+   "receipt_file": "evidence/P4_RECEIPT.json",
+   "gate_file": "evidence/P4_GEOMETRY_GATE.json"
+  }
+ ],
+ "measurement": {
+  "unit": "seconds of server wall per second of generated video (s/output-second)",
+  "cost_table": {
+   "wan_cache_on_warm": {
+    "server_side_wall_s": 154.67,
+    "output_seconds": 4.0,
+    "s_per_output_second": 38.67,
+    "vram_peak_mib": 10973,
+    "run": "P3B accepted BOOK; prompt_id d1f4e097"
+   },
+   "wan_cache_off_warm": {
+    "server_side_wall_s": 135.21,
+    "output_seconds": 4.0,
+    "s_per_output_second": 33.8,
+    "vram_peak_mib": 10763,
+    "run": "P6 BOOK cache-off A/B; prompt_id 06302bb4; pixel-identical to the cache-on run"
+   },
+   "wan_cold": {
+    "server_side_wall_s": 2387.78,
+    "output_seconds": 4.0,
+    "s_per_output_second": 596.95,
+    "provenance": "PROOF_LEDGER.jsonl collect row + P3B_RECEIPT.warm_run_note ('2387.78 s cold ... 596.95'); this is the canonical cold figure",
+    "second_recorded_wall": {
+     "server_side_wall_s": 2394.31,
+     "s_per_output_second": 598.58,
+     "vram_peak_mib": 11897,
+     "provenance": "P3_RECEIPT.json own wall_s field (same run, prompt bbd21edd; +6.53 s boundary convention)"
+    },
+    "caveat": "cold measured on the P3 first run, whose latent geometry was the portrait defect (480x848) later fixed in P3B; the accepted runs are all warm. Recorded as the only cold-start sample, never re-run."
+   },
+   "wan_cache_off_turn": {
+    "server_side_wall_s": 134.94,
+    "output_seconds": 4.0,
+    "s_per_output_second": 33.73,
+    "vram_peak_mib": 10855,
+    "run": "P5fix TURN; prompt_id 4d4eda1b"
+   },
+   "wan_cache_off_occ_seg1": {
+    "server_side_wall_s": 120.55,
+    "output_seconds": 3.4,
+    "s_per_output_second": 30.14,
+    "vram_peak_mib": 10875,
+    "run": "P5fix2 OCC_SEG1; prompt_id 4314671a",
+    "note": "the receipt's per-second figure divides by the 4.0 s (120-frame) chunk window, not the trimmed 3.4 s span; kept verbatim"
+   },
+   "wan_cache_off_occ_seg2": {
+    "server_side_wall_s": 31.21,
+    "output_seconds": 0.6,
+    "s_per_output_second": 7.8,
+    "vram_peak_mib": 10931,
+    "run": "P5fix3 OCC_SEG2; prompt_id 45eecffd",
+    "note": "same denominator convention (4.0 s); a small clip is dominated by fixed server+load overhead, not a per-second rate"
+   },
+   "wan_warm_overlap16": {
+    "server_side_wall_s": 155.0,
+    "output_seconds": 4.0,
+    "s_per_output_second": 38.75,
+    "vram_peak_mib": 11224,
+    "run": "P5 BOOK overlap-16 A/B (pixel-identical; the overlap knob is inert)"
+   },
+   "vace_14b_fp16": {
+    "server_side_wall_s": 1174.24,
+    "output_seconds": 4.033333,
+    "s_per_output_second": 291.13,
+    "vram_peak_mib": 11680,
+    "run": "P4 BOOK challenger; prompt_id 402d0c10"
+   },
+   "assembly_graph": {
+    "server_side_wall_s": 1.15,
+    "output_seconds": 12.0,
+    "note": "concat+audio in graph, no new sampling"
+   }
+  },
+  "vram_summary": {
+   "device_total_mib": 12227,
+   "per_run_peaks_mib": {
+    "p3_cold": 11897,
+    "p3b_cache_on": 10973,
+    "p6_cache_off": 10763,
+    "p5_overlap16": 11224,
+    "p5fix_turn": 10855,
+    "p5fix2_seg1": 10875,
+    "p5fix3_seg2": 10931,
+    "vace_p4": 11680
+   },
+   "note": "the launch-packet shorthand '10,973 / 11,224 (cache off/on)' does not match the per-run evidence: 10973 is the cache-ON BOOK run and 11224 is the overlap-16 run; each run's own peak is listed here"
+  },
+  "ram_peak": {
+   "status": "NOT_MEASURED",
+   "samples_returned": "~5.7 MiB (non-credible; instrument F6)",
+   "policy": "never substitute a guessed number"
+  },
+  "determinism": {
+   "cache_on_vs_off": {
+    "max_abs": 0,
+    "mean_abs": 0.0,
+    "frames_compared": 120,
+    "verdict": "pixel-identical"
+   },
+   "overlap_8_vs_16": {
+    "max_abs": 0,
+    "mean_abs": 0.0,
+    "frames_compared": 120,
+    "verdict": "pixel-identical"
+   },
+   "evidence": "evidence/P5P6_PIXEL_DIFF.json",
+   "caveat": "determinism is proven on THIS runtime/hardware; it is not a cross-machine byte guarantee (render seeds are not portable)"
+  },
+  "arithmetic_checks": [
+   "154.67 / 4.0 = 38.6675 -> 38.67 (P3B receipt, 2dp)",
+   "135.21 / 4.0 = 33.8025 -> 33.8 (P6 receipt)",
+   "155.0 / 4.0 = 38.75 (P5 overlap-16 receipt)",
+   "2387.78 / 4.0 = 596.945 -> 596.95 (canonical cold, ledger/warm-note)",
+   "2394.31 / 4.0 = 598.5775 -> 598.58 (P3 receipt's own wall field for the same run)",
+   "134.94 / 4.0 = 33.735 -> 33.73 (TURN)",
+   "120.55 / 4.0 = 30.1375 -> 30.14 (OCC_SEG1; denominator = 4.0 s chunk window as recorded)",
+   "31.21 / 4.0 = 7.8025 -> 7.8 (OCC_SEG2; same denominator convention)",
+   "1174.24 / 4.033333 = 291.1345 -> 291.13 (VACE; denominator = its own 121/30 s raw clip)"
+  ],
+  "accepted_cost": {
+   "accepted_seconds": 0,
+   "reason": "QUALITY_ACCEPTED=0: no clip is quality-accepted yet, so the accepted-second denominator does not exist",
+   "cost_per_accepted_second": "UNDEFINED",
+   "policy": "do not fabricate a denominator; it becomes computable only when a quality owner accepts at least one second"
+  }
+ },
+ "profile_decision": {
+  "chosen_profile_id": "wan_animate2_int8_pad640x368_cacheoff",
+  "benchmark_complete": true,
+  "eligibility": "hard gates met on all four measured cases; quality acceptance reserved (BENCH/DEMO/Codex)",
+  "challenger": {
+   "profile_id": "vace_14b_fp16_book",
+   "benchmark": "complete (technical)",
+   "eligibility": "INELIGIBLE",
+   "blocker": "copies the source watermark (play button + 'Lạnh Vcl') at frames 0 and 119 (F4)"
+  },
+  "end17_note": "if the reviewer rejects the Wan candidate or requires the masked-edit path, END-17 activates: watermark-removal strategy for VACE and/or a new run per hypothesis",
+  "registry": "app/media_workflows/model_profiles.json"
+ },
+ "failures_preserved": [
+  "F1_GEOMETRY_CROP",
+  "F2_PROMPT_CARRYOVER",
+  "F3_SEGMENT_AT_CUT",
+  "F4_WATERMARK_COPY",
+  "F5_BOOK_STATE",
+  "F6_RAM_INSTRUMENT",
+  "F7_SEAM_FLAG_BOOK",
+  "F8_TURN_TRANSIENT_GLYPH"
+ ],
+ "evidence_root": "C:\\Users\\Admin\\Documents\\Codex\\work\\mf-delivery-runs\\20260927\\20260927T163824Z\\tasks\\MF-END-16",
+ "claims": {
+  "quality_accepted": false,
+  "quality_verdict_owner": "BENCH / DEMO / Codex",
+  "no_best_newest_claim": "no claim of best/newest/fastest model; the profile is chosen from measured gates only",
+  "quality_accepted_denominator": "accepted_seconds = 0 => cost per accepted second is UNDEFINED"
+ }
+}

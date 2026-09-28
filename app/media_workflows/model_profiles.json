@@ -1,0 +1,211 @@
+{
+ "schema_version": "mf.model_profiles.v1",
+ "generated_at_utc": "2026-09-28T08:40:31Z",
+ "engine": {
+  "name": "ComfyUI",
+  "version": "0.37.0",
+  "head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+  "models_root": "C:/Users/Admin/Documents/Codex/work/mfv1/runtime/video14b/models",
+  "license": "ComfyUI GPL-3.0 (LICENSE at the repo root)",
+  "isolation": "own base-directory (input/output/temp/user/custom_nodes pre-created; main.py::execute_prestartup_script lists custom_nodes before serving) + --models-directory at the shared read-only root + own port + --reserve-vram 1.0 --disable-auto-launch; one job at a time"
+ },
+ "profiles": [
+  {
+   "id": "wan_animate2_int8_pad640x368_cacheoff",
+   "kind": "shot_reskin_video",
+   "graph_id": "wan_shot_v1",
+   "graph_file": "app/media_workflows/wan_shot_v1.json",
+   "models": [
+    {
+     "role": "unet",
+     "rel": "diffusion_models/wan_animate_2_int8_convrot.safetensors",
+     "sha256": "0580ecdd65e47e97c30df9670d13a6c4a131d26de5a1faf2ccc78392d5167584",
+     "bytes": 16653175528,
+     "license": "apache-2.0",
+     "source": "Comfy-Org/Wan-Animate-2",
+     "revision": "ed158470869ff31fa51cf56012dac33fb00f494b"
+    },
+    {
+     "role": "lora",
+     "rel": "loras/lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
+     "sha256": "85c4a61c30e0497aa44b91d93a893b624708461a56fe5485183b28fa07e2dfb3",
+     "bytes": 738005744,
+     "license": "apache-2.0",
+     "source": "Comfy-Org/Wan-Animate-2",
+     "revision": "ed158470869ff31fa51cf56012dac33fb00f494b"
+    },
+    {
+     "role": "text_encoder",
+     "rel": "text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+     "sha256": "c3355d30191f1f066b26d93fba017ae9809dce6c627dda5f6a66eaa651204f68",
+     "bytes": 6735906897,
+     "license": "apache-2.0",
+     "source": "Comfy-Org/Wan-Animate-2",
+     "revision": "ed158470869ff31fa51cf56012dac33fb00f494b"
+    },
+    {
+     "role": "clip_vision",
+     "rel": "clip_vision/clip_vision_h.safetensors",
+     "sha256": "64a7ef761bfccbadbaa3da77366aac4185a6c58fa5de5f589b42a65bcc21f161",
+     "bytes": 1264219396,
+     "license": "apache-2.0",
+     "source": "Comfy-Org/Wan-Animate-2",
+     "revision": "ed158470869ff31fa51cf56012dac33fb00f494b"
+    },
+    {
+     "role": "vae",
+     "rel": "vae/Wan2_1_VAE_bf16.safetensors",
+     "sha256": "1ab9a32cc2c740f6e39d80d367ce5dcc28db8c71b79b28670546b8973e9d75f9",
+     "bytes": 253806278,
+     "license": "apache-2.0",
+     "source": "Comfy-Org/Wan-Animate-2",
+     "revision": "ed158470869ff31fa51cf56012dac33fb00f494b"
+    }
+   ],
+   "params": {
+    "steps": 6,
+    "sampler": "lcm",
+    "cfg": 1.0,
+    "shift": 5,
+    "context_length": 21,
+    "context_overlap": 8,
+    "cache": "off",
+    "native_output_dims": [
+     640,
+     368
+    ],
+    "pad": "centered (4+4 rows over 640x360)",
+    "checkpoint_variant": "int8_convrot + rank64 distill LoRA"
+   },
+   "measured": {
+    "cold_s_per_output_second": 596.95,
+    "warm_s_per_output_second": 38.67,
+    "cache_off_s_per_output_second": 33.8,
+    "vram_peak_mib": 11224,
+    "ram_peak": "NOT_MEASURED",
+    "cases": [
+     "BOOK",
+     "TURN",
+     "OCC_SEG1",
+     "OCC_SEG2"
+    ],
+    "evidence": "app/media_workflows/wan_shot_v1.manifest.json#measurement"
+   },
+   "benchmark": {
+    "status": "COMPLETE",
+    "scope": "all four measured cases ran through this profile; each produced a real MP4 + receipt",
+    "note": "benchmark-complete != eligible"
+   },
+   "eligibility": {
+    "status": "ELIGIBLE_PENDING_QUALITY_OWNER",
+    "hard_gate_rows": [
+     {
+      "gate": "dims 640x368",
+      "verdict": "PASS",
+      "evidence": "P3B_GEOMETRY_GATE / P5FIX_GATE / P5FIX3_GATE"
+     },
+     {
+      "gate": "timing (120/120/102/18 frames, 30/1, PTS monotonic)",
+      "verdict": "PASS",
+      "evidence": "per-case gates"
+     },
+     {
+      "gate": "coverage per segment (incl. partial right-edge person on BOOK)",
+      "verdict": "PASS",
+      "evidence": "per-case coverage previews + vision rows"
+     },
+     {
+      "gate": "holder/contact preserved (BOOK)",
+      "verdict": "PASS",
+      "evidence": "P3B coverage vision row"
+     },
+     {
+      "gate": "no watermark",
+      "verdict": "PASS",
+      "evidence": "per-case coverage vision rows"
+     },
+     {
+      "gate": "book-state equals the source event open_two_pages @72",
+      "verdict": "OPEN (product decision F5)",
+      "evidence": "P3B gate note"
+     },
+     {
+      "gate": "RAM peak quantified",
+      "verdict": "OPEN (instrument F6)",
+      "evidence": "receipts"
+     }
+    ],
+    "quality_acceptance": "reserved to BENCH / DEMO / Codex (QUALITY_ACCEPTED=0)"
+   },
+   "cost": {
+    "accepted_seconds": 0,
+    "cost_per_accepted_second": "UNDEFINED",
+    "why": "no quality-accepted second exists yet; fabricating a denominator would be false"
+   },
+   "selection_rule": "chosen on measured hard gates, not on name/recency/time; speed never traded against fidelity (cache OFF is faster AND pixel-identical)"
+  },
+  {
+   "id": "vace_14b_fp16_book",
+   "kind": "shot_reskin_video",
+   "graph_id": "animate2_vace_book.p4 (evidence)",
+   "graph_file": "graphs/animate2_vace_book.p4.api.json",
+   "models": [
+    {
+     "role": "unet",
+     "rel": "diffusion_models/wan2.1_vace_14B_fp16.safetensors",
+     "sha256": "f202a5c59b8a91ada1862c46a038214f1f7f216c61ec8350d25f69b919da4307",
+     "bytes": 34675323640,
+     "license": "apache-2.0",
+     "source": "Comfy-Org/Wan_2.1_ComfyUI_repackaged",
+     "revision": "617a7633e636506f850e043bc4605f290a466a8e"
+    }
+   ],
+   "params": {
+    "steps": 20,
+    "sampler": "uni_pc",
+    "cfg": 6.0,
+    "shift": 8,
+    "note": "measured run config (P4)"
+   },
+   "measured": {
+    "s_per_output_second": 291.13,
+    "vram_peak_mib": 11680,
+    "ram_peak": "NOT_MEASURED",
+    "evidence": "evidence/P4_RECEIPT.json + evidence/P4_GEOMETRY_GATE.json"
+   },
+   "benchmark": {
+    "status": "COMPLETE_TECHNICAL",
+    "scope": "BOOK case only, same unit/seed as the Wan baseline"
+   },
+   "eligibility": {
+    "status": "INELIGIBLE",
+    "blockers": [
+     "copies the source watermark (play button + 'Lạnh Vcl') at frames 0 and 119 (F4) — product blocker",
+     "second segment/case never run on this profile"
+    ],
+    "quality_acceptance": "reserved to BENCH / DEMO / Codex"
+   },
+   "cost": {
+    "accepted_seconds": 0,
+    "cost_per_accepted_second": "UNDEFINED",
+    "why": "same as above; additionally the profile is not deliverable"
+   }
+  }
+ ],
+ "selection": {
+  "chosen": "wan_animate2_int8_pad640x368_cacheoff",
+  "rationale": "the only profile with accepted-gate clips for all four measured segments; strictly faster AND lower-VRAM variant chosen among its own variants with pixel-identical evidence",
+  "not_chosen": [
+   {
+    "id": "vace_14b_fp16_book",
+    "why": "watermark-copy blocker (F4)"
+   }
+  ],
+  "end17_note": "no profile change is forced by speed; END-17 activates only if review rejects the Wan candidate or the masked-edit path is required",
+  "decided_by": "MF-END-16 worker per packet 16.4 (eligibility measured here; quality acceptance reserved)"
+ },
+ "claims": {
+  "quality_accepted": false,
+  "no_best_newest_claim": true
+ }
+}
