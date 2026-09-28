@@ -476,7 +476,8 @@ def test_mf20_2_publication_replay_does_not_duplicate(tmp_path: Path) -> None:
         )
         s.execute(
             text(
-                "INSERT INTO character(id,workspace_id,name,code) VALUES ('ch1','default','hero','hero1')"
+                "INSERT INTO character(id,workspace_id,name,code) VALUES"
+                " ('ch1','default','hero','hero1')"
             )
         )
         s.execute(
