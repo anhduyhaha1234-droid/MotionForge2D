@@ -43,6 +43,17 @@ dubbing = [
     "openai-whisper>=20240601",
     "deep-translator>=1.11",
 ]
+# MF-END-18: the ComfyUI shot-engine adapter ships as a PINNED external archive, never
+# imported from a dev worktree. Build + verify it from the frozen source commit with
+# scripts/build_mf_comfy_dependency.py (runtime verifies the pinned bytes + in-package
+# provenance on every engine load in app/adapters/media_engine/comfy.py):
+#   python scripts/build_mf_comfy_dependency.py --out .mf_deps --install-target .mf_deps/site
+comfy = [
+    "mf-comfy==0.1.0",
+]
+
+[project.entry-points."motionforge.media_engine"]
+comfy_shot_engine = "app.adapters.media_engine.comfy:ComfyShotEngine"
 
 [tool.setuptools.packages.find]
 where = ["."]
