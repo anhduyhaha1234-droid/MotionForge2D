@@ -1,0 +1,7 @@
+# Start Prompt for Hermes - S05-T01
+
+Read `docs/pm/sessions/S05-T01-video-preflight/TASK.md` and every Required reading item completely, in order. Produce only the approved preflight/probe contract `docs/architecture/VIDEO_PREFLIGHT_CONTRACT.md` and the session evidence. Do not write any runtime code, routes, schemas, persistence, migrations, workers, APIs, frontend code, fixtures or tests. Do not touch `channels.json`, `data/`, database files, user data, the primary worktree `C:\Users\Admin\MotionForge2D`, or any existing session packet.
+
+Ground every codec/container and behavior decision in the cited requirement. Where the required reading does not decide a product question, list it as a blocker in the contract's "Decisions deferred to PM" section — never invent the behavior. The contract must include the ffprobe safety/timeout policy, the canonical probe metadata mapping to the existing durable `video_item` columns, the durable job/import semantics (preflight read-only; import writes probe + artifact in one transaction; idempotency and retry reuse), and the actionable error taxonomy with stable codes and Vietnamese suggested actions.
+
+Run the targeted validation commands and the fresh 7/7 quality baseline, append real evidence to `LOG.md`, fill `REPORT.md` per the template, set REPORT status to `SUBMITTED`, then exit. Do not approve, commit, push, or create the next task packet. If any dependency is not approved or any required decision is missing, stop and report `BLOCKED`.

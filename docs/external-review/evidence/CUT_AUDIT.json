@@ -1,0 +1,224 @@
+{
+  "app_source": {
+    "decoded_frames": 360,
+    "largest_frame_deltas": [
+      {
+        "frame": 241,
+        "mean_abs_delta": 102.08940124511719
+      },
+      {
+        "frame": 343,
+        "mean_abs_delta": 98.62379455566406
+      },
+      {
+        "frame": 121,
+        "mean_abs_delta": 84.14425659179688
+      },
+      {
+        "frame": 331,
+        "mean_abs_delta": 4.874629497528076
+      },
+      {
+        "frame": 334,
+        "mean_abs_delta": 4.6072916984558105
+      },
+      {
+        "frame": 328,
+        "mean_abs_delta": 4.6066203117370605
+      },
+      {
+        "frame": 312,
+        "mean_abs_delta": 4.314722061157227
+      },
+      {
+        "frame": 324,
+        "mean_abs_delta": 4.185370445251465
+      }
+    ]
+  },
+  "app_output": {
+    "decoded_frames": 360,
+    "largest_frame_deltas": [
+      {
+        "frame": 240,
+        "mean_abs_delta": 118.08036804199219
+      },
+      {
+        "frame": 120,
+        "mean_abs_delta": 86.60087585449219
+      },
+      {
+        "frame": 134,
+        "mean_abs_delta": 34.5975227355957
+      },
+      {
+        "frame": 136,
+        "mean_abs_delta": 23.838773727416992
+      },
+      {
+        "frame": 261,
+        "mean_abs_delta": 18.6978702545166
+      },
+      {
+        "frame": 260,
+        "mean_abs_delta": 17.737106323242188
+      },
+      {
+        "frame": 138,
+        "mean_abs_delta": 16.67601776123047
+      },
+      {
+        "frame": 137,
+        "mean_abs_delta": 15.621110916137695
+      }
+    ]
+  },
+  "proof_v13": {
+    "decoded_frames": 360,
+    "largest_frame_deltas": [
+      {
+        "frame": 342,
+        "mean_abs_delta": 105.67046356201172
+      },
+      {
+        "frame": 240,
+        "mean_abs_delta": 100.91988372802734
+      },
+      {
+        "frame": 120,
+        "mean_abs_delta": 85.87826538085938
+      },
+      {
+        "frame": 268,
+        "mean_abs_delta": 24.131921768188477
+      },
+      {
+        "frame": 213,
+        "mean_abs_delta": 23.824329376220703
+      },
+      {
+        "frame": 214,
+        "mean_abs_delta": 23.585857391357422
+      },
+      {
+        "frame": 315,
+        "mean_abs_delta": 22.0
+      },
+      {
+        "frame": 166,
+        "mean_abs_delta": 21.908193588256836
+      }
+    ]
+  },
+  "BOOK_src": {
+    "decoded_frames": 120,
+    "largest_frame_deltas": [
+      {
+        "frame": 72,
+        "mean_abs_delta": 1.3402777910232544
+      },
+      {
+        "frame": 95,
+        "mean_abs_delta": 0.7006713151931763
+      },
+      {
+        "frame": 44,
+        "mean_abs_delta": 0.6858564615249634
+      },
+      {
+        "frame": 29,
+        "mean_abs_delta": 0.5749768614768982
+      },
+      {
+        "frame": 30,
+        "mean_abs_delta": 0.566828727722168
+      },
+      {
+        "frame": 43,
+        "mean_abs_delta": 0.5523379445075989
+      },
+      {
+        "frame": 117,
+        "mean_abs_delta": 0.24250000715255737
+      },
+      {
+        "frame": 41,
+        "mean_abs_delta": 0.1628703773021698
+      }
+    ]
+  },
+  "TURN_795_src": {
+    "decoded_frames": 120,
+    "largest_frame_deltas": [
+      {
+        "frame": 45,
+        "mean_abs_delta": 4.1575927734375
+      },
+      {
+        "frame": 55,
+        "mean_abs_delta": 3.9425694942474365
+      },
+      {
+        "frame": 49,
+        "mean_abs_delta": 3.8768749237060547
+      },
+      {
+        "frame": 48,
+        "mean_abs_delta": 3.8187036514282227
+      },
+      {
+        "frame": 57,
+        "mean_abs_delta": 3.813981533050537
+      },
+      {
+        "frame": 61,
+        "mean_abs_delta": 3.799004554748535
+      },
+      {
+        "frame": 51,
+        "mean_abs_delta": 3.7854628562927246
+      },
+      {
+        "frame": 54,
+        "mean_abs_delta": 3.742870330810547
+      }
+    ]
+  },
+  "OCC_14768_src": {
+    "decoded_frames": 120,
+    "largest_frame_deltas": [
+      {
+        "frame": 102,
+        "mean_abs_delta": 98.6371078491211
+      },
+      {
+        "frame": 90,
+        "mean_abs_delta": 4.878055572509766
+      },
+      {
+        "frame": 87,
+        "mean_abs_delta": 4.606064796447754
+      },
+      {
+        "frame": 93,
+        "mean_abs_delta": 4.598217487335205
+      },
+      {
+        "frame": 71,
+        "mean_abs_delta": 4.313889026641846
+      },
+      {
+        "frame": 83,
+        "mean_abs_delta": 4.18115758895874
+      },
+      {
+        "frame": 80,
+        "mean_abs_delta": 4.134397983551025
+      },
+      {
+        "frame": 74,
+        "mean_abs_delta": 3.9349305629730225
+      }
+    ]
+  }
+}

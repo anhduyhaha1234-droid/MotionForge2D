@@ -1,0 +1,30 @@
+# S06-R01 - Execution Log
+
+- 2026-08-04: Isolated review worktree created from master `a43b20d`; awaiting Hermes.
+- 2026-08-04: Audited source commit `62b2bcd` (feat(s06-t01)) independently — did not inherit Antigravity approval claims.
+  - Scope: durable character library (models, migration `d5e6f7a8b9c0`, repository, schemas, router, focused tests).
+  - Out-of-scope payload identified: `.gitignore` change (no-op on master — already `/projects/`), S06-T01 session packet (identical to master's existing files), models.py `__all__` churn (17 pre-existing exports deleted — reverted), 7 legacy-import fixture files (initially removed; restored after proving they are directly required by master's own legacy import tests for the 7/7 baseline).
+- 2026-08-04: Applied `git cherry-pick --no-commit 62b2bcd`. Conflicts in `app/api/app.py` and `app/api/deps.py` resolved (kept master's S03-T04 summary router + added characters router; reconciled `get_db_session` to master's `default_database_path(injected)` pattern; removed duplicate `Session` TYPE_CHECKING import).
+- 2026-08-04: Reconciliations applied:
+  - `app/schemas/characters.py`: removed persistence-record imports (DTO boundary — schemas depend only on pydantic; `from_record` params typed `Any` per master convention).
+  - `app/persistence/models.py`: preserved all pre-existing `__all__` exports; added character constants/models only.
+  - Migration `d5e6f7a8b9c0` verified ORM-consistent (character_asset `revision` column matches TimestampMixin).
+- 2026-08-04: Fixture environment gaps (pre-existing on master, not introduced by the port):
+  - Legacy-import fixtures referenced by master's tests were never committed to master (only untracked leftovers in the primary worktree); restored from the source commit as tracked files (justified: Gate 2 runs those tests).
+  - `corrupt/projects/no_json/` empty dir required by `test_dir_without_project_json_is_warning`; cannot be tracked by git; recreated on disk.
+  - CRLF conversion (autocrlf, no .gitattributes) breaks byte-sensitive sha256 fixture checks on fresh checkouts; normalized working-tree fixture bytes to LF (identical to blobs) so the baseline passes.
+  - Review worktree had no frontend `node_modules`; copied from primary worktree (522MB) so Gates 5-7 can run (Turbopack rejects symlinked/junction node_modules).
+- 2026-08-04: Verification results:
+  - Migration lineage: `a1b2c3d4e5f6 → 23b308b1fd0b → 1c9f2a4b7d8e → d5e6f7a8b9c0 (head)`; upgrade verified; downgrade refuses (RuntimeError, consistent with S02/S03 policy).
+  - Focused: `tests/test_character_domain.py` 3/3 PASS.
+  - Directly required: `tests/test_persistence_bootstrap.py` + `tests/test_durable_job_persistence.py` 79/79 PASS (includes downgrade-refusal and table-set regression checks).
+  - Full suite: 578 passed, 19 skipped, 7 deselected.
+  - Ruff (`app tests`): clean. MyPy (`app`): clean.
+  - Quality baseline: 7/7 PASS (run `20260804-125745` had Gate 7 FAIL due to missing frontend deps; after installing node_modules re-run PASS).
+- 2026-08-04: REPORT written as SUBMITTED. No commits created; S06-T02 not started.
+- 2026-08-04: INDEPENDENT REVIEW by FIVE_JOB repair train (session 20260804_130632_207bf0):
+  - Verdict: **PASS** — port is scoped (17 files, +1643/-10), reconciliations documented, tests/lint/baseline evidence present.
+  - Reconciliation deltas re-verified on primary master after port: `get_db_session` uses master's `default_database_path(injected)` pattern; DTO boundary `from_row(cls, row: Any)` (schemas depend only on pydantic); models `__all__` preserves all pre-existing exports; `durable_summaries` router kept alongside `durable_characters`.
+  - Migration lineage re-verified on primary: `a1b2c3d4e5f6 → 23b308b1fd0b → 1c9f2a4b7d8e → d5e6f7a8b9c0 (head)`; upgrade creates character/character_pack_version/character_asset; downgrade refuses (RuntimeError, per S06 contract).
+  - Focused tests on primary: test_character_domain + test_persistence_bootstrap + test_durable_job_persistence = 82 passed.
+  - Out-of-scope exclusion honored on port: legacy-import fixtures NOT ported to master (they already exist as untracked files in the primary worktree; master's legacy tests pass with them); `.gitignore` change not ported (no-op); stale S06-T01 packet not ported (already on master).

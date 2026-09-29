@@ -1,0 +1,45 @@
+[
+  {
+    "file": "compare_book.jpg",
+    "sha256": "98aec846634f93acdc57b8b11808bc28585c708169f9ed449749ea094dd62c47",
+    "bytes": 522328,
+    "authority": "independent_Codex_review_20260929_morning"
+  },
+  {
+    "file": "compare_turn.jpg",
+    "sha256": "83704623961df5c750b8ba9a4987b64b1b2992f8c1a926023e3ec4e4c8da0378",
+    "bytes": 482789,
+    "authority": "independent_Codex_review_20260929_morning"
+  },
+  {
+    "file": "compare_occ.jpg",
+    "sha256": "5c8f0a10e4ae39fcddf53f7e08ec5ad5dbe893cc2370c06105aac0fc7d05088f",
+    "bytes": 697341,
+    "authority": "independent_Codex_review_20260929_morning"
+  },
+  {
+    "file": "comparison_frame180.jpg",
+    "sha256": "91d3ca9a0f71feac7a873d3f244a40431f38f4f5d33381ea93a394b972e752eb",
+    "bytes": 132448,
+    "authority": "independent_Codex_review_20260929_morning"
+  },
+  {
+    "file": "R5_RENDER_ONLY_NOT_ACCEPTED.mp4",
+    "sha256": "075133f3d2d6918d7cff3a036d7234ce64e154b06b09fe8dbc4b1b04ff9fa269",
+    "bytes": 3840735,
+    "authority": "independent_Codex_review_20260929_morning"
+  },
+  {
+    "file": "CUT_AUDIT.json",
+    "sha256": "52d847cd8d6841ac7d3215ef23fb2710c1a63c550e6bbc6ebcf7e7078717da3e",
+    "bytes": 4706,
+    "authority": "independent_Codex_review_20260929_morning"
+  },
+  {
+    "file": "MANAGER_MATRIX_1710.md",
+    "sha256": "e27f655c5bf4fff48f6157cf12297d6cd8168e5636cf3af3f96b117c6c85a38a",
+    "bytes": 7185,
+    "authority": "manager_report_read_at_handoff_not_independent_rerun",
+    "reported_timestamp": "2026-09-29 17:10 +07"
+  }
+]

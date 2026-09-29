@@ -1,3 +1,5 @@
+> **External developer review — 29/09/2026:** Start at [START_HERE_EXTERNAL_REVIEW.md](START_HERE_EXTERNAL_REVIEW.md) for the current product brief, blockers, source snapshot and setup limits. Product acceptance remains **NOT_APPROVED / NOT_CLOSED; QUALITY_ACCEPTED=0**. The original README below is historical context.
+
 # MotionForge 2D
 
 Local-first 2D animation motion extraction and replacement tool.

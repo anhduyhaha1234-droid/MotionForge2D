@@ -11,3 +11,7 @@ app/services/renderer_routes/__init__.py text eol=lf
 app/services/renderer_routes/adaptive_pose_swap.py text eol=lf
 app/services/renderer_routes/benchmark_results.py text eol=lf
 app/services/renderer_routes/composite.py text eol=crlf
+
+# Review snapshots and evidence retain the exact bytes recorded in their manifests.
+/review-snapshots/** -text
+/docs/external-review/evidence/** -text

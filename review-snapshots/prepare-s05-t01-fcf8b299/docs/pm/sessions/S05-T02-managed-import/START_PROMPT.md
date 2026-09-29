@@ -1,0 +1,9 @@
+# Start Prompt for Hermes - S05-T02
+
+Read `docs/pm/sessions/S05-T02-managed-import/TASK.md` and every Required reading item completely, in order. Produce only the S05-T02 deliverable: the managed import service (`app/services/video_import.py`), the minimal durable-worker support it needs, the ANALYZE_MEDIA handler registration, the synthetic/tmp test suite (`tests/test_video_import.py`), and the session evidence. Do not write API routes, frontend code, schemas/migrations, production data, `channels.json`, or unrelated files. Do not touch the primary worktree `C:\Users\Admin\MotionForge2D` or any existing session packet.
+
+The outcome must satisfy: managed import safely streams/copies a source video into ManagedRoot, computes SHA-256 and size during copy, atomically publishes a ready Artifact, links it as the VideoItem source and persists existing probe metadata in one transaction/job effect. Idempotent retry/restart must not duplicate artifacts or orphan files. Cancellation/failure cleans staging/partial files. Enforce path containment and never mutate/delete the original source.
+
+Use only synthetic/tmp fixtures. Test success, checksum/size, original unchanged, duplicate/idempotent submit, copy failure, DB rollback orphan cleanup, cancellation, path escape/symlink containment, insufficient disk, unsupported V1 media decision, and restart recovery. No new schema unless the contract proves unavoidable; if so stop BLOCKED. No frontend, canonical proxy/timebase (T03), production data, channels.json or unrelated files.
+
+Run the targeted tests, ruff, mypy, `git diff --check` and the fresh 7/7 quality baseline, append real evidence to `LOG.md`, fill `REPORT.md` per the template, set REPORT status to `SUBMITTED`, then exit. Do not approve, commit, push, or create the next task packet. If any dependency is not approved or any required decision is missing, stop and report `BLOCKED`.

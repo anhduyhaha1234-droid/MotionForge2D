@@ -1,0 +1,460 @@
+{
+ "9": {
+  "inputs": {
+   "filename_prefix": "mf_reskin_v1/video14b/roundI1/anchor_book_i1c1",
+   "images": [
+    "75:65",
+    0
+   ]
+  },
+  "class_type": "SaveImage",
+  "_meta": {
+   "title": "Save Image"
+  }
+ },
+ "76": {
+  "inputs": {
+   "image": "i1_BOOK_f000_640x368.png"
+  },
+  "class_type": "LoadImage",
+  "_meta": {
+   "title": "Load Image"
+  }
+ },
+ "75:61": {
+  "inputs": {
+   "sampler_name": "euler"
+  },
+  "class_type": "KSamplerSelect",
+  "_meta": {
+   "title": "KSamplerSelect"
+  }
+ },
+ "75:70": {
+  "inputs": {
+   "unet_name": "flux-2-klein-4b-fp8.safetensors",
+   "weight_dtype": "default"
+  },
+  "class_type": "UNETLoader",
+  "_meta": {
+   "title": "Load Diffusion Model"
+  }
+ },
+ "75:71": {
+  "inputs": {
+   "clip_name": "qwen_3_4b.safetensors",
+   "type": "flux2",
+   "device": "default"
+  },
+  "class_type": "CLIPLoader",
+  "_meta": {
+   "title": "Load CLIP"
+  }
+ },
+ "75:72": {
+  "inputs": {
+   "vae_name": "flux2-vae.safetensors"
+  },
+  "class_type": "VAELoader",
+  "_meta": {
+   "title": "Load VAE"
+  }
+ },
+ "75:66": {
+  "inputs": {
+   "width": [
+    "75:99",
+    0
+   ],
+   "height": [
+    "75:99",
+    1
+   ],
+   "batch_size": 1
+  },
+  "class_type": "EmptyFlux2LatentImage",
+  "_meta": {
+   "title": "Empty Flux 2 Latent"
+  }
+ },
+ "75:80": {
+  "inputs": {
+   "upscale_method": "nearest-exact",
+   "megapixels": 0.23552,
+   "resolution_steps": 1,
+   "image": [
+    "76",
+    0
+   ]
+  },
+  "class_type": "ImageScaleToTotalPixels",
+  "_meta": {
+   "title": "Scale Image to Total Pixels"
+  }
+ },
+ "75:62": {
+  "inputs": {
+   "steps": 4,
+   "width": [
+    "75:99",
+    0
+   ],
+   "height": [
+    "75:99",
+    1
+   ]
+  },
+  "class_type": "Flux2Scheduler",
+  "_meta": {
+   "title": "Flux2Scheduler"
+  }
+ },
+ "75:74": {
+  "inputs": {
+   "text": "Reference image 1 is the exact frame to redraw. Redraw it as a flat 2D cel-shaded animation illustration in a flat colour palette: solid flat colour fills, one hard shadow tone per shape, thin clean outlines, no gradients, no photographic texture, no 3D rendering. Keep the identical composition, camera, scale and aspect ratio of reference image 1 and keep every contact between bodies and objects. Keep the frame edges exactly as they are, including the thin black band at the very top and the very bottom: do not crop, do not zoom, do not letterbox, do not add borders. Reference image 1 shows three people in one room. The pale/grey-haired figure seated on the left in the black chair, both hands on an open blue book, takes the character design of reference image 2: same seated posture, same screen position, same silhouette envelope and the same overlap with the chair, the table and the book. The brown-haired figure in the magenta/pink dress standing behind and to the right takes the character design of reference image 3: same standing position, same height, same overlap in front of the wall. The dark-haired figure seated on the right, seen from behind so that only the back of the head and shoulders show above the table, takes the character design of reference image 4: same seated position, same amount of body showing. The open blue book, the table with the green tray, and the chairs are redrawn in the same flat style, in the same positions, with the same interactions. The room - the brown wall panel, the window opening, the floor line and the cupboard on the right - becomes a flat background design with the same layout and the same openings. The number of people must not change: do not add or remove a person, do not add a face, a head or a hand that reference image 1 does not already show, and do not move any person. No added text, no captions, no subtitles, no logo, no watermark: the video watermark in the bottom-left corner of reference image 1 must not appear in the result. GEOMETRY LOCK: this overrides everything else. Copy the layout of reference image 1 exactly. The seated grey-haired reader keeps BOTH hands on the SAME open blue book with BOTH pages visible, at exactly the same screen position and the same size. The standing brown-haired woman keeps her exact position, height and dress colour. The person seen from behind stays EXACTLY where reference image 1 shows him: the right side of the frame, seated behind the table, only the back of the head and the shoulders above the table edge, the same size as in reference image 1, neither moved toward the centre nor enlarged and not lowered. The table with the green tray stays in the bottom-right corner exactly where reference image 1 shows it. Do not rearrange the right half of the frame and do not change the size of any person.",
+   "clip": [
+    "75:71",
+    0
+   ]
+  },
+  "class_type": "CLIPTextEncode",
+  "_meta": {
+   "title": "CLIP Text Encode (Positive Prompt)"
+  }
+ },
+ "75:82": {
+  "inputs": {
+   "conditioning": [
+    "75:74",
+    0
+   ]
+  },
+  "class_type": "ConditioningZeroOut",
+  "_meta": {
+   "title": "Conditioning Zero Out"
+  }
+ },
+ "75:121": {
+  "inputs": {
+   "conditioning": [
+    "75:82",
+    0
+   ],
+   "latent": [
+    "75:122",
+    0
+   ]
+  },
+  "class_type": "ReferenceLatent",
+  "_meta": {
+   "title": "Set Reference Latent"
+  }
+ },
+ "75:99": {
+  "inputs": {
+   "image": [
+    "75:80",
+    0
+   ]
+  },
+  "class_type": "GetImageSize",
+  "_meta": {
+   "title": "Get Image Size"
+  }
+ },
+ "75:123": {
+  "inputs": {
+   "conditioning": [
+    "75:74",
+    0
+   ],
+   "latent": [
+    "75:122",
+    0
+   ]
+  },
+  "class_type": "ReferenceLatent",
+  "_meta": {
+   "title": "Set Reference Latent"
+  }
+ },
+ "75:122": {
+  "inputs": {
+   "pixels": [
+    "75:80",
+    0
+   ],
+   "vae": [
+    "75:72",
+    0
+   ]
+  },
+  "class_type": "VAEEncode",
+  "_meta": {
+   "title": "VAE Encode"
+  }
+ },
+ "75:64": {
+  "inputs": {
+   "noise": [
+    "75:73",
+    0
+   ],
+   "guider": [
+    "75:63",
+    0
+   ],
+   "sampler": [
+    "75:61",
+    0
+   ],
+   "sigmas": [
+    "75:62",
+    0
+   ],
+   "latent_image": [
+    "75:66",
+    0
+   ]
+  },
+  "class_type": "SamplerCustomAdvanced",
+  "_meta": {
+   "title": "SamplerCustomAdvanced"
+  }
+ },
+ "75:65": {
+  "inputs": {
+   "samples": [
+    "75:64",
+    0
+   ],
+   "vae": [
+    "75:72",
+    0
+   ]
+  },
+  "class_type": "VAEDecode",
+  "_meta": {
+   "title": "VAE Decode"
+  }
+ },
+ "75:73": {
+  "inputs": {
+   "noise_seed": 2026092511
+  },
+  "class_type": "RandomNoise",
+  "_meta": {
+   "title": "RandomNoise"
+  }
+ },
+ "75:63": {
+  "inputs": {
+   "cfg": 1,
+   "model": [
+    "75:70",
+    0
+   ],
+   "positive": [
+    "I1R4P",
+    0
+   ],
+   "negative": [
+    "I1R4N",
+    0
+   ]
+  },
+  "class_type": "CFGGuider",
+  "_meta": {
+   "title": "CFG Guider"
+  }
+ },
+ "I1R2L": {
+  "inputs": {
+   "image": "i1_cast_boy_hacker_sitting.png"
+  },
+  "class_type": "LoadImage",
+  "_meta": {
+   "title": "I1 reference 2 (cast_boy_hacker_sitting)"
+  }
+ },
+ "I1R2S": {
+  "inputs": {
+   "resize_type": "scale longer dimension",
+   "resize_type.longer_size": 368,
+   "scale_method": "area",
+   "input": [
+    "I1R2L",
+    0
+   ]
+  },
+  "class_type": "ResizeImageMaskNode",
+  "_meta": {
+   "title": "I1 reference 2 resize (aspect preserved, no crop)"
+  }
+ },
+ "I1R2E": {
+  "inputs": {
+   "pixels": [
+    "I1R2S",
+    0
+   ],
+   "vae": [
+    "75:72",
+    0
+   ]
+  },
+  "class_type": "VAEEncode"
+ },
+ "I1R2P": {
+  "inputs": {
+   "conditioning": [
+    "75:123",
+    0
+   ],
+   "latent": [
+    "I1R2E",
+    0
+   ]
+  },
+  "class_type": "ReferenceLatent"
+ },
+ "I1R2N": {
+  "inputs": {
+   "conditioning": [
+    "75:121",
+    0
+   ],
+   "latent": [
+    "I1R2E",
+    0
+   ]
+  },
+  "class_type": "ReferenceLatent"
+ },
+ "I1R3L": {
+  "inputs": {
+   "image": "i1_cast_dan_choi_standing.png"
+  },
+  "class_type": "LoadImage",
+  "_meta": {
+   "title": "I1 reference 3 (cast_dan_choi_standing)"
+  }
+ },
+ "I1R3S": {
+  "inputs": {
+   "resize_type": "scale longer dimension",
+   "resize_type.longer_size": 368,
+   "scale_method": "area",
+   "input": [
+    "I1R3L",
+    0
+   ]
+  },
+  "class_type": "ResizeImageMaskNode",
+  "_meta": {
+   "title": "I1 reference 3 resize (aspect preserved, no crop)"
+  }
+ },
+ "I1R3E": {
+  "inputs": {
+   "pixels": [
+    "I1R3S",
+    0
+   ],
+   "vae": [
+    "75:72",
+    0
+   ]
+  },
+  "class_type": "VAEEncode"
+ },
+ "I1R3P": {
+  "inputs": {
+   "conditioning": [
+    "I1R2P",
+    0
+   ],
+   "latent": [
+    "I1R3E",
+    0
+   ]
+  },
+  "class_type": "ReferenceLatent"
+ },
+ "I1R3N": {
+  "inputs": {
+   "conditioning": [
+    "I1R2N",
+    0
+   ],
+   "latent": [
+    "I1R3E",
+    0
+   ]
+  },
+  "class_type": "ReferenceLatent"
+ },
+ "I1R4L": {
+  "inputs": {
+   "image": "i1_cast_gau_nau_back.png"
+  },
+  "class_type": "LoadImage",
+  "_meta": {
+   "title": "I1 reference 4 (cast_gau_nau_back)"
+  }
+ },
+ "I1R4S": {
+  "inputs": {
+   "resize_type": "scale longer dimension",
+   "resize_type.longer_size": 368,
+   "scale_method": "area",
+   "input": [
+    "I1R4L",
+    0
+   ]
+  },
+  "class_type": "ResizeImageMaskNode",
+  "_meta": {
+   "title": "I1 reference 4 resize (aspect preserved, no crop)"
+  }
+ },
+ "I1R4E": {
+  "inputs": {
+   "pixels": [
+    "I1R4S",
+    0
+   ],
+   "vae": [
+    "75:72",
+    0
+   ]
+  },
+  "class_type": "VAEEncode"
+ },
+ "I1R4P": {
+  "inputs": {
+   "conditioning": [
+    "I1R3P",
+    0
+   ],
+   "latent": [
+    "I1R4E",
+    0
+   ]
+  },
+  "class_type": "ReferenceLatent"
+ },
+ "I1R4N": {
+  "inputs": {
+   "conditioning": [
+    "I1R3N",
+    0
+   ],
+   "latent": [
+    "I1R4E",
+    0
+   ]
+  },
+  "class_type": "ReferenceLatent"
+ }
+}
