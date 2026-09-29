@@ -712,9 +712,17 @@ def build_completion_block(
     revisions: Mapping[str, str],
     summary: OrchestratorSummary,
     evidence_binding: Mapping[str, Any] | None = None,
+    comparison_band: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Deterministic completion evidence recorded in JobAttempt result +
-    step checkpoint (zero-item completion evidence included)."""
+    step checkpoint (zero-item completion evidence included).
+
+    ``comparison_band`` is the MF-END-22 source↔output comparison report
+    (CMC correction 29/09).  When it reports ``not_ready`` — an invalid /
+    unknown / missing measurement or a typed refusal — zero-item completion
+    evidence is FALSIFIED and the typed reasons are recorded, so a
+    non-measurement can never be read as a clean "0 issue" pass (P1-03b).
+    """
     run = summary
     issues_found = sum(
         int(entry.get("items_found") or 0)
@@ -761,17 +769,139 @@ def build_completion_block(
             # Reuse-safe: the flag is the detectors' REPORTED issue count
             # (zero = the band found nothing), never the row-creation count
             # (a replay reuses existing rows and would misreport as clean).
+            # MF-END-22: a comparison band that could not MEASURE (invalid /
+            # unknown / missing / refusal) falsifies the flag — a
+            # non-measurement is never a clean zero-item pass.
             "evidence": (
                 run.errors == 0
                 and run.checks_skipped == 0
                 and issues_found == 0
+                and not _comparison_not_ready(comparison_band)
             ),
             "qc_items_created": run.created,
             "issues_found": issues_found,
             "checks_run": run.checks_run,
             "not_applicable": run.not_applicable,
+            "non_ready": list(_comparison_not_ready(comparison_band)),
         },
+        "comparison_band": (
+            dict(comparison_band) if comparison_band is not None else None
+        ),
     }
+
+
+def _comparison_not_ready(
+    comparison_band: Mapping[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """Typed non-ready reasons (role / frame / evidence) from the band.
+
+    Empty list = the band measured everything it was asked to measure (or no
+    band was supplied).  A refusal or an indeterminate comparator yields one
+    entry per cause, carrying the detector, the entry point, the typed code,
+    the affected role ids, the affected frames and the evidence anchor.
+    """
+    if not isinstance(comparison_band, Mapping):
+        return []
+    if str(comparison_band.get("applicability") or "") == "not_applicable":
+        # No comparison evidence exists on either side: the absent path is
+        # recorded in the completion block but is NOT a non-ready cause (a
+        # video whose features were never produced is not a measured
+        # failure).  The refusals stay in ``comparison_band`` verbatim.
+        return []
+    reasons: list[dict[str, Any]] = []
+    for refusal in comparison_band.get("refusals") or []:
+        if not isinstance(refusal, Mapping):
+            continue
+        reasons.append(
+            {
+                "detector": "comparison_band",
+                "entry_point": "",
+                "side": str(refusal.get("side") or ""),
+                "code": str(refusal.get("code") or ""),
+                "role_ids": [],
+                "frames": [],
+                "evidence": str(refusal.get("dependency") or refusal.get("detail") or ""),
+                "detail": str(refusal.get("message") or ""),
+            }
+        )
+    for item in comparison_band.get("indeterminate") or []:
+        if not isinstance(item, Mapping):
+            continue
+        reasons.append(
+            {
+                "detector": str(item.get("detector") or ""),
+                "entry_point": str(item.get("entry_point") or ""),
+                "side": "comparison",
+                "code": str(item.get("code") or ""),
+                "codes": list(item.get("codes") or []),
+                "role_ids": list(item.get("role_ids") or []),
+                "frames": list(item.get("frames") or []),
+                "evidence": str(
+                    (comparison_band.get("evidence") or {}).get("output_observations", {}).get(
+                        "digest"
+                    )
+                    or ""
+                ),
+                "detail": str(item.get("detail") or ""),
+            }
+        )
+    return reasons
+
+
+def _comparison_band_report(
+    session: Session,
+    *,
+    manifest: Mapping[str, Any],
+    scope: str,
+) -> dict[str, Any] | None:
+    """Run the MF-END-22 comparison band for one QC run (never raises).
+
+    The band is a REPORT, not a detector arg set: a band that cannot run at
+    all (no managed root, an unexpected error) is recorded as a typed
+    refusal rather than killing a QC run that the other detectors can still
+    satisfy — but a refusal ALWAYS carries ``not_ready`` so it can never be
+    read as a clean pass.
+    """
+    from app.services.qc_evidence import QcEvidenceError
+    from app.services.qc_evidence.compose import compose_comparison_band
+
+    try:
+        managed_root = _evidence_managed_root()
+    except Exception as exc:  # noqa: BLE001 - fail closed, typed
+        return {
+            "schema_version": "mf-end-22/comparison-band@1",
+            "applicability": "required",
+            "not_ready": True,
+            "detectors": {},
+            "indeterminate": [],
+            "refusals": [
+                {
+                    "side": "managed_root",
+                    "code": QC_RUN_EVIDENCE_UNAVAILABLE,
+                    "message": f"{type(exc).__name__}: {exc}",
+                    "dependency": "the managed artifact root the evidence reader verifies bytes in",
+                }
+            ],
+        }
+    try:
+        return compose_comparison_band(
+            session,
+            managed_root=managed_root,
+            workspace_id=str(manifest.get("workspace_id") or ""),
+            project_id=str(manifest.get("project_id") or ""),
+            video_item_id=str(manifest.get("video_item_id") or ""),
+            generation=str(manifest.get("source_generation") or "1"),
+        )
+    except QcEvidenceError as exc:
+        return {
+            "schema_version": "mf-end-22/comparison-band@1",
+            "applicability": "required",
+            "not_ready": True,
+            "detectors": {},
+            "indeterminate": [],
+            "refusals": [{"side": "comparison_band", **exc.as_dict()}],
+            "scope": scope,
+        }
 
 
 # ── the durable handler ──────────────────────────────────────────────────────
@@ -904,6 +1034,20 @@ def qc_checks_handler(ctx: WorkerContext) -> dict[str, Any]:
             project_id=str(manifest.get("project_id") or "") or None,
             video_item_id=str(manifest.get("video_item_id") or ""),
         )
+        # MF-END-22 (CMC correction 29/09 — P1-03a): the five comparison
+        # entry points run HERE, on the production QC path, against the
+        # CURRENT run's own bytes (sealed MF-END-13 source facts from the
+        # lock manifest + the published MF-END-21 output observations).
+        # A side that is absent for a video with no comparison evidence is
+        # ``not_applicable``; anything the band cannot MEASURE is recorded
+        # and makes the run non-ready (P1-03b, folded into the completion).
+        comparison_band: dict[str, Any] | None = None
+        if any(name not in ("audio_missing", "av_sync_drift") for name in detectors):
+            comparison_band = _comparison_band_report(
+                session,
+                manifest=manifest,
+                scope=scope,
+            )
 
     # Fail-closed completion: an errored / deadline-exhausted / cancelled
     # orchestrator run is NEVER recorded as a completed check-run — the
@@ -965,6 +1109,7 @@ def qc_checks_handler(ctx: WorkerContext) -> dict[str, Any]:
         revisions=detector_revisions(detectors),
         summary=summary,
         evidence_binding=binding_for_completion,
+        comparison_band=comparison_band,
     )
     ctx.write_checkpoint(completion)
     return completion

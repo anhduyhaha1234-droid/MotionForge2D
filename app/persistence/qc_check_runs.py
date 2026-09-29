@@ -189,6 +189,8 @@ class CheckRunState:
     started_at: Any = None
     finished_at: Any = None
     check_state_detail: str = ""
+    comparison_completion: bool | None = None
+    comparison_non_ready: list[dict[str, Any]] | None = None
 
 
 @dataclass(frozen=True)
@@ -206,6 +208,7 @@ class CheckRunReadiness:
     policy_content_hash: str = ""
     check_state_detail: str = ""
     latest_job_id: str | None = None
+    comparison_completion: bool | None = None
 
 
 def _completion_from_attempts(
@@ -768,6 +771,8 @@ def latest_check_run_state(
                     if isinstance(completion.get("zero_item_completion"), dict)
                     else None
                 ),
+                comparison_completion=_comparison_completion_flag(completion),
+                comparison_non_ready=_comparison_non_ready_reasons(completion),
                 summary=completion.get("summary"),
                 detector_revisions=completion.get("detector_revisions"),
                 check_state_detail=(
@@ -784,6 +789,8 @@ def latest_check_run_state(
                     if isinstance(completion.get("zero_item_completion"), dict)
                     else None
                 ),
+                comparison_completion=_comparison_completion_flag(completion),
+                comparison_non_ready=_comparison_non_ready_reasons(completion),
                 summary=completion.get("summary"),
                 detector_revisions=completion.get("detector_revisions"),
                 check_state_detail=(
@@ -798,6 +805,8 @@ def latest_check_run_state(
             zero_item_completion=_zero_item_flag(completion),
             summary=completion.get("summary"),
             detector_revisions=completion.get("detector_revisions"),
+            comparison_completion=_comparison_completion_flag(completion),
+            comparison_non_ready=_comparison_non_ready_reasons(completion),
             check_state_detail="completed current FULL-scope run with durable completion "
             "evidence proving the binding 10-detector coverage and matching "
             "the current video evidence fingerprint and policy hash",
@@ -837,6 +846,29 @@ def _zero_item_flag(completion: dict[str, Any]) -> bool | None:
     if isinstance(zic, dict):
         return bool(zic.get("evidence"))
     return None
+
+
+def _comparison_completion_flag(completion: dict[str, Any]) -> bool | None:
+    """Whether the MF-END-22 comparison band MEASURED (or is absent).
+
+    ``True`` = the band reached a measurement for every comparator it was
+    required to run (or reported ``not_applicable`` — nothing to compare);
+    ``False`` = a comparator could not measure (invalid / unknown / missing /
+    refusal), which is a NON-READY verdict, never a clean zero-item pass;
+    ``None`` = the run predates the comparison band.
+    """
+    band = completion.get("comparison_band")
+    if not isinstance(band, dict):
+        return None
+    return not bool(band.get("not_ready"))
+
+
+def _comparison_non_ready_reasons(completion: dict[str, Any]) -> list[dict[str, Any]]:
+    """The typed non-ready causes the run recorded (role / frame / evidence)."""
+    reasons = (completion.get("zero_item_completion") or {}).get("non_ready")
+    if not isinstance(reasons, list):
+        return []
+    return [dict(reason) for reason in reasons if isinstance(reason, dict)]
 
 
 def check_run_readiness(
@@ -890,6 +922,35 @@ def check_run_readiness(
         for r in records
         if str(r.severity) == "blocker" and str(r.status) == "open"
     )
+    comparison_flag = state.comparison_completion
+    if comparison_flag is False:
+        # MF-END-22 / P1-03b: the run completed but at least one comparator
+        # could not MEASURE (invalid / unknown / missing measurement /
+        # typed refusal).  That is a NON-READY verdict by contract — it can
+        # never be read as "0 items found, therefore pass".  Zero QCItems is
+        # not evidence of a measurement.
+        non_ready = list(state.comparison_non_ready or [])
+        return CheckRunReadiness(
+            status=READINESS_NOT_RUN,
+            run_state=RUN_STATE_COMPLETED,
+            video_item_id=video_item_id,
+            zero_item_completion=state.zero_item_completion,
+            evidence_matches=True,
+            policy_matches=True,
+            policy_id=str(policy.get("policy_id") or POLICY_ID),
+            policy_content_hash=str(policy["content_hash"]),
+            check_state_detail=(
+                "completed current run did NOT measure the comparison band "
+                f"({len(non_ready)} non-ready cause(s): "
+                + ", ".join(
+                    f"{r.get('detector')}:{r.get('code')}" for r in non_ready[:4]
+                )
+                + "); readiness stays not_run — a non-measurement is not a pass"
+            ),
+            latest_job_id=state.job_id,
+            comparison_completion=False,
+            comparison_non_ready=non_ready,
+        )
     status = READINESS_READY if blockers == 0 else READINESS_BLOCKED
     return CheckRunReadiness(
         status=status,
@@ -897,6 +958,7 @@ def check_run_readiness(
         video_item_id=video_item_id,
         blockers=blockers,
         zero_item_completion=state.zero_item_completion,
+        comparison_completion=comparison_flag,
         evidence_matches=True,
         policy_matches=True,
         policy_id=str(policy.get("policy_id") or POLICY_ID),

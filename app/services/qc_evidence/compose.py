@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from fractions import Fraction
 from pathlib import Path
@@ -3303,8 +3303,405 @@ def compose_visual_band(
     return composed
 
 
+# ── MF-END-22 comparison band (CMC correction 29/09 — P1-03a) ────────────────
+#
+# The five comparison entry points ("source facts vs OUTPUT observations") are
+# invoked HERE, on the production QC path, with the persisted evidence of the
+# CURRENT run:
+#
+# * SOURCE facts — the SEALED MF-END-13 payload frozen in the current S09 lock
+#   manifest (``manifest["source_interaction_facts"]``, verified through the
+#   public ``validate_manifest`` contract and its recorded fingerprint);
+# * OUTPUT observations — the published MF-END-21 payload for this video
+#   (``sources.rendered_observations_artifact``: bytes re-hashed against the
+#   artifact row before use);
+# * the source↔output frame mapping is RESOLVED AND RECORDED (declared, or
+#   the identity basis only when the two spans are the same interval) — a
+#   mapping that cannot be proven refuses, it is never guessed.
+#
+# A missing/ambiguous side is reported as a TYPED refusal and the band is
+# ``not_ready``; nothing is fabricated into a pass.
+
+COMPARISON_BAND_SCHEMA = "mf-end-22/comparison-band@1"
+
+#: The five comparison entry points, in stable order (name -> entry point).
+COMPARISON_DETECTORS: tuple[tuple[str, str], ...] = (
+    ("contact_break_comparison", "compare_contact_facts"),
+    ("z_order_error_comparison", "compare_occlusion_facts"),
+    ("trajectory_drift_comparison", "compare_motion_facts"),
+    ("identity_drift_comparison", "compare_identity_facts"),
+    ("temporal_flicker_comparison", "compare_static_and_flicker"),
+)
+
+#: Verdict/status vocabulary that is NOT a measurement (never a pass).
+#: ``missing`` covers the absent-status case: a comparator that produced no
+#: status at all has no measurement either, and it is reported as
+#: indeterminate rather than silently passing.
+COMPARISON_NON_MEASURED_STATUSES = frozenset(
+    {"invalid", "unknown", "blocked", "missing", "not_measured", ""}
+)
+
+
+def _comparison_source_facts(ctx: _Context) -> tuple[dict[str, Any], dict[str, Any]]:
+    """The SEALED source facts payload frozen in the current lock manifest."""
+    manifest = src.current_lock_manifest(ctx.session, ctx.scope)
+    if manifest is None:
+        raise missing(
+            "qc_comparison",
+            "the video has no current S09 lock manifest, so the sealed source "
+            "interaction facts (MF-END-13) are not available for comparison",
+            fact="a current structural lock manifest carrying source facts",
+            producer="structural lock producer (MF-END-13 freeze block)",
+            persistence="structural_lock manifest row",
+        )
+    payload = dict(getattr(manifest, "manifest", {}) or {})
+    facts = payload.get("source_interaction_facts")
+    if not isinstance(facts, dict):
+        raise missing(
+            "qc_comparison",
+            "the current lock manifest carries no sealed source interaction "
+            "facts; the comparison band refuses instead of inventing them",
+            fact="manifest.source_interaction_facts (sealed MF-END-13 payload)",
+            producer="structural lock producer",
+            persistence="structural_lock manifest row",
+        )
+    fingerprint = (payload.get("fingerprints") or {}).get("source_interaction_facts")
+    proof = {
+        "manifest_id": str(getattr(manifest, "id", "")),
+        "manifest_version": str(getattr(manifest, "version", "")),
+        "manifest_fingerprint": str(fingerprint or ""),
+        "facts_digest": str(facts.get("digest") or ""),
+        "source_sha256": str((facts.get("source") or {}).get("sha256") or ""),
+    }
+    return dict(facts), proof
+
+
+def compose_comparison_band(
+    session: Session,
+    *,
+    managed_root: Path,
+    workspace_id: str,
+    project_id: str,
+    video_item_id: str,
+    generation: str = "1",
+    frame_map: Mapping[Any, Any] | None = None,
+) -> dict[str, Any]:
+    """Run the five source↔output comparators on the CURRENT run's evidence.
+
+    Returns a deterministic report (JSON-safe):
+
+    ``{schema_version, policy, evidence:{...}, frame_map:{...proof...},
+       detectors:{name:{status, verdict, items, unknown, blocked, ...}},
+       indeterminate:[{detector, code, role_id, frames, detail}],
+       not_ready: bool, refusals:[...]}``
+
+    ``not_ready`` is True whenever a comparator could not reach a measurement
+    (invalid / unknown / blocked / refusal) — a non-measurement is NEVER
+    reported as a clean zero-item pass.
+    """
+    from app.services.qc_checks import contact_break as _cb
+    from app.services.qc_checks import identity_drift as _id
+    from app.services.qc_checks import trajectory_drift as _tr
+    from app.services.qc_checks import z_order_error as _zo
+    from app.services.qc_evidence import measure as _qcm
+
+    scope = src.load_scope(
+        session,
+        workspace_id=workspace_id,
+        project_id=project_id,
+        video_item_id=video_item_id,
+        generation=generation,
+    )
+    ctx = _Context(
+        session=session,
+        managed_root=Path(managed_root),
+        scope=scope,
+        max_frames=MAX_WINDOW_FRAMES,
+    )
+    entries: dict[str, Any] = {}
+    refusals: list[dict[str, Any]] = []
+    facts: dict[str, Any] = {}
+    facts_proof: dict[str, Any] = {}
+    observations: dict[str, Any] = {}
+    observations_proof: dict[str, Any] = {}
+    try:
+        facts, facts_proof = _comparison_source_facts(ctx)
+    except QcEvidenceError as exc:
+        refusals.append({"side": "source_facts", **exc.as_dict()})
+    try:
+        evidence, payload = src.rendered_observations_artifact(
+            session, Path(managed_root), scope, detector="qc_comparison"
+        )
+        observations = dict(payload)
+        observations_proof = {
+            "artifact_id": str(evidence.artifact_id),
+            "sha256": str(evidence.sha256),
+            "size_bytes": int(evidence.size_bytes),
+            "output_sha256": str((payload.get("output") or {}).get("sha256") or ""),
+            "digest": str(payload.get("digest") or ""),
+            "production": bool(payload.get("production")),
+        }
+    except QcEvidenceError as exc:
+        refusals.append({"side": "output_observations", **exc.as_dict()})
+
+    if refusals:
+        # Applicability: a video with NO comparison evidence on EITHER side
+        # has nothing to compare — the band is ``not_applicable`` and must
+        # not manufacture a non-ready verdict out of an absent feature.  As
+        # soon as ONE side exists, measuring the other becomes mandatory and
+        # the refusal is a typed non-ready cause (P1-03b).
+        both_absent = len(refusals) == len(("source_facts", "output_observations"))
+        detail_codes = {str(r.get("code") or "") for r in refusals}
+        absent_codes = {QC_EVIDENCE_MISSING}
+        applicable = not (both_absent and detail_codes <= absent_codes)
+        return {
+            "schema_version": COMPARISON_BAND_SCHEMA,
+            "policy": {
+                "policy_id": _qcm.COMPARISON_POLICY_ID,
+                "content_hash": _qcm.comparison_policy_digest(),
+            },
+            "evidence": {
+                "source_facts": facts_proof,
+                "output_observations": observations_proof,
+            },
+            "frame_map": {},
+            "detectors": {},
+            "indeterminate": [],
+            "applicability": "required" if applicable else "not_applicable",
+            "not_ready": bool(applicable),
+            "refusals": refusals,
+        }
+
+    mapping_source, mapping_output = _comparison_span_proof(observations, facts)
+    resolved_map, map_evidence = _qcm.comparison_frame_map(
+        source_span=mapping_source,
+        output_span=mapping_output,
+        declared=frame_map,
+    )
+    args: dict[str, Any] = {
+        "source_facts": facts,
+        "output_observations": observations,
+    }
+    if resolved_map is not None:
+        args["frame_map"] = {"source_to_output": dict(resolved_map)}
+    runners: dict[str, Any] = {
+        "contact_break_comparison": _cb.compare_contact_facts,
+        "z_order_error_comparison": _zo.compare_occlusion_facts,
+        "trajectory_drift_comparison": _tr.compare_motion_facts,
+        "identity_drift_comparison": _id.compare_identity_facts,
+    }
+    for name, entry_point in COMPARISON_DETECTORS:
+        runner = runners.get(name)
+        if runner is None:
+            # temporal_flicker does not consume the artifact pair: it measures
+            # the DECODED OUTPUT pixels against the source's own series.
+            entries[name] = _comparison_flicker_entry(
+                ctx, facts, observations, entry_point
+            )
+            continue
+        try:
+            result = runner(dict(args))
+        except Exception as exc:  # noqa: BLE001 - typed, fail closed
+            entries[name] = {
+                "status": "blocked",
+                "entry_point": entry_point,
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+            continue
+        verdict = dict(result.get("verdict") or {})
+        entries[name] = {
+            "status": verdict.get("verdict"),
+            "entry_point": entry_point,
+            "passed": verdict.get("passed"),
+            "hard_failures": list(verdict.get("hard_failures") or []),
+            "soft_failures": list(verdict.get("soft_failures") or []),
+            "items": [dict(item) for item in result.get("items") or []],
+            "unknown": [dict(item) for item in result.get("unknown") or []],
+            "blocked": [dict(item) for item in result.get("blocked") or []],
+            "checked": [dict(item) for item in result.get("checked") or []],
+            "policy_digest": (result.get("policy") or {}).get("digest"),
+        }
+
+    indeterminate: list[dict[str, Any]] = []
+    for name, entry in entries.items():
+        status = str(entry.get("status") or "")
+        if status in COMPARISON_NON_MEASURED_STATUSES or not status:
+            typed_codes = [
+                str(item.get("code"))
+                for item in (entry.get("unknown") or entry.get("blocked") or [])
+                if item.get("code")
+            ]
+            error_text = str(entry.get("error") or "")
+            if not typed_codes:
+                typed_codes = [error_text] if error_text else [
+                    _qcm.CODE_COMPARISON_NOT_OBSERVED
+                ]
+            indeterminate.append(
+                {
+                    "detector": name,
+                    "entry_point": str(entry.get("entry_point") or ""),
+                    "status": status,
+                    "code": typed_codes[0],
+                    "codes": typed_codes,
+                    "role_ids": sorted(
+                        {
+                            str(item.get("role_id"))
+                            for item in (entry.get("unknown") or entry.get("blocked") or [])
+                            if item.get("role_id")
+                        }
+                    ),
+                    "frames": [
+                        frame
+                        for item in (entry.get("unknown") or entry.get("blocked") or [])
+                        for frame in (item.get("frames") or [])
+                    ][:64],
+                    "detail": (
+                        f"{name}: a measurement could not be reached "
+                        f"({status}) — a non-measurement is not a pass"
+                    ),
+                }
+            )
+    return {
+        "schema_version": COMPARISON_BAND_SCHEMA,
+        "policy": {
+            "policy_id": _qcm.COMPARISON_POLICY_ID,
+            "content_hash": _qcm.comparison_policy_digest(),
+        },
+        "evidence": {
+            "source_facts": facts_proof,
+            "output_observations": observations_proof,
+        },
+        "frame_map": map_evidence,
+        "detectors": entries,
+        "indeterminate": indeterminate,
+        "applicability": "measured",
+        "not_ready": (
+            bool(indeterminate)
+            or resolved_map is None
+            or len(entries) != len(COMPARISON_DETECTORS)
+        ),
+        "refusals": [],
+    }
+
+
+def _comparison_span_proof(
+    observations: Mapping[str, Any], facts: Mapping[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """The two SIDES' own frame spans (output artifact / facts source)."""
+    output_span = observations.get("span")
+    facts_span = (facts.get("source") or {}).get("span")
+    return (
+        dict(facts_span) if isinstance(facts_span, Mapping) else {},
+        dict(output_span) if isinstance(output_span, Mapping) else {},
+    )
+
+
+def _comparison_flicker_entry(
+    ctx: _Context,
+    facts: Mapping[str, Any],
+    observations: Mapping[str, Any],
+    entry_point: str,
+) -> dict[str, Any]:
+    """Flicker/static entry: decoded OUTPUT luminance vs the source series.
+
+    The output frames are decoded from the render artifact the observations
+    seal (``output.relative_path`` re-verified by the artifact reader); the
+    source series is the FACTS' camera classification floor when no source
+    series exists — recorded as the basis, never fabricated.
+    """
+    from app.services.qc_checks import temporal_flicker as _tf
+    from app.services.qc_evidence import measure as _qcm
+
+    output = observations.get("output") or {}
+    relative = str(output.get("relative_path") or "")
+    if not relative:
+        return {
+            "status": "blocked",
+            "entry_point": entry_point,
+            "error": "the published observations carry no render path to decode",
+        }
+    path = Path(ctx.managed_root) / relative
+    span = observations.get("span") or {}
+    start = int(span.get("start_frame", 0))
+    end = int(span.get("end_frame_exclusive", start))
+    try:
+        frames = ro_decode_output_frames(path, list(range(start, end)))
+    except Exception as exc:  # noqa: BLE001 - typed, fail closed
+        return {
+            "status": "blocked",
+            "entry_point": entry_point,
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+    luminance = [
+        round(float(np.asarray(frames[index]).astype(np.float64).mean()), 9)
+        for index in sorted(frames)
+    ]
+    if len(luminance) < 2:
+        return {
+            "status": "unknown",
+            "entry_point": entry_point,
+            "unknown": [
+                {
+                    "code": _qcm.CODE_COMPARISON_NOT_OBSERVED,
+                    "role_id": "",
+                    "frames": [start, end - 1],
+                    "detail": (
+                        f"only {len(luminance)} output frame(s) decoded; no "
+                        "inter-frame measurement exists (nothing is invented)"
+                    ),
+                }
+            ],
+        }
+    source_series: list[float] = []
+    for window in facts.get("camera") or []:
+        motion = window.get("content_motion") or {}
+        if isinstance(motion, Mapping) and motion.get("mean_px_per_frame") is not None:
+            rate = float(motion["mean_px_per_frame"])
+            source_series = [0.0] + [rate] * (len(luminance) - 1)
+            break
+    result = _tf.compare_static_and_flicker(
+        {
+            "luminance": luminance,
+            "source_luminance": source_series,
+            "window": {"start_frame": start, "end_frame_exclusive": end},
+        }
+    )
+    verdict = dict(result.get("verdict") or {})
+    return {
+        "status": verdict.get("verdict"),
+        "entry_point": entry_point,
+        "passed": verdict.get("passed"),
+        "hard_failures": list(verdict.get("hard_failures") or []),
+        "soft_failures": list(verdict.get("soft_failures") or []),
+        "items": [dict(item) for item in result.get("items") or []],
+        "unknown": [dict(item) for item in result.get("unknown") or []],
+        "blocked": [dict(item) for item in result.get("blocked") or []],
+        "checked": [dict(item) for item in result.get("checked") or []],
+        "appearance": verdict.get("appearance"),
+        "policy_digest": (result.get("policy") or {}).get("digest"),
+        "basis": {
+            "decoded_frames": len(luminance),
+            "source_series_basis": (
+                "facts.camera.content_motion.mean_px_per_frame"
+                if source_series
+                else "none"
+            ),
+        },
+    }
+
+
+def ro_decode_output_frames(path: Path, indices: Sequence[int]) -> dict[int, Any]:
+    """Decode OUTPUT frames through the MF-END-21 decoder (fail-closed)."""
+    from app.services import rendered_observations as _ro
+
+    return _ro.decode_output_frame_map(path, indices)
+
+
 __all__ = [
     "CHECKPOINT_REF",
+    "COMPARISON_BAND_SCHEMA",
+    "COMPARISON_DETECTORS",
+    "compose_comparison_band",
     "CROP_WINDOW_PX",
     "HALO_MARGIN_PX",
     "OUTPUT_BINDING_SCHEMA",
