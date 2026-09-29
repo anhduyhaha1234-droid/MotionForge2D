@@ -58,6 +58,7 @@ from app.persistence.jobs import IdempotencyKeyInUse, StepInput
 from app.persistence.models import Artifact, ProjectCastMapping, VideoItem
 from app.services import video_import
 from app.services.qc_checks.orchestrator import (
+    QC_ORCHESTRATOR_INDETERMINATE,
     OrchestratorSummary,
     run_full_check_set,
 )
@@ -777,12 +778,33 @@ def build_completion_block(
                 and run.checks_skipped == 0
                 and issues_found == 0
                 and not _comparison_not_ready(comparison_band)
+                and int(getattr(run, "indeterminate", 0) or 0) == 0
             ),
             "qc_items_created": run.created,
             "issues_found": issues_found,
             "checks_run": run.checks_run,
             "not_applicable": run.not_applicable,
-            "non_ready": list(_comparison_not_ready(comparison_band)),
+            "indeterminate": int(getattr(run, "indeterminate", 0) or 0),
+            "indeterminate_detectors": list(
+                getattr(run, "indeterminate_detectors", ()) or ()
+            ),
+            "non_ready": list(_comparison_not_ready(comparison_band))
+            + [
+                {
+                    "detector": name,
+                    "entry_point": "orchestrator_detector",
+                    "side": "detector",
+                    "code": QC_ORCHESTRATOR_INDETERMINATE,
+                    "role_ids": [],
+                    "frames": [],
+                    "evidence": "detector output status",
+                    "detail": (
+                        f"{name}: the detector ran but reached no measurement "
+                        "(invalid/unknown) — a non-measurement is not a pass"
+                    ),
+                }
+                for name in (getattr(run, "indeterminate_detectors", ()) or ())
+            ],
         },
         "comparison_band": (
             dict(comparison_band) if comparison_band is not None else None

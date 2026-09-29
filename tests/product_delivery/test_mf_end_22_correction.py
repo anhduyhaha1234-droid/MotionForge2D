@@ -37,6 +37,7 @@ from app.services.qc_checks import (
 from app.services.qc_checks import (
     identity_drift as ident,
 )
+from app.services.qc_checks import orchestrator
 from app.services.qc_checks import (
     temporal_flicker as tf,
 )
@@ -60,6 +61,50 @@ def _read(relative: str) -> str:
 
 def _band_source() -> str:
     return _read("services/qc_evidence/compose.py")
+
+
+class _Run:
+    """Minimal OrchestratorSummary stand-in for the REAL completion builder."""
+
+    def __init__(self, *, indeterminate: int = 0, detectors: tuple[str, ...] = ()) -> None:
+        self.run_id = "run-1"
+        self.checks_requested = 1
+        self.checks_run = 1
+        self.checks_skipped = 0
+        self.created = 0
+        self.reused = 0
+        self.resolved_after_recheck = 0
+        self.reopened_stale = 0
+        self.not_applicable = 0
+        self.errors = 0
+        self.cancelled = False
+        self.deadline_exceeded = False
+        self.run_sec = 0.0
+        self.per_detector = {"d": {"items_found": 0}}
+        self.indeterminate = indeterminate
+        self.indeterminate_detectors = detectors
+
+
+def _completion_for(
+    *,
+    band: dict[str, Any] | None = None,
+    indeterminate: int = 0,
+    indeterminate_detectors: tuple[str, ...] = (),
+) -> dict[str, Any]:
+    """Build the REAL completion block through the production builder."""
+    return handler.build_completion_block(
+        scope="full",
+        scope_fp="fp",
+        evidence_fp="efp",
+        source_fp={"source_artifact_id": "a", "source_sha256": "b"},
+        source_generation="1",
+        detectors=["d"],
+        revisions={"d": "r"},
+        summary=_Run(  # type: ignore[arg-type]
+            indeterminate=indeterminate, detectors=indeterminate_detectors
+        ),
+        comparison_band=band,
+    )
 
 
 # ── T1 — the call path exists (grep-level proof, plus a live check) ──────────
@@ -190,10 +235,19 @@ def test_correction_4_non_measurement_is_not_a_pass() -> None:
     reasons = handler._comparison_not_ready(non_ready_band)
     assert len(reasons) == 1
     assert handler._comparison_not_ready({"applicability": "not_applicable"}) == []
-    flag = qcr._comparison_completion_flag({"comparison_band": non_ready_band})
-    assert flag is False
-    assert qcr._comparison_completion_flag({"comparison_band": {"not_ready": False}}) is True
+    assert qcr._comparison_completion_flag({"comparison_band": non_ready_band}) is False
+    assert (
+        qcr._comparison_completion_flag({"comparison_band": {"not_ready": False}})
+        is True
+    )
     assert qcr._comparison_completion_flag({}) is None
+    # detector-level indeterminacy alone (no band) is ALSO non-ready
+    assert (
+        qcr._comparison_completion_flag(
+            {"zero_item_completion": {"evidence": False, "non_ready": reasons}}
+        )
+        is False
+    )
     assert qcr._comparison_non_ready_reasons(
         {"zero_item_completion": {"non_ready": reasons}}
     ) == reasons
@@ -300,8 +354,82 @@ def test_correction_7_negative_control_refuses_foreign_side() -> None:
     )
 
 
-# ── T8 — the band report is deterministic ───────────────────────────────────
+# ── T7b — LIVE negative control on the real bad-run record (R5) ─────────────
 
+#: The MF-DEMO-E2E-R5 run record (READ-ONLY evidence from the 2026-09-27 run).
+R5_PROBE = Path(
+    "C:/Users/Admin/Documents/Codex/work/mf-delivery-runs/20260927/"
+    "20260927T163824Z/tasks/MF-DEMO-E2E-R5/raw/probe5_seed_compose.json"
+)
+#: The MF-DEMO-E2E-R4 compose probe (READ-ONLY).
+R4_PROBE = Path(
+    "C:/Users/Admin/Documents/Codex/work/mf-delivery-runs/20260927/"
+    "20260927T163824Z/tasks/MF-DEMO-E2E-R4/raw/probe_qc_compose_r4.json"
+)
+
+
+def test_correction_9_live_negative_control_r5_invalid_identity() -> None:
+    """LIVE REPRO on real bytes: R5's identity_drift is invalid/0 items.
+
+    The record is the ACTUAL run result (read-only, never regenerated): the
+    detector reported ``status=invalid`` ``code=THRESHOLD_INVALID`` with a
+    measured distance of 109.048669 and **items=0**.  That shape must be
+    classified as a NON-MEASUREMENT — never as a clean zero-item run.
+    """
+    if not R5_PROBE.exists():
+        pytest.skip("R5 evidence is not present on this host (read-only input)")
+    record = json.loads(R5_PROBE.read_text(encoding="utf-8"))
+    detectors = record.get("detectors") or {}
+    identity = detectors.get("identity_drift") or {}
+    output = identity.get("output") or {}
+    assert identity.get("status") == "invalid"
+    assert identity.get("code") == CODE_THRESHOLD_INVALID
+    assert int(identity.get("items") or 0) == 0
+    assert float(output.get("measured_distance") or 0.0) > 0.0
+    # the production classification (orchestrator + handler + readiness):
+    assert output.get("status") in orchestrator._INDETERMINATE_STATUSES
+    completion = _completion_for(
+        indeterminate=1, indeterminate_detectors=("identity_drift",)
+    )
+    zic = completion["zero_item_completion"]
+    assert zic["evidence"] is False, "invalid/0-item must NOT be a clean pass"
+    assert zic["indeterminate"] == 1
+    assert zic["non_ready"][0]["code"] == orchestrator.QC_ORCHESTRATOR_INDETERMINATE
+    assert zic["non_ready"][0]["detector"] == "identity_drift"
+    # ...and the readiness authority refuses to call it ready
+    state = qcr.CheckRunState(
+        video_item_id="v",
+        run_state=qcr.RUN_STATE_COMPLETED,
+        comparison_completion=qcr._comparison_completion_flag(completion),
+        comparison_non_ready=qcr._comparison_non_ready_reasons(completion),
+    )
+    assert state.comparison_completion is False
+    # the R4 probe is read-only evidence of the same defect class
+    if R4_PROBE.exists():
+        r4 = json.loads(R4_PROBE.read_text(encoding="utf-8"))
+        compose_section = r4.get("compose") or {}
+        assert compose_section.get("ok") in (True, False)
+
+
+def test_correction_10_valid_control_still_passes() -> None:
+    """The valid control: a fully measured band keeps clean zero-item evidence."""
+    band = {
+        "applicability": "measured",
+        "not_ready": False,
+        "detectors": {"contact_break_comparison": {"status": "pass"}},
+        "indeterminate": [],
+        "refusals": [],
+        "evidence": {"output_observations": {"digest": "ok"}},
+    }
+    completion = _completion_for(band=band)
+    zic = completion["zero_item_completion"]
+    assert zic["evidence"] is True
+    assert zic["non_ready"] == []
+    assert zic["indeterminate"] == 0
+    assert qcr._comparison_completion_flag(completion) is True
+
+
+# ── T8 — the band report is deterministic ───────────────────────────────────
 
 def test_correction_8_band_is_deterministic() -> None:
     detector_names = [name for name, _ in compose_mod.COMPARISON_DETECTORS]

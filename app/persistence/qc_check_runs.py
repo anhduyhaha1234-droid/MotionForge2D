@@ -849,18 +849,26 @@ def _zero_item_flag(completion: dict[str, Any]) -> bool | None:
 
 
 def _comparison_completion_flag(completion: dict[str, Any]) -> bool | None:
-    """Whether the MF-END-22 comparison band MEASURED (or is absent).
+    """Whether the comparison band (and the detector band) MEASURED.
 
-    ``True`` = the band reached a measurement for every comparator it was
-    required to run (or reported ``not_applicable`` — nothing to compare);
-    ``False`` = a comparator could not measure (invalid / unknown / missing /
-    refusal), which is a NON-READY verdict, never a clean zero-item pass;
-    ``None`` = the run predates the comparison band.
+    ``True`` = every comparator reached a measurement and no detector was
+    indeterminate (or the band is ``not_applicable`` — nothing to compare);
+    ``False`` = at least one typed non-ready cause was recorded (invalid /
+    unknown / missing measurement / refusal), which is a NON-READY verdict,
+    never a clean zero-item pass;
+    ``None`` = the run predates both contracts.
     """
+    reasons = _comparison_non_ready_reasons(completion)
+    zic = completion.get("zero_item_completion")
+    has_zic = isinstance(zic, dict)
     band = completion.get("comparison_band")
-    if not isinstance(band, dict):
+    if not has_zic and not isinstance(band, dict):
         return None
-    return not bool(band.get("not_ready"))
+    if reasons:
+        return False
+    if isinstance(band, dict):
+        return not bool(band.get("not_ready"))
+    return True
 
 
 def _comparison_non_ready_reasons(completion: dict[str, Any]) -> list[dict[str, Any]]:

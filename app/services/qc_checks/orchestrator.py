@@ -80,6 +80,8 @@ from app.services.qc_checks.runner import (
 #: Stable orchestrator-level error codes.
 QC_ORCHESTRATOR_MISSING_ARGS = "QC_ORCHESTRATOR_MISSING_ARGS"
 QC_ORCHESTRATOR_PERSIST_ERROR = "QC_ORCHESTRATOR_PERSIST_ERROR"
+#: MF-END-22 / P1-03b: a detector that ran but never reached a measurement.
+QC_ORCHESTRATOR_INDETERMINATE = "QC_ORCHESTRATOR_INDETERMINATE"
 
 #: Whitelist of ``QCItemRepository.create`` parameters.  Detector
 #: candidate payloads may carry extra keys (``status``, ``metric``, ...)
@@ -113,6 +115,13 @@ _CREATE_PARAMS = frozenset(
 _RESOLVE_OK_STATUSES = frozenset({"pass", "warning", "blocker", "not_applicable"})
 _INVALID_STATUS = "invalid"
 
+#: MF-END-22 / P1-03b: statuses that mean the detector did NOT reach a
+#: measurement.  They are counted as ``indeterminate`` and they falsify
+#: zero-item completion — a non-measurement is never a "0 items found" pass
+#: (the R4/R5 identity_drift record: ``invalid`` / ``THRESHOLD_INVALID`` with
+#: a measured distance of 109.05 and 0 items).
+_INDETERMINATE_STATUSES = frozenset({"invalid", "unknown"})
+
 #: Recheck evidence provenance.
 _RECHECK_SOURCE = "s11-qc-orchestrator"
 
@@ -143,6 +152,8 @@ class OrchestratorSummary:
     deadline_exceeded: bool
     run_sec: float
     per_detector: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
+    indeterminate: int = 0
+    indeterminate_detectors: tuple[str, ...] = ()
 
 
 def _canonical_json(value: Any) -> str:
@@ -589,6 +600,8 @@ def run_full_check_set(
     resolved_total = 0
     not_applicable_total = 0
     errors_total = 0
+    indeterminate_total = 0
+    indeterminate_detectors: list[str] = []
     cancelled = False
     deadline_exceeded = False
 
@@ -682,6 +695,23 @@ def run_full_check_set(
         )
         if _output_applicability(output) == "not_applicable":
             not_applicable_total += 1
+        if str(_output_status(output) or "") in _INDETERMINATE_STATUSES:
+            # MF-END-22 / P1-03b: the detector ran but never reached a
+            # measurement (e.g. identity_drift invalid/THRESHOLD_INVALID with
+            # a measured distance and 0 items).  Recorded per detector AND
+            # aggregated, so the completion block can falsify zero-item
+            # evidence instead of reporting a clean "0 issues" run.
+            indeterminate_total += 1
+            indeterminate_detectors.append(name)
+            entry.update(
+                indeterminate=True,
+                indeterminate_code=str(
+                    (output or {}).get("code")
+                    if isinstance(output, dict)
+                    else ""
+                )
+                or QC_ORCHESTRATOR_INDETERMINATE,
+            )
         checks_run += 1
 
         try:
@@ -782,6 +812,8 @@ def run_full_check_set(
         deadline_exceeded=deadline_exceeded,
         run_sec=time.monotonic() - started,
         per_detector=per_detector,
+        indeterminate=indeterminate_total,
+        indeterminate_detectors=tuple(indeterminate_detectors),
     )
 
 
