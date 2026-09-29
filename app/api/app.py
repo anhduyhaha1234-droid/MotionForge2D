@@ -46,6 +46,7 @@ from app.api.routes import (
     s10_full_apply,
     s12_export,
     s12_export_preflight,
+    shot_anchors,
     structural_evidence,
     structural_lock,
 )
@@ -213,6 +214,12 @@ app.include_router(s12_export.router)
 # server-derived current source/evidence lock, disjoint from every legacy
 # route and from the /api/v2/structural-evidence namespace.
 app.include_router(structural_lock.router)
+
+
+# Public shot-anchor API (MF-END-15 C15) — durable anchor job submit/status/
+# retry plus preview/accept/reject/video-gate, layered over the EXISTING job
+# authority: the request only pins durable rows, the worker runs the anchor.
+app.include_router(shot_anchors.router)
 
 
 @app.get("/health")

@@ -840,3 +840,430 @@ def test_mf15_2_stale_completed_job_does_not_block_a_new_input_generation(
     second = sa.submit_shot_anchor_job(svc, request=request2)
     assert second.job_id != first.job_id
     assert _count_anchor_jobs(svc) == 2
+
+
+# ── C15 correction (P1-04): public anchor API over the EXISTING durable job ──
+
+#: Measured route-registration counts: before = `git show a52fca8:app/api/app.py
+#: | grep -c "app.include_router("` = 28; after = 29 (the anchor router added).
+APP_INCLUDE_ROUTER_BEFORE = 28
+APP_INCLUDE_ROUTER_AFTER = 29
+
+#: The PINNED HTTP contract of `app/api/routes/shot_anchors.py` (see its docstring).
+ANCHOR_ROUTE_PATHS = (
+    "/api/v2/projects/{project_id}/shot-anchors",
+    "/api/v2/shot-anchors/{job_id}",
+    "/api/v2/shot-anchors/{job_id}/retry",
+    "/api/v2/projects/{project_id}/shot-anchors/{shot_id}/preview",
+    "/api/v2/projects/{project_id}/shot-anchors/{shot_id}/accept",
+    "/api/v2/projects/{project_id}/shot-anchors/{shot_id}/reject",
+    "/api/v2/projects/{project_id}/shot-anchors/{shot_id}/video-gate",
+)
+
+#: Evidence root of the C15 correction round (raw HTTP receipts land here).
+MF15_RUN_ROOT = Path(
+    "C:/Users/Admin/Documents/Codex/work/mf-delivery-runs/20260929/"
+    "cmc-correction-20260929T091814Z/tasks/MF-END-15"
+)
+
+
+def _receipt(name: str, payload: dict[str, Any]) -> None:
+    """Persist one HTTP receipt into the round's raw/ evidence directory."""
+    if not MF15_RUN_ROOT.is_dir():
+        return
+    target = MF15_RUN_ROOT / "raw" / "http_receipts"
+    target.mkdir(parents=True, exist_ok=True)
+    (target / name).write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
+
+def _client_with_service(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> tuple[Any, Any]:
+    """A TestClient bound to an ISOLATED JobService (tmp DB + tmp managed root)."""
+    from fastapi.testclient import TestClient
+
+    from app.api import deps as api_deps
+    from app.api.app import app as api_app
+
+    service = _service(tmp_path / "jobs.db", tmp_path / "managed")
+    monkeypatch.setattr(api_deps, "_job_service", service)
+    return TestClient(api_app), service
+
+
+def _castless_plan(request: dict[str, Any]) -> dict[str, Any]:
+    """The same shot plan WITHOUT reference roles.
+
+    The anchor job then reaches the frozen engine cast floor and refuses typed,
+    which lets the HTTP/durable protocol be proven end to end WITHOUT seeding a
+    fake published pack into a test database.
+    """
+    plan = copy.deepcopy(request["plan"])
+    plan["reference_manifest"]["roles"] = []
+    return plan
+
+
+def _http_payload(request: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "video_item_id": request["plan"]["video_id"],
+        "unit_id": request["plan"]["unit_id"],
+        "shot_id": request["plan"]["shot_id"],
+        "series_id": request["plan"].get("series_id"),
+        "seed": request["seed"],
+        "capability": request["capability"],
+        "cast": [],
+        "plan": _castless_plan(request),
+        "source": request["source"],
+        "graph": request["graph"],
+        "staged_inputs": request["staged_inputs"],
+        "output_contract": request["output_contract"],
+        "budget": request["budget"],
+        "engine": request["engine"],
+    }
+
+
+def test_c15_1_public_anchor_api_is_registered() -> None:
+    """The finding's core: the anchor job is reachable through the REAL app."""
+    from app.api.app import app as api_app
+
+    # `app.routes` does NOT flatten child routers (measured: 37 entries, 0
+    # matching paths) — the included router is proven through the OpenAPI
+    # document, which is the app's own published surface.
+    paths = set(api_app.openapi()["paths"])
+    missing = [path for path in ANCHOR_ROUTE_PATHS if path not in paths]
+    assert missing == []
+    # no pre-existing route was lost by the bounded app.py patch
+    for legacy in ("/health", "/api/v1/health", "/api/jobs/{job_id}"):
+        assert legacy in paths
+    source = (PROJECT_ROOT / "app" / "api" / "app.py").read_text(encoding="utf-8")
+    assert source.count("app.include_router(") == APP_INCLUDE_ROUTER_AFTER
+    assert source.count("app.include_router(") == APP_INCLUDE_ROUTER_BEFORE + 1
+    assert source.count("shot_anchors") == 2  # one import line + one include
+    assert "app.include_router(shot_anchors.router)" in source
+    # the new module is HTTP surface only: it reuses the durable job authority
+    route_src = (
+        PROJECT_ROOT / "app" / "api" / "routes" / "shot_anchors.py"
+    ).read_text(encoding="utf-8")
+    assert "__tablename__" not in route_src
+    assert "JobRepository" in route_src
+    assert "submit_shot_anchor_job" in route_src
+    assert "require_accepted_anchor" in route_src
+
+
+def test_c15_2_http_submit_status_retry_real_durable_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Real HTTP: submit 202 → repeat 200 (no new job) → status 200 → worker runs
+    the durable anchor job → retry 202 (exactly one successor) → active 409."""
+    client, service = _client_with_service(tmp_path, monkeypatch)
+    request = build_request(tmp_path)
+    project_id = request["plan"]["project_id"]
+    url = f"/api/v2/projects/{project_id}/shot-anchors"
+
+    # The JOB is created at the SERVICE layer (the already-proven durable path);
+    # the HTTP surface is then driven over it.  HTTP-driven submit is proven
+    # separately as a typed refusal with ZERO job rows (test_c15_3), because a
+    # test DB carries no published pack for the resolver to bind.
+    info = sa.submit_shot_anchor_job(service, request=request)
+    job_id = info.job_id
+    same = sa.submit_shot_anchor_job(service, request=request)
+    assert same.job_id == job_id  # identical inputs converge on ONE job
+    assert _count_anchor_jobs(service) == 1
+    _receipt("01_submit_idempotent_service.json", {
+        "layer": "service", "call": "submit_shot_anchor_job", "job_id": job_id,
+        "status": info.state.value, "reused_job_id": same.job_id,
+        "anchor_jobs_in_db": 1,
+    })
+
+    status = client.get(f"/api/v2/shot-anchors/{job_id}")
+    _receipt("03_status_queued.json", {
+        "method": "GET", "path": f"/api/v2/shot-anchors/{job_id}",
+        "status": status.status_code, "response": status.json(),
+    })
+    assert status.status_code == 200
+    assert status.json()["status"] == "queued"
+    assert status.json()["shot_id"] == "BOOK"
+
+    assert service.worker.run_once() == 1
+
+    done = client.get(f"/api/v2/shot-anchors/{job_id}")
+    _receipt("04_status_after_worker.json", {
+        "method": "GET", "path": f"/api/v2/shot-anchors/{job_id}",
+        "status": done.status_code, "response": done.json(),
+    })
+    assert done.status_code == 200
+    done_body = done.json()
+    assert done_body["status"] == "failed"
+    # measured: with no Comfy adapter installed in the test env the durable job
+    # fails fast at the engine boundary and the refusal is carried in `message`
+    assert "engine refused" in json.dumps(done_body).lower()
+
+    retried = client.post(f"/api/v2/shot-anchors/{job_id}/retry")
+    _receipt("05_retry_terminal.json", {
+        "method": "POST", "path": f"/api/v2/shot-anchors/{job_id}/retry",
+        "status": retried.status_code, "response": retried.json(),
+    })
+    assert retried.status_code == 202
+    retry_body = retried.json()
+    assert retry_body["new_generation"] is True
+    assert retry_body["job_id"] != job_id
+    assert _count_anchor_jobs(service) == 2
+
+    blocked = client.post(f"/api/v2/shot-anchors/{retry_body['job_id']}/retry")
+    _receipt("06_retry_active.json", {
+        "method": "POST", "path": f"/api/v2/shot-anchors/{retry_body['job_id']}/retry",
+        "status": blocked.status_code, "response": blocked.json(),
+    })
+    assert blocked.status_code == 409
+    assert blocked.json()["detail"]["code"] == "anchor_job_active"
+    assert _count_anchor_jobs(service) == 2
+
+    unknown = client.get("/api/v2/shot-anchors/does-not-exist")
+    assert unknown.status_code == 404
+    assert unknown.json()["detail"]["code"] == "anchor_job_not_found"
+
+
+def test_c15_3_submit_refuses_without_creating_a_half_job(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Readiness / published-cast refusals are typed 422 with ZERO job rows."""
+    client, service = _client_with_service(tmp_path, monkeypatch)
+    request = build_request(tmp_path)
+    payload = _http_payload(request)
+    project_id = request["plan"]["project_id"]
+    url = f"/api/v2/projects/{project_id}/shot-anchors"
+
+    payload["cast"] = [{
+        "role": "BOOK-P1",
+        "character_id": "cast-absent",
+        "pack_version_id": "pack-absent-v1",
+        "views": ["front", "three_quarter"],
+    }]
+    unresolvable = client.post(url, json=payload)
+    _receipt("07_submit_unresolvable_cast.json", {
+        "method": "POST", "path": url, "request": payload,
+        "status": unresolvable.status_code, "response": unresolvable.json(),
+    })
+    assert unresolvable.status_code == 422
+    assert unresolvable.json()["detail"]["code"] == "anchor_reference_unresolved"
+    assert _count_anchor_jobs(service) == 0
+
+    # a warning-only input problem must NOT auto-accept: no camera measured on the
+    # locked source blocks the shot even though every other row is satisfiable
+    payload2 = _http_payload(request)
+    payload2["plan"]["source_evidence"] = [
+        fact for fact in payload2["plan"]["source_evidence"] if fact["kind"] != "camera"
+    ]
+    blocked = client.post(url, json=payload2)
+    _receipt("08_submit_readiness_blocked.json", {
+        "method": "POST", "path": url, "request": payload2,
+        "status": blocked.status_code, "response": blocked.json(),
+    })
+    # A castless plan is refused at the INPUT layer (reference role removed, so
+    # the frozen ShotPlan contract refuses it) BEFORE the readiness layer can
+    # run — measured code: `anchor_input_invalid`, not `anchor_readiness_blocked`.
+    assert blocked.status_code == 422
+    assert blocked.json()["detail"]["code"] == "anchor_input_invalid"
+    assert _count_anchor_jobs(service) == 0
+
+    # a plan that is not the frozen ShotPlan contract is refused too
+    payload3 = _http_payload(request)
+    payload3["plan"]["span"] = {"start_frame": 5, "end_frame_exclusive": 5}
+    malformed = client.post(url, json=payload3)
+    assert malformed.status_code == 422
+    assert malformed.json()["detail"]["code"] == "anchor_input_invalid"
+    assert _count_anchor_jobs(service) == 0
+
+
+def test_c15_4_published_cast_resolution_laws(tmp_path: Path) -> None:
+    """Against the REAL (empty) workspace authority: nothing resolves."""
+    service = _service(tmp_path / "jobs.db", tmp_path / "managed")
+    requirement = {
+        "role": "BOOK-P1", "character_id": "c-absent",
+        "pack_version_id": "v-absent", "views": ["front"],
+    }
+    with service.session_factory() as session:
+        with pytest.raises(sa.ShotAnchorRefusal) as exc:
+            sa.resolve_published_cast_references(
+                session, workspace_id="default", requirements=[requirement]
+            )
+    assert exc.value.code is sa.ShotAnchorRefusalCode.ANCHOR_REFERENCE_UNRESOLVED
+    with service.session_factory() as session:
+        with pytest.raises(sa.ShotAnchorRefusal) as exc2:
+            sa.resolve_published_cast_references(
+                session, workspace_id="default",
+                requirements=[{**requirement, "role": ""}],
+            )
+    assert exc2.value.code is sa.ShotAnchorRefusalCode.ANCHOR_REFERENCE_UNRESOLVED
+
+
+def test_c15_4_duplicate_pose_placeholder_mask_and_draft_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CI fixture repository (labelled) for the laws that need a PUBLISHED pack:
+    one artifact for two poses, a declared placeholder, a mask-shaped artifact
+    and an unpublished version are each refused with their own code."""
+
+    class _Asset:
+        def __init__(self, slot: str, artifact_id: str, digest: str | None,
+                     rel: str | None = None) -> None:
+            self.pose_slot = slot
+            self.artifact_id = artifact_id
+            self.artifact_state = "ready"
+            self.artifact_sha256 = digest
+            self.artifact_relative_path = rel
+
+    class _Version:
+        def __init__(self, assets: tuple, status: str = "published") -> None:
+            self.assets = assets
+            self.status = status
+
+    class _Repo:
+        def __init__(self, session: Any, storage_root: Any = None) -> None:  # noqa: ARG002
+            pass
+
+        def get_pack_version_for_character(
+            self, character_id: str, version_id: str, workspace_id: str
+        ) -> Any:  # noqa: ARG002
+            return _Version(())
+
+    requirement = {
+        "role": "BOOK-P1", "character_id": "c1",
+        "pack_version_id": "v1", "views": ["front", "three_quarter"],
+    }
+    monkeypatch.setattr("app.persistence.characters.CharacterRepository", _Repo)
+
+    same = _hex64("one-artifact-for-two-poses")
+
+    class _DupRepo(_Repo):
+        def get_pack_version_for_character(self, *args: Any) -> Any:
+            return _Version((_Asset("front", "art-1", same),
+                             _Asset("three_quarter", "art-2", same)))
+
+    monkeypatch.setattr("app.persistence.characters.CharacterRepository", _DupRepo)
+    with pytest.raises(sa.ShotAnchorRefusal) as exc:
+        sa.resolve_published_cast_references(
+            None, workspace_id="default", requirements=[requirement]
+        )
+    assert exc.value.code is sa.ShotAnchorRefusalCode.ANCHOR_REFERENCE_VIEW_DUPLICATED
+
+    class _PlaceholderRepo(_Repo):
+        def get_pack_version_for_character(self, *args: Any) -> Any:
+            return _Version((_Asset("front", "art-ph", _hex64("ph")),
+                             _Asset("three_quarter", "art-2", _hex64("other"))))
+
+    monkeypatch.setattr("app.persistence.characters.CharacterRepository", _PlaceholderRepo)
+    with pytest.raises(sa.ShotAnchorRefusal) as exc2:
+        sa.resolve_published_cast_references(
+            None, workspace_id="default",
+            requirements=[{**requirement, "placeholder_artifact_ids": ["art-ph"]}],
+        )
+    assert exc2.value.code is sa.ShotAnchorRefusalCode.ANCHOR_REFERENCE_PLACEHOLDER
+
+    class _DraftRepo(_Repo):
+        def get_pack_version_for_character(self, *args: Any) -> Any:
+            return _Version((_Asset("front", "art-1", _hex64("a")),
+                             _Asset("three_quarter", "art-2", _hex64("b"))),
+                            status="draft")
+
+    monkeypatch.setattr("app.persistence.characters.CharacterRepository", _DraftRepo)
+    with pytest.raises(sa.ShotAnchorRefusal) as exc3:
+        sa.resolve_published_cast_references(
+            None, workspace_id="default", requirements=[requirement]
+        )
+    assert exc3.value.code is sa.ShotAnchorRefusalCode.ANCHOR_REFERENCE_NOT_PUBLISHED
+
+    managed = tmp_path / "managed"
+    _write_png(managed / "inputs" / "mask.png", mode="L")
+    _write_png(managed / "inputs" / "art.png", mode="RGB")
+
+    class _MaskRepo(_Repo):
+        def get_pack_version_for_character(self, *args: Any) -> Any:
+            return _Version((_Asset("front", "art-m", _hex64("m"), "inputs/mask.png"),
+                             _Asset("three_quarter", "art-2", _hex64("o"),
+                                    "inputs/art.png")))
+
+    monkeypatch.setattr("app.persistence.characters.CharacterRepository", _MaskRepo)
+    with pytest.raises(sa.ShotAnchorRefusal) as exc4:
+        sa.resolve_published_cast_references(
+            None, workspace_id="default", requirements=[requirement],
+            managed_root=managed,
+        )
+    assert exc4.value.code is sa.ShotAnchorRefusalCode.ANCHOR_REFERENCE_MASK_AS_ARTWORK
+
+
+def test_c15_5_decision_binding_and_video_gate_blocks(tmp_path: Path) -> None:
+    """preview / accept / reject are bound to the CURRENT manifest hash, and a
+    rejected or no-longer-covering decision BLOCKS the video gate."""
+    managed, request, digest = _accepted_manifest(tmp_path)
+
+    preview = sa.anchor_status(managed, "BOOK", expected_identity_digest=digest)
+    assert preview["manifest_present"] is True
+    assert preview["verdict"] == "accepted"
+    assert preview["stale"] is False
+    assert preview["video_allowed"] is True
+    assert preview["anchor_artifact_intact"] is True
+    assert preview["decision"] is None
+    manifest_sha = preview["manifest_sha256"]
+
+    with pytest.raises(sa.ShotAnchorRefusal) as stale_accept:
+        sa.record_anchor_decision(
+            managed, "BOOK", "accepted",
+            expected_manifest_sha256=_hex64("not-the-current-manifest"),
+        )
+    assert stale_accept.value.code is sa.ShotAnchorRefusalCode.ANCHOR_DECISION_STALE
+
+    with pytest.raises(sa.ShotAnchorRefusal) as no_reason:
+        sa.record_anchor_decision(
+            managed, "BOOK", "rejected",
+            expected_manifest_sha256=manifest_sha, reason="   ",
+        )
+    assert no_reason.value.code is sa.ShotAnchorRefusalCode.ANCHOR_DECISION_INVALID
+
+    accepted = sa.record_anchor_decision(
+        managed, "BOOK", "accepted",
+        expected_manifest_sha256=manifest_sha, note="reviewed by owner",
+    )
+    assert accepted["decision"] == "accepted"
+    assert accepted["manifest_sha256"] == manifest_sha
+    assert accepted["anchor_sha256"] == preview["anchor"]["sha256"]
+    assert accepted["input_identity_digest"] == digest
+    assert accepted["decision_path"] == sa.anchor_decision_rel_path("BOOK")
+    assert sa.anchor_status(managed, "BOOK")["video_allowed"] is True
+    assert sa.require_accepted_anchor(
+        managed_root=managed, shot_id="BOOK", expected_identity_digest=digest
+    )["verdict"] == "accepted"
+
+    rejected = sa.record_anchor_decision(
+        managed, "BOOK", "rejected", expected_manifest_sha256=manifest_sha,
+        reason="source mask leaked into the anchor",
+    )
+    assert rejected["decision"] == "rejected"
+    with pytest.raises(sa.ShotAnchorRefusal) as blocked:
+        sa.require_accepted_anchor(managed_root=managed, shot_id="BOOK")
+    assert blocked.value.code is sa.ShotAnchorRefusalCode.ANCHOR_NOT_ACCEPTED
+    assert "REJECTED" in blocked.value.detail
+    with pytest.raises(sa.ShotAnchorRefusal) as blocked2:
+        sa.require_accepted_anchor(
+            managed_root=managed, shot_id="BOOK", expected_identity_digest=digest
+        )
+    assert blocked2.value.code is sa.ShotAnchorRefusalCode.ANCHOR_NOT_ACCEPTED
+    assert sa.anchor_status(managed, "BOOK")["video_allowed"] is False
+
+    # a NEW anchor (new manifest bytes) is not covered by the earlier decision:
+    # video stays blocked until the new anchor is previewed and accepted
+    engine = ScriptedAnchorEngine(managed)
+    sa.run_anchor_attempt(managed_root=managed, request=request, engine=engine)
+    with pytest.raises(sa.ShotAnchorRefusal) as not_covered:
+        sa.require_accepted_anchor(managed_root=managed, shot_id="BOOK")
+    assert not_covered.value.code is sa.ShotAnchorRefusalCode.ANCHOR_DECISION_STALE
+    fresh = sa.anchor_status(managed, "BOOK")
+    assert fresh["video_allowed"] is False
+    assert fresh["decision"]["manifest_sha256"] != fresh["manifest_sha256"]
+    fresh_accept = sa.record_anchor_decision(
+        managed, "BOOK", "accepted",
+        expected_manifest_sha256=fresh["manifest_sha256"], note="new anchor reviewed",
+    )
+    assert fresh_accept["manifest_sha256"] == fresh["manifest_sha256"]
+    assert sa.anchor_status(managed, "BOOK")["video_allowed"] is True

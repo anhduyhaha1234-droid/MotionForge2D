@@ -140,6 +140,11 @@ class ShotAnchorRefusalCode(str, Enum):
     ANCHOR_MANIFEST_MISSING = "anchor_manifest_missing"
     ANCHOR_NOT_ACCEPTED = "anchor_not_accepted"
     ANCHOR_STALE_INPUT = "anchor_stale_input"
+    ANCHOR_JOB_ACTIVE = "anchor_job_active"
+    ANCHOR_REFERENCE_VIEW_DUPLICATED = "anchor_reference_view_duplicated"
+    ANCHOR_REFERENCE_PLACEHOLDER = "anchor_reference_placeholder"
+    ANCHOR_DECISION_STALE = "anchor_decision_stale"
+    ANCHOR_DECISION_INVALID = "anchor_decision_invalid"
 
 
 class ShotAnchorRefusal(Exception):  # noqa: N818 — mirrors the contract's refusal naming
@@ -891,6 +896,7 @@ def submit_shot_anchor_job(
     *,
     request: Mapping[str, Any],
     workspace_id: str | None = None,
+    generation: int | None = None,
 ) -> Any:
     """Submit (or converge on) the ONE durable anchor job for this input identity.
 
@@ -905,7 +911,11 @@ def submit_shot_anchor_job(
     digest = anchor_input_identity_digest(identity)
     shot_id = str(request["shot_id"])
     project_id = str(request["project_id"])
-    key = f"shot-anchor:{project_id}:{shot_id}:{digest}"
+    #: A RETRY keeps the same input identity (so a completed run is never
+    #: duplicated) and only bumps the generation, which is what makes exactly
+    #: ONE successor job for the SAME inputs.
+    suffix = f":g{int(generation)}" if generation else ""
+    key = f"shot-anchor:{project_id}:{shot_id}:{digest}{suffix}"
     manifest = {
         "anchor_request": dict(request),
         "project_id": project_id,
@@ -990,6 +1000,26 @@ def anchor_gate(
             "before video)",
             shot_id=shot_id,
         )
+    manifest_sha = hash_file(target)
+    decision = read_anchor_decision(root, shot_id)
+    if decision is not None:
+        if decision.get("manifest_sha256") != manifest_sha:
+            raise ShotAnchorRefusal(
+                ShotAnchorRefusalCode.ANCHOR_DECISION_STALE,
+                f"shot {shot_id!r} carries a review decision bound to manifest "
+                f"{str(decision.get('manifest_sha256'))[:16]}… but the current anchor manifest "
+                f"is {manifest_sha[:16]}… — the decision does not cover this anchor",
+                shot_id=shot_id,
+            )
+        if decision.get("decision") == "rejected":
+            raise ShotAnchorRefusal(
+                ShotAnchorRefusalCode.ANCHOR_NOT_ACCEPTED,
+                f"shot {shot_id!r} anchor was REJECTED by the reviewer: "
+                f"{decision.get('reason')!r}; video work stays blocked until a new anchor is "
+                "produced and accepted",
+                shot_id=shot_id,
+                decision=dict(decision),
+            )
     anchor = doc.get("anchor") or {}
     anchor_rel = str(anchor.get("store_relative_path") or "")
     artifact = root.resolve(anchor_rel)
@@ -1014,3 +1044,312 @@ def anchor_gate(
 def require_accepted_anchor(**kwargs: Any) -> dict[str, Any]:
     """The named gate every video submit calls (see :func:`anchor_gate`)."""
     return anchor_gate(**kwargs)
+
+
+# ── C15: preview / accept / reject surface (bound to CURRENT hashes) ─────────
+
+#: Schema of the durable review decision (accept/reject) of one shot's anchor.
+ANCHOR_DECISION_SCHEMA = "mf.shot_anchor.decision/1"
+
+
+def anchor_decision_rel_path(shot_id: str) -> str:
+    """Managed-root-relative path of one shot's anchor review decision."""
+    return f"{ANCHOR_MANIFEST_SUBDIR}/{_safe_component(shot_id)}/shot_anchor_decision.json"
+
+
+def _as_managed_root(value: Any) -> ManagedRoot:
+    """Accept either a managed root path or an already-built ``ManagedRoot``."""
+    return value if isinstance(value, ManagedRoot) else ManagedRoot(value)
+
+
+def read_anchor_decision(managed_root: str | Path, shot_id: str) -> dict[str, Any] | None:
+    """Read the recorded review decision of one shot, or ``None`` when there is one."""
+    root = _as_managed_root(managed_root)
+    target = root.resolve(anchor_decision_rel_path(shot_id))
+    if not target.is_file():
+        return None
+    try:
+        doc = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return doc if isinstance(doc, dict) else None
+
+
+def record_anchor_decision(
+    managed_root: str | Path,
+    shot_id: str,
+    decision: str,
+    *,
+    expected_manifest_sha256: str | None = None,
+    reason: str | None = None,
+    note: str | None = None,
+) -> dict[str, Any]:
+    """Record ``accepted`` / ``rejected`` for the anchor a caller just previewed.
+
+    Fail-closed binding: the decision quotes the manifest hash it was taken
+    against, so a stale quote refuses instead of approving a different anchor.
+    A rejected RUN verdict can never be accepted by a decision, and a rejection
+    must carry a reason (the reviewer's finding is evidence, not a flag).
+    """
+    if decision not in ("accepted", "rejected"):
+        raise ShotAnchorRefusal(
+            ShotAnchorRefusalCode.ANCHOR_DECISION_INVALID,
+            f"decision must be 'accepted' or 'rejected'; got {decision!r}",
+        )
+    if decision == "rejected" and not (reason or "").strip():
+        raise ShotAnchorRefusal(
+            ShotAnchorRefusalCode.ANCHOR_DECISION_INVALID,
+            "a rejection must carry a reason",
+        )
+    root = ManagedRoot(managed_root)
+    manifest_target = root.resolve(anchor_manifest_rel_path(shot_id))
+    if not manifest_target.is_file():
+        raise ShotAnchorRefusal(
+            ShotAnchorRefusalCode.ANCHOR_MANIFEST_MISSING,
+            f"shot {shot_id!r} has no anchor manifest to decide on",
+            shot_id=shot_id,
+        )
+    manifest_sha = hash_file(manifest_target)
+    if not expected_manifest_sha256 or expected_manifest_sha256 != manifest_sha:
+        raise ShotAnchorRefusal(
+            ShotAnchorRefusalCode.ANCHOR_DECISION_STALE,
+            f"the decision quotes manifest {str(expected_manifest_sha256)[:16]}… but the current "
+            f"anchor manifest is {manifest_sha[:16]}…; preview again before deciding",
+            shot_id=shot_id,
+            current_manifest_sha256=manifest_sha,
+        )
+    doc = json.loads(manifest_target.read_text(encoding="utf-8"))
+    if decision == "accepted" and doc.get("verdict") != "accepted":
+        raise ShotAnchorRefusal(
+            ShotAnchorRefusalCode.ANCHOR_NOT_ACCEPTED,
+            f"shot {shot_id!r} anchor run verdict is {doc.get('verdict')!r}; a rejected run "
+            "cannot be accepted by a decision",
+            shot_id=shot_id,
+            reasons=list(doc.get("reasons") or []),
+        )
+    decision_doc: dict[str, Any] = {
+        "schema_version": ANCHOR_DECISION_SCHEMA,
+        "shot_id": shot_id,
+        "decision": decision,
+        "reason": (reason or "").strip() or None,
+        "note": note,
+        "manifest_sha256": manifest_sha,
+        "anchor_sha256": (doc.get("anchor") or {}).get("sha256"),
+        "input_identity_digest": doc.get("input_identity_digest"),
+        "decided_at_unix": time.time(),
+    }
+    rel = anchor_decision_rel_path(shot_id)
+    root.atomic_write_bytes(
+        rel, json.dumps(decision_doc, indent=2, sort_keys=True).encode("utf-8")
+    )
+    decision_doc["decision_path"] = rel
+    decision_doc["decision_file_sha256"] = hash_file(root.resolve(rel))
+    return decision_doc
+
+
+def anchor_status(
+    managed_root: str | Path,
+    shot_id: str,
+    *,
+    expected_identity_digest: str | None = None,
+) -> dict[str, Any]:
+    """PREVIEW one shot's anchor: verdict, CURRENT hashes, staleness, decision.
+
+    Read-only and non-raising for a missing anchor (the preview must be able to
+    say "nothing yet"); ``video_allowed`` is computed from the SAME rules the
+    gate enforces, so the preview cannot claim more than the gate will honour.
+    """
+    root = ManagedRoot(managed_root)
+    rel = anchor_manifest_rel_path(shot_id)
+    target = root.resolve(rel)
+    body: dict[str, Any] = {
+        "shot_id": shot_id,
+        "manifest_path": rel,
+        "manifest_present": target.is_file(),
+        "expected_identity_digest": expected_identity_digest,
+        "verdict": "missing",
+        "stale": None,
+        "video_allowed": False,
+        "decision": read_anchor_decision(root, shot_id),
+    }
+    if not target.is_file():
+        return body
+    doc = json.loads(target.read_text(encoding="utf-8"))
+    body["manifest_sha256"] = hash_file(target)
+    body["verdict"] = doc.get("verdict")
+    body["reasons"] = list(doc.get("reasons") or [])
+    body["anchor"] = dict(doc.get("anchor") or {})
+    body["receipt"] = dict(doc.get("receipt") or {})
+    body["input_identity_digest"] = doc.get("input_identity_digest")
+    body["readiness"] = dict(doc.get("readiness") or {})
+    stale = (
+        None if expected_identity_digest is None
+        else doc.get("input_identity_digest") != expected_identity_digest
+    )
+    body["stale"] = stale
+    anchor = body["anchor"]
+    anchor_rel = str(anchor.get("store_relative_path") or "")
+    intact = False
+    if anchor_rel:
+        anchor_file = root.resolve(anchor_rel)
+        intact = bool(
+            anchor_file.is_file() and hash_file(anchor_file) == anchor.get("sha256")
+        )
+    body["anchor_artifact_intact"] = intact
+    decision = body["decision"]
+    body["video_allowed"] = bool(
+        doc.get("verdict") == "accepted"
+        and intact
+        and stale is not True
+        and not (decision or {}).get("decision") == "rejected"
+    )
+    return body
+
+
+def plan_from_payload(payload: Mapping[str, Any]) -> ShotPlan:
+    """Validate a shot-plan payload into the FROZEN ``ShotPlan`` contract."""
+    try:
+        return ShotPlan.model_validate(dict(payload))
+    except Exception as exc:  # noqa: BLE001 — a malformed plan is a typed refusal
+        raise ShotAnchorRefusal(
+            ShotAnchorRefusalCode.ANCHOR_INPUT_INVALID,
+            f"the shot plan is not a valid {ShotPlan.__name__}: {exc}",
+        ) from exc
+
+
+def reference_resolver(
+    entries: Sequence[AnchorReferenceEntry],
+) -> Callable[[str, str | None], Any]:
+    """The readiness gate's resolver over already-resolved cast entries."""
+    return _resolver_for(entries)
+
+
+def resolve_published_cast_references(
+    session: Any,
+    *,
+    workspace_id: str,
+    requirements: Sequence[Mapping[str, Any]],
+    managed_root: str | Path | None = None,
+) -> tuple[AnchorReferenceEntry, ...]:
+    """Resolve each role's references from the PUBLISHED cast authority.
+
+    The client never names an artifact: every entry comes from the workspace's
+    own ``CharacterRepository`` pack versions.  Refused, typed:
+
+    * the pack version is missing/foreign or NOT ``published``
+      (``anchor_reference_not_published``);
+    * a required view has no asset on that pose slot, or its artifact is not
+      ``ready`` / carries no full-file sha (``anchor_reference_unresolved``);
+    * the artifact is a declared placeholder (``anchor_reference_placeholder``);
+    * ONE artifact sha stands in for two poses of the same role
+      (``anchor_reference_view_duplicated`` — "một ảnh cho nhiều pose").
+
+    When ``managed_root`` is supplied the managed file is measured, so a
+    single-channel (mask) image mode is caught by ``resolve_anchor_references``
+    as source-mask-as-artwork.
+    """
+    from app.persistence.characters import CharacterRepository  # noqa: PLC0415
+    from app.services.shot_input_readiness import probe_image_mode  # noqa: PLC0415
+    repository = CharacterRepository(
+        session, Path(str(managed_root)) if managed_root is not None else None
+    )
+    entries: list[AnchorReferenceEntry] = []
+    for requirement in requirements:
+        role = str(requirement.get("role") or "")
+        character_id = str(requirement.get("character_id") or "")
+        version_id = str(requirement.get("pack_version_id") or "")
+        views = [str(view) for view in (requirement.get("views") or [])]
+        placeholders = {
+            str(item) for item in (requirement.get("placeholder_artifact_ids") or [])
+        }
+        if not role or not character_id or not version_id or not views:
+            raise ShotAnchorRefusal(
+                ShotAnchorRefusalCode.ANCHOR_REFERENCE_UNRESOLVED,
+                f"cast requirement {requirement!r} must carry role, character_id, "
+                "pack_version_id and at least one view",
+            )
+        try:
+            version = repository.get_pack_version_for_character(
+                character_id, version_id, workspace_id
+            )
+        except Exception as exc:  # noqa: BLE001 — unknown/foreign version is a refusal
+            raise ShotAnchorRefusal(
+                ShotAnchorRefusalCode.ANCHOR_REFERENCE_UNRESOLVED,
+                f"role {role!r}: pack version {version_id!r} could not be read "
+                f"({type(exc).__name__}: {exc})",
+                role=role,
+                character_id=character_id,
+            ) from exc
+        if version.status != "published":
+            raise ShotAnchorRefusal(
+                ShotAnchorRefusalCode.ANCHOR_REFERENCE_NOT_PUBLISHED,
+                f"role {role!r}: pack version {version_id!r} is {version.status!r}; only a "
+                "PUBLISHED pack may carry reference pixels into the engine",
+                role=role,
+                status=version.status,
+            )
+        by_slot = {asset.pose_slot: asset for asset in version.assets}
+        seen: dict[str, str] = {}
+        for view in views:
+            asset = by_slot.get(view)
+            if asset is None:
+                raise ShotAnchorRefusal(
+                    ShotAnchorRefusalCode.ANCHOR_REFERENCE_UNRESOLVED,
+                    f"role {role!r}: pack version {version_id!r} has no asset on pose slot "
+                    f"{view!r} (available: {sorted(by_slot)})",
+                    role=role,
+                    view=view,
+                )
+            if asset.artifact_id in placeholders:
+                raise ShotAnchorRefusal(
+                    ShotAnchorRefusalCode.ANCHOR_REFERENCE_PLACEHOLDER,
+                    f"role {role!r} view {view!r}: artifact {asset.artifact_id!r} is a declared "
+                    "placeholder, not finished artwork",
+                    role=role,
+                    view=view,
+                )
+            if asset.artifact_state != "ready" or not asset.artifact_sha256:
+                raise ShotAnchorRefusal(
+                    ShotAnchorRefusalCode.ANCHOR_REFERENCE_UNRESOLVED,
+                    f"role {role!r} view {view!r}: artifact {asset.artifact_id!r} is "
+                    f"{asset.artifact_state!r} without a verified digest",
+                    role=role,
+                    view=view,
+                )
+            previous = seen.get(str(asset.artifact_sha256))
+            if previous is not None and previous != view:
+                raise ShotAnchorRefusal(
+                    ShotAnchorRefusalCode.ANCHOR_REFERENCE_VIEW_DUPLICATED,
+                    f"role {role!r}: views {previous!r} and {view!r} resolve to the SAME artifact "
+                    f"sha {str(asset.artifact_sha256)[:16]}… — one image may not stand in for two "
+                    "poses",
+                    role=role,
+                    views=[previous, view],
+                )
+            seen[str(asset.artifact_sha256)] = view
+            store_rel = asset.artifact_relative_path
+            mode = None
+            if managed_root is not None and store_rel:
+                try:
+                    managed_file = ManagedRoot(managed_root).resolve(store_rel)
+                    mode = probe_image_mode(managed_file) if managed_file.is_file() else None
+                except Exception:  # noqa: BLE001 — an unreadable path is "no mode measured"
+                    mode = None
+            entries.append(
+                AnchorReferenceEntry(
+                    role=role,
+                    view=view,
+                    artifact_id=asset.artifact_id,
+                    sha256=asset.artifact_sha256,
+                    published=True,
+                    key=f"{view}@{role}",
+                    kind="artwork",
+                    mode=mode,
+                    character_id=character_id,
+                    pack_version_id=version_id,
+                    store_relative_path=store_rel,
+                )
+            )
+    if not entries:
+        return ()
+    return resolve_anchor_references(entries)
