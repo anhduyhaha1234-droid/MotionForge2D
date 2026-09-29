@@ -42,6 +42,7 @@ from app.services.source_locked_timeline import (
 )
 
 MF_TS_SIZE = "160x120"
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 # ── fixtures: tiny REAL media generated once per session ─────────────────────
@@ -112,6 +113,27 @@ def cut60(media_dir: Path) -> Path:
             "-f", "lavfi", "-i", f"testsrc=duration=1:size={MF_TS_SIZE}:rate=30",
             "-f", "lavfi", "-i", f"color=black:duration=1:size={MF_TS_SIZE}:rate=30",
             "-filter_complex", "[0:v][1:v]concat=n=2:v=1[out]", "-map", "[out]",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", str(path),
+        ]
+    )
+    assert path.stat().st_size > 0
+    return path
+
+
+@pytest.fixture(scope="session")
+def demo12s() -> Path:
+    """The REAL demo fixture bytes (not synthesized here) — measured, never assumed."""
+    path = PROJECT_ROOT / "tests" / "fixtures" / "delta_f5" / "source_12s.mp4"
+    assert path.is_file(), f"demo fixture missing: {path}"
+    return path
+
+
+@pytest.fixture(scope="session")
+def cfr30_noaudio(media_dir: Path) -> Path:
+    path = media_dir / "cfr30_noaudio.mp4"
+    _ffmpeg(
+        [
+            "-f", "lavfi", "-i", f"testsrc=duration=1:size={MF_TS_SIZE}:rate=30",
             "-c:v", "libx264", "-pix_fmt", "yuv420p", str(path),
         ]
     )
@@ -620,3 +642,156 @@ def test_vfr_source_plan_full_coverage(vfr_drop: Path) -> None:
     assert problems == []
     assert artifact.facts.fps_classification == "VFR"
     assert artifact.shots[0].span.end_frame_exclusive == facts.frame_count
+
+
+# ── CMC correction 29/09: source-authoritative map + audio timebase ─────────
+
+
+def test_correction_real_fixture_authoritative_map(demo12s: Path) -> None:
+    """The REAL demo fixture partitions at the MEASURED cuts (never 3x120)."""
+    facts = plan.probe_source_facts(demo12s, deep_count=True)
+    partition = plan.build_source_time_map(demo12s, facts=facts)
+    assert facts.frame_count == 360
+    assert facts.decoded_frame_count == 360  # decode agrees with the packet table
+    assert (facts.fps_num, facts.fps_den) == (30, 1)
+    assert facts.fps_classification == "CFR"
+    assert (facts.stream_timebase_num, facts.stream_timebase_den) == (1, 15360)
+    assert [s.start_frame for s in partition.shots] == [0, 121, 241, 343]
+    assert [(s.start_frame, s.end_frame_exclusive) for s in partition.shots] == [
+        (0, 121),
+        (121, 241),
+        (241, 343),
+        (343, 360),
+    ]
+    assert partition.dropped_cuts == ()
+    assert validate_half_open_partition(
+        [(s.start_frame, s.end_frame_exclusive) for s in partition.shots], 360
+    ) == []
+
+
+def test_correction_detects_hardcoded_manifest_drift(demo12s: Path) -> None:
+    """The demo's declared 3x120 map must NOT verify against the source."""
+    verdict = plan.verify_shot_plan_correction(
+        demo12s,
+        [
+            {"shot_id": "BOOK", "start_frame": 0, "end_frame": 119},
+            {"shot_id": "TURN", "start_frame": 120, "end_frame": 239},
+            {"shot_id": "OCC", "start_frame": 240, "end_frame": 359},
+        ],
+    )
+    assert verdict.valid is False
+    assert verdict.status == plan.CORRECTION_MANIFEST_MISMATCH
+    assert verdict.measured_cuts == (121, 241, 343)
+    assert verdict.declared_boundaries == (120, 240)
+    assert verdict.missing_boundaries == (121, 241, 343)
+    assert verdict.unexpected_boundaries == (120, 240)
+    # measured cuts fall INSIDE the declared windows: 121 in TURN [120,239],
+    # 241 and 343 in OCC [240,359]; BOOK [0,119] contains none.
+    assert verdict.internal_cuts == (
+        {"shot_id": "TURN", "cut_frame": 121, "window_local_frame": 1,
+         "must_be_represented_as": "boundary_or_declared_event"},
+        {"shot_id": "OCC", "cut_frame": 241, "window_local_frame": 1,
+         "must_be_represented_as": "boundary_or_declared_event"},
+        {"shot_id": "OCC", "cut_frame": 343, "window_local_frame": 103,
+         "must_be_represented_as": "boundary_or_declared_event"},
+    )
+    assert verdict.coverage_problems == ()
+    assert verdict.measured_frame_count == 360
+
+
+def test_correction_accepts_the_authoritative_map(demo12s: Path) -> None:
+    """The measured map itself verifies valid (the check is not a rubber stamp)."""
+    verdict = plan.verify_shot_plan_correction(
+        demo12s,
+        [
+            {"shot_id": "S0", "start_frame": 0, "end_frame": 120},
+            {"shot_id": "S1", "start_frame": 121, "end_frame": 240},
+            {"shot_id": "S2", "start_frame": 241, "end_frame": 342},
+            {"shot_id": "S3", "start_frame": 343, "end_frame": 359},
+        ],
+    )
+    assert verdict.valid is True
+    assert verdict.status == plan.CORRECTION_VALID
+    assert verdict.missing_boundaries == ()
+    assert verdict.unexpected_boundaries == ()
+    assert verdict.internal_cuts == ()
+
+
+def test_correction_internal_cut_is_reported_not_invented(cut60: Path) -> None:
+    """A real cut inside one declared shot is REPORTED as internal, not added."""
+    verdict = plan.verify_shot_plan_correction(
+        cut60, [{"shot_id": "WHOLE", "start_frame": 0, "end_frame": 59}]
+    )
+    assert verdict.valid is False
+    assert verdict.missing_boundaries == (30,)
+    assert verdict.unexpected_boundaries == ()
+    assert verdict.coverage_problems == ()
+    assert [(row["cut_frame"], row["window_local_frame"]) for row in verdict.internal_cuts] == [
+        (30, 30)
+    ]
+
+
+def test_correction_tolerance_and_bad_shots(cut60: Path) -> None:
+    tolerant = plan.verify_shot_plan_correction(
+        cut60,
+        [
+            {"shot_id": "A", "start_frame": 0, "end_frame": 29},
+            {"shot_id": "B", "start_frame": 31, "end_frame": 59},
+        ],
+        tolerance_frames=1,
+    )
+    assert tolerant.status == plan.CORRECTION_MANIFEST_MISMATCH  # still a coverage mismatch
+    assert tolerant.missing_boundaries == ()
+    assert tolerant.unexpected_boundaries == ()
+    assert tolerant.coverage_problems  # frame 30 is lost by the declared map
+    _refuses(
+        plan.CODE_COVERAGE_INVALID,
+        plan.verify_shot_plan_correction,
+        cut60,
+        [],
+    )
+    _refuses(
+        plan.CODE_COVERAGE_INVALID,
+        plan.verify_shot_plan_correction,
+        cut60,
+        [{"shot_id": "A", "start_frame": 0, "end_frame": 59}],
+        tolerance_frames=-1,
+    )
+
+
+def test_audio_sample_span_uses_audio_timebase(demo12s: Path) -> None:
+    """Audio boundaries come from the AUDIO stream, not the video frame count."""
+    facts = plan.probe_source_facts(demo12s)
+    assert facts.audio is not None
+    assert facts.audio.sample_rate == 48000
+    assert facts.audio.channels == 2
+    span = plan.SourceSpan(start_frame=0, end_frame_exclusive=360)
+    mapped = plan.audio_sample_span_for_frames(facts, span)
+    assert mapped["span"] == [0, 360]
+    assert mapped["start_sample"] == 0
+    assert mapped["end_sample"] == 576000  # 12 s x 48000 Hz, exact
+    assert mapped["sample_count"] == 576000
+    assert mapped["audio_timebase"] == "1/48000"
+
+
+def test_audio_sample_span_one_frame_grid(demo12s: Path) -> None:
+    facts = plan.probe_source_facts(demo12s)
+    span_first = plan.SourceSpan(start_frame=0, end_frame_exclusive=1)
+    first = plan.audio_sample_span_for_frames(facts, span_first)
+    assert first["start_sample"] == 0
+    assert first["end_sample"] == 1600
+    span_second = plan.SourceSpan(start_frame=1, end_frame_exclusive=2)
+    second = plan.audio_sample_span_for_frames(facts, span_second)
+    assert second["start_sample"] == 1600
+    assert second["end_sample"] == 3200
+
+
+def test_audio_sample_span_refuses_without_audio(cfr30_noaudio: Path) -> None:
+    facts = plan.probe_source_facts(cfr30_noaudio)
+    assert facts.audio is None
+    _refuses(
+        plan.CODE_FACTS_INVALID,
+        plan.audio_sample_span_for_frames,
+        facts,
+        plan.SourceSpan(start_frame=0, end_frame_exclusive=1),
+    )
