@@ -1201,7 +1201,7 @@ def anchor_status(
         doc.get("verdict") == "accepted"
         and intact
         and stale is not True
-        and not (decision or {}).get("decision") == "rejected"
+        and (decision or {}).get("decision") != "rejected"
     )
     return body
 

@@ -20,7 +20,7 @@ Method / path                   Purpose                             Status
 ==============================  ==================================  ====================
 POST   /api/v2/projects/{pid}/shot-anchors                         202 new / 200 reused
 GET    /api/v2/shot-anchors/{job_id}                               200 / 404
-POST   /api/v2/shot-anchors/{job_id}/retry                         200 reuse / 202 generation / 409 active
+POST   /api/v2/shot-anchors/{job_id}/retry                         200 reuse / 202 successor
 GET    /api/v2/projects/{pid}/shot-anchors/{shot}/preview          200 / 404
 POST   /api/v2/projects/{pid}/shot-anchors/{shot}/accept           200 / 409
 POST   /api/v2/projects/{pid}/shot-anchors/{shot}/reject           200 / 409

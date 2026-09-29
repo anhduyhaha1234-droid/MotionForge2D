@@ -958,13 +958,10 @@ def test_c15_2_http_submit_status_retry_real_durable_path(
     the durable anchor job → retry 202 (exactly one successor) → active 409."""
     client, service = _client_with_service(tmp_path, monkeypatch)
     request = build_request(tmp_path)
-    project_id = request["plan"]["project_id"]
-    url = f"/api/v2/projects/{project_id}/shot-anchors"
-
     # The JOB is created at the SERVICE layer (the already-proven durable path);
-    # the HTTP surface is then driven over it.  HTTP-driven submit is proven
-    # separately as a typed refusal with ZERO job rows (test_c15_3), because a
-    # test DB carries no published pack for the resolver to bind.
+    # the HTTP surface is driven over it. HTTP submit is proven separately as a
+    # typed refusal with ZERO job rows (test_c15_3), because a test DB carries
+    # no published pack for the resolver to bind.
     info = sa.submit_shot_anchor_job(service, request=request)
     job_id = info.job_id
     same = sa.submit_shot_anchor_job(service, request=request)
@@ -1083,18 +1080,20 @@ def test_c15_4_published_cast_resolution_laws(tmp_path: Path) -> None:
         "role": "BOOK-P1", "character_id": "c-absent",
         "pack_version_id": "v-absent", "views": ["front"],
     }
-    with service.session_factory() as session:
-        with pytest.raises(sa.ShotAnchorRefusal) as exc:
-            sa.resolve_published_cast_references(
-                session, workspace_id="default", requirements=[requirement]
-            )
+    with service.session_factory() as session, pytest.raises(
+        sa.ShotAnchorRefusal
+    ) as exc:
+        sa.resolve_published_cast_references(
+            session, workspace_id="default", requirements=[requirement]
+        )
     assert exc.value.code is sa.ShotAnchorRefusalCode.ANCHOR_REFERENCE_UNRESOLVED
-    with service.session_factory() as session:
-        with pytest.raises(sa.ShotAnchorRefusal) as exc2:
-            sa.resolve_published_cast_references(
-                session, workspace_id="default",
-                requirements=[{**requirement, "role": ""}],
-            )
+    with service.session_factory() as session, pytest.raises(
+        sa.ShotAnchorRefusal
+    ) as exc2:
+        sa.resolve_published_cast_references(
+            session, workspace_id="default",
+            requirements=[{**requirement, "role": ""}],
+        )
     assert exc2.value.code is sa.ShotAnchorRefusalCode.ANCHOR_REFERENCE_UNRESOLVED
 
 
