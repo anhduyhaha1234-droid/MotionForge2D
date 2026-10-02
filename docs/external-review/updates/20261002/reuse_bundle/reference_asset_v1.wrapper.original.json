@@ -1,0 +1,571 @@
+{
+ "schema_version": "mf.reference_asset.graph.v1",
+ "graph_id": "reference_asset_v1",
+ "purpose": "Create ONE character artwork view that is missing from the cast library, from an existing authored reference of the SAME character, with the identity/style/view requirement pinned by the prompt and the reference latent.",
+ "derived_from": {
+  "template_id": "image_flux2_klein_image_edit_4b_distilled",
+  "template_package": "comfyui_workflow_templates_json 0.1.92 (installed)",
+  "template_path": "C:/Users/Admin/Documents/Codex/work/mfv1/runtime/video14b/venv/Lib/site-packages/comfyui_workflow_templates_json/templates/image_flux2_klein_image_edit_4b_distilled.json",
+  "template_sha256": "e0388a8870495802314d58fa61616ddcdb7064dac5f85a8787c9e08180b8a560",
+  "template_sha16": "e0388a8870495802",
+  "base_template_reference_only": {
+   "template_id": "image_flux2_klein_image_edit_4b_base",
+   "template_path": "C:/Users/Admin/Documents/Codex/work/mfv1/runtime/video14b/venv/Lib/site-packages/comfyui_workflow_templates_json/templates/image_flux2_klein_image_edit_4b_base.json",
+   "template_sha256": "346cd9a63bfe34a5a9207f50c34a87feaf4e70806d13c9d2738fd521133670d0",
+   "why_reference_only": "the base 4B checkpoint and its VAE are NOT installed on the pinned runtime; the base profile (20 steps, cfg 5, full_encoder_small_decoder) is therefore not runnable here"
+  },
+  "conversion": "official UI template -> flat API prompt: the two inline 'Image Edit (Flux.2 Klein 4B Distilled)' subgraph instances and the 'Reference Conditioning' sub-graph are inlined (their nodes are plain registered nodes; no subgraph ids are sent to the API)"
+ },
+ "distilled_vs_base": {
+  "installed_variant": "distilled",
+  "installed_artifacts": {
+   "unet": "diffusion_models/flux-2-klein-4b-fp8.safetensors",
+   "text_encoder": "text_encoders/qwen_3_4b.safetensors",
+   "vae": "vae/flux2-vae.safetensors"
+  },
+  "base_artifacts_installed": false,
+  "evidence": [
+   "P0_MODEL_INVENTORY.json groups: diffusion_models has 4 files; no *base-4b* file",
+   "official distilled template links flux-2-klein-4b-fp8.safetensors",
+   "official base template links flux-2-klein-base-4b-fp8.safetensors + full_encoder_small_decoder.safetensors (absent)",
+   "both official templates are hashed in the manifest (base kept as reference only)"
+  ],
+  "profile_delta": {
+   "steps": {
+    "distilled": 4,
+    "base": 20
+   },
+   "cfg": {
+    "distilled": 1,
+    "base": 5
+   },
+   "vae": {
+    "distilled": "flux2-vae.safetensors",
+    "base": "full_encoder_small_decoder.safetensors"
+   }
+  },
+  "rule": "a graph naming the base checkpoint, the base VAE, or the base 20-step/cfg-5 profile is a DIFFERENT graph and must be refused (negative fixtures)"
+ },
+ "parameters": [
+  {
+   "name": "ref_image",
+   "pointer": "graph/REF_LOAD/inputs/image",
+   "type": "string (file that must exist in the isolated server input dir)",
+   "rule": "non-empty PNG filename resolved against the server input dir",
+   "golden": "ra_v1_ref_dan_choi.png",
+   "description": "identity reference: the character artwork, RGBA composited ONCE on neutral"
+  },
+  {
+   "name": "prompt",
+   "pointer": "graph/PROMPT/inputs/text",
+   "type": "string",
+   "rule": "must state the target view AND the identity/style keepers",
+   "golden": "Reference image 1 is the character design: a flat doodle drawing in solid black ink on a plain light-grey background - a figure in a black baseball cap with its brim to the left, a black hoodie with a small STREET label on the chest, black trousers, black sneakers with laces and a tail that curls out behind, seated cross-legged, holding a phone in both hands and facing the viewer.\nRedraw this exact same character as a full-body view from BEHIND: the viewer now sees the character's back. The head shows only the back and the crown of the black cap - no eyes, no face, no mouth, no facial features at all - and the STREET label is not visible from this side because it is printed on the front of the chest. The black hoodie is seen from its back side with the hood lying flat, the tail curls out to the side of the body, and the phone stays in the character's hands as a small black shape beside the hip. Keep exactly the same drawing style as reference image 1: solid flat black fills, one thin clean black outline, no gradients, no shading, no texture, no extra colours - only black ink on the same plain grey background. Keep the same pose, proportions and presence: the character stays seated cross-legged in the centre of the frame at the same size, same head-to-body ratio, same sleeve, trouser and sneaker shapes. Do not show a face, do not turn the head towards the viewer, do not add colour, patterns, props, text, watermark or background objects, and do not change the clothes.",
+   "description": "view/identity requirement text"
+  },
+  {
+   "name": "seed",
+   "pointer": "graph/NOISE/inputs/noise_seed",
+   "type": "int",
+   "rule": "0 <= seed < 2**63",
+   "golden": 2026092801,
+   "description": "declared sampling seed"
+  },
+  {
+   "name": "canvas_width",
+   "pointer": "graph/LATENT/inputs/width",
+   "type": "int",
+   "rule": "16..16384, divisible by 16 (EmptyFlux2LatentImage step)",
+   "mirrors": [
+    "graph/SIGMAS/inputs/width"
+   ],
+   "golden": 1024,
+   "description": "declared canvas width (NOT derived from the reference)"
+  },
+  {
+   "name": "canvas_height",
+   "pointer": "graph/LATENT/inputs/height",
+   "type": "int",
+   "rule": "16..16384, divisible by 16",
+   "mirrors": [
+    "graph/SIGMAS/inputs/height"
+   ],
+   "golden": 1024,
+   "description": "declared canvas height"
+  },
+  {
+   "name": "ref_longer_side",
+   "pointer": "graph/REF_RESIZE/inputs/resize_type.longer_size",
+   "type": "int",
+   "rule": "16..4096, python round() (half-to-even) as in the node",
+   "golden": 768,
+   "description": "reference resize: longer side px, aspect preserved"
+  },
+  {
+   "name": "neutral_rgb_int",
+   "pointer": "graph/REF_BG/inputs/color",
+   "type": "int",
+   "rule": "0..0xFFFFFF as 0xRRGGBB",
+   "golden": 8421504,
+   "description": "declared neutral background for the alpha composite"
+  },
+  {
+   "name": "steps",
+   "pointer": "graph/SIGMAS/inputs/steps",
+   "type": "int",
+   "rule": "distilled profile: 4 (a base profile of 20 steps is NOT this graph)",
+   "golden": 4,
+   "description": "sampling steps"
+  },
+  {
+   "name": "cfg",
+   "pointer": "graph/GUIDER/inputs/cfg",
+   "type": "number",
+   "rule": "distilled profile: 1",
+   "golden": 1,
+   "description": "CFG scale"
+  },
+  {
+   "name": "filename_prefix",
+   "pointer": "graph/SAVE/inputs/filename_prefix",
+   "type": "string",
+   "rule": "run-scoped prefix; outputs land under <output>/<prefix>_00001_.png",
+   "golden": "mf_reference_asset_v1/dan_choi_back",
+   "description": "output prefix"
+  }
+ ],
+ "alpha_policy": {
+  "neutral_rgb": [
+   128,
+   128,
+   128
+  ],
+  "emptyimage_color_int": 8421504,
+  "composite_applied_in_graph": true,
+  "composite_times": 1,
+  "formula": "out = rgb*(alpha/255) + neutral*(1 - alpha/255)",
+  "nodes": {
+   "background": "REF_BG:EmptyImage",
+   "invert": "REF_INVERT:InvertMask",
+   "composite": "REF_COMP:ImageCompositeMasked"
+  },
+  "mask_convention": "measured in the pinned runtime: nodes.py LoadImage returns MASK = 1 - alpha; comfy_extras/nodes_mask.py ImageCompositeMasked weights the SOURCE with `mask`; so the mask must be inverted first",
+  "why": "raw RGB of an RGBA cutout is ~99% near-black (measured: dan_choi reference is 84.5% fully transparent); the accepted proof composites ONCE onto this neutral grey before any resize - this graph enforces that recipe itself",
+  "output": {
+   "channel_count": 3,
+   "alpha_synthesized": false,
+   "format": "PNG (opaque RGB)",
+   "owner_of_background_removal": "library ingest job (MF-END-03 upload / MF-END-09 asset job) - NOT this graph",
+   "reason": "no segmentation/background-removal weights are provisioned on the pinned runtime (P0: sam3/sam2/checkpoints groups missing); faking an alpha channel from a colour key would silently punch holes in the artwork, so the graph declares an opaque output instead"
+  }
+ },
+ "dimensions_policy": {
+  "canvas_wh": [
+   1024,
+   1024
+  ],
+  "canvas_source": "declared constants in the graph (parameters canvas_width/height)",
+  "divisible_by": 16,
+  "reference_resize": {
+   "node": "REF_RESIZE:ResizeImageMaskNode",
+   "resize_type": "scale longer dimension",
+   "longer_size": 768,
+   "scale_method": "area",
+   "node_formula": "comfy_extras/nodes_post_processing.py scale_longer_dimension - python round() (half-to-even)",
+   "rounding_convention": "python round, identical to the node"
+  },
+  "crop_applied": false,
+  "stretch_applied": false,
+  "output_dims": "equal to canvas_wh (verified against the real run receipt)"
+ },
+ "graph": {
+  "REF_LOAD": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": "ra_v1_ref_dan_choi.png"
+   },
+   "_meta": {
+    "title": "REF: identity reference (RGBA composited on neutral)"
+   }
+  },
+  "REF_SIZE": {
+   "class_type": "GetImageSize",
+   "inputs": {
+    "image": [
+     "REF_LOAD",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "REF: source size"
+   }
+  },
+  "REF_BG": {
+   "class_type": "EmptyImage",
+   "inputs": {
+    "width": [
+     "REF_SIZE",
+     0
+    ],
+    "height": [
+     "REF_SIZE",
+     1
+    ],
+    "batch_size": 1,
+    "color": 8421504
+   },
+   "_meta": {
+    "title": "REF: declared neutral background 0x808080"
+   }
+  },
+  "REF_INVERT": {
+   "class_type": "InvertMask",
+   "inputs": {
+    "mask": [
+     "REF_LOAD",
+     1
+    ]
+   },
+   "_meta": {
+    "title": "REF: LoadImage MASK is 1-alpha; invert to alpha"
+   }
+  },
+  "REF_COMP": {
+   "class_type": "ImageCompositeMasked",
+   "inputs": {
+    "destination": [
+     "REF_BG",
+     0
+    ],
+    "source": [
+     "REF_LOAD",
+     0
+    ],
+    "x": 0,
+    "y": 0,
+    "resize_source": false,
+    "mask": [
+     "REF_INVERT",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "REF: composite ONCE (graph-side alpha policy)"
+   }
+  },
+  "REF_RESIZE": {
+   "class_type": "ResizeImageMaskNode",
+   "inputs": {
+    "input": [
+     "REF_COMP",
+     0
+    ],
+    "resize_type": "scale longer dimension",
+    "resize_type.longer_size": 768,
+    "scale_method": "area"
+   },
+   "_meta": {
+    "title": "REF: aspect-preserving resize, no crop"
+   }
+  },
+  "REF_LATENT": {
+   "class_type": "VAEEncode",
+   "inputs": {
+    "pixels": [
+     "REF_RESIZE",
+     0
+    ],
+    "vae": [
+     "VAE",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "REF: encode"
+   }
+  },
+  "PROMPT": {
+   "class_type": "CLIPTextEncode",
+   "inputs": {
+    "text": "Reference image 1 is the character design: a flat doodle drawing in solid black ink on a plain light-grey background - a figure in a black baseball cap with its brim to the left, a black hoodie with a small STREET label on the chest, black trousers, black sneakers with laces and a tail that curls out behind, seated cross-legged, holding a phone in both hands and facing the viewer.\nRedraw this exact same character as a full-body view from BEHIND: the viewer now sees the character's back. The head shows only the back and the crown of the black cap - no eyes, no face, no mouth, no facial features at all - and the STREET label is not visible from this side because it is printed on the front of the chest. The black hoodie is seen from its back side with the hood lying flat, the tail curls out to the side of the body, and the phone stays in the character's hands as a small black shape beside the hip. Keep exactly the same drawing style as reference image 1: solid flat black fills, one thin clean black outline, no gradients, no shading, no texture, no extra colours - only black ink on the same plain grey background. Keep the same pose, proportions and presence: the character stays seated cross-legged in the centre of the frame at the same size, same head-to-body ratio, same sleeve, trouser and sneaker shapes. Do not show a face, do not turn the head towards the viewer, do not add colour, patterns, props, text, watermark or background objects, and do not change the clothes.",
+    "clip": [
+     "CLIP",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "view/identity requirement (prompt)"
+   }
+  },
+  "NEG_ZERO": {
+   "class_type": "ConditioningZeroOut",
+   "inputs": {
+    "conditioning": [
+     "PROMPT",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "distilled template: zeroed negative"
+   }
+  },
+  "POS_REF": {
+   "class_type": "ReferenceLatent",
+   "inputs": {
+    "conditioning": [
+     "PROMPT",
+     0
+    ],
+    "latent": [
+     "REF_LATENT",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "positive + reference latent"
+   }
+  },
+  "NEG_REF": {
+   "class_type": "ReferenceLatent",
+   "inputs": {
+    "conditioning": [
+     "NEG_ZERO",
+     0
+    ],
+    "latent": [
+     "REF_LATENT",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "negative + reference latent"
+   }
+  },
+  "UNET": {
+   "class_type": "UNETLoader",
+   "inputs": {
+    "unet_name": "flux-2-klein-4b-fp8.safetensors",
+    "weight_dtype": "default"
+   },
+   "_meta": {
+    "title": "FLUX.2 klein 4B fp8"
+   }
+  },
+  "CLIP": {
+   "class_type": "CLIPLoader",
+   "inputs": {
+    "clip_name": "qwen_3_4b.safetensors",
+    "type": "flux2",
+    "device": "default"
+   },
+   "_meta": {
+    "title": "Qwen3-4B text encoder"
+   }
+  },
+  "VAE": {
+   "class_type": "VAELoader",
+   "inputs": {
+    "vae_name": "flux2-vae.safetensors"
+   },
+   "_meta": {
+    "title": "FLUX.2 VAE"
+   }
+  },
+  "LATENT": {
+   "class_type": "EmptyFlux2LatentImage",
+   "inputs": {
+    "width": 1024,
+    "height": 1024,
+    "batch_size": 1
+   },
+   "_meta": {
+    "title": "canvas (declared, /16)"
+   }
+  },
+  "SIGMAS": {
+   "class_type": "Flux2Scheduler",
+   "inputs": {
+    "steps": 4,
+    "width": 1024,
+    "height": 1024
+   },
+   "_meta": {
+    "title": "Flux2Scheduler (distilled 4 steps)"
+   }
+  },
+  "SAMPLER": {
+   "class_type": "KSamplerSelect",
+   "inputs": {
+    "sampler_name": "euler"
+   },
+   "_meta": {
+    "title": "euler"
+   }
+  },
+  "NOISE": {
+   "class_type": "RandomNoise",
+   "inputs": {
+    "noise_seed": 2026092801
+   },
+   "_meta": {
+    "title": "declared seed"
+   }
+  },
+  "GUIDER": {
+   "class_type": "CFGGuider",
+   "inputs": {
+    "cfg": 1,
+    "model": [
+     "UNET",
+     0
+    ],
+    "positive": [
+     "POS_REF",
+     0
+    ],
+    "negative": [
+     "NEG_REF",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "cfg 1 (distilled)"
+   }
+  },
+  "SAMPLE": {
+   "class_type": "SamplerCustomAdvanced",
+   "inputs": {
+    "noise": [
+     "NOISE",
+     0
+    ],
+    "guider": [
+     "GUIDER",
+     0
+    ],
+    "sampler": [
+     "SAMPLER",
+     0
+    ],
+    "sigmas": [
+     "SIGMAS",
+     0
+    ],
+    "latent_image": [
+     "LATENT",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "sample"
+   }
+  },
+  "DECODE": {
+   "class_type": "VAEDecode",
+   "inputs": {
+    "samples": [
+     "SAMPLE",
+     0
+    ],
+    "vae": [
+     "VAE",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "decode"
+   }
+  },
+  "SAVE": {
+   "class_type": "SaveImage",
+   "inputs": {
+    "filename_prefix": "mf_reference_asset_v1/dan_choi_back",
+    "images": [
+     "DECODE",
+     0
+    ]
+   },
+   "_meta": {
+    "title": "save artwork (opaque RGB PNG)"
+   }
+  }
+ },
+ "golden_request": {
+  "character_id": "dan_choi",
+  "missing_view": "back",
+  "why_this_asset": "the library's dan_choi_back.png is byte-identical to the other five view files (single authored artwork, sha 271f1c5789ee8f...), so a back view does not exist; the accepted proof also renders BOOK-P3 (seen from behind)",
+  "source_artwork_sha256": "271f1c5789ee8fb9022ab402d834c8f2d4e862f972a105060e457b68b0282496",
+  "staged_inputs": [
+   {
+    "role": "identity reference (image1)",
+    "file": "ra_v1_ref_dan_choi.png",
+    "sha256": "271f1c5789ee8fb9022ab402d834c8f2d4e862f972a105060e457b68b0282496",
+    "bytes": 247711,
+    "dims": [
+     1024,
+     1024
+    ],
+    "mode": "RGBA",
+    "recipe": "raw authored artwork staged as-is (byte copy); the GRAPH composites its alpha ONCE on neutral 0x808080 before any resize",
+    "byte_identical_to_proof_reference": "this sha256 IS the accepted proof's BOOK-P2 cast reference artwork (shot_reskin FROZEN_EXAMPLES _FROZEN_REF_SHA)"
+   }
+  ],
+  "bindings": {
+   "ref_image": {
+    "pointer": "graph/REF_LOAD/inputs/image",
+    "value": "ra_v1_ref_dan_choi.png"
+   },
+   "prompt": {
+    "pointer": "graph/PROMPT/inputs/text",
+    "value": "Reference image 1 is the character design: a flat doodle drawing in solid black ink on a plain light-grey background - a figure in a black baseball cap with its brim to the left, a black hoodie with a small STREET label on the chest, black trousers, black sneakers with laces and a tail that curls out behind, seated cross-legged, holding a phone in both hands and facing the viewer.\nRedraw this exact same character as a full-body view from BEHIND: the viewer now sees the character's back. The head shows only the back and the crown of the black cap - no eyes, no face, no mouth, no facial features at all - and the STREET label is not visible from this side because it is printed on the front of the chest. The black hoodie is seen from its back side with the hood lying flat, the tail curls out to the side of the body, and the phone stays in the character's hands as a small black shape beside the hip. Keep exactly the same drawing style as reference image 1: solid flat black fills, one thin clean black outline, no gradients, no shading, no texture, no extra colours - only black ink on the same plain grey background. Keep the same pose, proportions and presence: the character stays seated cross-legged in the centre of the frame at the same size, same head-to-body ratio, same sleeve, trouser and sneaker shapes. Do not show a face, do not turn the head towards the viewer, do not add colour, patterns, props, text, watermark or background objects, and do not change the clothes."
+   },
+   "seed": {
+    "pointer": "graph/NOISE/inputs/noise_seed",
+    "value": 2026092801
+   },
+   "canvas_width": {
+    "pointer": "graph/LATENT/inputs/width",
+    "value": 1024
+   },
+   "canvas_height": {
+    "pointer": "graph/LATENT/inputs/height",
+    "value": 1024
+   },
+   "ref_longer_side": {
+    "pointer": "graph/REF_RESIZE/inputs/resize_type.longer_size",
+    "value": 768
+   },
+   "neutral_rgb_int": {
+    "pointer": "graph/REF_BG/inputs/color",
+    "value": 8421504
+   },
+   "steps": {
+    "pointer": "graph/SIGMAS/inputs/steps",
+    "value": 4
+   },
+   "cfg": {
+    "pointer": "graph/GUIDER/inputs/cfg",
+    "value": 1
+   },
+   "filename_prefix": {
+    "pointer": "graph/SAVE/inputs/filename_prefix",
+    "value": "mf_reference_asset_v1/dan_choi_back"
+   }
+  },
+  "expected_output": {
+   "dims": [
+    1024,
+    1024
+   ],
+   "channel_count": 3,
+   "note": "filled by the real run in the manifest golden_run block"
+  }
+ },
+ "output_contract": {
+  "node": "SAVE:SaveImage",
+  "files": 1,
+  "dims": "canvas_wh",
+  "alpha": "opaque RGB",
+  "naming": "<filename_prefix>_00001_.png under the run output dir"
+ }
+}

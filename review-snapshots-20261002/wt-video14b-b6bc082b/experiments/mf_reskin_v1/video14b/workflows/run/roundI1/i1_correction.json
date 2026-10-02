@@ -1,0 +1,48 @@
+{
+ "artifact": "i1_correction.json",
+ "task_id": "MF-V1-VIDEO14B",
+ "round": "I1",
+ "shot": "BOOK",
+ "src": "workflows\\run\\roundI1\\anchor_book.i1.api.json",
+ "dst": "workflows\\run\\roundI1\\anchor_book.i1c1.api.json",
+ "diagnosis": "DIAGNOSED 2026-09-26 from sheet_book_native.png (BOOK attempt a1): against the same-index reference the right half of the frame is rearranged and the prop interaction changed - (1) BOOK-P1 holds a single closed-looking blue book in ONE hand while the reference shows the SAME OPEN blue book with BOTH pages visible and BOTH hands on it; (2) the person seen from behind, BOOK-P3, moved from the right side of the frame toward the centre and is drawn LARGER and lower so the amount of body showing changed; (3) the table with the green tray is pushed to the far-right edge. The anchor is the first-frame reference for the animation, and WanAnimate2 drives pose from the same window, so a rearranged right half and a changed prop contact are wrong for that use. Correction: keep the graph, the four references, their order, 4 steps, cfg 1 and the sampler; append a GEOMETRY LOCK paragraph to the instruction and use ONE new declared seed.",
+ "seed_before": 2026092501,
+ "seed_after": 2026092511,
+ "instruction_sha256_before": "03e988f506db9abc508eeb3f3dc8e0915f397388db75bf11bae1fb9e6a92c195",
+ "instruction_sha256_after": "70d6f85e50db8e4c0df610d0ebafc3b97e539e7a89708b0454b983f5423af1fa",
+ "instruction_chars_before": 2007,
+ "instruction_chars_after": 2827,
+ "filename_prefix_before": "mf_reskin_v1/video14b/roundI1/anchor_book_i1",
+ "filename_prefix_after": "mf_reskin_v1/video14b/roundI1/anchor_book_i1c1",
+ "graph_sha256": "2c65745aca619f7699aa7b2367f62d88e00931862ec8492665bb03a1b9ea62c5",
+ "graph_before_sha256": "96675da540cd2e35145a7ea0406d5ef184c16f822fc442ec5f176fd2e262efac",
+ "measured_diff": [
+  {
+   "node": "75:73",
+   "class_type": "RandomNoise",
+   "input": "noise_seed",
+   "before": 2026092501,
+   "after": 2026092511
+  },
+  {
+   "node": "75:74",
+   "class_type": "CLIPTextEncode",
+   "input": "text",
+   "before": "Reference image 1 is the exact frame to redraw. Redraw it as a flat 2D cel-shaded animation illustration in a flat colou...",
+   "after": "Reference image 1 is the exact frame to redraw. Redraw it as a flat 2D cel-shaded animation illustration in a flat colou..."
+  },
+  {
+   "node": "9",
+   "class_type": "SaveImage",
+   "input": "filename_prefix",
+   "before": "mf_reskin_v1/video14b/roundI1/anchor_book_i1",
+   "after": "mf_reskin_v1/video14b/roundI1/anchor_book_i1c1"
+  }
+ ],
+ "changed_node_ids": [
+  "75:73",
+  "75:74",
+  "9"
+ ],
+ "wiring_and_references_unchanged": true
+}

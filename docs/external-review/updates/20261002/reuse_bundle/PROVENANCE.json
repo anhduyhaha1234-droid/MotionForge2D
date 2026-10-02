@@ -1,0 +1,64 @@
+{
+  "purpose": "Reuse exact existing graphs and installed official templates; bind real media before execution",
+  "production_modified": false,
+  "inference_run": false,
+  "accepted_video": false,
+  "runtime_node_source": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\ComfyUI\\comfy_extras\\nodes_wan.py",
+  "runtime_node_sha256": "39ff111cc45c8d2a75cab1aa3b97ad9bf9037868178af2468bc52b34dbd0d96d",
+  "files": [
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\work\\mf-delivery-20260927\\INTEGRATION\\app\\media_workflows\\reference_asset_v1.json",
+      "source_sha256": "e49b5669e6e45326ba77c08fc9ab6c6b8c07e0a55479876213847ffa99c1e760",
+      "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-rebuild-skills-20261001\\reuse_bundle\\reference_asset_v1.wrapper.original.json",
+      "snapshot_sha256": "e49b5669e6e45326ba77c08fc9ab6c6b8c07e0a55479876213847ffa99c1e760",
+      "api_graph": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-rebuild-skills-20261001\\reuse_bundle\\reference_asset_v1.baseline.api.json",
+      "api_sha256": "d95174ec196f09baf0f7e9445cede6708597a4f1a816491cb3e0411f6efab24f",
+      "nodes": 22,
+      "requires_per_shot_bindings": true
+    },
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\work\\mf-delivery-20260927\\INTEGRATION\\app\\media_workflows\\shot_anchor_v1.json",
+      "source_sha256": "e02574f799cfac6477be455aa18ff68e02f5ba5ed34c2651dba55d8496f266c6",
+      "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-rebuild-skills-20261001\\reuse_bundle\\shot_anchor_v1.wrapper.original.json",
+      "snapshot_sha256": "e02574f799cfac6477be455aa18ff68e02f5ba5ed34c2651dba55d8496f266c6",
+      "api_graph": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-rebuild-skills-20261001\\reuse_bundle\\shot_anchor_v1.baseline.api.json",
+      "api_sha256": "0ff8ed9c92441230d76d42f2d3eeffb92e70f1b8749f663b170d1566a3df7f4e",
+      "nodes": 48,
+      "requires_per_shot_bindings": true
+    },
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\work\\mf-delivery-20260927\\INTEGRATION\\app\\media_workflows\\wan_shot_v1.json",
+      "source_sha256": "c08c64df713b65bb6a244ba13c75dcb5941638cfe6d1ead25d6fca4bbbae630e",
+      "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-rebuild-skills-20261001\\reuse_bundle\\wan_shot_v1.wrapper.original.json",
+      "snapshot_sha256": "c08c64df713b65bb6a244ba13c75dcb5941638cfe6d1ead25d6fca4bbbae630e",
+      "api_graph": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-rebuild-skills-20261001\\reuse_bundle\\wan_shot_v1.baseline.api.json",
+      "api_sha256": "69e550387d1535afd0c491b9f153b7431dcd2a637fc4f7079becef085ea24d3e",
+      "nodes": 63,
+      "requires_per_shot_bindings": true,
+      "corrected_api_graph": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-rebuild-skills-20261001\\reuse_bundle\\wan_shot_v1.motion_enabled.api.json",
+      "corrected_api_sha256": "7da45b824d0c0810a5ff318fcf713914fb211a6405985de9e22435a042e448c7",
+      "delta": [
+        {
+          "pointer": "/672:587/inputs/pose_end_percent",
+          "before": 0,
+          "after": 1.0
+        }
+      ],
+      "verification": "Static config correction only; no inference. Runtime schema default end=1; full-range driving must be measured."
+    },
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\venv\\Lib\\site-packages\\comfyui_workflow_templates_json\\templates\\image_flux2_klein_image_edit_4b_distilled.json",
+      "source_sha256": "e0388a8870495802314d58fa61616ddcdb7064dac5f85a8787c9e08180b8a560",
+      "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-rebuild-skills-20261001\\reuse_bundle\\upstream_image_flux2_klein_image_edit_4b_distilled.json",
+      "snapshot_sha256": "e0388a8870495802314d58fa61616ddcdb7064dac5f85a8787c9e08180b8a560",
+      "format": "Comfy UI workflow, not API graph"
+    },
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\venv\\Lib\\site-packages\\comfyui_workflow_templates_json\\templates\\video_wan_animate2.json",
+      "source_sha256": "f9907c332e7b2c48e9378797f8952ed90391efd6924a4ff162208d369fb52563",
+      "snapshot": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-rebuild-skills-20261001\\reuse_bundle\\upstream_video_wan_animate2.json",
+      "snapshot_sha256": "f9907c332e7b2c48e9378797f8952ed90391efd6924a4ff162208d369fb52563",
+      "format": "Comfy UI workflow, not API graph"
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-> **External developer review — 29/09/2026:** Start at [START_HERE_EXTERNAL_REVIEW.md](START_HERE_EXTERNAL_REVIEW.md) for the current product brief, blockers, source snapshot and setup limits. Product acceptance remains **NOT_APPROVED / NOT_CLOSED; QUALITY_ACCEPTED=0**. The original README below is historical context.
+> **Updated developer handoff — 02/10/2026:** Use branch `review/20261002-full-code` and start at [START_HERE_EXTERNAL_REVIEW.md](START_HERE_EXTERNAL_REVIEW.md). [Current update](docs/external-review/updates/20261002/README.md) includes the integrated source, refreshed WIP snapshots, WAN motion-window finding and prototype workflow correction. Product acceptance remains **NOT_APPROVED / NOT_CLOSED; QUALITY_ACCEPTED=0**. The original README below is historical context.
 
 # MotionForge 2D
 

@@ -15,3 +15,5 @@ app/services/renderer_routes/composite.py text eol=crlf
 # Review snapshots and evidence retain the exact bytes recorded in their manifests.
 /review-snapshots/** -text
 /docs/external-review/evidence/** -text
+/review-snapshots-20261002/** -text
+/docs/external-review/updates/20261002/** -text

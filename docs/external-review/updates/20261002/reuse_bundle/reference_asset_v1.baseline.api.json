@@ -1,0 +1,312 @@
+{
+  "REF_LOAD": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "ra_v1_ref_dan_choi.png"
+    },
+    "_meta": {
+      "title": "REF: identity reference (RGBA composited on neutral)"
+    }
+  },
+  "REF_SIZE": {
+    "class_type": "GetImageSize",
+    "inputs": {
+      "image": [
+        "REF_LOAD",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "REF: source size"
+    }
+  },
+  "REF_BG": {
+    "class_type": "EmptyImage",
+    "inputs": {
+      "width": [
+        "REF_SIZE",
+        0
+      ],
+      "height": [
+        "REF_SIZE",
+        1
+      ],
+      "batch_size": 1,
+      "color": 8421504
+    },
+    "_meta": {
+      "title": "REF: declared neutral background 0x808080"
+    }
+  },
+  "REF_INVERT": {
+    "class_type": "InvertMask",
+    "inputs": {
+      "mask": [
+        "REF_LOAD",
+        1
+      ]
+    },
+    "_meta": {
+      "title": "REF: LoadImage MASK is 1-alpha; invert to alpha"
+    }
+  },
+  "REF_COMP": {
+    "class_type": "ImageCompositeMasked",
+    "inputs": {
+      "destination": [
+        "REF_BG",
+        0
+      ],
+      "source": [
+        "REF_LOAD",
+        0
+      ],
+      "x": 0,
+      "y": 0,
+      "resize_source": false,
+      "mask": [
+        "REF_INVERT",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "REF: composite ONCE (graph-side alpha policy)"
+    }
+  },
+  "REF_RESIZE": {
+    "class_type": "ResizeImageMaskNode",
+    "inputs": {
+      "input": [
+        "REF_COMP",
+        0
+      ],
+      "resize_type": "scale longer dimension",
+      "resize_type.longer_size": 768,
+      "scale_method": "area"
+    },
+    "_meta": {
+      "title": "REF: aspect-preserving resize, no crop"
+    }
+  },
+  "REF_LATENT": {
+    "class_type": "VAEEncode",
+    "inputs": {
+      "pixels": [
+        "REF_RESIZE",
+        0
+      ],
+      "vae": [
+        "VAE",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "REF: encode"
+    }
+  },
+  "PROMPT": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "Reference image 1 is the character design: a flat doodle drawing in solid black ink on a plain light-grey background - a figure in a black baseball cap with its brim to the left, a black hoodie with a small STREET label on the chest, black trousers, black sneakers with laces and a tail that curls out behind, seated cross-legged, holding a phone in both hands and facing the viewer.\nRedraw this exact same character as a full-body view from BEHIND: the viewer now sees the character's back. The head shows only the back and the crown of the black cap - no eyes, no face, no mouth, no facial features at all - and the STREET label is not visible from this side because it is printed on the front of the chest. The black hoodie is seen from its back side with the hood lying flat, the tail curls out to the side of the body, and the phone stays in the character's hands as a small black shape beside the hip. Keep exactly the same drawing style as reference image 1: solid flat black fills, one thin clean black outline, no gradients, no shading, no texture, no extra colours - only black ink on the same plain grey background. Keep the same pose, proportions and presence: the character stays seated cross-legged in the centre of the frame at the same size, same head-to-body ratio, same sleeve, trouser and sneaker shapes. Do not show a face, do not turn the head towards the viewer, do not add colour, patterns, props, text, watermark or background objects, and do not change the clothes.",
+      "clip": [
+        "CLIP",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "view/identity requirement (prompt)"
+    }
+  },
+  "NEG_ZERO": {
+    "class_type": "ConditioningZeroOut",
+    "inputs": {
+      "conditioning": [
+        "PROMPT",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "distilled template: zeroed negative"
+    }
+  },
+  "POS_REF": {
+    "class_type": "ReferenceLatent",
+    "inputs": {
+      "conditioning": [
+        "PROMPT",
+        0
+      ],
+      "latent": [
+        "REF_LATENT",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "positive + reference latent"
+    }
+  },
+  "NEG_REF": {
+    "class_type": "ReferenceLatent",
+    "inputs": {
+      "conditioning": [
+        "NEG_ZERO",
+        0
+      ],
+      "latent": [
+        "REF_LATENT",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "negative + reference latent"
+    }
+  },
+  "UNET": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "flux-2-klein-4b-fp8.safetensors",
+      "weight_dtype": "default"
+    },
+    "_meta": {
+      "title": "FLUX.2 klein 4B fp8"
+    }
+  },
+  "CLIP": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen_3_4b.safetensors",
+      "type": "flux2",
+      "device": "default"
+    },
+    "_meta": {
+      "title": "Qwen3-4B text encoder"
+    }
+  },
+  "VAE": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "flux2-vae.safetensors"
+    },
+    "_meta": {
+      "title": "FLUX.2 VAE"
+    }
+  },
+  "LATENT": {
+    "class_type": "EmptyFlux2LatentImage",
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 1
+    },
+    "_meta": {
+      "title": "canvas (declared, /16)"
+    }
+  },
+  "SIGMAS": {
+    "class_type": "Flux2Scheduler",
+    "inputs": {
+      "steps": 4,
+      "width": 1024,
+      "height": 1024
+    },
+    "_meta": {
+      "title": "Flux2Scheduler (distilled 4 steps)"
+    }
+  },
+  "SAMPLER": {
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "_meta": {
+      "title": "euler"
+    }
+  },
+  "NOISE": {
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": 2026092801
+    },
+    "_meta": {
+      "title": "declared seed"
+    }
+  },
+  "GUIDER": {
+    "class_type": "CFGGuider",
+    "inputs": {
+      "cfg": 1,
+      "model": [
+        "UNET",
+        0
+      ],
+      "positive": [
+        "POS_REF",
+        0
+      ],
+      "negative": [
+        "NEG_REF",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "cfg 1 (distilled)"
+    }
+  },
+  "SAMPLE": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": [
+        "NOISE",
+        0
+      ],
+      "guider": [
+        "GUIDER",
+        0
+      ],
+      "sampler": [
+        "SAMPLER",
+        0
+      ],
+      "sigmas": [
+        "SIGMAS",
+        0
+      ],
+      "latent_image": [
+        "LATENT",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "sample"
+    }
+  },
+  "DECODE": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "SAMPLE",
+        0
+      ],
+      "vae": [
+        "VAE",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "decode"
+    }
+  },
+  "SAVE": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "filename_prefix": "mf_reference_asset_v1/dan_choi_back",
+      "images": [
+        "DECODE",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "save artwork (opaque RGB PNG)"
+    }
+  }
+}

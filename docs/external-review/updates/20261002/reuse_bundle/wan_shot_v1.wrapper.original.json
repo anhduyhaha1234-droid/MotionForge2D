@@ -1,0 +1,1931 @@
+{
+ "schema_version": "mf.wan_shot.graph.v1",
+ "graph_id": "wan_shot_v1",
+ "generated_at_utc": "2026-09-28T08:40:31Z",
+ "purpose": "Pinned Wan Animate 2 INT8 shot-reskin graph: source window (motion) + per-shot anchor (look) -> 640x368 clip with the source's own audio; the engine behind the measured profile.",
+ "derived_from": {
+  "template": {
+   "file": "mf_animate2_book4s.shim.api.json",
+   "path": "C:/Users/Admin/Documents/Codex/2026-09-11/tr-x20/outputs/mf-reskin-correction-20260922/20260922T0955Z/VIDEO14B/waveB/workflows/mf_animate2_book4s.shim.api.json",
+   "sha256": "6e92d82b20cb2d9b1e6a9fe0e8d9cddc88ea81fdf4151ef4c6b62e21cf158fa5",
+   "sha256_16": "6e92d82b20cb2d9b",
+   "nodes": 64,
+   "note": "internal R27 wave-B shim template (no external license); the accepted P3B graph was built from it"
+  },
+  "accepted_predecessor_graph": {
+   "file": "graphs/animate2_book.p3b.api.json",
+   "sha256": "b2ab500748d5163797ccef71e6ed9e078682440a656afd6ae4ab4cf43234a36d",
+   "nodes": 64,
+   "cache": "on",
+   "why": "P3b geometry fix accepted, BOOK coverage PASS (the first accepted clip of the wave)",
+   "receipt": "evidence/P3B_RECEIPT.json",
+   "prompt_id": "d1f4e097-458d-4bd4-8049-fe6da26f91c1"
+  },
+  "pinned_variant": {
+   "name": "cache_off",
+   "file": "graphs/animate2_book.p6nocache.api.json",
+   "sha256": "4247f9e8b233da4b6213c3254b637abd4d2e6c17b307b32cddb9b7b17bbd4759",
+   "nodes": 63,
+   "delta_from_predecessor": [
+    {
+     "node": "672:594",
+     "class_type": "WanAnimate2Cache",
+     "action": "removed"
+    },
+    {
+     "node": "672:591",
+     "class_type": "BasicScheduler",
+     "input": "model",
+     "was": [
+      "672:594",
+      0
+     ],
+     "now": [
+      "672:588",
+      0
+     ]
+    },
+    {
+     "node": "672:592",
+     "class_type": "ModelSamplingSD3",
+     "input": "model",
+     "was": [
+      "672:594",
+      0
+     ],
+     "now": [
+      "672:588",
+      0
+     ]
+    }
+   ],
+   "why": "measured faster AND lower VRAM AND pixel-identical to the cache-on run at the same seed (max_abs 0 over 120 frames), so the cache is dropped",
+   "gate": "evidence/P6_NOCACHE_GATE.json"
+  },
+  "geometry_fix": {
+   "pad_node": {
+    "id": "P3B_PAD",
+    "class_type": "ResizeAndPadImage",
+    "target_width": 640,
+    "target_height": 368,
+    "padding_color": "black",
+    "interpolation": "area",
+    "semantics_source": "comfy_extras/nodes_images.py:594-641 (scale=min(fit), centered pad)"
+   },
+   "rewired": [
+    "672:596 (GetImageSize)",
+    "672:599 (ImageFromBatch)",
+    "672:587 (WanAnimate2ToVideo.pose_video)"
+   ],
+   "removed": {
+    "id": "672:600",
+    "class_type": "ResizeImageMaskNode",
+    "because": "hard-coded 482x854 crop=center (portrait latent)"
+   },
+   "why": "compose on the source aspect; the crop=center alternative would destroy the sides, and crop=disabled STRETCHES (measured node tooltip)",
+   "evidence": "evidence/P3B_GRAPH.json + evidence/P3B_RECEIPT.json"
+  },
+  "node_semantics_measured": [
+   {
+    "claim": "WanAnimate2ToVideo consumes reference_image[:1]",
+    "source": "nodes_wan.py:1253 (read; a 4-image batch does not mean 4 replacement roles)"
+   },
+   {
+    "claim": "continuation uses 1 last frame + offset (not another model's overlap)",
+    "source": "nodes_wan.py WanAnimate2ToVideo inputs (measured)"
+   },
+   {
+    "claim": "video nodes use a 4n+1 frame shape",
+    "source": "measured: VACE raw output 121 frames for a 120 request; Wan path trims to 120"
+   },
+   {
+    "claim": "context overlap 8 vs 16 is inert on this shot",
+    "source": "P5_OVERLAP_GATE (pixel-identical)"
+   }
+  ]
+ },
+ "runtime_pin": {
+  "comfyui_version": "0.37.0",
+  "head": "73c9bad4d21e7addbe1d13bc92eee0f1431b017d",
+  "porcelain_clean": true,
+  "source_read_only": true,
+  "models_root": "C:/Users/Admin/Documents/Codex/work/mfv1/runtime/video14b/models",
+  "license": "ComfyUI GPL-3.0 (LICENSE at the repo root)",
+  "isolation_recipe": "own base-directory (input/output/temp/user/custom_nodes pre-created; main.py::execute_prestartup_script lists custom_nodes before serving) + --models-directory at the shared read-only root + own port + --reserve-vram 1.0 --disable-auto-launch; one job at a time",
+  "verification": "raw/evidence_reverify.json (HEAD + version-file sha + no listener on 8188/8189/8190/8310/8321/8342)"
+ },
+ "checkpoint_variant": {
+  "note": "the pinned variant keeps the INT8 convrot checkpoint + the rank64 distill LoRA; other installed variants (bf16 animate, VACE 1.3B/14B, FLUX) are NOT this profile",
+  "models": [
+   {
+    "role": "unet",
+    "file": "wan_animate_2_int8_convrot.safetensors",
+    "rel": "diffusion_models/wan_animate_2_int8_convrot.safetensors",
+    "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\models\\diffusion_models\\wan_animate_2_int8_convrot.safetensors",
+    "bytes": 16653175528,
+    "sha256": "0580ecdd65e47e97c30df9670d13a6c4a131d26de5a1faf2ccc78392d5167584",
+    "sha256_first_1mib": "f7ba70b820aa441f5a59c1190eee183975c2785aa0fcefc5a3384bf5735aeb5f",
+    "license": "apache-2.0",
+    "source": {
+     "repo": "Comfy-Org/Wan-Animate-2",
+     "revision": "ed158470869ff31fa51cf56012dac33fb00f494b",
+     "revision_last_modified_utc": "2026-08-17T05:28:11Z",
+     "hf_lfs_oid_equals_measured_sha256": true,
+     "probe": "HF API /api/models/<repo>/revision/<rev> (license + date) and /tree (LFS oid) compared to the locally measured full sha256, 2026-09-28"
+    },
+    "why_used": "the pinned checkpoint variant: Wan Animate 2 INT8 convrot (not bf16/fp16)"
+   },
+   {
+    "role": "lora",
+    "file": "lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
+    "rel": "loras/lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
+    "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\models\\loras\\lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
+    "bytes": 738005744,
+    "sha256": "85c4a61c30e0497aa44b91d93a893b624708461a56fe5485183b28fa07e2dfb3",
+    "sha256_first_1mib": "9683d8ac899a3084dd9436d4d1ea58160af621cdc4136649a3395ba2e4cfe5e4",
+    "license": "apache-2.0",
+    "source": {
+     "repo": "Comfy-Org/Wan-Animate-2",
+     "revision": "ed158470869ff31fa51cf56012dac33fb00f494b",
+     "revision_last_modified_utc": "2026-08-17T05:28:11Z",
+     "hf_lfs_oid_equals_measured_sha256": true,
+     "probe": "HF API /api/models/<repo>/revision/<rev> (license + date) and /tree (LFS oid) compared to the locally measured full sha256, 2026-09-28"
+    },
+    "why_used": "the 6-step lcm distill LoRA the official graph chains"
+   },
+   {
+    "role": "text_encoder",
+    "file": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+    "rel": "text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+    "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\models\\text_encoders\\umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+    "bytes": 6735906897,
+    "sha256": "c3355d30191f1f066b26d93fba017ae9809dce6c627dda5f6a66eaa651204f68",
+    "sha256_first_1mib": "c4ef905e4c984b93277f916fd8709c7eee4b6be9a9b75d48a952bc41dd2f2029",
+    "license": "apache-2.0",
+    "source": {
+     "repo": "Comfy-Org/Wan-Animate-2",
+     "revision": "ed158470869ff31fa51cf56012dac33fb00f494b",
+     "revision_last_modified_utc": "2026-08-17T05:28:11Z",
+     "hf_lfs_oid_equals_measured_sha256": true,
+     "probe": "HF API /api/models/<repo>/revision/<rev> (license + date) and /tree (LFS oid) compared to the locally measured full sha256, 2026-09-28"
+    },
+    "why_used": "text encoder pinned by the graph (CLIPLoader type=wan)"
+   },
+   {
+    "role": "clip_vision",
+    "file": "clip_vision_h.safetensors",
+    "rel": "clip_vision/clip_vision_h.safetensors",
+    "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\models\\clip_vision\\clip_vision_h.safetensors",
+    "bytes": 1264219396,
+    "sha256": "64a7ef761bfccbadbaa3da77366aac4185a6c58fa5de5f589b42a65bcc21f161",
+    "sha256_first_1mib": "7809e2986b05a5f197662904030737a5f96e6aa069853e059efbccc2fbafe419",
+    "license": "apache-2.0",
+    "source": {
+     "repo": "Comfy-Org/Wan-Animate-2",
+     "revision": "ed158470869ff31fa51cf56012dac33fb00f494b",
+     "revision_last_modified_utc": "2026-08-17T05:28:11Z",
+     "hf_lfs_oid_equals_measured_sha256": true,
+     "probe": "HF API /api/models/<repo>/revision/<rev> (license + date) and /tree (LFS oid) compared to the locally measured full sha256, 2026-09-28"
+    },
+    "why_used": "CLIP vision for reference + drive-frame conditioning"
+   },
+   {
+    "role": "vae",
+    "file": "Wan2_1_VAE_bf16.safetensors",
+    "rel": "vae/Wan2_1_VAE_bf16.safetensors",
+    "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\models\\vae\\Wan2_1_VAE_bf16.safetensors",
+    "bytes": 253806278,
+    "sha256": "1ab9a32cc2c740f6e39d80d367ce5dcc28db8c71b79b28670546b8973e9d75f9",
+    "sha256_first_1mib": "744600e1e656c99db410ccf9e804fcdb50108dd4753a1afb542e1146125c74ac",
+    "license": "apache-2.0",
+    "source": {
+     "repo": "Comfy-Org/Wan-Animate-2",
+     "revision": "ed158470869ff31fa51cf56012dac33fb00f494b",
+     "revision_last_modified_utc": "2026-08-17T05:28:11Z",
+     "hf_lfs_oid_equals_measured_sha256": true,
+     "probe": "HF API /api/models/<repo>/revision/<rev> (license + date) and /tree (LFS oid) compared to the locally measured full sha256, 2026-09-28"
+    },
+    "why_used": "the graph's decode/encode VAE"
+   }
+  ],
+  "rejected_variants": [
+   {
+    "file": "diffusion_models/wan2.1_vace_14B_fp16.safetensors",
+    "why": "challenger profile; watermark-copy blocker (F4)"
+   },
+   {
+    "file": "diffusion_models/wan2.1_vace_1.3B_fp16.safetensors",
+    "why": "installed but never ran in the proof; benchmark NOT RUN"
+   }
+  ]
+ },
+ "parameters": [
+  {
+   "name": "anchor",
+   "pointer": "graph/189/inputs/image",
+   "type": "string",
+   "rule": "file in the isolated server input dir; the per-shot anchor PNG (640x368 RGB)",
+   "golden": "anchor_book_p2_00001_.png"
+  },
+  {
+   "name": "source",
+   "pointer": "graph/240/inputs/file",
+   "type": "string",
+   "rule": "driving window/segment mp4 (source span); 640x360, 30/1",
+   "golden": "BOOK_src.mp4"
+  },
+  {
+   "name": "prompt",
+   "pointer": "graph/672:582/inputs/text",
+   "type": "string",
+   "rule": "frozen per-shot prompt (sha recorded per case)",
+   "golden_sha256": "540d16b7b7300c40b3768bd589e963b03bf400e8aa6010ef2068d2161676bd9d"
+  },
+  {
+   "name": "seed",
+   "pointer": "graph/672:597/inputs/noise_seed",
+   "type": "int",
+   "rule": "0 <= seed < 2^63; the BOOK golden seed is the accepted run's seed",
+   "golden": 582699151003550
+  },
+  {
+   "name": "filename_prefix",
+   "pointer": "graph/246/inputs/filename_prefix|graph/292/inputs/filename_prefix",
+   "type": "string",
+   "rule": "output naming only; MUST NOT enter computation (same value both save nodes)",
+   "golden": "wan_shot_v1/book"
+  },
+  {
+   "name": "length_source",
+   "pointer": "graph/672:537 (GetImageSize of the loaded video) -> 672:636/672:639/672:667",
+   "type": "derived",
+   "rule": "chunking is derived from the loaded source, never typed by hand; 4n+1 node shape",
+   "golden": "derived from the (120, 102, 18) frame spans"
+  }
+ ],
+ "cases": [
+  {
+   "case_id": "BOOK",
+   "unit_id": "BOOK-UNIT-001",
+   "source": {
+    "file": "BOOK_src.mp4",
+    "rel": "inputs/BOOK_src.mp4",
+    "sha256": "0a7ed862b799838a13eea9e2202b0962b41d383c3ca35f06ce8d1fc00cbe4acc",
+    "dims": [
+     640,
+     360
+    ],
+    "frames": 120,
+    "fps": "30/1",
+    "duration": "4.000000",
+    "span": [
+     0,
+     120
+    ]
+   },
+   "anchor": {
+    "file": "anchor_book_p2_00001_.png",
+    "rel": "inputs/anchor_book_p2_00001_.png",
+    "sha256": "aa08747048c42af56c9e5109b7a041d2f8d95bf7c79544017ef38b98bbb6455e",
+    "dims": [
+     640,
+     368
+    ],
+    "mode": "RGB"
+   },
+   "prompt_sha256": "540d16b7b7300c40b3768bd589e963b03bf400e8aa6010ef2068d2161676bd9d",
+   "seed": 582699151003550,
+   "graph_evidence": {
+    "file": "graphs/animate2_book.p3b.api.json",
+    "sha256": "b2ab500748d5163797ccef71e6ed9e078682440a656afd6ae4ab4cf43234a36d"
+   },
+   "receipt": {
+    "file": "evidence/P3B_RECEIPT.json",
+    "prompt_id": "d1f4e097-458d-4bd4-8049-fe6da26f91c1",
+    "graph": "graphs/animate2_book.p3b.api.json",
+    "cache": "on",
+    "server_side_wall_s": 154.67,
+    "seconds_per_output_second": 38.67,
+    "vram_peak_mib": 10973
+   },
+   "output_main": {
+    "file": "output/p3b/animate2_book_p3b_00001_.mp4",
+    "bytes": 208053,
+    "sha256": "dfc4e37b81ba4252635581a6f75fef1084324dcd7af9015e3ea3e2c86b90d77f",
+    "ffprobe": {
+     "width": 640,
+     "height": 368,
+     "r_frame_rate": "30/1",
+     "duration": "4.000000",
+     "nb_read_frames": "120"
+    }
+   },
+   "gate": {
+    "file": "evidence/P3B_GEOMETRY_GATE.json",
+    "coverage": "PASS",
+    "seam": "NO_VISIBLE_SEAM_DEFECT (numeric flag kept)"
+   },
+   "pinned_variant_run": {
+    "note": "the same case re-run with the pinned cache-OFF wiring (pixel-identical)",
+    "file": "output/p6_book_nocache/animate2_book_nocache_00001_.mp4",
+    "sha256": "be83cf705a7a8769a307aaf1c3292e314d612b2aaecf946d8c366674c2fe866b",
+    "graph": "graphs/animate2_book.p6nocache.api.json",
+    "graph_sha256": "4247f9e8b233da4b6213c3254b637abd4d2e6c17b307b32cddb9b7b17bbd4759",
+    "prompt_id": "06302bb4-68d1-4a48-be56-59c14451e100",
+    "server_side_wall_s": 135.21,
+    "seconds_per_output_second": 33.8,
+    "vram_peak_mib": 10763
+   }
+  },
+  {
+   "case_id": "TURN",
+   "unit_id": "TURN-UNIT-001",
+   "source": {
+    "file": "TURN_795_src.mp4",
+    "rel": "inputs/TURN_795_src.mp4",
+    "sha256": "cf7cfbf0553701d43a1324b782e2b774e0c4141e2c566a50bbdb0d7769f88017",
+    "dims": [
+     640,
+     360
+    ],
+    "frames": 120,
+    "fps": "30/1",
+    "duration": "4.000000",
+    "span": [
+     0,
+     120
+    ]
+   },
+   "anchor": {
+    "file": "anchor_turn_p2_00001_.png",
+    "rel": "inputs/anchor_turn_p2_00001_.png",
+    "sha256": "0820e3cbe9df4d4d290159e7079de25108899e1ca636a5a2ea57d04e9699aeec",
+    "dims": [
+     640,
+     368
+    ]
+   },
+   "prompt_sha256": "eca92d5eb298827aa7ffb61874efa07c4fe28ba0d3aa59c8d8aac77ff88bca2d",
+   "seed": 2026092811,
+   "graph_evidence": {
+    "file": "graphs/animate2_turn.p5fix.api.json",
+    "sha256": "fa94d3265e8993c4c1e758be8ef105f7f72b55bffa56179f37e60b23f771378a"
+   },
+   "receipt": {
+    "file": "evidence/P5FIX_TURN_RECEIPT.json",
+    "prompt_id": "4d4eda1b-d590-4073-aaf0-5e43daf2b36b",
+    "graph": "graphs/animate2_turn.p5fix.api.json",
+    "cache": "off",
+    "server_side_wall_s": 134.94,
+    "seconds_per_output_second": 33.73,
+    "vram_peak_mib": 10855
+   },
+   "output_main": {
+    "file": "output/p5fix_turn/animate2_turn_p5fix_00001_.mp4",
+    "bytes": 409148,
+    "sha256": "f0b2d6e0dc90b12f31e19e0e8efa97086facaf059def95401dbd0f08de5559c6",
+    "ffprobe": {
+     "width": 640,
+     "height": 368,
+     "r_frame_rate": "30/1",
+     "duration": "4.000000",
+     "nb_read_frames": "120"
+    }
+   },
+   "gate": {
+    "file": "evidence/P5FIX_GATE.json",
+    "coverage": "PASS",
+    "note": "transient doubled glyph at f60 recorded"
+   }
+  },
+  {
+   "case_id": "OCC_SEG1",
+   "unit_id": "OCC-UNIT-001",
+   "source": {
+    "file": "p5fix2_occ_seg1.mp4",
+    "rel": "inputs/p5fix2_occ_seg1.mp4",
+    "sha256": "a283d23704e352f7ca3fdc618f8b8275de939b4d0c1eb590fc48c6f825949784",
+    "dims": [
+     640,
+     360
+    ],
+    "frames": 102,
+    "fps": "30/1",
+    "duration": "3.400000",
+    "span": [
+     0,
+     102
+    ],
+    "split_from": "OCC window cut at frame 102"
+   },
+   "anchor": {
+    "file": "anchor_occ_p2_00001_.png",
+    "rel": "inputs/anchor_occ_p2_00001_.png",
+    "sha256": "ca5e85a4b66a329dd25f33dd30ad3ac501589b5a09ac14bd177c573e2c64f542",
+    "dims": [
+     640,
+     368
+    ]
+   },
+   "prompt_sha256": "b2a1e176eaaa3f4df07c927921c6a7fbb64d9ca0c9d2705d17be7e5038f33516",
+   "seed": 2026092831,
+   "graph_evidence": {
+    "file": "graphs/animate2_occ_seg1.p5fix2.api.json",
+    "sha256": "d802b6cc68dd9322dde0f9d3fd19981e98bac12541a622bee12c8f4dd667c32d"
+   },
+   "receipt": {
+    "file": "evidence/P5FIX2_SEG1_RECEIPT.json",
+    "prompt_id": "4314671a-3311-4f0b-9ae6-597b9202d871",
+    "graph": "graphs/animate2_occ_seg1.p5fix2.api.json",
+    "cache": "off",
+    "server_side_wall_s": 120.55,
+    "seconds_per_output_second": 30.14,
+    "vram_peak_mib": 10875
+   },
+   "output_main": {
+    "file": "output/p5fix2_occ_seg1/animate2_occ_seg1_p5fix2_00001_.mp4",
+    "bytes": 149258,
+    "sha256": "b9b1cdb989f43ffbee7ea72f52005e86b44d0219d3a49719a6964f53f7f55cc4",
+    "ffprobe": {
+     "width": 640,
+     "height": 368,
+     "r_frame_rate": "30/1",
+     "duration": "3.400000",
+     "nb_read_frames": "102"
+    }
+   },
+   "gate": {
+    "file": "evidence/P5FIX2_GATE.json",
+    "coverage": "PASS",
+    "comparator_note": "the recorded dims_640x368 boolean in that gate file is a false negative (int vs str comparison); measured dims were 640x368 — documented in P5FIX3_GATE.gates_note"
+   }
+  },
+  {
+   "case_id": "OCC_SEG2",
+   "unit_id": "OCC-UNIT-001",
+   "source": {
+    "file": "p5fix2_occ_seg2.mp4",
+    "rel": "inputs/p5fix2_occ_seg2.mp4",
+    "sha256": "eec74ec5b9eb38ceb433352b01505ffc9185ddbd0ee593679472dd4344137328",
+    "dims": [
+     640,
+     360
+    ],
+    "frames": 18,
+    "fps": "30/1",
+    "duration": "0.600000",
+    "span": [
+     102,
+     120
+    ],
+    "split_from": "OCC window cut at frame 102"
+   },
+   "anchor": {
+    "file": "anchor_occ_seg2_p5fix2_00001_.png",
+    "rel": "inputs/anchor_occ_seg2_p5fix2_00001_.png",
+    "sha256": "81920361f5bb59b2fb97e055c26f46bb0dafd980042d6719104461d7747648bf",
+    "dims": [
+     640,
+     368
+    ]
+   },
+   "prompt_sha256": "dd00d8acee0e3ce1d4f9b73e25bc283310717bac5a63a0f96d9c5ca22ac65c53",
+   "seed": 2026092841,
+   "graph_evidence": {
+    "file": "graphs/animate2_occ_seg2.p5fix3.api.json",
+    "sha256": "0b207c5e5a485cca5c2f368a6c3882bc1f41f7c233b4c786cfb818e048b53220"
+   },
+   "receipt": {
+    "file": "evidence/P5FIX3_SEG2_RECEIPT.json",
+    "prompt_id": "45eecffd-a744-46f3-bafd-4bcdadc45ddd",
+    "graph": "graphs/animate2_occ_seg2.p5fix3.api.json",
+    "cache": "off",
+    "server_side_wall_s": 31.21,
+    "seconds_per_output_second": 7.8,
+    "vram_peak_mib": 10931
+   },
+   "output_main": {
+    "file": "output/p5fix3_occ_seg2/animate2_occ_seg2_p5fix3_00001_.mp4",
+    "bytes": 46422,
+    "sha256": "7db4734bf73e267737ff9b17b4579792f9fd44d8140e0724cc364576a55098a7",
+    "ffprobe": {
+     "width": 640,
+     "height": 368,
+     "r_frame_rate": "30/1",
+     "duration": "0.600000",
+     "nb_read_frames": "18"
+    }
+   },
+   "gate": {
+    "file": "evidence/P5FIX3_GATE.json",
+    "coverage": "PASS",
+    "deviations": "generated book OPEN vs source closed; hooded jacket reads more detailed (recorded, not hidden)"
+   }
+  }
+ ],
+ "frame_mapping": {
+  "timebase": {
+   "fps": "30/1",
+   "source_dims_wh": [
+    640,
+    360
+   ],
+   "output_dims_wh": [
+    640,
+    368
+   ],
+   "pad": "ResizeAndPadImage (P3B_PAD) target 640x368, black, interpolation=area, CENTERED => 4 rows top + 4 rows bottom",
+   "source_node": "comfy_extras/nodes_images.py:594-641 (scale=min(fit), centered pad)"
+  },
+  "segments": [
+   {
+    "unit": "BOOK",
+    "source_span": [
+     0,
+     120
+    ],
+    "output_span": [
+     0,
+     120
+    ],
+    "map": "identity i -> i",
+    "frames": 120
+   },
+   {
+    "unit": "TURN",
+    "source_span": [
+     0,
+     120
+    ],
+    "output_span": [
+     0,
+     120
+    ],
+    "map": "identity i -> i",
+    "frames": 120
+   },
+   {
+    "unit": "OCC_SEG1",
+    "source_span": [
+     0,
+     102
+    ],
+    "output_span": [
+     0,
+     102
+    ],
+    "map": "identity i -> i",
+    "frames": 102
+   },
+   {
+    "unit": "OCC_SEG2",
+    "source_span": [
+     102,
+     120
+    ],
+    "output_span": [
+     0,
+     18
+    ],
+    "map": "i -> i - 102",
+    "frames": 18
+   }
+  ],
+  "cut_map": {
+   "BOOK": {
+    "cuts": [],
+    "evidence": "P5FIX2_CUT_SCAN windows.BOOK verdict NO_CUT_OVER_THRESHOLD"
+   },
+   "TURN": {
+    "cuts": [],
+    "evidence": "P5FIX2_CUT_SCAN windows.TURN"
+   },
+   "OCC": {
+    "cut_frames": [
+     102
+    ],
+    "rule": "changed_fraction>=0.50 AND mean_abs_diff>=12.0 (declared threshold; measured 102.10 vs median 0.004)",
+    "evidence": "P5FIX2_CUT_SCAN + P5FIX2_SPLIT"
+   }
+  },
+  "assembly": {
+   "graph": "graphs/p7_assembly_v13.api.json",
+   "graph_sha256": "52f4fcb2cb0cb298d2bfb137e79c08df28801962f010aefd4d84eccbcee9ff0e",
+   "prompt_id": "e79a9cb7-9138-4117-90d3-b6c1defd3570",
+   "order": [
+    "BOOK",
+    "TURN",
+    "OCC_SEG1",
+    "OCC_SEG2"
+   ],
+   "total_frames": 360,
+   "duration_s": "12.000000",
+   "audio": "graph-native LoadAudio x3 (BOOK_src.mp4 + TURN_795_src.mp4 + OCC_14768_src.mp4) + AudioConcat -> ConcatenateVideo.complete_audio; the two OCC segments share the one OCC window audio",
+   "staged_copies_byte_identical": true,
+   "output": {
+    "file": "output/p7/assembly_v13_00001_.mp4",
+    "bytes": 819282,
+    "sha256": "6878becc7e1db4c561253fb3ab79a85aacf0ecf685f7ea10dbac0e5b834a750e",
+    "ffprobe": {
+     "width": 640,
+     "height": 368,
+     "r_frame_rate": "30/1",
+     "duration": "12.000000",
+     "nb_read_frames": "360"
+    },
+    "audio_ffprobe": {
+     "codec": "aac",
+     "sample_rate": "44100",
+     "channels": 2,
+     "duration": "11.980998"
+    }
+   },
+   "superseded_kept_on_disk": [
+    "output/p7/assembly_v12_00001_.mp4",
+    "output/p7/assembly_v11_00001_.mp4",
+    "output/p7/assembly_v1_00001_.mp4"
+   ],
+   "note": "assembly output stays 640x368 (it does NOT crop the 4+4 pad rows): the pad is a conditioning geometry, the output keeps it — declared, measured"
+  },
+  "chunk_semantics": {
+   "node_shape": "4n+1 (measured: VACE raw clip 121 frames for a 120-frame request; Wan output trimmed to 120 by TrimVideoLatent 672:602 + ImageFromBatch 672:604)",
+   "context_length": 21,
+   "context_overlap": 8,
+   "overlap_inert_measured": "8 -> 16 produced a pixel-identical clip (max_abs 0 over 120 frames); overlap is not a quality lever here",
+   "evidence": "P5_OVERLAP_GATE.json + P5P6_PIXEL_DIFF.json"
+  },
+  "exact_output_trim": "per segment the output frame count equals its source span (120/120/102/18), verified by ffprobe nb_read_frames; assembly = sum = 360"
+ },
+ "failure_taxonomy": [
+  {
+   "id": "F1_GEOMETRY_CROP",
+   "status": "FIXED_VERIFIED",
+   "where": "P3 -> P3B",
+   "defect": "the template's node 672:600 ResizeImageMaskNode hard-coded 482x854 crop=center so the latent was portrait and table/back-figure/partial person were cropped away (coverage FAIL)",
+   "fix": "P3B_PAD ResizeAndPadImage 640x368 (area, centered) feeding 672:596/672:599/672:587.pose_video; 672:600 removed",
+   "evidence": [
+    "evidence/P3B_GRAPH.json",
+    "evidence/P3B_RECEIPT.json",
+    "evidence/P3B_GEOMETRY_GATE.json"
+   ]
+  },
+  {
+   "id": "F2_PROMPT_CARRYOVER",
+   "status": "FIXED_VERIFIED",
+   "where": "P5 -> P5fix",
+   "defect": "the BOOK prompt was copied into the TURN/OCC graphs (same prompt sha across all three) so the generated content was the book scene",
+   "fix": "per-unit prompts (frozen; sha recorded per case)",
+   "evidence": [
+    "evidence/P5_TURN_OCC_GATE.json",
+    "evidence/P5FIX_GATE.json"
+   ]
+  },
+  {
+   "id": "F3_SEGMENT_AT_CUT",
+   "status": "FIXED_VERIFIED",
+   "where": "P5fix2 -> P5fix3",
+   "defect": "the OCC window contains a cut at frame 102; the recorded [0,120) run/blind continuation failed on the second segment (rendered a document scene)",
+   "fix": "split at the measured cut; OCC_SEG2 got its own anchor (anchor_occ_seg2_p5fix2, sha 81920361...) and its own prompt",
+   "evidence": [
+    "evidence/P5FIX2_CUT_SCAN.json",
+    "evidence/P5FIX2_SPLIT.json",
+    "evidence/P5FIX3_SEG2_RECEIPT.json"
+   ]
+  },
+  {
+   "id": "F4_WATERMARK_COPY",
+   "status": "OPEN_PRODUCT_BLOCKER",
+   "where": "P4 (VACE path)",
+   "defect": "VACE 14B fp16 copies the source's YouTube watermark (play button + 'Lạnh Vcl') at frames 0 and 119; Wan Animate 2 output has none",
+   "impact": "the VACE path is not deliverable until a watermark-removal strategy is proven",
+   "evidence": [
+    "evidence/P4_GEOMETRY_GATE.json",
+    "previews/p4_ab_*.png"
+   ]
+  },
+  {
+   "id": "F5_BOOK_STATE",
+   "status": "OPEN_PRODUCT_DECISION",
+   "where": "BOOK case",
+   "defect": "source event open_two_pages @72; Wan keeps the book CLOSED across the window, VACE shows it OPEN at f119",
+   "impact": "needs a product decision; fidelity to the event is not achieved at this window on either profile",
+   "evidence": [
+    "evidence/P3B_GEOMETRY_GATE.json",
+    "evidence/P4_GEOMETRY_GATE.json"
+   ]
+  },
+  {
+   "id": "F6_RAM_INSTRUMENT",
+   "status": "OPEN_INSTRUMENT",
+   "where": "all GPU runs",
+   "defect": "RAM peak NOT MEASURED: every sampler returned a non-credible ~5 MiB figure (tasklist and ctypes variants) for a server holding ~11 GB of weights",
+   "impact": "RAM cost of the profile is unquantified; the number is reported as NOT MEASURED, never guessed",
+   "evidence": [
+    "evidence/P3B_RECEIPT.json:server_ram_peak_mib=5.7",
+    "evidence/P6_NOCACHE_RECEIPT.json:server_ram_peak_mib=5.8"
+   ]
+  },
+  {
+   "id": "F7_SEAM_FLAG_BOOK",
+   "status": "FLAGGED_KEPT",
+   "where": "BOOK case",
+   "defect": "numeric join elevation 80->81 = 2.1582 and clip max 2.3195 at 85->86 vs p99 2.1692; read as motion-rate elevation (woman's arm rising), no visible seam",
+   "impact": "flag kept; a reviewer can re-open previews/p5_overlap16_seam_strip.png",
+   "evidence": [
+    "evidence/P3B_GEOMETRY_GATE.json:seam",
+    "evidence/P5_OVERLAP_GATE.json"
+   ]
+  },
+  {
+   "id": "F8_TURN_TRANSIENT_GLYPH",
+   "status": "RECORDED_KEPT",
+   "where": "TURN case",
+   "defect": "a transient doubled glyph at frame 60 of the accepted TURN clip",
+   "impact": "recorded, not hidden; TURN coverage still PASS of its own segment",
+   "evidence": [
+    "evidence/P5FIX_GATE.json"
+   ]
+  }
+ ],
+ "output_contract": {
+  "nodes": [
+   "246 (main clip, primary)",
+   "292 (side-by-side composite, auxiliary)"
+  ],
+  "files_per_run": 4,
+  "main_dims": "640x368",
+  "aux_dims": "1294x368 (stitched source|generated)",
+  "naming": "<filename_prefix>_0000N_.mp4 under the run output dir; N=1 main, N=3 aux (N=2/4 are 1-frame stills the CreateVideo path also writes)",
+  "audio": "carried from the loaded source by CreateVideo (672:245 / 291:80 feed audio from GetVideoComponents)"
+ },
+ "claims": {
+  "quality_accepted": false,
+  "quality_verdict_owner": "BENCH / DEMO / Codex",
+  "no_best_newest_claim": "no claim of best/newest/fastest model; the profile is chosen from measured gates only",
+  "quality_accepted_denominator": "accepted_seconds = 0 => cost per accepted second is UNDEFINED"
+ },
+ "graph": {
+  "189": {
+   "inputs": {
+    "image": "anchor_book_p2_00001_.png"
+   },
+   "class_type": "LoadImage",
+   "_meta": {
+    "title": "Load Image (Reference Image)"
+   }
+  },
+  "240": {
+   "inputs": {
+    "file": "BOOK_src.mp4"
+   },
+   "class_type": "LoadVideo",
+   "_meta": {
+    "title": "Load Video (Pose Video)"
+   }
+  },
+  "246": {
+   "inputs": {
+    "filename_prefix": "wan_shot_v1/book",
+    "format": "auto",
+    "format.codec": "auto",
+    "codec": "auto",
+    "video": [
+     "672:245",
+     0
+    ]
+   },
+   "class_type": "SaveVideo",
+   "_meta": {
+    "title": "Save Video"
+   }
+  },
+  "292": {
+   "inputs": {
+    "filename_prefix": "wan_shot_v1/book",
+    "format": "auto",
+    "format.codec": "auto",
+    "codec": "auto",
+    "video": [
+     "291:80",
+     0
+    ]
+   },
+   "class_type": "SaveVideo",
+   "_meta": {
+    "title": "Save Video"
+   }
+  },
+  "672:578": {
+   "inputs": {
+    "unet_name": "wan_animate_2_int8_convrot.safetensors",
+    "weight_dtype": "default"
+   },
+   "class_type": "UNETLoader",
+   "_meta": {
+    "title": "Load Diffusion Model"
+   }
+  },
+  "672:579": {
+   "inputs": {
+    "lora_name": "lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
+    "strength_model": 1,
+    "model": [
+     "672:578",
+     0
+    ]
+   },
+   "class_type": "LoraLoaderModelOnly",
+   "_meta": {
+    "title": "Load LoRA"
+   }
+  },
+  "672:580": {
+   "inputs": {
+    "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+    "type": "wan",
+    "device": "default"
+   },
+   "class_type": "CLIPLoader",
+   "_meta": {
+    "title": "Load CLIP"
+   }
+  },
+  "672:583": {
+   "inputs": {
+    "clip_name": "clip_vision_h.safetensors"
+   },
+   "class_type": "CLIPVisionLoader",
+   "_meta": {
+    "title": "Load CLIP Vision"
+   }
+  },
+  "672:584": {
+   "inputs": {
+    "vae_name": "Wan2_1_VAE_bf16.safetensors"
+   },
+   "class_type": "VAELoader",
+   "_meta": {
+    "title": "Load VAE"
+   }
+  },
+  "672:590": {
+   "inputs": {
+    "resize_type": "scale dimensions",
+    "resize_type.width": [
+     "672:596",
+     0
+    ],
+    "resize_type.height": [
+     "672:596",
+     1
+    ],
+    "resize_type.crop": "center",
+    "scale_method": "area",
+    "input": [
+     "189",
+     0
+    ]
+   },
+   "class_type": "ResizeImageMaskNode",
+   "_meta": {
+    "title": "Resize Image/Mask"
+   }
+  },
+  "672:595": {
+   "inputs": {
+    "video": [
+     "240",
+     0
+    ]
+   },
+   "class_type": "GetVideoComponents",
+   "_meta": {
+    "title": "Get Video Components"
+   }
+  },
+  "672:596": {
+   "inputs": {
+    "image": [
+     "P3B_PAD",
+     0
+    ]
+   },
+   "class_type": "GetImageSize",
+   "_meta": {
+    "title": "Get Image Size"
+   }
+  },
+  "672:599": {
+   "inputs": {
+    "batch_index": 0,
+    "length": 1,
+    "image": [
+     "P3B_PAD",
+     0
+    ]
+   },
+   "class_type": "ImageFromBatch",
+   "_meta": {
+    "title": "Get Image from Batch"
+   }
+  },
+  "672:581": {
+   "inputs": {
+    "text": "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走",
+    "clip": [
+     "672:580",
+     0
+    ]
+   },
+   "class_type": "CLIPTextEncode",
+   "_meta": {
+    "title": "CLIP Text Encode (Negative Prompt)"
+   }
+  },
+  "672:582": {
+   "inputs": {
+    "text": "Character Description: a 2D cel-shaded illustration of a seated older reader holding an open book, redesigned with new clothing, new hair and a new flat colour palette; Background description: the same room redrawn as 2D illustration with new wall colour, new furniture design and a new lighting tint.\nKeep the composition, the camera, the body poses, the hand grip on the book, the prop placement and the second person exactly where they are; change who and what they are, not where they are.",
+    "clip": [
+     "672:580",
+     0
+    ]
+   },
+   "class_type": "CLIPTextEncode",
+   "_meta": {
+    "title": "CLIP Text Encode (Positive Prompt)"
+   }
+  },
+  "672:585": {
+   "inputs": {
+    "text": "Same viewpoint as the driving video: no camera movement and no viewpoint change. The driving video supplies body motion and hand gestures only.",
+    "clip": [
+     "672:580",
+     0
+    ]
+   },
+   "class_type": "CLIPTextEncode",
+   "_meta": {
+    "title": "CLIP Text Encode (Prompt)"
+   }
+  },
+  "672:589": {
+   "inputs": {
+    "crop": "none",
+    "clip_vision": [
+     "672:583",
+     0
+    ],
+    "image": [
+     "672:590",
+     0
+    ]
+   },
+   "class_type": "CLIPVisionEncode",
+   "_meta": {
+    "title": "CLIP Vision Encode"
+   }
+  },
+  "672:598": {
+   "inputs": {
+    "crop": "none",
+    "clip_vision": [
+     "672:583",
+     0
+    ],
+    "image": [
+     "672:599",
+     0
+    ]
+   },
+   "class_type": "CLIPVisionEncode",
+   "_meta": {
+    "title": "CLIP Vision Encode"
+   }
+  },
+  "672:586": {
+   "inputs": {
+    "context_length": 21,
+    "context_overlap": 8,
+    "context_schedule": "standard_static",
+    "context_stride": 1,
+    "closed_loop": false,
+    "fuse_method": "pyramid",
+    "dim": 2,
+    "freenoise": true,
+    "cond_retain_index_list": "0",
+    "split_conds_to_windows": false,
+    "latent_retain_index_list": "",
+    "causal_window_fix": true,
+    "model": [
+     "672:579",
+     0
+    ]
+   },
+   "class_type": "ContextWindowsManual",
+   "_meta": {
+    "title": "Context Windows (Manual)"
+   }
+  },
+  "672:537": {
+   "inputs": {
+    "image": [
+     "672:288",
+     0
+    ]
+   },
+   "class_type": "GetImageSize",
+   "_meta": {
+    "title": "Get Image Size"
+   }
+  },
+  "672:636": {
+   "inputs": {
+    "expression": "floor((a - 2) / (b - 1))",
+    "values.a": [
+     "672:537",
+     2
+    ],
+    "values.b": [
+     "672:635",
+     0
+    ],
+    "values": {
+     "a": [
+      "672:537",
+      2
+     ],
+     "b": [
+      "672:635",
+      0
+     ]
+    }
+   },
+   "class_type": "ComfyMathExpression",
+   "_meta": {
+    "title": "Math Expression"
+   }
+  },
+  "672:642": {
+   "inputs": {
+    "mode": "simple",
+    "mode.num_iterations": [
+     "672:645",
+     1
+    ],
+    "cache_iterations": false
+   },
+   "class_type": "StartLoop",
+   "_meta": {
+    "title": "Start Loop"
+   }
+  },
+  "672:645": {
+   "inputs": {
+    "expression": "a + 1",
+    "values.a": [
+     "672:636",
+     1
+    ],
+    "values": {
+     "a": [
+      "672:636",
+      1
+     ]
+    }
+   },
+   "class_type": "ComfyMathExpression",
+   "_meta": {
+    "title": "Math Expression"
+   }
+  },
+  "672:646": {
+   "inputs": {
+    "switch": [
+     "672:642",
+     2
+    ],
+    "on_false": [
+     "672:635",
+     0
+    ],
+    "on_true": [
+     "672:639",
+     1
+    ]
+   },
+   "class_type": "ComfySwitchNode",
+   "_meta": {
+    "title": "If/Else Switch(length)"
+   }
+  },
+  "672:649": {
+   "inputs": {
+    "index": 0,
+    "list": [
+     "672:642",
+     4
+    ]
+   },
+   "class_type": "GetItemFromList",
+   "_meta": {
+    "title": "Get Item From List"
+   }
+  },
+  "672:288": {
+   "inputs": {
+    "video": [
+     "240",
+     0
+    ]
+   },
+   "class_type": "GetVideoComponents",
+   "_meta": {
+    "title": "Get Video Components"
+   }
+  },
+  "672:587": {
+   "inputs": {
+    "width": [
+     "672:596",
+     0
+    ],
+    "height": [
+     "672:596",
+     1
+    ],
+    "length": [
+     "672:646",
+     0
+    ],
+    "batch_size": 1,
+    "video_frame_offset": [
+     "672:652",
+     0
+    ],
+    "pose_strength": 1,
+    "pose_start_percent": 0,
+    "pose_end_percent": 0,
+    "reference_image_strength": 1,
+    "positive": [
+     "672:582",
+     0
+    ],
+    "negative": [
+     "672:581",
+     0
+    ],
+    "vae": [
+     "672:584",
+     0
+    ],
+    "reference_image": [
+     "672:590",
+     0
+    ],
+    "pose_video": [
+     "P3B_PAD",
+     0
+    ],
+    "clip_vision_output": [
+     "672:589",
+     0
+    ],
+    "positive_pose": [
+     "672:585",
+     0
+    ],
+    "clip_vision_output_pose": [
+     "672:598",
+     0
+    ],
+    "continue_motion": [
+     "672:651",
+     0
+    ]
+   },
+   "class_type": "WanAnimate2ToVideo",
+   "_meta": {
+    "title": "WanAnimate2ToVideo"
+   }
+  },
+  "672:588": {
+   "inputs": {
+    "switch": false,
+    "on_false": [
+     "672:579",
+     0
+    ],
+    "on_true": [
+     "672:586",
+     0
+    ]
+   },
+   "class_type": "ComfySwitchNode",
+   "_meta": {
+    "title": "If/Else Switch"
+   }
+  },
+  "672:653": {
+   "inputs": {
+    "index": 1,
+    "list": [
+     "672:642",
+     4
+    ]
+   },
+   "class_type": "GetItemFromList",
+   "_meta": {
+    "title": "Get Item From List"
+   }
+  },
+  "672:651": {
+   "inputs": {
+    "switch": [
+     "672:642",
+     1
+    ],
+    "on_false": [
+     "672:649",
+     0
+    ]
+   },
+   "class_type": "ComfySwitchNode",
+   "_meta": {
+    "title": "If/Else Switch (continue_motion)"
+   }
+  },
+  "672:591": {
+   "inputs": {
+    "scheduler": "simple",
+    "steps": 6,
+    "denoise": 1,
+    "model": [
+     "672:588",
+     0
+    ]
+   },
+   "class_type": "BasicScheduler",
+   "_meta": {
+    "title": "BasicScheduler"
+   }
+  },
+  "672:592": {
+   "inputs": {
+    "shift": 5,
+    "model": [
+     "672:588",
+     0
+    ]
+   },
+   "class_type": "ModelSamplingSD3",
+   "_meta": {
+    "title": "ModelSamplingSD3"
+   }
+  },
+  "672:593": {
+   "inputs": {
+    "sampler_name": "lcm"
+   },
+   "class_type": "KSamplerSelect",
+   "_meta": {
+    "title": "KSamplerSelect"
+   }
+  },
+  "672:635": {
+   "inputs": {
+    "value": 81
+   },
+   "class_type": "PrimitiveInt",
+   "_meta": {
+    "title": "Int (fragment_length)"
+   }
+  },
+  "672:639": {
+   "inputs": {
+    "expression": "4 * ceil((a - b * c + c - 1) / 4) + 1",
+    "values.a": [
+     "672:537",
+     2
+    ],
+    "values.b": [
+     "672:635",
+     0
+    ],
+    "values.c": [
+     "672:636",
+     1
+    ],
+    "values": {
+     "a": [
+      "672:537",
+      2
+     ],
+     "b": [
+      "672:635",
+      0
+     ],
+     "c": [
+      "672:636",
+      1
+     ]
+    }
+   },
+   "class_type": "ComfyMathExpression",
+   "_meta": {
+    "title": "Math Expression"
+   }
+  },
+  "672:652": {
+   "inputs": {
+    "switch": [
+     "672:642",
+     1
+    ],
+    "on_false": [
+     "672:653",
+     0
+    ],
+    "on_true": [
+     "672:654",
+     0
+    ]
+   },
+   "class_type": "ComfySwitchNode",
+   "_meta": {
+    "title": "If/Else Switch(video_frame_offset)"
+   }
+  },
+  "672:654": {
+   "inputs": {
+    "value": 0
+   },
+   "class_type": "PrimitiveInt",
+   "_meta": {
+    "title": "Int"
+   }
+  },
+  "672:597": {
+   "inputs": {
+    "add_noise": true,
+    "noise_seed": 582699151003550,
+    "cfg": 1,
+    "model": [
+     "672:592",
+     0
+    ],
+    "positive": [
+     "672:587",
+     0
+    ],
+    "negative": [
+     "672:587",
+     1
+    ],
+    "sampler": [
+     "672:593",
+     0
+    ],
+    "sigmas": [
+     "672:591",
+     0
+    ],
+    "latent_image": [
+     "672:587",
+     2
+    ]
+   },
+   "class_type": "SamplerCustom",
+   "_meta": {
+    "title": "SamplerCustom"
+   }
+  },
+  "672:667": {
+   "inputs": {
+    "expression": "(a % 4 == 1) and ((b - 1) % 4 == 0)",
+    "values.a": [
+     "672:537",
+     2
+    ],
+    "values.b": [
+     "672:635",
+     0
+    ],
+    "values": {
+     "a": [
+      "672:537",
+      2
+     ],
+     "b": [
+      "672:635",
+      0
+     ]
+    }
+   },
+   "class_type": "ComfyMathExpression",
+   "_meta": {
+    "title": "Exact w/o trim? (F%4==1 and b%4==1)"
+   }
+  },
+  "672:601": {
+   "inputs": {
+    "samples": [
+     "672:602",
+     0
+    ],
+    "vae": [
+     "672:584",
+     0
+    ]
+   },
+   "class_type": "VAEDecode",
+   "_meta": {
+    "title": "VAE Decode"
+   }
+  },
+  "672:602": {
+   "inputs": {
+    "trim_amount": [
+     "672:587",
+     3
+    ],
+    "samples": [
+     "672:597",
+     0
+    ]
+   },
+   "class_type": "TrimVideoLatent",
+   "_meta": {
+    "title": "Trim Video Latent"
+   }
+  },
+  "672:604": {
+   "inputs": {
+    "batch_index": 1,
+    "length": 4096,
+    "image": [
+     "672:601",
+     0
+    ]
+   },
+   "class_type": "ImageFromBatch",
+   "_meta": {
+    "title": "Get Image from Batch"
+   }
+  },
+  "672:605": {
+   "inputs": {
+    "switch": [
+     "672:642",
+     1
+    ],
+    "on_false": [
+     "672:604",
+     0
+    ],
+    "on_true": [
+     "672:601",
+     0
+    ]
+   },
+   "class_type": "ComfySwitchNode",
+   "_meta": {
+    "title": "If/Else Switch"
+   }
+  },
+  "672:648": {
+   "inputs": {
+    "inputs.input0": [
+     "672:601",
+     0
+    ],
+    "inputs.input1": [
+     "672:587",
+     5
+    ],
+    "inputs": {
+     "input0": [
+      "672:601",
+      0
+     ],
+     "input1": [
+      "672:587",
+      5
+     ]
+    }
+   },
+   "class_type": "CreateList",
+   "_meta": {
+    "title": "Create List"
+   }
+  },
+  "672:647": {
+   "inputs": {
+    "accumulate": true,
+    "output_value": [
+     "672:605",
+     0
+    ],
+    "next_iteration_value": [
+     "672:648",
+     0
+    ],
+    "terminations.termination0": [
+     "672:587",
+     5
+    ],
+    "terminations": {
+     "termination0": [
+      "672:587",
+      5
+     ]
+    }
+   },
+   "class_type": "EndLoop",
+   "_meta": {
+    "title": "End Loop"
+   }
+  },
+  "672:661": {
+   "inputs": {
+    "batch_size": [
+     "672:537",
+     2
+    ],
+    "images": [
+     "672:647",
+     0
+    ]
+   },
+   "class_type": "RebatchImages",
+   "_meta": {
+    "title": "Rebatch Images"
+   }
+  },
+  "672:670": {
+   "inputs": {
+    "batch_index": 0,
+    "length": [
+     "672:537",
+     2
+    ],
+    "image": [
+     "672:661",
+     0
+    ]
+   },
+   "class_type": "ImageFromBatch",
+   "_meta": {
+    "title": "Trim tail to F"
+   }
+  },
+  "672:671": {
+   "inputs": {
+    "switch": [
+     "672:667",
+     2
+    ],
+    "on_false": [
+     "672:670",
+     0
+    ],
+    "on_true": [
+     "672:661",
+     0
+    ]
+   },
+   "class_type": "ComfySwitchNode",
+   "_meta": {
+    "title": "Apply tail trim?"
+   }
+  },
+  "672:245": {
+   "inputs": {
+    "fps": [
+     "672:288",
+     2
+    ],
+    "bit_depth": "auto",
+    "color_space": "sRGB",
+    "codec": "none",
+    "images": [
+     "672:671",
+     0
+    ],
+    "audio": [
+     "672:288",
+     1
+    ]
+   },
+   "class_type": "CreateVideo",
+   "_meta": {
+    "title": "Create Video"
+   }
+  },
+  "291:78": {
+   "inputs": {
+    "video": [
+     "240",
+     0
+    ]
+   },
+   "class_type": "GetVideoComponents",
+   "_meta": {
+    "title": "Get Video Components"
+   }
+  },
+  "291:77": {
+   "inputs": {
+    "video": [
+     "246",
+     0
+    ]
+   },
+   "class_type": "GetVideoComponents",
+   "_meta": {
+    "title": "Get Video Components"
+   }
+  },
+  "291:90": {
+   "inputs": {
+    "image": [
+     "291:79",
+     0
+    ]
+   },
+   "class_type": "GetImageSize",
+   "_meta": {
+    "title": "Get Image Size"
+   }
+  },
+  "291:80": {
+   "inputs": {
+    "fps": [
+     "291:77",
+     2
+    ],
+    "bit_depth": 8,
+    "color_space": "sRGB",
+    "codec": "none",
+    "images": [
+     "291:97",
+     0
+    ],
+    "audio": [
+     "291:77",
+     1
+    ]
+   },
+   "class_type": "CreateVideo",
+   "_meta": {
+    "title": "Create Video"
+   }
+  },
+  "291:290": {
+   "inputs": {
+    "expression": "a & ~1",
+    "values.a": [
+     "291:90",
+     0
+    ],
+    "values": {
+     "a": [
+      "291:90",
+      0
+     ]
+    }
+   },
+   "class_type": "ComfyMathExpression",
+   "_meta": {
+    "title": "Math Expression"
+   }
+  },
+  "291:96": {
+   "inputs": {
+    "expression": "a & ~1",
+    "values.a": [
+     "291:90",
+     1
+    ],
+    "values": {
+     "a": [
+      "291:90",
+      1
+     ]
+    }
+   },
+   "class_type": "ComfyMathExpression",
+   "_meta": {
+    "title": "Math Expression"
+   }
+  },
+  "291:79": {
+   "inputs": {
+    "direction": "right",
+    "match_image_size": true,
+    "spacing_width": 0,
+    "spacing_color": "white",
+    "image1": [
+     "291:417",
+     0
+    ],
+    "image2": [
+     "291:573",
+     0
+    ]
+   },
+   "class_type": "ImageStitch",
+   "_meta": {
+    "title": "Stitch Images"
+   }
+  },
+  "291:97": {
+   "inputs": {
+    "resize_type": "scale dimensions",
+    "resize_type.width": [
+     "291:290",
+     1
+    ],
+    "resize_type.height": [
+     "291:96",
+     1
+    ],
+    "resize_type.crop": "center",
+    "scale_method": "area",
+    "input": [
+     "291:79",
+     0
+    ]
+   },
+   "class_type": "ResizeImageMaskNode",
+   "_meta": {
+    "title": "Resize Image/Mask"
+   }
+  },
+  "291:416": {
+   "inputs": {
+    "image": [
+     "291:77",
+     0
+    ]
+   },
+   "class_type": "GetImageSize",
+   "_meta": {
+    "title": "Get Image Size"
+   }
+  },
+  "291:417": {
+   "inputs": {
+    "batch_index": 0,
+    "length": [
+     "291:572",
+     1
+    ],
+    "image": [
+     "291:77",
+     0
+    ]
+   },
+   "class_type": "ImageFromBatch",
+   "_meta": {
+    "title": "Get Image from Batch"
+   }
+  },
+  "291:571": {
+   "inputs": {
+    "image": [
+     "291:78",
+     0
+    ]
+   },
+   "class_type": "GetImageSize",
+   "_meta": {
+    "title": "Get Image Size"
+   }
+  },
+  "291:572": {
+   "inputs": {
+    "expression": "min(a,b)",
+    "values.a": [
+     "291:416",
+     2
+    ],
+    "values.b": [
+     "291:571",
+     2
+    ],
+    "values": {
+     "a": [
+      "291:416",
+      2
+     ],
+     "b": [
+      "291:571",
+      2
+     ]
+    }
+   },
+   "class_type": "ComfyMathExpression",
+   "_meta": {
+    "title": "Math Expression"
+   }
+  },
+  "291:573": {
+   "inputs": {
+    "batch_index": 0,
+    "length": [
+     "291:572",
+     1
+    ],
+    "image": [
+     "291:78",
+     0
+    ]
+   },
+   "class_type": "ImageFromBatch",
+   "_meta": {
+    "title": "Get Image from Batch"
+   }
+  },
+  "P3B_PAD": {
+   "inputs": {
+    "image": [
+     "672:595",
+     0
+    ],
+    "target_width": 640,
+    "target_height": 368,
+    "padding_color": "black",
+    "interpolation": "area"
+   },
+   "class_type": "ResizeAndPadImage",
+   "_meta": {
+    "title": "Resize And Pad Image (P3b geometry fix)"
+   }
+  }
+ },
+ "node_roles": {
+  "189": "reference image (per-shot anchor; reference_image[:1])",
+  "240": "driving video (source window/segment)",
+  "246": "main clip output",
+  "292": "side-by-side composite output (aux)",
+  "672:578": "Wan Animate 2 INT8 convrot checkpoint loader",
+  "672:579": "LightX2V rank64 distill LoRA",
+  "672:580": "umt5 text encoder loader",
+  "672:583": "clip_vision_h loader",
+  "672:584": "Wan2.1 VAE bf16 loader",
+  "672:590": "anchor resize to the reference geometry",
+  "672:595": "source frames (+fps/audio) via GetVideoComponents",
+  "672:596": "SIZE AUTHORITY: GetImageSize(P3B_PAD) -> node width/height",
+  "672:599": "first padded drive frame for CLIP vision",
+  "672:581": "negative prompt",
+  "672:582": "positive prompt (per-shot, frozen)",
+  "672:585": "camera/keep-viewpoint prompt",
+  "672:589": "reference CLIP-vision conditioning",
+  "672:598": "drive-frame CLIP-vision conditioning",
+  "672:586": "ContextWindowsManual (cache-path split; bypassed in cache-off wiring)",
+  "672:537": "source video size (drives all length math)",
+  "672:636": "chunk-count math",
+  "672:642": "chunk loop (StartLoop)",
+  "672:645": "loop iterations = chunks + 1",
+  "672:646": "length switch per chunk",
+  "672:649": "loop item 0",
+  "672:288": "source frames/audio/fps for the output video",
+  "672:587": "WanAnimate2ToVideo (the model node; pose+reference+motion)",
+  "672:588": "model-source switch (cache off => always the LoRA output)",
+  "672:653": "loop item 1",
+  "672:651": "offset switch",
+  "672:591": "BasicScheduler (steps=6)",
+  "672:592": "ModelSamplingSD3 (shift=5)",
+  "672:593": "KSamplerSelect (lcm)",
+  "672:635": "chunk_length primitive (81)",
+  "672:639": "4n+1 length math",
+  "672:652": "video_frame_offset switch",
+  "672:654": "frame offset primitive (0)",
+  "672:597": "SamplerCustom (seed/cfg)",
+  "672:667": "final-batch shape predicate",
+  "672:601": "VAEDecode",
+  "672:602": "TrimVideoLatent (exact output trim)",
+  "672:604": "drop-first-frame batch",
+  "672:605": "loop output switch",
+  "672:648": "loop accumulate list",
+  "672:647": "EndLoop (accumulate)",
+  "672:661": "RebatchImages",
+  "672:670": "first-batch slice",
+  "672:671": "final output switch",
+  "672:245": "CreateVideo (fps/audio from source)",
+  "291:78": "reference-side video components",
+  "291:77": "generated-side video components",
+  "291:90": "even-width math",
+  "291:80": "CreateVideo for the composite",
+  "291:290": "even-width math (ref)",
+  "291:96": "even-height math",
+  "291:79": "ImageStitch (source|generated)",
+  "291:97": "composite resize",
+  "291:416": "ref size",
+  "291:417": "ref first frame",
+  "291:571": "gen size",
+  "291:572": "min dim",
+  "291:573": "gen first frame",
+  "P3B_PAD": "source-aspect pad to 640x368 (geometry fix; conditioning only)"
+ }
+}

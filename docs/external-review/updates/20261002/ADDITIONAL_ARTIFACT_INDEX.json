@@ -1,0 +1,42 @@
+{
+  "captured_at_utc": "2026-10-02T03:04:57.737468+00:00",
+  "scope": "Prompt revision and canonical PM update after code snapshot cutoff; these are planning artifacts, no dispatch or product approval",
+  "files": [
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-shotwise-demo-20261002\\NEXT_HERMES_DEMO_PROMPT.md",
+      "file": "prompt-20261002/NEXT_HERMES_DEMO_PROMPT.md",
+      "sha256": "b141e04c81b5f44d3b0de8a99d761a4a7b3bcde10762e59ef1f7edf930d5ed9b",
+      "bytes": 30899
+    },
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-shotwise-demo-20261002\\SESSION_OPENING_PROPOSAL.md",
+      "file": "prompt-20261002/SESSION_OPENING_PROPOSAL.md",
+      "sha256": "20608ca0698e0c2bcdebe8b737200cdb27b0e01dfe3326d414fe5b4e16581617",
+      "bytes": 3018
+    },
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-shotwise-demo-20261002\\PROTOTYPE_PREFLIGHT.json",
+      "file": "prompt-20261002/PROTOTYPE_PREFLIGHT.json",
+      "sha256": "a89598507680bc6d892f396e8d18a0c560a82305fd8a6f62fa1f88889459b618",
+      "bytes": 2639
+    },
+    {
+      "source": "C:\\Users\\Admin\\MotionForge2D\\docs\\pm\\HERMES_AUTOPILOT_RULES.md",
+      "file": "current-pm-20261002/HERMES_AUTOPILOT_RULES.md",
+      "sha256": "e40f3aa68afb1a82618bd5179dad70b4080842b1447b82cfec3ed93846126bf0",
+      "bytes": 38044
+    },
+    {
+      "source": "C:\\Users\\Admin\\MotionForge2D\\docs\\pm\\CODEX_PM_HANDOFF.md",
+      "file": "current-pm-20261002/CODEX_PM_HANDOFF.md",
+      "sha256": "2cfa620d00a86967e5c2d1d311fa487e1417518bdf8e5949cf62e95ec4772763",
+      "bytes": 89996
+    },
+    {
+      "source": "C:\\Users\\Admin\\MotionForge2D\\docs\\pm\\ROADMAP.md",
+      "file": "current-pm-20261002/ROADMAP.md",
+      "sha256": "25d157602a9a05b4f15ed5d11d2c6d6ec929835da899433c50dea96f50f6837f",
+      "bytes": 56435
+    }
+  ]
+}

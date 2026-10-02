@@ -1,0 +1,334 @@
+{
+ "9": {
+  "inputs": {
+   "filename_prefix": "mf_reskin_v1/video14b/roundI1/anchor_turn_i1",
+   "images": [
+    "75:65",
+    0
+   ]
+  },
+  "class_type": "SaveImage",
+  "_meta": {
+   "title": "Save Image"
+  }
+ },
+ "76": {
+  "inputs": {
+   "image": "i1_TURN_f000_640x368.png"
+  },
+  "class_type": "LoadImage",
+  "_meta": {
+   "title": "Load Image"
+  }
+ },
+ "75:61": {
+  "inputs": {
+   "sampler_name": "euler"
+  },
+  "class_type": "KSamplerSelect",
+  "_meta": {
+   "title": "KSamplerSelect"
+  }
+ },
+ "75:70": {
+  "inputs": {
+   "unet_name": "flux-2-klein-4b-fp8.safetensors",
+   "weight_dtype": "default"
+  },
+  "class_type": "UNETLoader",
+  "_meta": {
+   "title": "Load Diffusion Model"
+  }
+ },
+ "75:71": {
+  "inputs": {
+   "clip_name": "qwen_3_4b.safetensors",
+   "type": "flux2",
+   "device": "default"
+  },
+  "class_type": "CLIPLoader",
+  "_meta": {
+   "title": "Load CLIP"
+  }
+ },
+ "75:72": {
+  "inputs": {
+   "vae_name": "flux2-vae.safetensors"
+  },
+  "class_type": "VAELoader",
+  "_meta": {
+   "title": "Load VAE"
+  }
+ },
+ "75:66": {
+  "inputs": {
+   "width": [
+    "75:99",
+    0
+   ],
+   "height": [
+    "75:99",
+    1
+   ],
+   "batch_size": 1
+  },
+  "class_type": "EmptyFlux2LatentImage",
+  "_meta": {
+   "title": "Empty Flux 2 Latent"
+  }
+ },
+ "75:80": {
+  "inputs": {
+   "upscale_method": "nearest-exact",
+   "megapixels": 0.23552,
+   "resolution_steps": 1,
+   "image": [
+    "76",
+    0
+   ]
+  },
+  "class_type": "ImageScaleToTotalPixels",
+  "_meta": {
+   "title": "Scale Image to Total Pixels"
+  }
+ },
+ "75:62": {
+  "inputs": {
+   "steps": 4,
+   "width": [
+    "75:99",
+    0
+   ],
+   "height": [
+    "75:99",
+    1
+   ]
+  },
+  "class_type": "Flux2Scheduler",
+  "_meta": {
+   "title": "Flux2Scheduler"
+  }
+ },
+ "75:74": {
+  "inputs": {
+   "text": "Reference image 1 is the exact frame to redraw. Redraw it as a flat 2D cel-shaded animation illustration in a flat colour palette: solid flat colour fills, one hard shadow tone per shape, thin clean outlines, no gradients, no photographic texture, no 3D rendering. Keep the identical composition, camera, scale and aspect ratio of reference image 1 and keep every contact between bodies and objects. Keep the frame edges exactly as they are, including the thin black band at the very top and the very bottom: do not crop, do not zoom, do not letterbox, do not add borders. This shot is a prop/detail shot: reference image 1 and reference image 2 show NO person at all - a single printed form lies flat, filling the frame, on a plain brown/orange background, with the flat blue edge of a binder at the left. Redraw exactly that: the same printed form in the same position and the same size, the same ruled lines and the same unreadable letterhead blocks as flat shapes, the same plain brown/orange background with its soft edge, and the same flat blue binder edge at the left with the same angle and the same width. Do not add a person, a hand, a face or a figure to this shot. The number of people must not change: do not add or remove a person, do not add a face, a head or a hand that reference image 1 does not already show, and do not move any person. No added text, no captions, no subtitles, no logo, no watermark: the video watermark in the bottom-left corner of reference image 1 must not appear in the result.",
+   "clip": [
+    "75:71",
+    0
+   ]
+  },
+  "class_type": "CLIPTextEncode",
+  "_meta": {
+   "title": "CLIP Text Encode (Positive Prompt)"
+  }
+ },
+ "75:82": {
+  "inputs": {
+   "conditioning": [
+    "75:74",
+    0
+   ]
+  },
+  "class_type": "ConditioningZeroOut",
+  "_meta": {
+   "title": "Conditioning Zero Out"
+  }
+ },
+ "75:121": {
+  "inputs": {
+   "conditioning": [
+    "75:82",
+    0
+   ],
+   "latent": [
+    "75:122",
+    0
+   ]
+  },
+  "class_type": "ReferenceLatent",
+  "_meta": {
+   "title": "Set Reference Latent"
+  }
+ },
+ "75:99": {
+  "inputs": {
+   "image": [
+    "75:80",
+    0
+   ]
+  },
+  "class_type": "GetImageSize",
+  "_meta": {
+   "title": "Get Image Size"
+  }
+ },
+ "75:123": {
+  "inputs": {
+   "conditioning": [
+    "75:74",
+    0
+   ],
+   "latent": [
+    "75:122",
+    0
+   ]
+  },
+  "class_type": "ReferenceLatent",
+  "_meta": {
+   "title": "Set Reference Latent"
+  }
+ },
+ "75:122": {
+  "inputs": {
+   "pixels": [
+    "75:80",
+    0
+   ],
+   "vae": [
+    "75:72",
+    0
+   ]
+  },
+  "class_type": "VAEEncode",
+  "_meta": {
+   "title": "VAE Encode"
+  }
+ },
+ "75:64": {
+  "inputs": {
+   "noise": [
+    "75:73",
+    0
+   ],
+   "guider": [
+    "75:63",
+    0
+   ],
+   "sampler": [
+    "75:61",
+    0
+   ],
+   "sigmas": [
+    "75:62",
+    0
+   ],
+   "latent_image": [
+    "75:66",
+    0
+   ]
+  },
+  "class_type": "SamplerCustomAdvanced",
+  "_meta": {
+   "title": "SamplerCustomAdvanced"
+  }
+ },
+ "75:65": {
+  "inputs": {
+   "samples": [
+    "75:64",
+    0
+   ],
+   "vae": [
+    "75:72",
+    0
+   ]
+  },
+  "class_type": "VAEDecode",
+  "_meta": {
+   "title": "VAE Decode"
+  }
+ },
+ "75:73": {
+  "inputs": {
+   "noise_seed": 2026092502
+  },
+  "class_type": "RandomNoise",
+  "_meta": {
+   "title": "RandomNoise"
+  }
+ },
+ "75:63": {
+  "inputs": {
+   "cfg": 1,
+   "model": [
+    "75:70",
+    0
+   ],
+   "positive": [
+    "I1R2P",
+    0
+   ],
+   "negative": [
+    "I1R2N",
+    0
+   ]
+  },
+  "class_type": "CFGGuider",
+  "_meta": {
+   "title": "CFG Guider"
+  }
+ },
+ "I1R2L": {
+  "inputs": {
+   "image": "i1_TURN_f080_640x368.png"
+  },
+  "class_type": "LoadImage",
+  "_meta": {
+   "title": "I1 reference 2 (source_frame_late)"
+  }
+ },
+ "I1R2S": {
+  "inputs": {
+   "resize_type": "scale longer dimension",
+   "resize_type.longer_size": 368,
+   "scale_method": "area",
+   "input": [
+    "I1R2L",
+    0
+   ]
+  },
+  "class_type": "ResizeImageMaskNode",
+  "_meta": {
+   "title": "I1 reference 2 resize (aspect preserved, no crop)"
+  }
+ },
+ "I1R2E": {
+  "inputs": {
+   "pixels": [
+    "I1R2S",
+    0
+   ],
+   "vae": [
+    "75:72",
+    0
+   ]
+  },
+  "class_type": "VAEEncode"
+ },
+ "I1R2P": {
+  "inputs": {
+   "conditioning": [
+    "75:123",
+    0
+   ],
+   "latent": [
+    "I1R2E",
+    0
+   ]
+  },
+  "class_type": "ReferenceLatent"
+ },
+ "I1R2N": {
+  "inputs": {
+   "conditioning": [
+    "75:121",
+    0
+   ],
+   "latent": [
+    "I1R2E",
+    0
+   ]
+  },
+  "class_type": "ReferenceLatent"
+ }
+}

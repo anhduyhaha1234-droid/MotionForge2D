@@ -1,0 +1,78 @@
+{
+  "utc": "2026-10-02T02:43:16.426535+00:00",
+  "db_uri": "file:C:/Users/Admin/AppData/Local/hermes/state.db?mode=ro",
+  "query": "SELECT id,title,started_at,ended_at,end_reason,model,model_config FROM sessions WHERE id IN (?,?,?)",
+  "params": [
+    "20260930_235002_3ac7f9",
+    "20260929_041810_bc7c61",
+    "20260928_181955_a6d89a"
+  ],
+  "owners": [
+    {
+      "id": "20260928_181955_a6d89a",
+      "title": null,
+      "started_at": 1790594398.2581072,
+      "ended_at": null,
+      "end_reason": null,
+      "model": "ocg/deepseek-v4.1-flash",
+      "safe_model_config": {
+        "max_tokens": 16384
+      },
+      "messages": 618
+    },
+    {
+      "id": "20260929_041810_bc7c61",
+      "title": null,
+      "started_at": 1790630293.9378657,
+      "ended_at": null,
+      "end_reason": null,
+      "model": "ocg/deepseek-v4.1-flash",
+      "safe_model_config": {
+        "max_tokens": 16384
+      },
+      "messages": 517
+    },
+    {
+      "id": "20260930_235002_3ac7f9",
+      "title": "Preflight Hermes Manager MotionForge M1-01",
+      "started_at": 1790787002.4450908,
+      "ended_at": null,
+      "end_reason": null,
+      "model": "cmc/deepseek/deepseek-v4.1-flash",
+      "safe_model_config": {
+        "model": "cmc/deepseek/deepseek-v4.1-flash",
+        "provider": "custom:muse"
+      },
+      "messages": 1216
+    }
+  ],
+  "files": [
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mf-delivery-runs\\20260929\\cmc-correction-20260929T091814Z\\tasks\\MF-DEMO-E2E-R5\\raw\\source_12s.mp4",
+      "exists": true,
+      "bytes": 629545
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\venv\\Scripts\\python.exe",
+      "exists": true,
+      "bytes": 274712
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\ComfyUI\\main.py",
+      "exists": true,
+      "bytes": 25024
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\models\\diffusion_models\\wan_animate_2_int8_convrot.safetensors",
+      "exists": true,
+      "bytes": 16653175528
+    },
+    {
+      "path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\models\\diffusion_models\\flux-2-klein-4b-fp8.safetensors",
+      "exists": true,
+      "bytes": 4070624520
+    }
+  ],
+  "source_sha256": "fc18e859599f8feeb730ee9018413ced4c183f90a15e20ccc162433c4666c8cc",
+  "caveat": "Saved session metadata does not prove current process inactivity; Manager rechecks before dispatch. No model/provider/Hermes import or run."
+}

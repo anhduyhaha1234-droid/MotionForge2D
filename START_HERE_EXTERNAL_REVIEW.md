@@ -1,6 +1,10 @@
 # MotionForge2D — Hồ sơ bàn giao review kỹ thuật
 
-**Ngày bàn giao: 29/09/2026 · Nhánh: `codex/external-review-20260929` · Trạng thái sản phẩm: CHANGES_REQUESTED / NOT_APPROVED / NOT_CLOSED · QUALITY_ACCEPTED = 0.**
+**Cập nhật: 02/10/2026 · Nhánh đầy đủ mới: `review/20261002-full-code` · NOT_APPROVED / NOT_CLOSED · QUALITY_ACCEPTED = 0.**
+
+Đọc [bản cập nhật hiện hành 02/10](docs/external-review/updates/20261002/README.md) trước. Code tích hợp ở root vẫn là candidate `a52fca897906fd61a088016dd802718fdf06d217`; thay đổi chưa commit đã được chụp lại từ100 worktree, gồm C19/C25/M1-01 và tài liệu quản lý mới. `review-snapshots-20261002/` là WIP để review, không được nhập hàng loạt vào app. Graph WAN sửa motion window được cung cấp riêng trong bản cập nhật; chưa chạy inference hoặc merge vào production.
+
+Phần dưới ghi nhận bàn giao29/09 để truy nguồn. Số liệu cutoff, ưu tiên triển khai và visibility repo ở tài liệu cũ không được coi là trạng thái mới nhất; update02/10 ghi đè các điểm đó.
 
 MotionForge2D là công cụ chạy local để chuyển diện mạo video có sẵn sang bộ nhân vật, đồ vật và bối cảnh mới. Người dùng chọn nhân vật từ kho riêng, dùng nhất quán xuyên suốt một series, đồng thời giữ hành động, tương tác, camera, nhịp cắt, timeline và âm thanh nguồn. ComfyUI điều phối xử lý từng scene/unit; model video là thành phần của pipeline.
 

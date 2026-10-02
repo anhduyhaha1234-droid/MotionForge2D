@@ -1,0 +1,183 @@
+{
+  "files": [
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-rebuild-skills-20261001\\MOTION_WINDOW_FINDING.md",
+      "file": "evidence/MOTION_WINDOW_FINDING.md",
+      "sha256": "3943cd3fd2b241658dd96bb03c273f970e3385ea5ba5b8f07696734835e0a075",
+      "bytes": 8447,
+      "classification": "20261001_static_review_and_authorized_demo_plan_not_execution"
+    },
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-rebuild-skills-20261001\\REVIEW_CLOSURE.md",
+      "file": "evidence/REVIEW_CLOSURE.md",
+      "sha256": "d000d3a50abd2711e7ab3a9fc0b757d4ba289a8f062be8224699373f6814b67d",
+      "bytes": 3063,
+      "classification": "20261001_static_review_and_authorized_demo_plan_not_execution"
+    },
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-rebuild-skills-20261001\\REUSE_EXECUTION_MATRIX.md",
+      "file": "evidence/REUSE_EXECUTION_MATRIX.md",
+      "sha256": "a1ee74aa94b488d4ae72ff1ee6d2cf800035c56b0913b5ce5e7d4e78a4d287a1",
+      "bytes": 9582,
+      "classification": "20261001_static_review_and_authorized_demo_plan_not_execution"
+    },
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-rebuild-skills-20261001\\DECISION_AND_COMPARISON.md",
+      "file": "evidence/DECISION_AND_COMPARISON.md",
+      "sha256": "b233185c6da611b343d601dd5e3929a0ab29c8982b1be6d4650bc3986f32e741",
+      "bytes": 10910,
+      "classification": "20261001_static_review_and_authorized_demo_plan_not_execution"
+    },
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-rebuild-skills-20261001\\NEXT_HERMES_DEMO_PROMPT.md",
+      "file": "evidence/NEXT_HERMES_DEMO_PROMPT.md",
+      "sha256": "74f4889ed43f426d30216df67e98bcb9503a926a4ebe65363962736e83fcc96d",
+      "bytes": 27319,
+      "classification": "20261001_static_review_and_authorized_demo_plan_not_execution"
+    },
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-rebuild-skills-20261001\\SESSION_OPENING_PROPOSAL.md",
+      "file": "evidence/SESSION_OPENING_PROPOSAL.md",
+      "sha256": "608459efa6eb8103785f025c44c9cbed399c26916b6758262ef23a02691ccef3",
+      "bytes": 2972,
+      "classification": "20261001_static_review_and_authorized_demo_plan_not_execution"
+    },
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-rebuild-skills-20261001\\FINAL_VERIFICATION.json",
+      "file": "evidence/FINAL_VERIFICATION.json",
+      "sha256": "899ae6c15276d078bf7107858eee35bb6c7e6c49704a9a382403cad9d30a79a1",
+      "bytes": 1825,
+      "classification": "20261001_static_review_and_authorized_demo_plan_not_execution"
+    },
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-rebuild-skills-20261001\\SKILLS_INSTALL_REPORT.md",
+      "file": "evidence/SKILLS_INSTALL_REPORT.md",
+      "sha256": "f732fcf334c66b1d0afacc3369d53daf724f676f00f9136d4af0528422b224b0",
+      "bytes": 6290,
+      "classification": "20261001_static_review_and_authorized_demo_plan_not_execution"
+    },
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-rebuild-skills-20261001\\reuse_bundle\\PROVENANCE.json",
+      "file": "reuse_bundle/PROVENANCE.json",
+      "sha256": "7b536305b093b10827a5e4732de6ff23057e830e433d2e5b6c209000b82f1971",
+      "bytes": 4864,
+      "classification": "prototype_workflow_copy_not_integrated"
+    },
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-rebuild-skills-20261001\\reuse_bundle\\reference_asset_v1.baseline.api.json",
+      "file": "reuse_bundle/reference_asset_v1.baseline.api.json",
+      "sha256": "d95174ec196f09baf0f7e9445cede6708597a4f1a816491cb3e0411f6efab24f",
+      "bytes": 7205,
+      "classification": "prototype_workflow_copy_not_integrated"
+    },
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-rebuild-skills-20261001\\reuse_bundle\\reference_asset_v1.wrapper.original.json",
+      "file": "reuse_bundle/reference_asset_v1.wrapper.original.json",
+      "sha256": "e49b5669e6e45326ba77c08fc9ab6c6b8c07e0a55479876213847ffa99c1e760",
+      "bytes": 19550,
+      "classification": "prototype_workflow_copy_not_integrated"
+    },
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-rebuild-skills-20261001\\reuse_bundle\\shot_anchor_v1.baseline.api.json",
+      "file": "reuse_bundle/shot_anchor_v1.baseline.api.json",
+      "sha256": "0ff8ed9c92441230d76d42f2d3eeffb92e70f1b8749f663b170d1566a3df7f4e",
+      "bytes": 16804,
+      "classification": "prototype_workflow_copy_not_integrated"
+    },
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-rebuild-skills-20261001\\reuse_bundle\\shot_anchor_v1.wrapper.original.json",
+      "file": "reuse_bundle/shot_anchor_v1.wrapper.original.json",
+      "sha256": "e02574f799cfac6477be455aa18ff68e02f5ba5ed34c2651dba55d8496f266c6",
+      "bytes": 33713,
+      "classification": "prototype_workflow_copy_not_integrated"
+    },
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-rebuild-skills-20261001\\reuse_bundle\\upstream_image_flux2_klein_image_edit_4b_distilled.json",
+      "file": "reuse_bundle/upstream_image_flux2_klein_image_edit_4b_distilled.json",
+      "sha256": "e0388a8870495802314d58fa61616ddcdb7064dac5f85a8787c9e08180b8a560",
+      "bytes": 108945,
+      "classification": "prototype_workflow_copy_not_integrated"
+    },
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-rebuild-skills-20261001\\reuse_bundle\\upstream_video_wan_animate2.json",
+      "file": "reuse_bundle/upstream_video_wan_animate2.json",
+      "sha256": "f9907c332e7b2c48e9378797f8952ed90391efd6924a4ff162208d369fb52563",
+      "bytes": 164226,
+      "classification": "prototype_workflow_copy_not_integrated"
+    },
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-rebuild-skills-20261001\\reuse_bundle\\wan_shot_v1.baseline.api.json",
+      "file": "reuse_bundle/wan_shot_v1.baseline.api.json",
+      "sha256": "69e550387d1535afd0c491b9f153b7431dcd2a637fc4f7079becef085ea24d3e",
+      "bytes": 20638,
+      "classification": "prototype_workflow_copy_not_integrated"
+    },
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-rebuild-skills-20261001\\reuse_bundle\\wan_shot_v1.motion_enabled.api.json",
+      "file": "reuse_bundle/wan_shot_v1.motion_enabled.api.json",
+      "sha256": "7da45b824d0c0810a5ff318fcf713914fb211a6405985de9e22435a042e448c7",
+      "bytes": 20640,
+      "classification": "prototype_workflow_copy_not_integrated"
+    },
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-rebuild-skills-20261001\\reuse_bundle\\wan_shot_v1.wrapper.original.json",
+      "file": "reuse_bundle/wan_shot_v1.wrapper.original.json",
+      "sha256": "c08c64df713b65bb6a244ba13c75dcb5941638cfe6d1ead25d6fca4bbbae630e",
+      "bytes": 48965,
+      "classification": "prototype_workflow_copy_not_integrated"
+    },
+    {
+      "source": "C:\\Users\\Admin\\MotionForge2D\\docs\\pm\\HERMES_AUTOPILOT_RULES.md",
+      "file": "current-pm/HERMES_AUTOPILOT_RULES.md",
+      "sha256": "bf6165c1de48c23c066a7d40af78932ffc3508dc0a35111729159b14ef97bac2",
+      "bytes": 37576,
+      "classification": "current_canonical_local_PM_snapshot"
+    },
+    {
+      "source": "C:\\Users\\Admin\\MotionForge2D\\docs\\pm\\CODEX_PM_HANDOFF.md",
+      "file": "current-pm/CODEX_PM_HANDOFF.md",
+      "sha256": "d3f882b9b520385f15a70eb6540731846182086c0a4ac220bc40c5808f7d6491",
+      "bytes": 89617,
+      "classification": "current_canonical_local_PM_snapshot"
+    },
+    {
+      "source": "C:\\Users\\Admin\\MotionForge2D\\docs\\pm\\ROADMAP.md",
+      "file": "current-pm/ROADMAP.md",
+      "sha256": "998058aa49bc5c33d356bebef2f03f943b30cd57b00f7a4283d91399f71632de",
+      "bytes": 56053,
+      "classification": "current_canonical_local_PM_snapshot"
+    },
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-m1-codex-review-20261001\\REPORT.md",
+      "file": "evidence/M1_CODEX_REVIEW_20261001.md",
+      "sha256": "96083d5be8aada2f02df13cde244216e74575ee71b39560ce774debe99175d17",
+      "bytes": 12182,
+      "classification": "dated_review_evidence_not_new_test_run"
+    },
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-m1-codex-review-20261001\\CORRECTION_MATRIX.md",
+      "file": "evidence/M1_CORRECTION_MATRIX_20261001.md",
+      "sha256": "d70ccf9dfa2c2a2171f96ad16df9d489dadf2f66ba8e5856e7e89c27312db942",
+      "bytes": 2977,
+      "classification": "dated_review_evidence_not_new_test_run"
+    },
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-goal-review-skills-20260929\\CODE_REVIEW.md",
+      "file": "evidence/CODE_REVIEW_20260929.md",
+      "sha256": "3bcfae97f4b7946a3ac37868e6fff0e6715b881e668f15b3e1ae429787270828",
+      "bytes": 14663,
+      "classification": "dated_review_evidence_not_new_test_run"
+    },
+    {
+      "source": "C:\\Users\\Admin\\Documents\\Codex\\2026-09-22\\tr-ng-th-i-terminal-gi\\outputs\\mf-shotwise-demo-20261002\\PROTOTYPE_PREFLIGHT.json",
+      "file": "evidence/PREFLIGHT_20261002.json",
+      "sha256": "a89598507680bc6d892f396e8d18a0c560a82305fd8a6f62fa1f88889459b618",
+      "bytes": 2639,
+      "classification": "dated_review_evidence_not_new_test_run"
+    }
+  ],
+  "source_capture_cutoff_utc": "2026-10-02T02:56:02.380416+00:00",
+  "base_candidate": "a52fca897906fd61a088016dd802718fdf06d217",
+  "quality_accepted": 0,
+  "gpu_rerun_for_publication": false
+}

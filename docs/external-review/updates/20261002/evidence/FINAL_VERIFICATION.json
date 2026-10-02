@@ -1,0 +1,40 @@
+{
+  "checked_at_utc": "2026-10-01T15:23:18.266868+00:00",
+  "new_skill_files_verified": 155,
+  "new_skill_hash_errors": [],
+  "preexisting_skill_files_verified": 445,
+  "preexisting_skill_errors": [],
+  "bundle_hash_errors": [],
+  "wan_graph_delta_only_pose_end_0_to_1": true,
+  "integration_head": "a52fca897906fd61a088016dd802718fdf06d217",
+  "integration_porcelain": "",
+  "authority_files": [
+    {
+      "path": "C:\\Users\\Admin\\MotionForge2D\\docs\\pm\\HERMES_AUTOPILOT_RULES.md",
+      "before": "4e0033cc933f87400138b8c96db9ea707b8ce129b4e0582df66d096b6938f08e",
+      "after": "bf6165c1de48c23c066a7d40af78932ffc3508dc0a35111729159b14ef97bac2",
+      "backup_verified": true
+    },
+    {
+      "path": "C:\\Users\\Admin\\MotionForge2D\\docs\\pm\\CODEX_PM_HANDOFF.md",
+      "before": "75a327b26a05b2601f68f3c1425f8a188d459bf74a55a2cdb4d497cafd56b566",
+      "after": "d3f882b9b520385f15a70eb6540731846182086c0a4ac220bc40c5808f7d6491",
+      "backup_verified": true
+    },
+    {
+      "path": "C:\\Users\\Admin\\MotionForge2D\\docs\\pm\\ROADMAP.md",
+      "before": "d6c0b6ee8219cba01860ddcf0081ed1c1add2764bf84f5a7ae9ec4d5dc6c135c",
+      "after": "998058aa49bc5c33d356bebef2f03f943b30cd57b00f7a4283d91399f71632de",
+      "backup_verified": true
+    }
+  ],
+  "inference_run": false,
+  "hermes_dispatched": false,
+  "quality_accepted": 0,
+  "packet_hashes": {
+    "NEXT_HERMES_DEMO_PROMPT.md": "74f4889ed43f426d30216df67e98bcb9503a926a4ebe65363962736e83fcc96d",
+    "SESSION_OPENING_PROPOSAL.md": "608459efa6eb8103785f025c44c9cbed399c26916b6758262ef23a02691ccef3",
+    "REUSE_EXECUTION_MATRIX.md": "a1ee74aa94b488d4ae72ff1ee6d2cf800035c56b0913b5ce5e7d4e78a4d287a1",
+    "SKILLS_INSTALL_MANIFEST.json": "c6576b0c3d8b46c0eea9f8916547818826da5e0e95d4edb7714680633a1c7587"
+  }
+}

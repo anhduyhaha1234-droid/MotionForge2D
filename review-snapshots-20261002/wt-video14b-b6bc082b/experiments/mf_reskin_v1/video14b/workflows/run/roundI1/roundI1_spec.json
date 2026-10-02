@@ -1,0 +1,278 @@
+{
+ "template": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\temp\\roundI1\\mf_klein_edit_4b_distilled.template.api.json",
+ "template_sha256": "6b8d961d5662d7dffacf7990150889529fd59bc089761987ed2d75decb337b00",
+ "canvas": [
+  640,
+  368
+ ],
+ "steps": 4,
+ "ref_longer_side": 368,
+ "input_root": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\input",
+ "graphs": {
+  "BOOK": {
+   "shot": "BOOK",
+   "kind": "identity_anchor",
+   "refs": [
+    {
+     "index": 1,
+     "role": "source_frame",
+     "file": "roundI1_src/BOOK_f000_640x368.png",
+     "why": "t=0 frame of the BOOK window decoded at its NATIVE 640x360 and padded to 640x368 by TRANSLATION (4/4) - the composition the anchor must reproduce and the canvas driver. Round D's frame of this index was RESAMPLED to 640x368 (1.02222 vertical stretch) and is deliberately NOT fed to the encoder",
+     "frozen_path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\input\\roundI1_src\\BOOK_f000_640x368.png",
+     "frozen_sha256": "3f0d090a9c022fe136542c9f017b1f7cde40b1f79e80b92541846ed0e0a9c8c0",
+     "loadimage_value": "i1_BOOK_f000_640x368.png",
+     "staged_path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\input\\i1_BOOK_f000_640x368.png",
+     "staged_sha256": "3f0d090a9c022fe136542c9f017b1f7cde40b1f79e80b92541846ed0e0a9c8c0",
+     "chain": [
+      "76",
+      "75:80",
+      "75:122",
+      "75:123/75:121"
+     ]
+    },
+    {
+     "index": 2,
+     "role": "cast_boy_hacker_sitting",
+     "file": "roundD_refs/cast_boy_hacker_sitting.png",
+     "why": "frozen round-D reference for identity BOOK-P1 (seated reader)",
+     "frozen_path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\input\\roundD_refs\\cast_boy_hacker_sitting.png",
+     "frozen_sha256": "a60969452f904e5e7249db1ff43d7b552f8d7105fa6bff84c6bc32b9273d02c4",
+     "loadimage_value": "i1_cast_boy_hacker_sitting.png",
+     "staged_path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\input\\i1_cast_boy_hacker_sitting.png",
+     "staged_sha256": "a60969452f904e5e7249db1ff43d7b552f8d7105fa6bff84c6bc32b9273d02c4",
+     "chain": [
+      "I1R2L",
+      "I1R2S",
+      "I1R2E",
+      "I1R2P/I1R2N"
+     ]
+    },
+    {
+     "index": 3,
+     "role": "cast_dan_choi_standing",
+     "file": "roundD_refs/cast_dan_choi_standing.png",
+     "why": "frozen round-D reference for identity BOOK-P2 (standing figure)",
+     "frozen_path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\input\\roundD_refs\\cast_dan_choi_standing.png",
+     "frozen_sha256": "271f1c5789ee8fb9022ab402d834c8f2d4e862f972a105060e457b68b0282496",
+     "loadimage_value": "i1_cast_dan_choi_standing.png",
+     "staged_path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\input\\i1_cast_dan_choi_standing.png",
+     "staged_sha256": "271f1c5789ee8fb9022ab402d834c8f2d4e862f972a105060e457b68b0282496",
+     "chain": [
+      "I1R3L",
+      "I1R3S",
+      "I1R3E",
+      "I1R3P/I1R3N"
+     ]
+    },
+    {
+     "index": 4,
+     "role": "cast_gau_nau_back",
+     "file": "roundD_refs/cast_gau_nau_back.png",
+     "why": "frozen round-D reference for identity BOOK-P3 (seated, seen from behind)",
+     "frozen_path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\input\\roundD_refs\\cast_gau_nau_back.png",
+     "frozen_sha256": "9658aa3a947ffbf3c062757380438c36eb05bd2959444dddc659afbc60bffd11",
+     "loadimage_value": "i1_cast_gau_nau_back.png",
+     "staged_path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\input\\i1_cast_gau_nau_back.png",
+     "staged_sha256": "9658aa3a947ffbf3c062757380438c36eb05bd2959444dddc659afbc60bffd11",
+     "chain": [
+      "I1R4L",
+      "I1R4S",
+      "I1R4E",
+      "I1R4P/I1R4N"
+     ]
+    }
+   ],
+   "removed_orphans": [
+    {
+     "node": "81",
+     "reason": "no consumer in the released API graph"
+    }
+   ],
+   "seeds": [
+    {
+     "node": "75:73",
+     "noise_seed": 2026092501
+    }
+   ],
+   "saves": [
+    {
+     "node": "9",
+     "filename_prefix": "mf_reskin_v1/video14b/roundI1/anchor_book_i1"
+    }
+   ],
+   "prompts": [
+    {
+     "node": "75:74",
+     "chars": 2007
+    }
+   ],
+   "scales": [
+    {
+     "node": "75:80",
+     "megapixels": 0.23552,
+     "why": "identity scale for a 640x368 input - the node must not resample"
+    }
+   ],
+   "positive_tail": "I1R4P",
+   "negative_tail": "I1R4N",
+   "graph": "workflows\\run\\roundI1\\anchor_book.i1.api.json",
+   "graph_sha256": "96675da540cd2e35145a7ea0406d5ef184c16f822fc442ec5f176fd2e262efac",
+   "nodes": 34,
+   "instruction": "Reference image 1 is the exact frame to redraw. Redraw it as a flat 2D cel-shaded animation illustration in a flat colour palette: solid flat colour fills, one hard shadow tone per shape, thin clean outlines, no gradients, no photographic texture, no 3D rendering. Keep the identical composition, camera, scale and aspect ratio of reference image 1 and keep every contact between bodies and objects. Keep the frame edges exactly as they are, including the thin black band at the very top and the very bottom: do not crop, do not zoom, do not letterbox, do not add borders. Reference image 1 shows three people in one room. The pale/grey-haired figure seated on the left in the black chair, both hands on an open blue book, takes the character design of reference image 2: same seated posture, same screen position, same silhouette envelope and the same overlap with the chair, the table and the book. The brown-haired figure in the magenta/pink dress standing behind and to the right takes the character design of reference image 3: same standing position, same height, same overlap in front of the wall. The dark-haired figure seated on the right, seen from behind so that only the back of the head and shoulders show above the table, takes the character design of reference image 4: same seated position, same amount of body showing. The open blue book, the table with the green tray, and the chairs are redrawn in the same flat style, in the same positions, with the same interactions. The room - the brown wall panel, the window opening, the floor line and the cupboard on the right - becomes a flat background design with the same layout and the same openings. The number of people must not change: do not add or remove a person, do not add a face, a head or a hand that reference image 1 does not already show, and do not move any person. No added text, no captions, no subtitles, no logo, no watermark: the video watermark in the bottom-left corner of reference image 1 must not appear in the result."
+  },
+  "TURN": {
+   "shot": "TURN",
+   "kind": "prop_detail_anchor",
+   "refs": [
+    {
+     "index": 1,
+     "role": "source_frame",
+     "file": "roundI1_src/TURN_f000_640x368.png",
+     "why": "t=0 frame of the TURN window decoded at native 640x360 and padded by TRANSLATION (4/4) - the composition and canvas driver",
+     "frozen_path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\input\\roundI1_src\\TURN_f000_640x368.png",
+     "frozen_sha256": "eb8e2d52ead593c95f03c218431ac15204c4ac33520775dce33a8eb44f7b4b59",
+     "loadimage_value": "i1_TURN_f000_640x368.png",
+     "staged_path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\input\\i1_TURN_f000_640x368.png",
+     "staged_sha256": "eb8e2d52ead593c95f03c218431ac15204c4ac33520775dce33a8eb44f7b4b59",
+     "chain": [
+      "76",
+      "75:80",
+      "75:122",
+      "75:123/75:121"
+     ]
+    },
+    {
+     "index": 2,
+     "role": "source_frame_late",
+     "file": "roundI1_src/TURN_f080_640x368.png",
+     "why": "t=80 of the same TURN window, same native decode + translation pad: the same document at another index, giving the encoder the prop's real geometry",
+     "frozen_path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\input\\roundI1_src\\TURN_f080_640x368.png",
+     "frozen_sha256": "1b0ca1e488b3bc4744f04613e4970a385786651dd8e1d698e578114581a5d01e",
+     "loadimage_value": "i1_TURN_f080_640x368.png",
+     "staged_path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\input\\i1_TURN_f080_640x368.png",
+     "staged_sha256": "1b0ca1e488b3bc4744f04613e4970a385786651dd8e1d698e578114581a5d01e",
+     "chain": [
+      "I1R2L",
+      "I1R2S",
+      "I1R2E",
+      "I1R2P/I1R2N"
+     ]
+    }
+   ],
+   "removed_orphans": [
+    {
+     "node": "81",
+     "reason": "no consumer in the released API graph"
+    }
+   ],
+   "seeds": [
+    {
+     "node": "75:73",
+     "noise_seed": 2026092502
+    }
+   ],
+   "saves": [
+    {
+     "node": "9",
+     "filename_prefix": "mf_reskin_v1/video14b/roundI1/anchor_turn_i1"
+    }
+   ],
+   "prompts": [
+    {
+     "node": "75:74",
+     "chars": 1518
+    }
+   ],
+   "scales": [
+    {
+     "node": "75:80",
+     "megapixels": 0.23552,
+     "why": "identity scale for a 640x368 input - the node must not resample"
+    }
+   ],
+   "positive_tail": "I1R2P",
+   "negative_tail": "I1R2N",
+   "graph": "workflows\\run\\roundI1\\anchor_turn.i1.api.json",
+   "graph_sha256": "c9c1bdcb2ba5f249f4e22c10ec844c6241a09bac16e399700fce9e1a10ff3f6d",
+   "nodes": 24,
+   "instruction": "Reference image 1 is the exact frame to redraw. Redraw it as a flat 2D cel-shaded animation illustration in a flat colour palette: solid flat colour fills, one hard shadow tone per shape, thin clean outlines, no gradients, no photographic texture, no 3D rendering. Keep the identical composition, camera, scale and aspect ratio of reference image 1 and keep every contact between bodies and objects. Keep the frame edges exactly as they are, including the thin black band at the very top and the very bottom: do not crop, do not zoom, do not letterbox, do not add borders. This shot is a prop/detail shot: reference image 1 and reference image 2 show NO person at all - a single printed form lies flat, filling the frame, on a plain brown/orange background, with the flat blue edge of a binder at the left. Redraw exactly that: the same printed form in the same position and the same size, the same ruled lines and the same unreadable letterhead blocks as flat shapes, the same plain brown/orange background with its soft edge, and the same flat blue binder edge at the left with the same angle and the same width. Do not add a person, a hand, a face or a figure to this shot. The number of people must not change: do not add or remove a person, do not add a face, a head or a hand that reference image 1 does not already show, and do not move any person. No added text, no captions, no subtitles, no logo, no watermark: the video watermark in the bottom-left corner of reference image 1 must not appear in the result."
+  },
+  "OCC": {
+   "shot": "OCC",
+   "kind": "prop_detail_anchor",
+   "refs": [
+    {
+     "index": 1,
+     "role": "source_frame",
+     "file": "roundI1_src/OCC_f000_640x368.png",
+     "why": "t=0 frame of the OCC window decoded at native 640x360 and padded by TRANSLATION (4/4) - the composition and canvas driver",
+     "frozen_path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\input\\roundI1_src\\OCC_f000_640x368.png",
+     "frozen_sha256": "bce8168bc5315f7413bc8f99508cb2274c2eb21c6dc8b4f800d167598f5646f5",
+     "loadimage_value": "i1_OCC_f000_640x368.png",
+     "staged_path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\input\\i1_OCC_f000_640x368.png",
+     "staged_sha256": "bce8168bc5315f7413bc8f99508cb2274c2eb21c6dc8b4f800d167598f5646f5",
+     "chain": [
+      "76",
+      "75:80",
+      "75:122",
+      "75:123/75:121"
+     ]
+    },
+    {
+     "index": 2,
+     "role": "source_frame_late",
+     "file": "roundI1_src/OCC_f040_640x368.png",
+     "why": "t=40 of the same OCC window, same native decode + translation pad: the same document with the pen and the writing hand at another index",
+     "frozen_path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\input\\roundI1_src\\OCC_f040_640x368.png",
+     "frozen_sha256": "5cf22f065337d4b01210446e0c354c1d3a55f13a438a00e81be2888364009ac3",
+     "loadimage_value": "i1_OCC_f040_640x368.png",
+     "staged_path": "C:\\Users\\Admin\\Documents\\Codex\\work\\mfv1\\runtime\\video14b\\input\\i1_OCC_f040_640x368.png",
+     "staged_sha256": "5cf22f065337d4b01210446e0c354c1d3a55f13a438a00e81be2888364009ac3",
+     "chain": [
+      "I1R2L",
+      "I1R2S",
+      "I1R2E",
+      "I1R2P/I1R2N"
+     ]
+    }
+   ],
+   "removed_orphans": [
+    {
+     "node": "81",
+     "reason": "no consumer in the released API graph"
+    }
+   ],
+   "seeds": [
+    {
+     "node": "75:73",
+     "noise_seed": 2026092503
+    }
+   ],
+   "saves": [
+    {
+     "node": "9",
+     "filename_prefix": "mf_reskin_v1/video14b/roundI1/anchor_occ_i1"
+    }
+   ],
+   "prompts": [
+    {
+     "node": "75:74",
+     "chars": 1692
+    }
+   ],
+   "scales": [
+    {
+     "node": "75:80",
+     "megapixels": 0.23552,
+     "why": "identity scale for a 640x368 input - the node must not resample"
+    }
+   ],
+   "positive_tail": "I1R2P",
+   "negative_tail": "I1R2N",
+   "graph": "workflows\\run\\roundI1\\anchor_occ.i1.api.json",
+   "graph_sha256": "92aebf72c16eb08bcac4053892bb0e000473417e1bff459316ad415622c2e9c9",
+   "nodes": 24,
+   "instruction": "Reference image 1 is the exact frame to redraw. Redraw it as a flat 2D cel-shaded animation illustration in a flat colour palette: solid flat colour fills, one hard shadow tone per shape, thin clean outlines, no gradients, no photographic texture, no 3D rendering. Keep the identical composition, camera, scale and aspect ratio of reference image 1 and keep every contact between bodies and objects. Keep the frame edges exactly as they are, including the thin black band at the very top and the very bottom: do not crop, do not zoom, do not letterbox, do not add borders. This shot is a prop/detail shot taken at the start of the OCC window: reference image 1 and reference image 2 show the same printed form filling the frame on a white/pale background, the flat blue binder edge at the left, and a single dark hand holding a black pen, writing on the document from the right side. No full figure and no face is visible anywhere in this shot at this index. Redraw exactly that: the same printed form with its ruled lines and unreadable letterhead blocks as flat shapes, the same blue binder edge, and the same single dark writing hand with the same black pen at the same angle, in the same position. Do not add a person, a second hand, a face or a seated figure to this shot - the figure that appears later in this window is NOT part of this frame. The number of people must not change: do not add or remove a person, do not add a face, a head or a hand that reference image 1 does not already show, and do not move any person. No added text, no captions, no subtitles, no logo, no watermark: the video watermark in the bottom-left corner of reference image 1 must not appear in the result."
+  }
+ }
+}
